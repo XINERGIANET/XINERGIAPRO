@@ -19,7 +19,7 @@ return new class extends Migration
             $table->decimal('quantity', 10, 2);
             $table->text('notes')->nullable(); 
             $table->decimal('unit_cost', 10, 2)->nullable();
-            $table->decimal('total_cost', 10, 2)->virtualAs('quantity * COALESCE(unit_cost, 0)');
+            $table->decimal('total_cost', 10, 2)->default(0);
             $table->integer('order')->default(0);
             $table->timestamps();
         });

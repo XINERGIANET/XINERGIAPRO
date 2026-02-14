@@ -81,6 +81,21 @@
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                         placeholder="Ej: Merma, Vencimiento, Transferencia..."></textarea>
                 </div>
+                <div class="mb-4 rounded-lg border border-gray-200 bg-white p-3">
+                    <label class="flex items-center gap-2 text-sm font-medium text-gray-700">
+                        <input type="checkbox" id="is-transfer" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                        Transferir stock a otra sucursal
+                    </label>
+                    <div id="transfer-target-wrapper" class="mt-3 hidden">
+                        <label for="to-branch-id" class="mb-1 block text-xs font-medium text-gray-600">Sucursal destino</label>
+                        <select id="to-branch-id" class="w-full rounded border border-gray-300 px-3 py-2 text-sm">
+                            <option value="">Selecciona sucursal</option>
+                            @foreach(($targetBranches ?? collect()) as $targetBranch)
+                                <option value="{{ $targetBranch->id }}">{{ $targetBranch->legal_name }} (#{{ $targetBranch->id }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
                 <div class="space-y-3 mb-5 text-sm">
                     <div class="flex justify-between text-gray-500 font-medium">
                         <span>Total de productos</span>
@@ -95,8 +110,8 @@
                     <button onclick="goBack()" class="py-3.5 rounded-xl border border-gray-300 bg-white text-gray-700 font-bold hover:bg-gray-50 shadow-sm transition-all">
                         Cancelar
                     </button>
-                    <button onclick="saveOutput()" class="py-3.5 rounded-xl bg-orange-600 text-white font-bold shadow-lg hover:bg-orange-700 active:scale-95 transition-all flex justify-center items-center gap-2">
-                        <span>Guardar salida</span> <i class="fas fa-box-open"></i>
+                    <button id="save-output-btn" onclick="saveOutput()" class="py-3.5 rounded-xl bg-orange-600 text-white font-bold shadow-lg hover:bg-orange-700 active:scale-95 transition-all flex justify-center items-center gap-2">
+                        <span id="save-output-text">Guardar salida</span> <i class="fas fa-box-open"></i>
                     </button>
                 </div>
             </div>
@@ -108,6 +123,19 @@
         const branchId = @json($branchId ?? null);
         let selectedProducts = [];
         let filteredProducts = productsData;
+
+        function isTransferMode() {
+            return !!document.getElementById('is-transfer')?.checked;
+        }
+
+        function refreshTransferUi() {
+            const transferMode = isTransferMode();
+            document.getElementById('transfer-target-wrapper')?.classList.toggle('hidden', !transferMode);
+            const saveText = document.getElementById('save-output-text');
+            if (saveText) {
+                saveText.textContent = transferMode ? 'Guardar transferencia' : 'Guardar salida';
+            }
+        }
 
         function getImageUrl(imgUrl) {
             if (imgUrl && imgUrl.trim() !== '') return imgUrl;
@@ -278,12 +306,30 @@
                     quantity: p.quantity,
                     comment: p.comment || ''
                 })),
-                comment: comment || 'Salida de productos del almacén',
+                comment: comment || 'Salida de productos del almacen',
                 branch_id: branchId,
             };
 
+            const transferMode = isTransferMode();
+            if (transferMode) {
+                const toBranchId = parseInt(document.getElementById('to-branch-id')?.value || '0', 10);
+                if (!toBranchId) {
+                    alert('Selecciona la sucursal destino para transferir.');
+                    return;
+                }
+                if (Number(branchId) === toBranchId) {
+                    alert('La sucursal destino no puede ser la misma sucursal actual.');
+                    return;
+                }
+                payload.to_branch_id = toBranchId;
+            }
+
             try {
-                const response = await fetch('{{ route("warehouse_movements.output.store") }}', {
+                const endpoint = transferMode
+                    ? '{{ route("warehouse_movements.transfer.store") }}'
+                    : '{{ route("warehouse_movements.output.store") }}';
+
+                const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -295,7 +341,7 @@
                 const data = await response.json();
 
                 if (response.ok && data.success) {
-                    alert('Salida de productos guardada correctamente');
+                    alert(transferMode ? 'Transferencia guardada correctamente' : 'Salida de productos guardada correctamente');
                     goBack();
                 } else {
                     alert('Error: ' + (data.message || 'No se pudo guardar la salida'));
@@ -316,6 +362,8 @@
         });
 
         document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('is-transfer')?.addEventListener('change', refreshTransferUi);
+            refreshTransferUi();
             renderProducts();
             renderCart();
         });
@@ -324,3 +372,4 @@
         }
     </script>
 @endsection
+

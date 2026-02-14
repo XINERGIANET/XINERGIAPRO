@@ -6,6 +6,7 @@ use App\Models\Movement;
 use App\Models\MovementType;
 use App\Models\DocumentType;
 use App\Models\Operation;
+use App\Models\Branch;
 use App\Models\Product;
 use App\Models\ProductBranch;
 use App\Models\Person;
@@ -126,12 +127,38 @@ class WarehouseMovementController extends Controller
             ];
         })->filter(fn($p) => !empty($p['name']))->values();
 
+        $currentCompanyId = (int) Branch::query()->where('id', $branchId)->value('company_id');
+        $profileId = (int) (session('profile_id') ?? optional(auth()->user())->profile_id);
+        $allowedBranchIds = DB::table('profile_branch')
+            ->where('profile_id', $profileId)
+            ->where('status', 1)
+            ->whereNull('deleted_at')
+            ->pluck('branch_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $isAdmin = $this->isAdminUser();
+        $targetBranchesQuery = Branch::query()
+            ->where('company_id', $currentCompanyId)
+            ->where('id', '!=', $branchId);
+        if (!$isAdmin) {
+            if (empty($allowedBranchIds)) {
+                $targetBranchesQuery->whereRaw('1=0');
+            } else {
+                $targetBranchesQuery->whereIn('id', $allowedBranchIds);
+            }
+        }
+        $targetBranches = $targetBranchesQuery
+            ->orderBy('legal_name')
+            ->get(['id', 'legal_name']);
+
         return view('warehouse_movements.output', [
             'products' => $products,
             'productBranches' => $productBranches,
             'productsMapped' => $productsMapped,
             'branchId' => $branchId,
             'viewId' => $viewId,
+            'targetBranches' => $targetBranches,
             'title' => 'Salida de Productos',
         ]);
     }
@@ -185,6 +212,7 @@ class WarehouseMovementController extends Controller
 
             // Generar número de movimiento (secuencia independiente por tipo de documento)
             $todayCount = Movement::where('document_type_id', $documentType->id)
+                ->where('branch_id', $branchId)
                 ->whereDate('created_at', Carbon::today())
                 ->count();
             $number = str_pad($todayCount + 1, 8, '0', STR_PAD_LEFT);
@@ -279,7 +307,7 @@ class WarehouseMovementController extends Controller
     public function transferStore(Request $request)
     {
         $request->validate([
-            'to_branch_id' => 'required|integer|exists:branches,id|different:from_branch_id',
+            'to_branch_id' => 'required|integer|exists:branches,id',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.01',
@@ -292,6 +320,42 @@ class WarehouseMovementController extends Controller
         $userName = session('user_name') ?? 'Sistema';
         $personId = session('person_id');
         $personName = session('person_fullname') ?? 'Sistema';
+
+        if ($fromBranchId <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se ha seleccionado sucursal de origen.',
+            ], 422);
+        }
+        if ($toBranchId === $fromBranchId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'La sucursal destino debe ser distinta de la sucursal actual.',
+            ], 422);
+        }
+
+        $originBranch = Branch::query()->find($fromBranchId);
+        $destinationBranch = Branch::query()->find($toBranchId);
+        if (!$originBranch || !$destinationBranch || (int) $originBranch->company_id !== (int) $destinationBranch->company_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'La sucursal destino no pertenece a la misma empresa.',
+            ], 422);
+        }
+
+        $profileId = (int) (session('profile_id') ?? optional(auth()->user())->profile_id);
+        $canUseDestination = DB::table('profile_branch')
+            ->where('profile_id', $profileId)
+            ->where('branch_id', $toBranchId)
+            ->where('status', 1)
+            ->whereNull('deleted_at')
+            ->exists();
+        if (!$canUseDestination && !$this->isAdminUser()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tienes acceso a la sucursal destino.',
+            ], 403);
+        }
 
         try {
             DB::beginTransaction();
@@ -326,7 +390,10 @@ class WarehouseMovementController extends Controller
                 }
             }
 
-            $outCount = Movement::where('document_type_id', $outDocumentType->id)->whereDate('created_at', Carbon::today())->count();
+            $outCount = Movement::where('document_type_id', $outDocumentType->id)
+                ->where('branch_id', $fromBranchId)
+                ->whereDate('created_at', Carbon::today())
+                ->count();
             $outNumber = str_pad((string) ($outCount + 1), 8, '0', STR_PAD_LEFT);
             $outMovement = Movement::create([
                 'number' => $outNumber,
@@ -350,7 +417,10 @@ class WarehouseMovementController extends Controller
                 'branch_id' => $fromBranchId,
             ]);
 
-            $inCount = Movement::where('document_type_id', $inDocumentType->id)->whereDate('created_at', Carbon::today())->count();
+            $inCount = Movement::where('document_type_id', $inDocumentType->id)
+                ->where('branch_id', $toBranchId)
+                ->whereDate('created_at', Carbon::today())
+                ->count();
             $inNumber = str_pad((string) ($inCount + 1), 8, '0', STR_PAD_LEFT);
             $inMovement = Movement::create([
                 'number' => $inNumber,
@@ -594,6 +664,7 @@ class WarehouseMovementController extends Controller
 
             // Generar número de movimiento (secuencia independiente por tipo de documento)
             $todayCount = Movement::where('document_type_id', $documentType->id)
+                ->where('branch_id', $branchId)
                 ->whereDate('created_at', Carbon::today())
                 ->count();
             $number = str_pad($todayCount + 1, 8, '0', STR_PAD_LEFT);
@@ -716,6 +787,14 @@ class WarehouseMovementController extends Controller
                 'message' => 'Error al guardar la entrada: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    private function isAdminUser(): bool
+    {
+        $user = auth()->user();
+        $profileName = strtoupper((string) ($user?->profile?->name ?? ''));
+
+        return (int) ($user?->profile_id ?? 0) === 1 || str_contains($profileName, 'ADMIN');
     }
 
     public function show($warehouseMovement)

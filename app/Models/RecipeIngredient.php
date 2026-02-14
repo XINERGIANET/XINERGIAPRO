@@ -15,12 +15,14 @@ class RecipeIngredient extends Model
         'quantity',
         'notes',
         'unit_cost',
+        'total_cost',
         'order',
     ];
 
     protected $casts = [
         'quantity' => 'decimal:2',
         'unit_cost' => 'decimal:2',
+        'total_cost' => 'decimal:2',
         'order' => 'integer',
     ];
 
@@ -41,6 +43,10 @@ class RecipeIngredient extends Model
 
     public function getTotalCostAttribute()
     {
-        return $this->quantity * ($this->unit_cost ?? 0);
+        if (array_key_exists('total_cost', $this->attributes)) {
+            return (float) $this->attributes['total_cost'];
+        }
+
+        return (float) $this->quantity * (float) ($this->unit_cost ?? 0);
     }
 }

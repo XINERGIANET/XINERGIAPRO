@@ -207,6 +207,7 @@ class RecipeController extends Controller
                 'quantity' => $ingredient['quantity'],
                 'notes' => $ingredient['notes'] ?? null,
                 'unit_cost' => $ingredient['unit_cost'] ?? 0,
+                'total_cost' => round((float) ($ingredient['quantity'] ?? 0) * (float) ($ingredient['unit_cost'] ?? 0), 2),
                 'order' => $index,
             ]);
         }
