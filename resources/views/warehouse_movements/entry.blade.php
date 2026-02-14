@@ -84,10 +84,36 @@
             {{-- Footer --}}
             <div class="p-6 bg-slate-100 border-t border-gray-300 shadow-[0_-5px_25px_rgba(0,0,0,0.05)] shrink-0 z-30">
                 <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Proveedor</label>
+                    <select id="supplier-person-id" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm">
+                        <option value="">Seleccionar proveedor</option>
+                        @foreach($suppliers as $supplier)
+                            <option value="{{ $supplier->id }}">
+                                {{ trim(($supplier->first_name ?? '').' '.($supplier->last_name ?? '')) ?: 'Persona #'.$supplier->id }}
+                                @if(!empty($supplier->document_number))
+                                    ({{ $supplier->document_number }})
+                                @endif
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Comentario (opcional)</label>
                     <textarea id="movement-comment" rows="2" 
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                         placeholder="Ej: Compra de proveedor, Transferencia de otra sucursal..."></textarea>
+                </div>
+                <div class="mb-4 grid grid-cols-2 gap-2">
+                    <select id="purchase-document-kind" class="rounded border px-2 py-2 text-sm">
+                        <option value="FACTURA">FACTURA</option>
+                        <option value="BOLETA">BOLETA</option>
+                        <option value="RECIBO">RECIBO</option>
+                    </select>
+                    <input id="purchase-series" class="rounded border px-2 py-2 text-sm" placeholder="Serie">
+                    <input id="purchase-number" class="rounded border px-2 py-2 text-sm" placeholder="Número doc" required>
+                    <input id="purchase-currency" class="rounded border px-2 py-2 text-sm" value="PEN" placeholder="Moneda">
+                    <input id="purchase-igv-rate" type="number" min="0" max="100" step="0.0001" class="rounded border px-2 py-2 text-sm" value="18" placeholder="IGV %">
+                    <input id="purchase-issued-at" type="date" class="rounded border px-2 py-2 text-sm" value="{{ now()->toDateString() }}">
                 </div>
                 <div class="space-y-3 mb-5 text-sm">
                     <div class="flex justify-between text-gray-500 font-medium">
@@ -276,6 +302,7 @@
                     unit: product.unit,
                     currentStock: product.currentStock,
                     quantity: 1,
+                    unitCost: Number(product.price || 0),
                     comment: ''
                 });
             }
@@ -339,6 +366,13 @@
                         </div>
                         <span class="text-sm text-gray-600">${prod.unit}</span>
                     </div>
+                    <div class="mt-3">
+                        <label class="block text-xs text-gray-600 mb-1">Costo unitario</label>
+                        <input type="number" min="0" step="0.000001"
+                            value="${Number(prod.unitCost || 0).toFixed(6)}"
+                            onchange="updateUnitCost(${prod.id}, this.value)"
+                            class="w-full px-2 py-1 border border-gray-300 rounded text-sm">
+                    </div>
                 </div>
             `).join('');
 
@@ -346,6 +380,13 @@
             const totalQuantity = selectedProducts.reduce((sum, p) => sum + p.quantity, 0);
             document.getElementById('total-products').textContent = totalProducts;
             document.getElementById('total-quantity').textContent = totalQuantity;
+        }
+
+        function updateUnitCost(productId, value) {
+            const product = selectedProducts.find(p => p.id === productId);
+            if (!product) return;
+            const numeric = Number(value);
+            product.unitCost = Number.isFinite(numeric) && numeric >= 0 ? numeric : 0;
         }
 
         function goBack() {
@@ -362,14 +403,30 @@
                 return;
             }
 
+            const supplierPersonId = document.getElementById('supplier-person-id').value;
+            if (!supplierPersonId) {
+                alert('Debes seleccionar un proveedor para registrar la recepcion.');
+                return;
+            }
+
             const comment = document.getElementById('movement-comment').value.trim();
             
             const payload = {
                 items: selectedProducts.map(p => ({
                     product_id: p.id,
                     quantity: p.quantity,
+                    unit_cost: Number(p.unitCost || 0),
                     comment: p.comment || ''
                 })),
+                supplier_person_id: Number(supplierPersonId),
+                purchase: {
+                    document_kind: document.getElementById('purchase-document-kind').value,
+                    series: document.getElementById('purchase-series').value || null,
+                    document_number: document.getElementById('purchase-number').value,
+                    currency: document.getElementById('purchase-currency').value || 'PEN',
+                    igv_rate: Number(document.getElementById('purchase-igv-rate').value || 18),
+                    issued_at: document.getElementById('purchase-issued-at').value
+                },
                 comment: comment || 'Entrada de productos al almacén',
                 branch_id: branchId,
                 movement_type: 'ENTRY'

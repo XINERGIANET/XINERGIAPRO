@@ -5,8 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\Branch;
 use App\Models\Company;
 use App\Models\Location;
+use App\Models\Movement;
 use App\Models\Operation;
 use App\Models\Person;
+use App\Models\Vehicle;
+use App\Models\WorkshopMovement;
 use App\Models\Profile;
 use App\Models\Role;
 use App\Models\User;
@@ -89,7 +92,7 @@ class PersonController extends Controller
     public function store(Request $request, Company $company, Branch $branch)
     {
         $branch = $this->resolveBranch($company, $branch);
-        $data = $this->validatePerson($request);
+        $data = $this->validatePerson($request, $branch);
         $data['branch_id'] = $branch->id;
         $roleIds = $this->validateRoles($request);
         $hasUserRole = in_array(1, $roleIds, true);
@@ -142,7 +145,7 @@ class PersonController extends Controller
     {
         $branch = $this->resolveBranch($company, $branch);
         $person = $this->resolvePerson($branch, $person);
-        $data = $this->validatePerson($request);
+        $data = $this->validatePerson($request, $branch, $person);
         $roleIds = $this->validateRoles($request);
         $hasUserRole = in_array(1, $roleIds, true);
         $userData = $this->validateUserData($request, $hasUserRole, $person);
@@ -187,6 +190,20 @@ class PersonController extends Controller
     {
         $branch = $this->resolveBranch($company, $branch);
         $person = $this->resolvePerson($branch, $person);
+
+        $hasVehicles = Vehicle::query()->where('client_person_id', $person->id)->exists();
+        $hasWorkshopOrders = WorkshopMovement::query()->where('client_person_id', $person->id)->exists();
+        $hasSales = Movement::query()
+            ->where('person_id', $person->id)
+            ->whereHas('salesMovement')
+            ->exists();
+
+        if ($hasVehicles || $hasWorkshopOrders || $hasSales) {
+            return back()->withErrors([
+                'error' => 'No se puede eliminar cliente con vehiculos, ordenes de servicio o ventas asociadas.',
+            ]);
+        }
+
         $person->delete();
 
         $viewId = request()->input('view_id');
@@ -225,7 +242,7 @@ class PersonController extends Controller
             ->with('status', 'Contraseña actualizada correctamente.');
     }
 
-    private function validatePerson(Request $request): array
+    private function validatePerson(Request $request, Branch $branch, ?Person $currentPerson = null): array
     {
         return $request->validate([
             'first_name' => ['required', 'string', 'max:255'],
@@ -235,7 +252,24 @@ class PersonController extends Controller
             'person_type' => ['required', 'string', 'max:100'],
             'phone' => ['required', 'string', 'max:50'],
             'email' => ['required', 'email', 'max:255'],
-            'document_number' => ['required', 'string', 'max:50'],
+            'document_number' => [
+                'required',
+                'string',
+                'max:50',
+                function ($attribute, $value, $fail) use ($branch, $currentPerson) {
+                    $exists = Person::query()
+                        ->join('branches', 'branches.id', '=', 'people.branch_id')
+                        ->where('branches.company_id', $branch->company_id)
+                        ->where('people.document_number', (string) $value)
+                        ->whereNull('people.deleted_at')
+                        ->when($currentPerson, fn ($query) => $query->where('people.id', '!=', $currentPerson->id))
+                        ->exists();
+
+                    if ($exists) {
+                        $fail('El documento ya existe en otra persona de la misma empresa.');
+                    }
+                },
+            ],
             'address' => ['required', 'string', 'max:255'],
             'location_id' => ['required', 'integer', 'exists:locations,id'],
         ]);
@@ -338,4 +372,3 @@ class PersonController extends Controller
         ];
     }
 }
-

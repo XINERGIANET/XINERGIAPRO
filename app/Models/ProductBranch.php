@@ -24,11 +24,13 @@ class ProductBranch extends Model
         'supplier_id',
         'stock',
         'price',
+        'avg_cost',
     ];
 
     protected $casts = [
         'stock' => 'decimal:4',
         'price' => 'decimal:2',
+        'avg_cost' => 'decimal:6',
         'stock_minimum' => 'decimal:4',
         'stock_maximum' => 'decimal:4',
         'minimum_sell' => 'decimal:4',

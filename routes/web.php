@@ -36,6 +36,16 @@ use App\Http\Controllers\KardexController;
 use App\Http\Controllers\RecipeBookController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\WarehouseMovementController;
+use App\Http\Controllers\WorkshopAppointmentController;
+use App\Http\Controllers\WorkshopAssemblyController;
+use App\Http\Controllers\WorkshopClientController;
+use App\Http\Controllers\WorkshopPurchaseController;
+use App\Http\Controllers\WorkshopSalesRegisterController;
+use App\Http\Controllers\WorkshopOrderController;
+use App\Http\Controllers\WorkshopExportController;
+use App\Http\Controllers\WorkshopReportController;
+use App\Http\Controllers\WorkshopServiceCatalogController;
+use App\Http\Controllers\WorkshopVehicleController;
 
 Route::prefix('restaurante')->name('restaurant.')->group(function () {
     Route::view('/', 'restaurant.home', ['title' => 'Xinergia Restaurante'])->name('home');
@@ -380,6 +390,8 @@ Route::middleware('auth')->group(function () {
         ->name('warehouse_movements.output');
     Route::post('/admin/herramientas/movimientos-almacen/salida', [WarehouseMovementController::class, 'outputStore'])
         ->name('warehouse_movements.output.store');
+    Route::post('/admin/herramientas/movimientos-almacen/transferencia', [WarehouseMovementController::class, 'transferStore'])
+        ->name('warehouse_movements.transfer.store');
     Route::get('/admin/herramientas/movimientos-almacen/{warehouseMovement}/show', [WarehouseMovementController::class, 'show'])
         ->name('warehouse_movements.show');
     Route::get('/admin/herramientas/movimientos-almacen/{warehouseMovement}/edit', [WarehouseMovementController::class, 'edit'])
@@ -390,5 +402,69 @@ Route::middleware('auth')->group(function () {
     //Recetario
     Route::resource('/cocina/recetario', RecipeBookController::class)
         ->names('recipe-book'); 
-});
 
+    Route::prefix('/admin/taller')->name('workshop.')->group(function () {
+        Route::get('/agenda', [WorkshopAppointmentController::class, 'index'])->name('appointments.index');
+        Route::post('/agenda', [WorkshopAppointmentController::class, 'store'])->name('appointments.store');
+        Route::put('/agenda/{appointment}', [WorkshopAppointmentController::class, 'update'])->name('appointments.update');
+        Route::delete('/agenda/{appointment}', [WorkshopAppointmentController::class, 'destroy'])->name('appointments.destroy');
+        Route::post('/agenda/{appointment}/convertir-os', [WorkshopAppointmentController::class, 'convertToOrder'])->name('appointments.convert');
+
+        Route::get('/vehiculos', [WorkshopVehicleController::class, 'index'])->name('vehicles.index');
+        Route::post('/vehiculos', [WorkshopVehicleController::class, 'store'])->name('vehicles.store');
+        Route::put('/vehiculos/{vehicle}', [WorkshopVehicleController::class, 'update'])->name('vehicles.update');
+        Route::delete('/vehiculos/{vehicle}', [WorkshopVehicleController::class, 'destroy'])->name('vehicles.destroy');
+        Route::get('/clientes/{person}/historial', [WorkshopClientController::class, 'show'])->name('clients.history');
+        Route::get('/compras', [WorkshopPurchaseController::class, 'index'])->name('purchases.index');
+        Route::get('/ventas', [WorkshopSalesRegisterController::class, 'index'])->name('sales-register.index');
+
+        Route::get('/servicios', [WorkshopServiceCatalogController::class, 'index'])->name('services.index');
+        Route::post('/servicios', [WorkshopServiceCatalogController::class, 'store'])->name('services.store');
+        Route::put('/servicios/{service}', [WorkshopServiceCatalogController::class, 'update'])->name('services.update');
+        Route::delete('/servicios/{service}', [WorkshopServiceCatalogController::class, 'destroy'])->name('services.destroy');
+
+        Route::get('/armados', [WorkshopAssemblyController::class, 'index'])->name('assemblies.index');
+        Route::post('/armados', [WorkshopAssemblyController::class, 'store'])->name('assemblies.store');
+        Route::put('/armados/{assembly}', [WorkshopAssemblyController::class, 'update'])->name('assemblies.update');
+        Route::delete('/armados/{assembly}', [WorkshopAssemblyController::class, 'destroy'])->name('assemblies.destroy');
+        Route::get('/armados/exportar', [WorkshopAssemblyController::class, 'exportMonthlyCsv'])->name('assemblies.export');
+
+        Route::get('/ordenes', [WorkshopOrderController::class, 'index'])->name('orders.index');
+        Route::get('/ordenes/crear', [WorkshopOrderController::class, 'create'])->name('orders.create');
+        Route::post('/ordenes', [WorkshopOrderController::class, 'store'])->name('orders.store');
+        Route::get('/ordenes/{order}', [WorkshopOrderController::class, 'show'])->name('orders.show');
+        Route::put('/ordenes/{order}', [WorkshopOrderController::class, 'update'])->name('orders.update');
+        Route::delete('/ordenes/{order}', [WorkshopOrderController::class, 'destroy'])->name('orders.destroy');
+
+        Route::post('/ordenes/{order}/detalle', [WorkshopOrderController::class, 'addDetail'])->name('orders.details.store');
+        Route::put('/ordenes/{order}/detalle/{detail}', [WorkshopOrderController::class, 'updateDetail'])->name('orders.details.update');
+        Route::delete('/ordenes/{order}/detalle/{detail}', [WorkshopOrderController::class, 'removeDetail'])->name('orders.details.destroy');
+        Route::post('/ordenes/{order}/inspeccion', [WorkshopOrderController::class, 'updateIntake'])->name('orders.intake.update');
+        Route::post('/ordenes/{order}/checklist', [WorkshopOrderController::class, 'saveChecklist'])->name('orders.checklists.store');
+        Route::post('/ordenes/{order}/cotizacion', [WorkshopOrderController::class, 'generateQuotation'])->name('orders.quotation');
+        Route::post('/ordenes/{order}/aprobar', [WorkshopOrderController::class, 'approve'])->name('orders.approve');
+        Route::post('/ordenes/{order}/consumir', [WorkshopOrderController::class, 'consumePart'])->name('orders.consume');
+        Route::post('/ordenes/{order}/generar-venta', [WorkshopOrderController::class, 'generateSale'])->name('orders.sale');
+        Route::post('/ordenes/{order}/registrar-pago', [WorkshopOrderController::class, 'registerPayment'])->name('orders.payment');
+        Route::post('/ordenes/{order}/devolver-pago', [WorkshopOrderController::class, 'refundPayment'])->name('orders.payment.refund');
+        Route::post('/ordenes/{order}/entregar', [WorkshopOrderController::class, 'deliver'])->name('orders.deliver');
+        Route::post('/ordenes/{order}/anular', [WorkshopOrderController::class, 'cancel'])->name('orders.cancel');
+        Route::post('/ordenes/{order}/reabrir', [WorkshopOrderController::class, 'reopen'])->name('orders.reopen');
+        Route::post('/ordenes/{order}/garantia', [WorkshopOrderController::class, 'registerWarranty'])->name('orders.warranty.store');
+        Route::post('/ordenes/{order}/tecnicos', [WorkshopOrderController::class, 'assignTechnicians'])->name('orders.technicians.assign');
+
+        Route::get('/reportes', [WorkshopReportController::class, 'index'])->name('reports.index');
+        Route::get('/reportes/export/ventas', [WorkshopExportController::class, 'salesMonthlyCsv'])->name('reports.export.sales');
+        Route::get('/reportes/export/compras', [WorkshopExportController::class, 'purchasesMonthlyCsv'])->name('reports.export.purchases');
+        Route::get('/reportes/export/os', [WorkshopExportController::class, 'workshopOrdersCsv'])->name('reports.export.orders');
+        Route::get('/reportes/export/productividad', [WorkshopExportController::class, 'productivityCsv'])->name('reports.export.productivity');
+        Route::get('/reportes/export/kardex', [WorkshopExportController::class, 'kardexProductCsv'])->name('reports.export.kardex');
+        Route::get('/ordenes/{order}/pdf/os', [WorkshopReportController::class, 'serviceOrderPdf'])->name('pdf.order');
+        Route::get('/ordenes/{order}/pdf/activacion', [WorkshopReportController::class, 'activationPdf'])->name('pdf.activation');
+        Route::get('/ordenes/{order}/pdf/pdi', [WorkshopReportController::class, 'pdiPdf'])->name('pdf.pdi');
+        Route::get('/ordenes/{order}/pdf/mantenimiento', [WorkshopReportController::class, 'maintenancePdf'])->name('pdf.maintenance');
+        Route::get('/ordenes/{order}/pdf/repuestos', [WorkshopReportController::class, 'partsSummaryPdf'])->name('pdf.parts');
+        Route::get('/ordenes/{order}/pdf/venta-interna', [WorkshopReportController::class, 'internalSalePdf'])->name('pdf.internal-sale');
+        Route::post('/ordenes/{order}/pdf/os/guardar', [WorkshopReportController::class, 'saveOrderPdfSnapshot'])->name('pdf.order.save');
+    });
+});

@@ -8,8 +8,10 @@ use App\Models\DocumentType;
 use App\Models\Operation;
 use App\Models\Product;
 use App\Models\ProductBranch;
+use App\Models\Person;
 use App\Models\WarehouseMovement;
 use App\Models\WarehouseMovementDetail;
+use App\Models\WorkshopPurchaseRecord;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -45,9 +47,20 @@ class WarehouseMovementController extends Controller
             ->get()
             ->keyBy('product_id');
 
+        $suppliers = Person::query()
+            ->where('branch_id', $branchId)
+            ->where(function ($query) {
+                $query->where('first_name', '<>', '')
+                    ->orWhere('last_name', '<>', '');
+            })
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name', 'document_number']);
+
         return view('warehouse_movements.entry', [
             'products' => $products,
             'productBranches' => $productBranches,
+            'suppliers' => $suppliers,
             'viewId' => $viewId,
             'title' => 'Entrada de Productos',
         ]);
@@ -263,6 +276,163 @@ class WarehouseMovementController extends Controller
         }
     }
 
+    public function transferStore(Request $request)
+    {
+        $request->validate([
+            'to_branch_id' => 'required|integer|exists:branches,id|different:from_branch_id',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|numeric|min:0.01',
+            'comment' => 'nullable|string|max:500',
+        ]);
+
+        $fromBranchId = (int) session('branch_id');
+        $toBranchId = (int) $request->input('to_branch_id');
+        $userId = session('user_id');
+        $userName = session('user_name') ?? 'Sistema';
+        $personId = session('person_id');
+        $personName = session('person_fullname') ?? 'Sistema';
+
+        try {
+            DB::beginTransaction();
+
+            $movementType = MovementType::where(function ($query) {
+                $query->where('description', 'like', '%Almac%')
+                    ->orWhere('description', 'like', '%Warehouse%')
+                    ->orWhere('description', 'like', '%Inventario%');
+            })->first() ?? MovementType::firstOrFail();
+
+            $outDocumentType = DocumentType::query()
+                ->where('movement_type_id', $movementType->id)
+                ->where(function ($query) {
+                    $query->where('name', 'like', '%Salida%')->orWhere('name', 'like', '%Transferencia%');
+                })
+                ->first() ?? DocumentType::find(8) ?? DocumentType::query()->where('movement_type_id', $movementType->id)->firstOrFail();
+
+            $inDocumentType = DocumentType::query()
+                ->where('movement_type_id', $movementType->id)
+                ->where(function ($query) {
+                    $query->where('name', 'like', '%Entrada%')->orWhere('name', 'like', '%Transferencia%');
+                })
+                ->first() ?? DocumentType::find(7) ?? DocumentType::query()->where('movement_type_id', $movementType->id)->firstOrFail();
+
+            foreach ($request->items as $item) {
+                $originStock = (float) ProductBranch::query()
+                    ->where('branch_id', $fromBranchId)
+                    ->where('product_id', (int) $item['product_id'])
+                    ->value('stock');
+                if ($originStock < (float) $item['quantity']) {
+                    throw new \RuntimeException('Stock insuficiente para transferencia del producto ID ' . $item['product_id']);
+                }
+            }
+
+            $outCount = Movement::where('document_type_id', $outDocumentType->id)->whereDate('created_at', Carbon::today())->count();
+            $outNumber = str_pad((string) ($outCount + 1), 8, '0', STR_PAD_LEFT);
+            $outMovement = Movement::create([
+                'number' => $outNumber,
+                'moved_at' => now(),
+                'user_id' => $userId,
+                'user_name' => $userName,
+                'person_id' => $personId,
+                'person_name' => $personName,
+                'responsible_id' => $personId ?? $userId,
+                'responsible_name' => $personName,
+                'comment' => $request->comment ?? 'Transferencia de stock a sucursal ' . $toBranchId,
+                'status' => 'A',
+                'movement_type_id' => $movementType->id,
+                'document_type_id' => $outDocumentType->id,
+                'branch_id' => $fromBranchId,
+                'parent_movement_id' => null,
+            ]);
+            $outWarehouse = WarehouseMovement::create([
+                'status' => 'FINALIZED',
+                'movement_id' => $outMovement->id,
+                'branch_id' => $fromBranchId,
+            ]);
+
+            $inCount = Movement::where('document_type_id', $inDocumentType->id)->whereDate('created_at', Carbon::today())->count();
+            $inNumber = str_pad((string) ($inCount + 1), 8, '0', STR_PAD_LEFT);
+            $inMovement = Movement::create([
+                'number' => $inNumber,
+                'moved_at' => now(),
+                'user_id' => $userId,
+                'user_name' => $userName,
+                'person_id' => $personId,
+                'person_name' => $personName,
+                'responsible_id' => $personId ?? $userId,
+                'responsible_name' => $personName,
+                'comment' => $request->comment ?? 'Transferencia recibida desde sucursal ' . $fromBranchId,
+                'status' => 'A',
+                'movement_type_id' => $movementType->id,
+                'document_type_id' => $inDocumentType->id,
+                'branch_id' => $toBranchId,
+                'parent_movement_id' => $outMovement->id,
+            ]);
+            $inWarehouse = WarehouseMovement::create([
+                'status' => 'FINALIZED',
+                'movement_id' => $inMovement->id,
+                'branch_id' => $toBranchId,
+            ]);
+
+            foreach ($request->items as $item) {
+                $product = Product::with('baseUnit')->findOrFail((int) $item['product_id']);
+                $qty = (float) $item['quantity'];
+
+                WarehouseMovementDetail::create([
+                    'warehouse_movement_id' => $outWarehouse->id,
+                    'product_id' => $product->id,
+                    'product_snapshot' => ['id' => $product->id, 'code' => $product->code, 'description' => $product->description],
+                    'unit_id' => $product->baseUnit->id ?? 1,
+                    'quantity' => $qty,
+                    'comment' => 'Transferencia salida',
+                    'status' => 'A',
+                    'branch_id' => $fromBranchId,
+                ]);
+
+                WarehouseMovementDetail::create([
+                    'warehouse_movement_id' => $inWarehouse->id,
+                    'product_id' => $product->id,
+                    'product_snapshot' => ['id' => $product->id, 'code' => $product->code, 'description' => $product->description],
+                    'unit_id' => $product->baseUnit->id ?? 1,
+                    'quantity' => $qty,
+                    'comment' => 'Transferencia ingreso',
+                    'status' => 'A',
+                    'branch_id' => $toBranchId,
+                ]);
+
+                $origin = ProductBranch::query()->where('branch_id', $fromBranchId)->where('product_id', $product->id)->lockForUpdate()->firstOrFail();
+                $destiny = ProductBranch::query()->where('branch_id', $toBranchId)->where('product_id', $product->id)->lockForUpdate()->first();
+                if (!$destiny) {
+                    $destiny = ProductBranch::query()->create([
+                        'product_id' => $product->id,
+                        'branch_id' => $toBranchId,
+                        'stock' => 0,
+                        'price' => (float) $origin->price,
+                        'avg_cost' => (float) ($origin->avg_cost ?? $origin->price ?? 0),
+                        'status' => 'A',
+                    ]);
+                }
+
+                $origin->update(['stock' => (float) $origin->stock - $qty]);
+                $destiny->update(['stock' => (float) $destiny->stock + $qty]);
+            }
+
+            DB::commit();
+            return response()->json([
+                'success' => true,
+                'message' => 'Transferencia registrada correctamente.',
+                'out_movement_id' => $outMovement->id,
+                'in_movement_id' => $inMovement->id,
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al transferir stock: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function index(Request $request)
     {
         $search = $request->input('search');
@@ -330,14 +500,58 @@ class WarehouseMovementController extends Controller
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.unit_cost' => 'required|numeric|min:0',
+            'supplier_person_id' => 'required|integer|exists:people,id',
+            'purchase.document_kind' => 'required|string|in:FACTURA,BOLETA,RECIBO',
+            'purchase.series' => 'nullable|string|max:20',
+            'purchase.document_number' => 'required|string|max:50',
+            'purchase.currency' => 'required|string|max:10',
+            'purchase.igv_rate' => 'required|numeric|min:0|max:100',
+            'purchase.issued_at' => 'required|date',
             'comment' => 'nullable|string|max:500',
         ]);
 
         $branchId = session('branch_id');
         $userId = session('user_id');
         $userName = session('user_name') ?? 'Sistema';
-        $personId = session('person_id');
-        $personName = session('person_fullname') ?? 'Sistema';
+        $supplier = Person::query()
+            ->where('id', (int) $request->input('supplier_person_id'))
+            ->where('branch_id', $branchId)
+            ->first();
+        $companyId = (int) DB::table('branches')->where('id', $branchId)->value('company_id');
+
+        if (!$supplier) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Debe seleccionar un proveedor valido de la sucursal actual.',
+            ], 422);
+        }
+
+        $documentKind = (string) $request->input('purchase.document_kind');
+        $series = (string) ($request->input('purchase.series') ?? '');
+        $documentNumber = (string) $request->input('purchase.document_number');
+        $currency = (string) $request->input('purchase.currency');
+        $igvRate = round((float) $request->input('purchase.igv_rate'), 4);
+        $issuedAt = (string) $request->input('purchase.issued_at');
+
+        $existsPurchaseDoc = WorkshopPurchaseRecord::query()
+            ->where('branch_id', $branchId)
+            ->where('document_kind', $documentKind)
+            ->where('series', $series !== '' ? $series : null)
+            ->where('document_number', $documentNumber)
+            ->exists();
+        if ($existsPurchaseDoc) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Documento de compra duplicado para la sucursal.',
+            ], 422);
+        }
+
+        $personId = (int) $supplier->id;
+        $personName = trim((string) $supplier->first_name . ' ' . (string) $supplier->last_name);
+        if ($personName === '') {
+            $personName = (string) ($supplier->document_number ?: 'Proveedor');
+        }
 
         try {
             DB::beginTransaction();
@@ -410,6 +624,7 @@ class WarehouseMovementController extends Controller
             ]);
 
             // Crear detalles y actualizar stock
+            $purchaseSubtotal = 0.0;
             foreach ($request->items as $item) {
                 $product = Product::with('baseUnit')->findOrFail($item['product_id']);
                 $productBranch = ProductBranch::where('product_id', $item['product_id'])
@@ -424,7 +639,9 @@ class WarehouseMovementController extends Controller
                         'branch_id' => $branchId,
                         'stock' => 0,
                         'price' => 0,
+                        'avg_cost' => 0,
                         'status' => 'A',
+                        'supplier_id' => $personId,
                     ]);
                 }
 
@@ -444,12 +661,46 @@ class WarehouseMovementController extends Controller
                     'branch_id' => $branchId,
                 ]);
 
-                // Actualizar stock (sumar para entrada)
-                $newStock = ($productBranch->stock ?? 0) + $item['quantity'];
+                // Actualizar stock y costo promedio ponderado.
+                $quantity = (float) $item['quantity'];
+                $unitCost = round((float) $item['unit_cost'], 6);
+                $purchaseSubtotal += ($quantity * $unitCost);
+                $currentStock = (float) ($productBranch->stock ?? 0);
+                $currentCost = (float) ($productBranch->avg_cost ?? 0);
+                if ($currentCost <= 0) {
+                    $currentCost = (float) ($productBranch->price ?? 0);
+                }
+                $newStock = $currentStock + $quantity;
+                $newAvgCost = $newStock > 0
+                    ? round((($currentStock * $currentCost) + ($quantity * $unitCost)) / $newStock, 6)
+                    : 0;
+
                 $productBranch->update([
-                    'stock' => $newStock
+                    'stock' => $newStock,
+                    'avg_cost' => $newAvgCost,
+                    'supplier_id' => $personId,
                 ]);
             }
+
+            $purchaseSubtotal = round($purchaseSubtotal, 6);
+            $purchaseIgv = round(($purchaseSubtotal * $igvRate) / 100, 6);
+            $purchaseTotal = round($purchaseSubtotal + $purchaseIgv, 6);
+
+            WorkshopPurchaseRecord::query()->create([
+                'movement_id' => $movement->id,
+                'company_id' => $companyId,
+                'branch_id' => $branchId,
+                'supplier_person_id' => $personId,
+                'document_kind' => $documentKind,
+                'series' => $series !== '' ? $series : null,
+                'document_number' => $documentNumber,
+                'currency' => $currency,
+                'igv_rate' => $igvRate,
+                'subtotal' => $purchaseSubtotal,
+                'igv' => $purchaseIgv,
+                'total' => $purchaseTotal,
+                'issued_at' => $issuedAt,
+            ]);
 
             DB::commit();
 
