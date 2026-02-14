@@ -46,7 +46,8 @@
                         <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Tipo</th>
                         <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Subtotal</th>
                         <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">IGV</th>
-                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Total</th>
+                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Total</th>
+                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -59,9 +60,20 @@
                             <td class="px-4 py-3 text-sm">{{ number_format((float)$sale->subtotal, 2) }}</td>
                             <td class="px-4 py-3 text-sm">{{ number_format((float)$sale->tax, 2) }}</td>
                             <td class="px-4 py-3 text-sm">{{ number_format((float)$sale->total, 2) }}</td>
+                            <td class="px-4 py-3 text-sm">
+                                <div class="flex flex-wrap gap-1.5">
+                                    @if($sale->movement_id)
+                                        <a href="{{ route('admin.sales.index') }}" class="rounded-lg bg-indigo-700 px-3 py-1.5 text-xs font-medium text-white">Ver</a>
+                                    @else
+                                        <button type="button" class="rounded-lg bg-indigo-700 px-3 py-1.5 text-xs font-medium text-white opacity-60">Ver</button>
+                                    @endif
+                                    <button type="button" onclick="alert('Operacion Editar disponible en el modulo de Ventas.');" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white">Editar</button>
+                                    <button type="button" onclick="alert('Operacion Eliminar disponible en el modulo de Ventas.');" class="rounded-lg bg-red-700 px-3 py-1.5 text-xs font-medium text-white">Eliminar</button>
+                                </div>
+                            </td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="px-4 py-4 text-sm text-gray-500">Sin ventas para el filtro.</td></tr>
+                        <tr><td colspan="8" class="px-4 py-4 text-sm text-gray-500">Sin ventas para el filtro.</td></tr>
                     @endforelse
                 </tbody>
             </table>

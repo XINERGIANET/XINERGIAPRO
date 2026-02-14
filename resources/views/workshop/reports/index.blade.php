@@ -85,7 +85,8 @@
                         <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Vehiculo</th>
                         <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Estado</th>
                         <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Total</th>
-                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Pagado</th>
+                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Pagado</th>
+                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -98,9 +99,20 @@
                             <td class="px-4 py-3 text-sm">{{ $order->status }}</td>
                             <td class="px-4 py-3 text-sm">{{ number_format((float) $order->total, 2) }}</td>
                             <td class="px-4 py-3 text-sm">{{ number_format((float) $order->paid_total, 2) }}</td>
+                            <td class="px-4 py-3 text-sm">
+                                <div class="flex flex-wrap gap-1.5">
+                                    <a href="{{ route('workshop.orders.show', $order) }}" class="rounded-lg bg-indigo-700 px-3 py-1.5 text-xs font-medium text-white">Ver</a>
+                                    <a href="{{ route('workshop.orders.show', $order) }}" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white">Editar</a>
+                                    <form method="POST" action="{{ route('workshop.orders.destroy', $order) }}" onsubmit="return confirm('Eliminar/anular esta OS?')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="rounded-lg bg-red-700 px-3 py-1.5 text-xs font-medium text-white">Eliminar</button>
+                                    </form>
+                                </div>
+                            </td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="px-4 py-4 text-sm text-gray-500">Sin datos.</td></tr>
+                        <tr><td colspan="8" class="px-4 py-4 text-sm text-gray-500">Sin datos.</td></tr>
                     @endforelse
                 </tbody>
             </table>

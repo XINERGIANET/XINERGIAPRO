@@ -65,7 +65,8 @@
                         <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">IGV %</th>
                         <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Subtotal</th>
                         <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">IGV</th>
-                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Total</th>
+                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Total</th>
+                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -80,9 +81,21 @@
                             <td class="px-4 py-3 text-sm">{{ number_format((float)$record->subtotal, 2) }}</td>
                             <td class="px-4 py-3 text-sm">{{ number_format((float)$record->igv, 2) }}</td>
                             <td class="px-4 py-3 text-sm">{{ number_format((float)$record->total, 2) }}</td>
+                            <td class="px-4 py-3 text-sm">
+                                <div class="flex flex-wrap gap-1.5">
+                                    @if($record->movement_id)
+                                        <a href="{{ route('warehouse_movements.show', $record->movement_id) }}" class="rounded-lg bg-indigo-700 px-3 py-1.5 text-xs font-medium text-white">Ver</a>
+                                        <a href="{{ route('warehouse_movements.edit', $record->movement_id) }}" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white">Editar</a>
+                                    @else
+                                        <button type="button" class="rounded-lg bg-indigo-700 px-3 py-1.5 text-xs font-medium text-white opacity-60">Ver</button>
+                                        <button type="button" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white opacity-60">Editar</button>
+                                    @endif
+                                    <button type="button" onclick="alert('Operacion Eliminar disponible en el modulo origen de movimientos.');" class="rounded-lg bg-red-700 px-3 py-1.5 text-xs font-medium text-white">Eliminar</button>
+                                </div>
+                            </td>
                         </tr>
                     @empty
-                        <tr><td colspan="9" class="px-4 py-4 text-sm text-gray-500">Sin compras para el filtro.</td></tr>
+                        <tr><td colspan="10" class="px-4 py-4 text-sm text-gray-500">Sin compras para el filtro.</td></tr>
                     @endforelse
                 </tbody>
             </table>

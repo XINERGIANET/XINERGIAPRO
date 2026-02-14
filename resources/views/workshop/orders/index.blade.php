@@ -52,7 +52,15 @@
                             <td class="px-4 py-3 text-sm">{{ number_format((float) $order->total, 2) }}</td>
                             <td class="px-4 py-3 text-sm">{{ number_format((float) $order->paid_total, 2) }}</td>
                             <td class="px-4 py-3 text-sm">
-                                <a href="{{ route('workshop.orders.show', $order) }}" class="rounded-lg bg-indigo-700 px-3 py-1.5 text-xs font-medium text-white">Abrir</a>
+                                <div class="flex flex-wrap gap-1.5">
+                                    <a href="{{ route('workshop.orders.show', $order) }}" class="rounded-lg bg-indigo-700 px-3 py-1.5 text-xs font-medium text-white">Ver</a>
+                                    <a href="{{ route('workshop.orders.show', $order) }}" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white">Editar</a>
+                                    <form method="POST" action="{{ route('workshop.orders.destroy', $order) }}" onsubmit="return confirm('Eliminar/anular esta OS?')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="rounded-lg bg-red-700 px-3 py-1.5 text-xs font-medium text-white">Eliminar</button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                     @empty
