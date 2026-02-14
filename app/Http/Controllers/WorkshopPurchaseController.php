@@ -65,8 +65,9 @@ class WorkshopPurchaseController extends Controller
 
         $branches = Branch::query()
             ->where('company_id', $branch->company_id)
-            ->orderBy('name')
-            ->get(['id', 'name', 'code']);
+            ->orderBy('legal_name')
+            ->selectRaw('id, legal_name as name, COALESCE(ruc, \'\') as code')
+            ->get();
 
         return view('workshop.purchases.index', compact(
             'records',
@@ -80,4 +81,3 @@ class WorkshopPurchaseController extends Controller
         ));
     }
 }
-

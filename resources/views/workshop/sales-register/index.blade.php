@@ -2,7 +2,7 @@
 
 @section('content')
 <div class="space-y-4">
-    <h1 class="text-xl font-semibold">Registro de Ventas - {{ $branch->name }}</h1>
+    <h1 class="text-xl font-semibold">Registro de Ventas - {{ $branch->legal_name }}</h1>
 
     <form method="GET" class="grid grid-cols-1 gap-2 rounded border p-4 md:grid-cols-4">
         <input type="month" name="month" value="{{ $month }}" class="rounded border px-3 py-2">
@@ -54,4 +54,3 @@
     {{ $sales->links() }}
 </div>
 @endsection
-

@@ -9,6 +9,27 @@
     if (auth()->check() && auth()->user()->profile_id) {
         $profileName = Profile::where('id', auth()->user()->profile_id)->value('name');
     }
+
+    $workshopStaticItems = [
+        ['name' => 'Agenda/Citas', 'route' => 'workshop.appointments.index', 'icon' => '<i class="ri-calendar-event-line text-lg"></i>'],
+        ['name' => 'Vehiculos', 'route' => 'workshop.vehicles.index', 'icon' => '<i class="ri-motorbike-line text-lg"></i>'],
+        ['name' => 'Ordenes de Servicio', 'route' => 'workshop.orders.index', 'icon' => '<i class="ri-file-list-3-line text-lg"></i>'],
+        ['name' => 'Servicios Taller', 'route' => 'workshop.services.index', 'icon' => '<i class="ri-settings-4-line text-lg"></i>'],
+        ['name' => 'Compras Taller', 'route' => 'workshop.purchases.index', 'icon' => '<i class="ri-file-list-2-line text-lg"></i>'],
+        ['name' => 'Ventas Taller', 'route' => 'workshop.sales-register.index', 'icon' => '<i class="ri-file-chart-line text-lg"></i>'],
+        ['name' => 'Armados Taller', 'route' => 'workshop.assemblies.index', 'icon' => '<i class="ri-hammer-line text-lg"></i>'],
+        ['name' => 'Reportes Taller', 'route' => 'workshop.reports.index', 'icon' => '<i class="ri-bar-chart-2-line text-lg"></i>'],
+    ];
+
+    $workshopStaticItems = collect($workshopStaticItems)
+        ->filter(fn ($item) => \Illuminate\Support\Facades\Route::has($item['route']))
+        ->map(fn ($item) => [
+            'name' => $item['name'],
+            'path' => route($item['route']),
+            'icon' => $item['icon'],
+        ])
+        ->values()
+        ->all();
 @endphp
 
 <aside id="sidebar"
@@ -206,6 +227,43 @@ class="fixed flex flex-col mt-0 top-0 px-5 left-0 dark:bg-gray-900 dark:border-g
                         </ul>
                     </div>
                 @endforeach
+
+                @if (!empty($workshopStaticItems))
+                    <div>
+                        <h2 class="mb-3 px-4 text-[11px] font-bold uppercase tracking-widest flex leading-[20px] text-gray-400/80 dark:text-gray-500"
+                            :class="(!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen) ?
+                            'lg:justify-center px-0' : 'justify-start'">
+                            <template x-if="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen">
+                                <span>Taller (Demo)</span>
+                            </template>
+                            <template x-if="!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen">
+                                <span class="h-px w-6 bg-gray-200 dark:bg-gray-800"></span>
+                            </template>
+                        </h2>
+                        <ul class="flex flex-col gap-1.5">
+                            @foreach ($workshopStaticItems as $item)
+                                <li>
+                                    <a href="{{ $item['path'] }}"
+                                       class="menu-item group w-full"
+                                       :class="[
+                                            isActive('{{ $item['path'] }}') ? 'menu-item-active' : 'menu-item-inactive',
+                                            !$store.sidebar.isExpanded && !$store.sidebar.isHovered ?
+                                            'xl:justify-center' : 'xl:justify-start'
+                                       ]">
+                                        <span :class="isActive('{{ $item['path'] }}') ? 'menu-item-icon-active' : 'menu-item-icon-inactive'">
+                                            {!! $item['icon'] !!}
+                                        </span>
+                                        <span
+                                            x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen"
+                                            class="menu-item-text flex items-center gap-2">
+                                            {{ $item['name'] }}
+                                        </span>
+                                    </a>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
             </div>
         </nav>
 
