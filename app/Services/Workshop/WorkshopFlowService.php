@@ -880,9 +880,9 @@ class WorkshopFlowService
                 'branch_snapshot' => $branchSnapshot,
                 'series' => '001',
                 'year' => (string) now()->year,
-                'detail_type' => 'DETAILED',
+                'detail_type' => 'DETALLADO',
                 'consumption' => 'N',
-                'payment_type' => 'CREDIT',
+                'payment_type' => 'CONTADO',
                 'status' => 'N',
                 'sale_type' => 'RETAIL',
                 'currency' => (string) $this->paramText('WS_CURRENCY', $branchId, 'PEN'),
@@ -900,7 +900,7 @@ class WorkshopFlowService
                 $unitId = (int) ($product?->base_unit_id ?: $this->resolveDefaultUnitId());
 
                 SalesMovementDetail::query()->create([
-                    'detail_type' => 'DETAILED',
+                    'detail_type' => 'DETALLADO',
                     'sales_movement_id' => $sale->id,
                     'code' => $product?->code ?: ('WS-' . $detail->id),
                     'description' => $detail->description,
@@ -1134,8 +1134,6 @@ class WorkshopFlowService
             }
 
             if (!$cashMovement) {
-                $movementTypeId = $this->resolveCashMovementTypeId();
-                $documentTypeId = $this->resolveDocumentTypeId($movementTypeId, 'Cobro Taller', 'none');
                 $paymentConceptId = $this->resolvePaymentConceptId();
 
                 $cashMovementEntity = Movement::query()->create([
@@ -1149,8 +1147,8 @@ class WorkshopFlowService
                     'responsible_name' => $userName,
                     'comment' => $comment ?: 'Cobro OS #' . $order->movement?->number,
                     'status' => '1',
-                    'movement_type_id' => $movementTypeId,
-                    'document_type_id' => $documentTypeId,
+                     'movement_type_id' => 4,
+                    'document_type_id' => 9,
                     'branch_id' => $branchId,
                     'parent_movement_id' => $order->sales_movement_id ?: $order->movement_id,
                 ]);
@@ -1931,7 +1929,7 @@ class WorkshopFlowService
 
         $opened = DB::table('cash_shift_relations')
             ->where('branch_id', $branchId)
-            ->where('status', 'A')
+            ->where('status', 1)
             ->whereNull('ended_at')
             ->exists();
 

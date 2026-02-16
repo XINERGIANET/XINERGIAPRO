@@ -38,10 +38,6 @@ class MenuOptionSeeder extends Seeder
                 ['name' => 'Billeteras digitales',        'action' => 'admin.digital_wallets.index',           'icon' => 'mdi-wallet'],
                 ['name' => 'Tipo de movimientos',        'action' => 'admin.movement_types.index',           'icon' => 'mdi-settings'],            
             ],
-            'Pedidos' => [
-                ['name' => 'Registro de areas',    'action' => 'areas.index',          'icon' => 'mdi-food'],
-                ['name' => 'Areas de pedido',    'action' => 'areas.tables.index',          'icon' => 'mdi-food'],
-            ],
             'Ventas' => [
                 ['name' => 'POS',                'action' => '/admin/ventas/pos',               'icon' => 'mdi-cash-register'],
                 ['name' => 'Facturación',        'action' => '/admin/ventas/facturacion',       'icon' => 'mdi-file-document'],

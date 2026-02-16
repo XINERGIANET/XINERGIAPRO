@@ -78,7 +78,7 @@
             <form method="POST" action="{{ route('workshop.vehicles.store') }}" class="grid grid-cols-1 gap-2 md:grid-cols-4">
                 @csrf
                 <select name="client_person_id" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
-                    <option value="">Cliente</option>
+                   
                     @foreach($clients as $client)
                         <option value="{{ $client->id }}">{{ $client->first_name }} {{ $client->last_name }}</option>
                     @endforeach

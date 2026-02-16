@@ -11,6 +11,25 @@ use Illuminate\Support\Facades\DB;
 
 class MenuHelper
 {
+    private const DISABLED_ACTION_PREFIXES = [
+        'admin.orders.',
+        'orders.',
+        'areas.',
+        'tables.',
+    ];
+
+    private const DISABLED_PATH_PREFIXES = [
+        '/pedidos',
+        '/areas',
+        '/mesas',
+    ];
+
+    private const DISABLED_MODULE_NAMES = [
+        'pedidos',
+        'areas',
+        'mesas',
+    ];
+
     public static function getMainNavItems()
     {
         $menuStructure = [];
@@ -63,9 +82,17 @@ class MenuHelper
             ->get();
 
         foreach ($modules as $module) {
+            if (self::isDisabledModule($module->name)) {
+                continue;
+            }
+
             $subItems = [];
 
             foreach ($module->menuOptions as $option) {
+                if (self::isDisabledMenuOption($option->action, $option->name)) {
+                    continue;
+                }
+
                 $path = $resolvePath($option->action);
                 $path = self::appendViewIdToPath($path, $option->view_id);
 
@@ -89,6 +116,39 @@ class MenuHelper
         }
 
         return $menuStructure;
+    }
+
+    private static function isDisabledMenuOption(?string $action, ?string $name = null): bool
+    {
+        $action = strtolower((string) $action);
+        $name = strtolower((string) $name);
+
+        foreach (self::DISABLED_ACTION_PREFIXES as $prefix) {
+            if (str_starts_with($action, $prefix)) {
+                return true;
+            }
+        }
+
+        foreach (self::DISABLED_PATH_PREFIXES as $prefix) {
+            if (str_starts_with($action, $prefix)) {
+                return true;
+            }
+        }
+
+        return str_contains($name, 'pedido') || str_contains($name, 'mesa') || str_contains($name, 'area');
+    }
+
+    private static function isDisabledModule(?string $moduleName): bool
+    {
+        $moduleName = strtolower((string) $moduleName);
+
+        foreach (self::DISABLED_MODULE_NAMES as $disabled) {
+            if (str_contains($moduleName, $disabled)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static function getOthersItems()

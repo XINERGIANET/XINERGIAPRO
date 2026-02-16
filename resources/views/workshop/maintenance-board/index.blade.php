@@ -61,6 +61,19 @@
             @forelse($cards as $card)
                 @php
                     $status = (string) $card->status;
+                    $pendingDebtCard = max(0, (float) $card->total - (float) $card->paid_total);
+                    $pendingBillingCountCard = (int) ($card->pending_billing_count ?? 0);
+                    $canCheckoutCard = in_array($card->status, ['in_progress', 'finished'], true)
+                        && ($pendingDebtCard > 0 || $pendingBillingCountCard > 0);
+                    $checkoutPayload = [
+                        'action' => route('workshop.maintenance-board.checkout', $card),
+                        'order_label' => 'OS ' . ($card->movement?->number ?? ('#' . $card->id)) . ' - ' . trim(($card->vehicle?->brand ?? '') . ' ' . ($card->vehicle?->model ?? '')),
+                        'total' => (float) ($card->total ?? 0),
+                        'paid_total' => (float) ($card->paid_total ?? 0),
+                        'debt' => $pendingDebtCard,
+                        'pending_billing_count' => $pendingBillingCountCard,
+                        'pending_billing_total' => (float) ($card->pending_billing_total ?? 0),
+                    ];
                     $statusMap = [
                         'draft' => ['Borrador', 'bg-slate-100 text-slate-700 border-slate-200'],
                         'diagnosis' => ['Diagnostico', 'bg-indigo-100 text-indigo-700 border-indigo-200'],
@@ -71,46 +84,80 @@
                     ];
                     [$statusLabel, $statusClass] = $statusMap[$status] ?? [strtoupper($status), 'bg-gray-100 text-gray-700 border-gray-200'];
                 @endphp
-                <div class="group relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg">
-                    <div class="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-gradient-to-br from-orange-200/40 to-indigo-200/40"></div>
+                <div class="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg">
+                    <div class="absolute -right-14 -top-14 h-40 w-40 rounded-full bg-gradient-to-br from-amber-300/20 to-indigo-300/20 blur-xl"></div>
+                    <div class="absolute -left-8 bottom-0 h-24 w-24 rounded-full bg-gradient-to-tr from-orange-300/20 to-transparent blur-lg"></div>
 
-                    <div class="relative z-10 mb-4 flex items-center justify-between">
+                    <div class="relative z-10 flex items-start justify-between gap-3">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Orden de servicio</p>
+                            <p class="text-sm font-bold text-slate-800">OS {{ $card->movement?->number ?? ('#' . $card->id) }}</p>
+                        </div>
                         <span class="rounded-full border px-3 py-1 text-xs font-semibold {{ $statusClass }}">{{ $statusLabel }}</span>
-                        <span class="text-xs font-medium text-gray-500">OS {{ $card->movement?->number ?? ('#' . $card->id) }}</span>
                     </div>
 
-                    <div class="relative z-10 mb-4 flex justify-center">
-                        <div class="flex h-44 w-44 items-center justify-center rounded-full border-8 border-white shadow-inner"
-                             style="background: radial-gradient(circle at 30% 30%, #0f172a, #1e293b 60%, #334155);">
-                            <div class="text-center text-white">
-                                <i class="ri-motorbike-fill text-6xl leading-none text-orange-300"></i>
-                                <p class="mt-2 text-xs uppercase tracking-[0.2em] text-slate-200">Mantenimiento</p>
+                    <div class="relative z-10 mt-3 rounded-2xl border border-slate-200 px-3 py-2.5 text-white"
+                         style="background: linear-gradient(120deg, #0f172a 0%, #1e293b 52%, #334155 100%);">
+                        <div class="flex items-center gap-3">
+                            <div class="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10">
+                                <svg viewBox="0 0 24 24" class="h-6 w-6 text-orange-300" fill="currentColor" aria-hidden="true">
+                                    <path d="M5.5 16.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Zm13 0a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM14 6l-1 3h3.3a1.5 1.5 0 0 1 1.33.81l1.72 3.44a3.5 3.5 0 0 1 2.12 3.25h-1.99a2.5 2.5 0 0 0-5 0H8a2.5 2.5 0 0 0-5 0H1a3.5 3.5 0 0 1 3.5-3.5h2.1l1.37-4.12A2 2 0 0 1 9.87 7.5H12l.6-1.8A1 1 0 0 1 13.55 5h2.95v1h-2.5Z"/>
+                                </svg>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="truncate text-lg font-bold leading-tight">{{ trim(($card->vehicle?->brand ?? '') . ' ' . ($card->vehicle?->model ?? '')) ?: 'Vehiculo en mantenimiento' }}</p>
+                                <p class="truncate text-xs tracking-wide text-slate-200">Placa {{ $card->vehicle?->plate ?: 'S/PLACA' }}</p>
                             </div>
                         </div>
                     </div>
 
-                    <div class="relative z-10 space-y-1 text-sm">
-                        <p class="font-semibold text-gray-900">{{ $card->vehicle?->brand }} {{ $card->vehicle?->model }}</p>
-                        <p class="text-gray-600">Placa: <span class="font-medium">{{ $card->vehicle?->plate ?: 'S/PLACA' }}</span></p>
-                        <p class="text-gray-600">Cliente: <span class="font-medium">{{ trim(($card->client?->first_name ?? '') . ' ' . ($card->client?->last_name ?? '')) }}</span></p>
-                        <p class="text-gray-600">Ingreso: <span class="font-medium">{{ optional($card->intake_date)->format('Y-m-d H:i') }}</span></p>
-                        <p class="text-gray-700">Total: <span class="font-semibold">S/ {{ number_format((float) $card->total, 2) }}</span></p>
+                    <div class="relative z-10 mt-3 grid grid-cols-1 gap-2 text-sm text-slate-700 sm:grid-cols-2">
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                            <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Cliente</p>
+                            <p class="font-semibold text-slate-800">{{ trim(($card->client?->first_name ?? '') . ' ' . ($card->client?->last_name ?? '')) }}</p>
+                        </div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                            <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ingreso</p>
+                            <p class="font-semibold text-slate-800">{{ optional($card->intake_date)->format('Y-m-d H:i') }}</p>
+                        </div>
                     </div>
 
-                    <div class="relative z-10 mt-5 flex flex-wrap gap-2">
+                    <div class="relative z-10 mt-2.5 grid grid-cols-3 gap-2">
+                        <div class="rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-center">
+                            <p class="text-[11px] uppercase tracking-wide text-slate-500">Total</p>
+                            <p class="text-sm font-bold text-slate-800">S/ {{ number_format((float) $card->total, 2) }}</p>
+                        </div>
+                        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-center">
+                            <p class="text-[11px] uppercase tracking-wide text-emerald-700">Pagado</p>
+                            <p class="text-sm font-bold text-emerald-700">S/ {{ number_format((float) $card->paid_total, 2) }}</p>
+                        </div>
+                        <div class="rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-2 text-center">
+                            <p class="text-[11px] uppercase tracking-wide text-amber-700">Pendiente</p>
+                            <p class="text-sm font-bold text-amber-700">S/ {{ number_format(max(0, (float) $card->total - (float) $card->paid_total), 2) }}</p>
+                        </div>
+                    </div>
+
+                    <div class="relative z-10 mt-3.5 flex flex-wrap gap-2">
                         @if($card->status === 'approved')
                             <form method="POST" action="{{ route('workshop.maintenance-board.start', $card) }}">
                                 @csrf
-                                <button class="rounded-lg bg-orange-600 px-3 py-2 text-xs font-semibold text-white">Iniciar servicio</button>
+                                <button class="rounded-xl bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700">Iniciar servicio</button>
                             </form>
                         @endif
                         @if($card->status === 'in_progress')
                             <form method="POST" action="{{ route('workshop.maintenance-board.finish', $card) }}">
                                 @csrf
-                                <button class="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white">Finalizar servicio</button>
+                                <button class="rounded-xl bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-800">Finalizar servicio</button>
                             </form>
                         @endif
-                        <a href="{{ route('workshop.orders.show', $card) }}" class="rounded-lg bg-slate-700 px-3 py-2 text-xs font-semibold text-white">Ver detalle</a>
+                        @if($canCheckoutCard)
+                            <button type="button"
+                                    class="rounded-xl bg-indigo-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-800"
+                                    @click="$dispatch('open-board-checkout-modal', @js($checkoutPayload))">
+                                Venta y cobro
+                            </button>
+                        @endif
+                        <a href="{{ route('workshop.orders.show', $card) }}" class="rounded-xl bg-slate-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800">Ver detalle</a>
                     </div>
                 </div>
             @empty
@@ -123,6 +170,119 @@
 
         <div class="mt-5">{{ $cards->links() }}</div>
     </x-common.component-card>
+
+    <x-ui.modal
+        x-data="{
+            open: false,
+            action: '',
+            order_label: '',
+            total: 0,
+            paid_total: 0,
+            debt: 0,
+            pending_billing_count: 0,
+            pending_billing_total: 0
+        }"
+        x-on:open-board-checkout-modal.window="
+            open = true;
+            action = $event.detail.action;
+            order_label = $event.detail.order_label;
+            total = Number($event.detail.total || 0);
+            paid_total = Number($event.detail.paid_total || 0);
+            debt = Number($event.detail.debt || 0);
+            pending_billing_count = Number($event.detail.pending_billing_count || 0);
+            pending_billing_total = Number($event.detail.pending_billing_total || 0);
+        "
+        :isOpen="false"
+        :showCloseButton="false"
+        class="max-w-3xl">
+        <div class="p-6 sm:p-8">
+            <div class="mb-5 flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Venta y cobro rapido</h3>
+                    <p class="text-sm text-gray-500" x-text="order_label"></p>
+                </div>
+                <button type="button" @click="open = false" class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
+                    <i class="ri-close-line text-xl"></i>
+                </button>
+            </div>
+
+            <div class="mb-4 grid grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm md:grid-cols-3">
+                <p>Total OS: <strong x-text="`S/ ${total.toFixed(2)}`"></strong></p>
+                <p>Pagado: <strong x-text="`S/ ${paid_total.toFixed(2)}`"></strong></p>
+                <p>Pendiente: <strong x-text="`S/ ${debt.toFixed(2)}`"></strong></p>
+            </div>
+
+            <form method="POST" :action="action" class="space-y-4">
+                @csrf
+
+                <input type="hidden" name="generate_sale" :value="pending_billing_count > 0 ? 1 : 0">
+
+                <div x-show="pending_billing_count > 0">
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Documento de venta</label>
+                    <select name="document_type_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" :required="pending_billing_count > 0">
+                        <option value="">Selecciona documento</option>
+                        @foreach($documentTypes as $documentType)
+                            <option value="{{ $documentType->id }}">{{ $documentType->name }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500" x-text="`Se facturaran ${pending_billing_count} linea(s) pendiente(s), total aprox: S/ ${pending_billing_total.toFixed(2)}.`"></p>
+                </div>
+
+                <div x-show="pending_billing_count <= 0" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+                    Esta OS ya no tiene lineas pendientes por facturar. Solo se registrara el cobro.
+                </div>
+
+                <div>
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Comentario venta (opcional)</label>
+                    <input name="sale_comment" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Venta desde tablero de mantenimiento">
+                </div>
+
+                <div>
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Caja</label>
+                    <select name="cash_register_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                        <option value="">Selecciona caja</option>
+                        @foreach($cashRegisters as $cashRegister)
+                            <option value="{{ $cashRegister->id }}">{{ $cashRegister->number }} {{ $cashRegister->status ? '(Activa)' : '' }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
+                    <div class="md:col-span-1">
+                        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Metodo de pago</label>
+                        <select name="payment_methods[0][payment_method_id]" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                            <option value="">Selecciona metodo</option>
+                            @foreach($paymentMethods as $paymentMethod)
+                                <option value="{{ $paymentMethod->id }}">{{ $paymentMethod->description }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="md:col-span-1">
+                        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Monto</label>
+                        <input type="number" step="0.01" min="0.01" name="payment_methods[0][amount]" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" :value="debt.toFixed(2)" required>
+                    </div>
+                    <div class="md:col-span-1">
+                        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Referencia</label>
+                        <input name="payment_methods[0][reference]" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Operacion / voucher">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Comentario cobro (opcional)</label>
+                    <input name="payment_comment" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Cobro registrado desde tablero">
+                </div>
+
+                <div class="flex flex-wrap gap-2 pt-1">
+                    <x-ui.button type="submit" size="md" variant="primary" style="background:linear-gradient(90deg,#1d4ed8,#4338ca);color:#fff">
+                        <i class="ri-cash-line"></i><span>Confirmar venta y cobro</span>
+                    </x-ui.button>
+                    <x-ui.button type="button" size="md" variant="outline" @click="open = false">
+                        <i class="ri-close-line"></i><span>Cancelar</span>
+                    </x-ui.button>
+                </div>
+            </form>
+        </div>
+    </x-ui.modal>
 
     <x-ui.modal x-data="{ open: false }" x-on:open-board-create-modal.window="open = true" :isOpen="false" :showCloseButton="false" class="max-w-6xl">
         <div class="p-6 sm:p-8">

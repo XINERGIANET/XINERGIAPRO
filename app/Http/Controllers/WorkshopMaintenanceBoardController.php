@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
+use App\Models\CashRegister;
+use App\Models\DocumentType;
+use App\Models\PaymentMethod;
 use App\Models\Person;
 use App\Models\Vehicle;
 use App\Models\WorkshopMovement;
@@ -11,6 +14,8 @@ use App\Services\Workshop\WorkshopFlowService;
 use App\Support\WorkshopAuthorization;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class WorkshopMaintenanceBoardController extends Controller
 {
@@ -31,6 +36,12 @@ class WorkshopMaintenanceBoardController extends Controller
 
         $cards = WorkshopMovement::query()
             ->with(['movement', 'vehicle', 'client'])
+            ->withCount([
+                'details as pending_billing_count' => fn ($query) => $query->whereNull('sales_movement_id'),
+            ])
+            ->withSum([
+                'details as pending_billing_total' => fn ($query) => $query->whereNull('sales_movement_id'),
+            ], 'total')
             ->where('company_id', $companyId)
             ->where('branch_id', $branchId)
             ->whereNotIn('status', ['delivered', 'cancelled'])
@@ -63,7 +74,38 @@ class WorkshopMaintenanceBoardController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'base_price', 'type']);
 
-        return view('workshop.maintenance-board.index', compact('cards', 'vehicles', 'clients', 'services'));
+        $saleMovementTypeId = (int) \App\Models\MovementType::query()
+            ->where('description', 'ILIKE', '%venta%')
+            ->orderBy('id')
+            ->value('id');
+
+        $documentTypes = DocumentType::query()
+            ->when($saleMovementTypeId > 0, fn ($query) => $query->where('movement_type_id', $saleMovementTypeId))
+            ->orderBy('name')
+            ->get(['id', 'name', 'stock']);
+
+        $cashRegisters = CashRegister::query()
+            ->when(
+                Schema::hasColumn('cash_registers', 'branch_id') && $branchId > 0,
+                fn ($query) => $query->where('branch_id', $branchId)
+            )
+            ->orderBy('number')
+            ->get(['id', 'number', 'status']);
+
+        $paymentMethods = PaymentMethod::query()
+            ->where('status', true)
+            ->orderBy('order_num')
+            ->get(['id', 'description']);
+
+        return view('workshop.maintenance-board.index', compact(
+            'cards',
+            'vehicles',
+            'clients',
+            'services',
+            'documentTypes',
+            'cashRegisters',
+            'paymentMethods'
+        ));
     }
 
     public function store(Request $request): RedirectResponse
@@ -190,6 +232,68 @@ class WorkshopMaintenanceBoardController extends Controller
         }
 
         return back()->with('status', 'Servicio finalizado. Puede continuar con cobro y entrega.');
+    }
+
+    public function checkout(Request $request, WorkshopMovement $order): RedirectResponse
+    {
+        $this->assertOrderScope($order);
+
+        $validated = $request->validate([
+            'generate_sale' => ['nullable', 'boolean'],
+            'document_type_id' => ['nullable', 'integer', 'exists:document_types,id'],
+            'sale_comment' => ['nullable', 'string'],
+            'cash_register_id' => ['required', 'integer', 'exists:cash_registers,id'],
+            'payment_methods' => ['required', 'array', 'min:1'],
+            'payment_methods.*.payment_method_id' => ['required', 'integer', 'exists:payment_methods,id'],
+            'payment_methods.*.amount' => ['required', 'numeric', 'min:0.01'],
+            'payment_methods.*.reference' => ['nullable', 'string', 'max:100'],
+            'payment_comment' => ['nullable', 'string'],
+        ]);
+
+        $user = auth()->user();
+        $branchId = (int) session('branch_id');
+
+        try {
+            DB::transaction(function () use ($order, $validated, $branchId, $user) {
+                $lockedOrder = WorkshopMovement::query()
+                    ->where('id', $order->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                $mustGenerateSale = (bool) ($validated['generate_sale'] ?? false);
+                if ($mustGenerateSale) {
+                    if (empty($validated['document_type_id'])) {
+                        throw new \RuntimeException('Debe seleccionar tipo de documento para generar la venta.');
+                    }
+
+                    $this->flowService->generateSale(
+                        $lockedOrder,
+                        (int) $validated['document_type_id'],
+                        $branchId,
+                        (int) $user?->id,
+                        (string) ($user?->name ?? 'Sistema'),
+                        $validated['sale_comment'] ?? null,
+                        null
+                    );
+                }
+
+                $freshOrder = WorkshopMovement::query()->findOrFail($lockedOrder->id);
+
+                $this->flowService->registerPayment(
+                    $freshOrder,
+                    (int) $validated['cash_register_id'],
+                    $validated['payment_methods'],
+                    $branchId,
+                    (int) $user?->id,
+                    (string) ($user?->name ?? 'Sistema'),
+                    $validated['payment_comment'] ?? null
+                );
+            });
+        } catch (\Throwable $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+
+        return back()->with('status', 'Venta y cobro registrados correctamente desde el tablero.');
     }
 
     private function assertOrderScope(WorkshopMovement $order): void

@@ -2,9 +2,9 @@
 
 @section('content')
 <div x-data="{}">
-    <x-common.page-breadcrumb pageTitle="Clientes Taller" />
+    <x-common.page-breadcrumb pageTitle="Personas" />
 
-    <x-common.component-card title="Clientes" desc="Gestion de clientes naturales y corporativos del taller.">
+    <x-common.component-card title="Personas" desc="Gestiona personas del taller (clientes y personal tecnico).">
         @if (session('status'))
             <div class="mb-4 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-700">{{ session('status') }}</div>
         @endif
@@ -84,21 +84,10 @@
                 </button>
             </div>
 
-            <form method="POST" action="{{ route('workshop.clients.store') }}" class="grid grid-cols-1 gap-2 md:grid-cols-3">
+            <form method="POST" action="{{ route('workshop.clients.store') }}" class="space-y-6">
                 @csrf
-                <select name="person_type" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
-                    <option value="DNI">DNI</option>
-                    <option value="RUC">RUC</option>
-                    <option value="CARNET DE EXTRANGERIA">CARNET DE EXTRANGERIA</option>
-                    <option value="PASAPORTE">PASAPORTE</option>
-                </select>
-                <input name="document_number" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Documento" required>
-                <input name="first_name" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nombres / Razon social" required>
-                <input name="last_name" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Apellidos" required>
-                <input name="phone" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Telefono" required>
-                <input name="email" type="email" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Correo">
-                <input name="address" class="h-11 rounded-lg border border-gray-300 px-3 text-sm md:col-span-2" placeholder="Direccion" required>
-                <div class="md:col-span-3 mt-2 flex gap-2">
+                @include('branches.people._form', ['person' => null])
+                <div class="mt-2 flex gap-2">
                     <x-ui.button type="submit" size="md" variant="primary"><i class="ri-save-line"></i><span>Guardar</span></x-ui.button>
                     <x-ui.button type="button" size="md" variant="outline" @click="open = false"><i class="ri-close-line"></i><span>Cancelar</span></x-ui.button>
                 </div>

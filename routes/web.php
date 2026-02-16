@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\AreaController;
 use App\Http\Controllers\DigitalWalletController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -17,7 +16,6 @@ use App\Http\Controllers\MovementTypeController;
 use App\Http\Controllers\DocumentTypeController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ProductController;
-use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\ParameterCategoriesController;
 use App\Http\Controllers\ParameterController;
@@ -26,7 +24,6 @@ use App\Http\Controllers\PaymentConceptController;
 use App\Http\Controllers\PaymentGatewaysController;
 use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\ProductBranchController;
-use App\Http\Controllers\TableController;
 use App\Http\Controllers\ViewsController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\TaxRateController;
@@ -172,27 +169,6 @@ Route::middleware('auth')->group(function () {
     //Kardex
     Route::get('/herramientas/kardex', [KardexController::class, 'index'])
         ->name('kardex.index');
-    //Rutas de ordenes
-    Route::resource('/Pedidos', OrderController::class)
-        ->names('admin.orders')
-        ->parameters(['orders' => 'order'])
-        ->only(['index', 'create']); // Solo incluir los métodos que existen
-
-    Route::get('/Pedidos/reporte', [OrderController::class, 'report'])
-        ->name('orders.report');
-
-  
-    Route::get('/Pedidos/cobrar', [OrderController::class, 'charge'])
-        ->name('admin.orders.charge');
-
-    Route::post('/Pedidos/procesar', [OrderController::class, 'processOrder'])
-        ->name('admin.orders.process');
-
-    Route::post('/Pedidos/procesar-pago', [OrderController::class, 'processOrderPayment'])
-        ->name('admin.orders.processOrderPayment');
-
-    Route::post('/Pedidos/cancelar', [OrderController::class, 'cancelOrder'])
-        ->name('admin.orders.cancelOrder');
     // dashboard pages
     Route::get('/', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
@@ -313,24 +289,6 @@ Route::middleware('auth')->group(function () {
     Route::resource('/admin/herramientas/unidades', UnitController::class)
         ->names('admin.units')
         ->parameters(['unidades' => 'unit']);
-
-
-    // Areas
-    Route::resource('/areas', AreaController::class)
-        ->names('areas')
-        ->parameters(['areas' => 'area'])
-        ->only(['index', 'store', 'edit', 'update', 'destroy']);
-
-    // Mesas
-    Route::resource('/areas/{area}/mesas', TableController::class)
-        ->names('areas.tables')
-        ->parameters(['areas' => 'area']);
-    Route::get('/mesas', [TableController::class, 'indexAll'])->name('tables.index');
-    Route::post('/mesas', [TableController::class, 'storeGeneral'])->name('tables.store');
-    Route::get('/mesas/{table}/edit', [TableController::class, 'editGeneral'])->name('tables.edit');
-    Route::put('/mesas/{table}', [TableController::class, 'updateGeneral'])->name('tables.update');
-    Route::delete('/mesas/{table}', [TableController::class, 'destroyGeneral'])->name('tables.destroy');
-
     //Tarjetas
     Route::resource('/admin/herramientas/tarjetas', CardController::class)
         ->names('admin.cards')
@@ -409,6 +367,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/tablero-mantenimiento', [WorkshopMaintenanceBoardController::class, 'store'])->name('maintenance-board.store');
         Route::post('/tablero-mantenimiento/{order}/iniciar', [WorkshopMaintenanceBoardController::class, 'start'])->name('maintenance-board.start');
         Route::post('/tablero-mantenimiento/{order}/finalizar', [WorkshopMaintenanceBoardController::class, 'finish'])->name('maintenance-board.finish');
+        Route::post('/tablero-mantenimiento/{order}/venta-cobro', [WorkshopMaintenanceBoardController::class, 'checkout'])->name('maintenance-board.checkout');
         Route::get('/clientes', [WorkshopClientController::class, 'index'])->name('clients.index');
         Route::post('/clientes', [WorkshopClientController::class, 'store'])->name('clients.store');
         Route::put('/clientes/{person}', [WorkshopClientController::class, 'update'])->name('clients.update');
@@ -483,3 +442,4 @@ Route::middleware('auth')->group(function () {
         Route::post('/ordenes/{order}/pdf/os/guardar', [WorkshopReportController::class, 'saveOrderPdfSnapshot'])->name('pdf.order.save');
     });
 });
+

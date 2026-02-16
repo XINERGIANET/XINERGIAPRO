@@ -12,13 +12,13 @@
 
     $workshopStaticItems = [
         ['name' => 'Tablero Mantenimiento', 'route' => 'workshop.maintenance-board.index', 'icon' => '<i class="ri-dashboard-2-line text-lg"></i>'],
-        ['name' => 'Clientes Taller', 'route' => 'workshop.clients.index', 'icon' => '<i class="ri-user-3-line text-lg"></i>'],
+        ['name' => 'Personas', 'route' => 'workshop.clients.index', 'icon' => '<i class="ri-user-3-line text-lg"></i>'],
         ['name' => 'Agenda/Citas', 'route' => 'workshop.appointments.index', 'icon' => '<i class="ri-calendar-event-line text-lg"></i>'],
         ['name' => 'Vehiculos', 'route' => 'workshop.vehicles.index', 'icon' => '<i class="ri-motorbike-line text-lg"></i>'],
         ['name' => 'Ordenes de Servicio', 'route' => 'workshop.orders.index', 'icon' => '<i class="ri-file-list-3-line text-lg"></i>'],
         ['name' => 'Servicios Taller', 'route' => 'workshop.services.index', 'icon' => '<i class="ri-settings-4-line text-lg"></i>'],
         ['name' => 'Compras Taller', 'route' => 'workshop.purchases.index', 'icon' => '<i class="ri-file-list-2-line text-lg"></i>'],
-        ['name' => 'Ventas Taller', 'route' => 'workshop.sales-register.index', 'icon' => '<i class="ri-file-chart-line text-lg"></i>'],
+        ['name' => 'Ventas Taller', 'route' => 'admin.sales.index', 'icon' => '<i class="ri-file-chart-line text-lg"></i>'],
         ['name' => 'Armados Taller', 'route' => 'workshop.assemblies.index', 'icon' => '<i class="ri-hammer-line text-lg"></i>'],
         ['name' => 'Reportes Taller', 'route' => 'workshop.reports.index', 'icon' => '<i class="ri-bar-chart-2-line text-lg"></i>'],
     ];
@@ -32,6 +32,8 @@
         ])
         ->values()
         ->all();
+
+    $workshopGroupIndex = count($menuGroups);
 @endphp
 
 <aside id="sidebar"
@@ -54,6 +56,14 @@ class="fixed flex flex-col mt-0 top-0 px-5 left-0 dark:bg-gray-900 dark:border-g
                     @endif
                 @endforeach
             @endforeach
+
+            @if (!empty($workshopStaticItems))
+                @foreach ($workshopStaticItems as $subItem)
+                    if (this.isActive('{{ $subItem['path'] }}')) {
+                        this.openSubmenus['{{ $workshopGroupIndex }}-0'] = true;
+                    }
+                @endforeach
+            @endif
         },
         keepSubmenuOpen(groupIndex, itemIndex) {
             const key = groupIndex + '-' + itemIndex;
@@ -126,7 +136,7 @@ class="fixed flex flex-col mt-0 top-0 px-5 left-0 dark:bg-gray-900 dark:border-g
     <div class="flex-1 flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar px-1">
         <nav class="mb-8 mt-4">
             <div class="flex flex-col gap-6">
-                {{-- @foreach ($menuGroups as $groupIndex => $menuGroup)
+                @foreach ($menuGroups as $groupIndex => $menuGroup)
                     <div>
                         <h2 class="mb-3 px-4 text-[11px] font-bold uppercase tracking-widest flex leading-[20px] text-gray-400/80 dark:text-gray-500"
                             :class="(!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen) ?
@@ -228,43 +238,61 @@ class="fixed flex flex-col mt-0 top-0 px-5 left-0 dark:bg-gray-900 dark:border-g
                             @endforeach
                         </ul>
                     </div>
-                @endforeach --}}
+                @endforeach
 
                 @if (!empty($workshopStaticItems))
-                    <div>
-                        <h2 class="mb-3 px-4 text-[11px] font-bold uppercase tracking-widest flex leading-[20px] text-gray-400/80 dark:text-gray-500"
-                            :class="(!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen) ?
-                            'lg:justify-center px-0' : 'justify-start'">
-                            <template x-if="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen">
-                                <span>Taller (Demo)</span>
-                            </template>
-                            <template x-if="!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen">
-                                <span class="h-px w-6 bg-gray-200 dark:bg-gray-800"></span>
-                            </template>
-                        </h2>
+                 
+                      
                         <ul class="flex flex-col gap-1.5">
-                            @foreach ($workshopStaticItems as $item)
-                                <li>
-                                    <a href="{{ $item['path'] }}"
-                                       class="menu-item group w-full"
-                                       :class="[
-                                            isActive('{{ $item['path'] }}') ? 'menu-item-active' : 'menu-item-inactive',
-                                            !$store.sidebar.isExpanded && !$store.sidebar.isHovered ?
-                                            'xl:justify-center' : 'xl:justify-start'
-                                       ]">
-                                        <span :class="isActive('{{ $item['path'] }}') ? 'menu-item-icon-active' : 'menu-item-icon-inactive'">
-                                            {!! $item['icon'] !!}
-                                        </span>
-                                        <span
-                                            x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen"
-                                            class="menu-item-text flex items-center gap-2">
-                                            {{ $item['name'] }}
-                                        </span>
-                                    </a>
-                                </li>
-                            @endforeach
+                            <li>
+                                <button @click="toggleSubmenu({{ $workshopGroupIndex }}, 0)"
+                                    class="menu-item group w-full"
+                                    :class="[
+                                        isSubmenuOpen({{ $workshopGroupIndex }}, 0) ? 'menu-item-active' : 'menu-item-inactive',
+                                        !$store.sidebar.isExpanded && !$store.sidebar.isHovered ? 'xl:justify-center' : 'xl:justify-start'
+                                    ]">
+
+                                    <span :class="isSubmenuOpen({{ $workshopGroupIndex }}, 0) ? 'menu-item-icon-active' : 'menu-item-icon-inactive'">
+                                        <i class="ri-tools-fill text-lg"></i>
+                                    </span>
+
+                                    <span
+                                        x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen"
+                                        class="menu-item-text flex items-center gap-2">
+                                        Taller
+                                    </span>
+
+                                    <svg x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen"
+                                        class="ml-auto w-4 h-4 transition-transform duration-300 opacity-60"
+                                        :class="{ 'rotate-180 text-brand-500 opacity-100': isSubmenuOpen({{ $workshopGroupIndex }}, 0) }"
+                                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </button>
+
+                                <div x-show="isSubmenuOpen({{ $workshopGroupIndex }}, 0) && ($store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen)"
+                                     x-transition:enter="transition ease-out duration-200"
+                                     x-transition:enter-start="opacity-0 -translate-y-2"
+                                     x-transition:enter-end="opacity-100 translate-y-0">
+                                    <ul class="mt-1.5 space-y-1 ml-10 border-l border-gray-100 dark:border-gray-800/50 pl-2">
+                                        @foreach ($workshopStaticItems as $item)
+                                            <li>
+                                                <a href="{{ $item['path'] }}"
+                                                    @click="keepSubmenuOpen({{ $workshopGroupIndex }}, 0)"
+                                                    class="menu-dropdown-item group/sub"
+                                                    :class="isActiveExact('{{ $item['path'] }}') ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'">
+                                                    <span class="w-5 h-5 flex items-center justify-center opacity-70 group-hover/sub:opacity-100 transition-opacity">
+                                                        {!! $item['icon'] !!}
+                                                    </span>
+                                                    {{ $item['name'] }}
+                                                </a>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            </li>
                         </ul>
-                    </div>
+                 
                 @endif
             </div>
         </nav>
