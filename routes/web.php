@@ -372,6 +372,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/clientes', [WorkshopClientController::class, 'store'])->name('clients.store');
         Route::put('/clientes/{person}', [WorkshopClientController::class, 'update'])->name('clients.update');
         Route::delete('/clientes/{person}', [WorkshopClientController::class, 'destroy'])->name('clients.destroy');
+        Route::get('/agenda/events', [WorkshopAppointmentController::class, 'events'])->name('appointments.events');
         Route::get('/agenda', [WorkshopAppointmentController::class, 'index'])->name('appointments.index');
         Route::post('/agenda', [WorkshopAppointmentController::class, 'store'])->name('appointments.store');
         Route::put('/agenda/{appointment}', [WorkshopAppointmentController::class, 'update'])->name('appointments.update');

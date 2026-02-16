@@ -25,6 +25,61 @@ class WorkshopAppointmentController extends Controller
         });
     }
 
+    public function events(Request $request)
+    {
+        $branchId = (int) session('branch_id');
+        $branch = $branchId > 0 ? \App\Models\Branch::query()->find($branchId) : null;
+        $companyId = (int) ($branch?->company_id ?? 0);
+
+        $from = $request->input('start');
+        $to = $request->input('end');
+
+        $appointments = Appointment::query()
+            ->with(['vehicle', 'client'])
+            ->when($companyId > 0, fn ($query) => $query->where('company_id', $companyId))
+            ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
+            ->when($from, fn ($query) => $query->whereDate('start_at', '>=', $from))
+            ->when($to, fn ($query) => $query->whereDate('start_at', '<=', $to))
+            ->get();
+
+        $events = $appointments->map(function ($app) {
+            $title = ($app->client?->first_name ?? 'Cita') . ' - ' . ($app->vehicle?->plate ?? '');
+            
+            $start = $app->start_at;
+            $end = $start->copy()->addHour();
+
+            return [
+                'id' => (string) $app->id,
+                'title' => $title,
+                'start' => $start->toIso8601String(),
+                'end' => $end->toIso8601String(),
+                'allDay' => false,
+                'backgroundColor' => $this->getStatusColor($app->status),
+                'borderColor' => $this->getStatusColor($app->status),
+                'textColor' => '#fff',
+                'extendedProps' => [
+                    'status' => $app->status,
+                    'reason' => $app->reason,
+                    'client' => ($app->client?->first_name ?? '') . ' ' . ($app->client?->last_name ?? ''),
+                ]
+            ];
+        });
+
+        return response()->json($events);
+    }
+
+    private function getStatusColor(string $status): string
+    {
+        return match ($status) {
+            'pending' => '#f59e0b',   // Amber
+            'confirmed' => '#10b981', // Emerald
+            'arrived' => '#3b82f6',   // Blue
+            'cancelled' => '#ef4444', // Red
+            'no_show' => '#6b7280',   // Gray
+            default => '#244BB3',     // Default Blue
+        };
+    }
+
     public function index(Request $request)
     {
         $branchId = (int) session('branch_id');

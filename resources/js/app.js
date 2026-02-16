@@ -8,10 +8,17 @@ import flatpickr from 'flatpickr';
 import 'flatpickr/dist/flatpickr.min.css';
 // FullCalendar
 import { Calendar } from '@fullcalendar/core';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import listPlugin from '@fullcalendar/list';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import interactionPlugin from '@fullcalendar/interaction';
 
 window.Alpine = Alpine;
 window.ApexCharts = ApexCharts;
 window.flatpickr = flatpickr;
+
+// FullCalendar is only exposed if needed by legacy code, 
+// but we prefer component-based initialization.
 window.FullCalendar = Calendar;
 
 const remixIconCatalog = {
@@ -409,6 +416,10 @@ const initPage = () => {
     // Calendar init
     if (document.querySelector('#calendar')) {
         import('./components/calendar-init').then(module => module.calendarInit());
+    }
+
+    if (document.querySelector('#workshop-calendar')) {
+        import('./components/workshop-calendar').then(module => module.initWorkshopCalendar());
     }
 };
 
