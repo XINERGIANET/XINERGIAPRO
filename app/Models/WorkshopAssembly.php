@@ -15,10 +15,18 @@ class WorkshopAssembly extends Model
         'branch_id',
         'brand_company',
         'vehicle_type',
+        'model',
+        'displacement',
+        'color',
+        'vin',
         'quantity',
         'unit_cost',
         'total_cost',
         'assembled_at',
+        'entry_at',
+        'started_at',
+        'finished_at',
+        'exit_at',
         'notes',
         'created_by',
     ];
@@ -28,6 +36,10 @@ class WorkshopAssembly extends Model
         'unit_cost' => 'decimal:6',
         'total_cost' => 'decimal:6',
         'assembled_at' => 'date',
+        'entry_at' => 'datetime',
+        'started_at' => 'datetime',
+        'finished_at' => 'datetime',
+        'exit_at' => 'datetime',
     ];
 
     public function company()

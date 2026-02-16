@@ -428,6 +428,12 @@ Route::middleware('auth')->group(function () {
         Route::put('/armados/{assembly}', [WorkshopAssemblyController::class, 'update'])->name('assemblies.update');
         Route::delete('/armados/{assembly}', [WorkshopAssemblyController::class, 'destroy'])->name('assemblies.destroy');
         Route::get('/armados/exportar', [WorkshopAssemblyController::class, 'exportMonthlyCsv'])->name('assemblies.export');
+        Route::post('/armados/costos', [WorkshopAssemblyController::class, 'storeCost'])->name('assemblies.costs.store');
+        Route::put('/armados/costos/{cost}', [WorkshopAssemblyController::class, 'updateCost'])->name('assemblies.costs.update');
+        Route::delete('/armados/costos/{cost}', [WorkshopAssemblyController::class, 'destroyCost'])->name('assemblies.costs.destroy');
+        Route::post('armados/{assembly}/start', [WorkshopAssemblyController::class, 'startAssembly'])->name('armados.start');
+        Route::post('armados/{assembly}/finish', [WorkshopAssemblyController::class, 'finishAssembly'])->name('armados.finish');
+        Route::post('armados/{assembly}/exit', [WorkshopAssemblyController::class, 'registerExit'])->name('armados.exit');
 
         Route::get('/ordenes', [WorkshopOrderController::class, 'index'])->name('orders.index');
         Route::get('/ordenes/crear', [WorkshopOrderController::class, 'create'])->name('orders.create');

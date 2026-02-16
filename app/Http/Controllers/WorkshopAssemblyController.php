@@ -79,9 +79,14 @@ class WorkshopAssemblyController extends Controller
         $data = $request->validate([
             'brand_company' => ['required', 'string', 'max:120'],
             'vehicle_type' => ['required', 'string', 'max:60'],
+            'model' => ['nullable', 'string', 'max:80'],
+            'displacement' => ['nullable', 'string', 'max:20'],
+            'color' => ['nullable', 'string', 'max:40'],
+            'vin' => ['nullable', 'string', 'max:100'],
             'quantity' => ['required', 'integer', 'min:1'],
             'unit_cost' => ['nullable', 'numeric', 'min:0'],
             'assembled_at' => ['required', 'date'],
+            'entry_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
         ]);
 
@@ -105,10 +110,15 @@ class WorkshopAssemblyController extends Controller
             'branch_id' => $branchId,
             'brand_company' => $data['brand_company'],
             'vehicle_type' => $data['vehicle_type'],
+            'model' => $data['model'] ?? null,
+            'displacement' => $data['displacement'] ?? null,
+            'color' => $data['color'] ?? null,
+            'vin' => $data['vin'] ?? null,
             'quantity' => (int) $data['quantity'],
             'unit_cost' => $resolvedUnitCost,
             'total_cost' => round(((int) $data['quantity']) * $resolvedUnitCost, 6),
             'assembled_at' => $data['assembled_at'],
+            'entry_at' => $data['entry_at'] ?? now(),
             'notes' => $data['notes'] ?? null,
             'created_by' => auth()->id(),
         ]);
@@ -124,9 +134,14 @@ class WorkshopAssemblyController extends Controller
         $data = $request->validate([
             'brand_company' => ['required', 'string', 'max:120'],
             'vehicle_type' => ['required', 'string', 'max:60'],
+            'model' => ['nullable', 'string', 'max:80'],
+            'displacement' => ['nullable', 'string', 'max:20'],
+            'color' => ['nullable', 'string', 'max:40'],
+            'vin' => ['nullable', 'string', 'max:100'],
             'quantity' => ['required', 'integer', 'min:1'],
             'unit_cost' => ['required', 'numeric', 'min:0'],
             'assembled_at' => ['required', 'date'],
+            'entry_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
         ]);
 
@@ -136,10 +151,15 @@ class WorkshopAssemblyController extends Controller
         $assembly->update([
             'brand_company' => $data['brand_company'],
             'vehicle_type' => $data['vehicle_type'],
+            'model' => $data['model'] ?? null,
+            'displacement' => $data['displacement'] ?? null,
+            'color' => $data['color'] ?? null,
+            'vin' => $data['vin'] ?? null,
             'quantity' => $quantity,
             'unit_cost' => $unitCost,
             'total_cost' => round($quantity * $unitCost, 6),
             'assembled_at' => $data['assembled_at'],
+            'entry_at' => $data['entry_at'] ?? $assembly->entry_at,
             'notes' => $data['notes'] ?? null,
         ]);
 
@@ -173,12 +193,20 @@ class WorkshopAssemblyController extends Controller
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Fecha', 'Empresa/Marca', 'Tipo Vehiculo', 'Cantidad', 'Costo Unitario', 'Costo Total', 'Observaciones']);
+            fputcsv($out, ['Fecha', 'Empresa/Marca', 'Tipo Vehiculo', 'Modelo', 'Cilindrada', 'Color', 'VIN', 'Ingreso', 'Inicio', 'Fin', 'Salida', 'Cantidad', 'Costo Unitario', 'Costo Total', 'Observaciones']);
             foreach ($rows as $row) {
                 fputcsv($out, [
                     optional($row->assembled_at)->format('Y-m-d'),
                     $row->brand_company,
                     $row->vehicle_type,
+                    (string) $row->model,
+                    (string) $row->displacement,
+                    (string) $row->color,
+                    (string) $row->vin,
+                    optional($row->entry_at)->format('Y-m-d H:i'),
+                    optional($row->started_at)->format('Y-m-d H:i'),
+                    optional($row->finished_at)->format('Y-m-d H:i'),
+                    optional($row->exit_at)->format('Y-m-d H:i'),
                     (int) $row->quantity,
                     number_format((float) $row->unit_cost, 6, '.', ''),
                     number_format((float) $row->total_cost, 6, '.', ''),
@@ -189,6 +217,104 @@ class WorkshopAssemblyController extends Controller
         }, $filename, [
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
+    }
+
+    public function storeCost(Request $request): RedirectResponse
+    {
+        [$branchId, $companyId] = $this->resolveContext();
+
+        $data = $request->validate([
+            'brand_company' => ['required', 'string', 'max:120'],
+            'vehicle_type' => ['required', 'string', 'max:60'],
+            'unit_cost' => ['required', 'numeric', 'min:0'],
+            'apply_to_all_branches' => ['nullable', 'boolean'],
+        ]);
+
+        WorkshopAssemblyCost::updateOrCreate(
+            [
+                'company_id' => $companyId,
+                'branch_id' => empty($data['apply_to_all_branches']) ? $branchId : null,
+                'brand_company' => $data['brand_company'],
+                'vehicle_type' => $data['vehicle_type'],
+            ],
+            [
+                'unit_cost' => round((float) $data['unit_cost'], 6),
+                'active' => true,
+            ]
+        );
+
+        return back()->with('status', 'Costo configurado correctamente.');
+    }
+
+    public function updateCost(Request $request, WorkshopAssemblyCost $cost): RedirectResponse
+    {
+        [$branchId, $companyId] = $this->resolveContext();
+        if ((int)$cost->company_id !== $companyId) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'brand_company' => ['required', 'string', 'max:120'],
+            'vehicle_type' => ['required', 'string', 'max:60'],
+            'unit_cost' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $cost->update([
+            'brand_company' => $data['brand_company'],
+            'vehicle_type' => $data['vehicle_type'],
+            'unit_cost' => round((float) $data['unit_cost'], 6),
+        ]);
+
+        return back()->with('status', 'Costo actualizado.');
+    }
+
+    public function destroyCost(WorkshopAssemblyCost $cost): RedirectResponse
+    {
+        [$branchId, $companyId] = $this->resolveContext();
+        if ((int)$cost->company_id !== $companyId) {
+            abort(403);
+        }
+
+        $cost->delete();
+
+        return back()->with('status', 'Costo eliminado.');
+    }
+    public function startAssembly(WorkshopAssembly $assembly): RedirectResponse
+    {
+        [$branchId, $companyId] = $this->resolveContext();
+        $this->assertScope($assembly, $branchId, $companyId);
+
+        $assembly->update(['started_at' => now()]);
+
+        return back()->with('status', 'Armado iniciado correctamente.');
+    }
+
+    public function finishAssembly(WorkshopAssembly $assembly): RedirectResponse
+    {
+        [$branchId, $companyId] = $this->resolveContext();
+        $this->assertScope($assembly, $branchId, $companyId);
+
+        if (!$assembly->started_at) {
+            return back()->with('error', 'Debe iniciar el armado primero.');
+        }
+
+        $assembly->update(['finished_at' => now()]);
+
+        return back()->with('status', 'Armado finalizado correctamente.');
+    }
+
+    public function registerExit(WorkshopAssembly $assembly): RedirectResponse
+    {
+        [$branchId, $companyId] = $this->resolveContext();
+        $this->assertScope($assembly, $branchId, $companyId);
+
+        if (!$assembly->finished_at) {
+            return back()->with('error', 'Debe finalizar el armado primero.');
+        }
+
+        $assembly->update(['exit_at' => now()]);
+
+        return back()->with('status', 'Salida registrada correctamente.');
     }
 
     private function resolveContext(): array
