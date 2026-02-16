@@ -1,92 +1,147 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="space-y-4">
-    <h1 class="text-xl font-semibold">Historial Cliente: {{ $person->first_name }} {{ $person->last_name }}</h1>
+<div>
+    <x-common.page-breadcrumb pageTitle="Historial de Cliente" />
 
-    <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
-        <div class="rounded border p-3"><strong>Vehículos:</strong> {{ $vehicles->count() }}</div>
-        <div class="rounded border p-3"><strong>OS:</strong> {{ $orders->count() }}</div>
-        <div class="rounded border p-3"><strong>Total OS:</strong> {{ number_format($totalOrders, 2) }}</div>
-        <div class="rounded border p-3"><strong>Deuda:</strong> {{ number_format($debtOrders, 2) }}</div>
-    </div>
-
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div class="rounded border p-4">
-            <h2 class="mb-2 font-semibold">Vehículos</h2>
-            @forelse($vehicles as $vehicle)
-                <div class="border-b py-1 text-sm">{{ $vehicle->brand }} {{ $vehicle->model }} - {{ $vehicle->plate ?: 'S/PLACA' }}</div>
-            @empty
-                <p class="text-sm text-gray-500">Sin vehículos.</p>
-            @endforelse
+    <x-common.component-card title="{{ $person->first_name }} {{ $person->last_name }}" desc="Detalle integral del cliente en taller.">
+        <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+            <div class="rounded-lg border border-gray-200 bg-white p-3 text-sm"><strong>Vehiculos:</strong> {{ $vehicles->count() }}</div>
+            <div class="rounded-lg border border-gray-200 bg-white p-3 text-sm"><strong>Citas:</strong> {{ $appointments->count() }}</div>
+            <div class="rounded-lg border border-gray-200 bg-white p-3 text-sm"><strong>OS total/deuda:</strong> {{ number_format($totalOrders, 2) }} / {{ number_format($debtOrders, 2) }}</div>
+            <div class="rounded-lg border border-gray-200 bg-white p-3 text-sm"><strong>Ventas/Pagos:</strong> {{ number_format($totalSales, 2) }} / {{ number_format($totalPayments, 2) }}</div>
         </div>
-        <div class="rounded border p-4">
-            <h2 class="mb-2 font-semibold">Citas</h2>
-            @forelse($appointments as $appointment)
-                <div class="border-b py-1 text-sm">{{ optional($appointment->start_at)->format('Y-m-d H:i') }} - {{ $appointment->status }} - {{ $appointment->reason }}</div>
-            @empty
-                <p class="text-sm text-gray-500">Sin citas.</p>
-            @endforelse
-        </div>
-    </div>
 
-    <div class="rounded border p-4">
-        <h2 class="mb-2 font-semibold">Órdenes de Servicio</h2>
-        <div class="overflow-x-auto rounded border">
-            <table class="w-full text-sm">
-                <thead class="bg-gray-100">
-                    <tr>
-                        <th class="p-2 text-left">OS</th>
-                        <th class="p-2 text-left">Fecha</th>
-                        <th class="p-2 text-left">Vehículo</th>
-                        <th class="p-2 text-left">Estado</th>
-                        <th class="p-2 text-left">Total</th>
-                        <th class="p-2 text-left">Pagado</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($orders as $order)
-                        <tr class="border-t">
-                            <td class="p-2">{{ $order->movement?->number }}</td>
-                            <td class="p-2">{{ optional($order->intake_date)->format('Y-m-d H:i') }}</td>
-                            <td class="p-2">{{ $order->vehicle?->plate }}</td>
-                            <td class="p-2">{{ $order->status }}</td>
-                            <td class="p-2">{{ number_format((float)$order->total,2) }}</td>
-                            <td class="p-2">{{ number_format((float)$order->paid_total,2) }}</td>
+        <div class="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div class="rounded-xl border border-gray-200 bg-white p-4">
+                <h3 class="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-700">Vehiculos</h3>
+                @forelse($vehicles as $vehicle)
+                    <div class="border-b border-gray-100 py-1 text-sm">{{ $vehicle->brand }} {{ $vehicle->model }} - {{ $vehicle->plate ?: 'S/PLACA' }}</div>
+                @empty
+                    <p class="text-sm text-gray-500">Sin vehiculos.</p>
+                @endforelse
+            </div>
+            <div class="rounded-xl border border-gray-200 bg-white p-4">
+                <h3 class="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-700">Citas</h3>
+                @forelse($appointments as $appointment)
+                    <div class="border-b border-gray-100 py-1 text-sm">{{ optional($appointment->start_at)->format('Y-m-d H:i') }} - {{ $appointment->status }} - {{ $appointment->reason }}</div>
+                @empty
+                    <p class="text-sm text-gray-500">Sin citas.</p>
+                @endforelse
+            </div>
+        </div>
+
+        <div class="mb-4 rounded-xl border border-gray-200 bg-white p-4">
+            <h3 class="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-700">Ordenes de Servicio</h3>
+            <div class="overflow-x-auto rounded border border-gray-200">
+                <table class="w-full min-w-[900px] text-sm">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="p-2 text-left">OS</th>
+                            <th class="p-2 text-left">Fecha</th>
+                            <th class="p-2 text-left">Vehiculo</th>
+                            <th class="p-2 text-left">Estado</th>
+                            <th class="p-2 text-left">Total</th>
+                            <th class="p-2 text-left">Pagado</th>
+                            <th class="p-2 text-left">Deuda</th>
                         </tr>
-                    @empty
-                        <tr><td colspan="6" class="p-2 text-gray-500">Sin órdenes.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        @forelse($orders as $order)
+                            <tr class="border-t border-gray-100">
+                                <td class="p-2">{{ $order->movement?->number }}</td>
+                                <td class="p-2">{{ optional($order->intake_date)->format('Y-m-d H:i') }}</td>
+                                <td class="p-2">{{ $order->vehicle?->plate }}</td>
+                                <td class="p-2">{{ $order->status }}</td>
+                                <td class="p-2">{{ number_format((float)$order->total,2) }}</td>
+                                <td class="p-2">{{ number_format((float)$order->paid_total,2) }}</td>
+                                <td class="p-2">{{ number_format((float)$order->debt,2) }}</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="7" class="p-2 text-gray-500">Sin ordenes.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
         </div>
-    </div>
 
-    <div class="rounded border p-4">
-        <h2 class="mb-2 font-semibold">Ventas</h2>
-        <div class="overflow-x-auto rounded border">
-            <table class="w-full text-sm">
-                <thead class="bg-gray-100">
-                    <tr>
-                        <th class="p-2 text-left">Fecha</th>
-                        <th class="p-2 text-left">Doc</th>
-                        <th class="p-2 text-left">Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($sales as $sale)
-                        <tr class="border-t">
-                            <td class="p-2">{{ optional($sale->movement?->moved_at)->format('Y-m-d H:i') }}</td>
-                            <td class="p-2">{{ $sale->movement?->number }}</td>
-                            <td class="p-2">{{ number_format((float)$sale->total, 2) }}</td>
+        <div class="mb-4 rounded-xl border border-gray-200 bg-white p-4">
+            <h3 class="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-700">Ventas</h3>
+            <div class="overflow-x-auto rounded border border-gray-200">
+                <table class="w-full min-w-[700px] text-sm">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="p-2 text-left">Fecha</th>
+                            <th class="p-2 text-left">Doc</th>
+                            <th class="p-2 text-left">Total</th>
                         </tr>
-                    @empty
-                        <tr><td colspan="3" class="p-2 text-gray-500">Sin ventas.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        @forelse($sales as $sale)
+                            <tr class="border-t border-gray-100">
+                                <td class="p-2">{{ optional($sale->movement?->moved_at)->format('Y-m-d H:i') }}</td>
+                                <td class="p-2">{{ $sale->movement?->number }}</td>
+                                <td class="p-2">{{ number_format((float)$sale->total, 2) }}</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="3" class="p-2 text-gray-500">Sin ventas.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
         </div>
-    </div>
+
+        <div class="mb-4 rounded-xl border border-gray-200 bg-white p-4">
+            <h3 class="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-700">Compras</h3>
+            <div class="overflow-x-auto rounded border border-gray-200">
+                <table class="w-full min-w-[700px] text-sm">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="p-2 text-left">Fecha</th>
+                            <th class="p-2 text-left">Doc</th>
+                            <th class="p-2 text-left">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($purchases as $purchase)
+                            <tr class="border-t border-gray-100">
+                                <td class="p-2">{{ optional($purchase->movement?->moved_at)->format('Y-m-d H:i') }}</td>
+                                <td class="p-2">{{ $purchase->movement?->number }}</td>
+                                <td class="p-2">{{ number_format((float)$purchase->total, 2) }}</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="3" class="p-2 text-gray-500">Sin compras.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="rounded-xl border border-gray-200 bg-white p-4">
+            <h3 class="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-700">Pagos</h3>
+            <div class="overflow-x-auto rounded border border-gray-200">
+                <table class="w-full min-w-[700px] text-sm">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="p-2 text-left">Fecha</th>
+                            <th class="p-2 text-left">Comprobante</th>
+                            <th class="p-2 text-left">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($payments as $payment)
+                            <tr class="border-t border-gray-100">
+                                <td class="p-2">{{ optional($payment->movement?->moved_at)->format('Y-m-d H:i') }}</td>
+                                <td class="p-2">{{ $payment->movement?->number }}</td>
+                                <td class="p-2">{{ number_format((float)$payment->total, 2) }}</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="3" class="p-2 text-gray-500">Sin pagos.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </x-common.component-card>
 </div>
 @endsection
-

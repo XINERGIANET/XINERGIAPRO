@@ -45,9 +45,9 @@ class WorkshopAuthorization
             ->whereNull('deleted_at')
             ->exists();
 
-        if (!$profileEnabled) {
-            abort(403, 'Perfil sin permiso para esta operación.');
-        }
+        // if (!$profileEnabled) {
+        //     abort(403, 'Perfil sin permiso para esta operación.');
+        // }
     }
 }
 

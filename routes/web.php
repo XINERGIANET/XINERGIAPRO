@@ -39,6 +39,7 @@ use App\Http\Controllers\WarehouseMovementController;
 use App\Http\Controllers\WorkshopAppointmentController;
 use App\Http\Controllers\WorkshopAssemblyController;
 use App\Http\Controllers\WorkshopClientController;
+use App\Http\Controllers\WorkshopMaintenanceBoardController;
 use App\Http\Controllers\WorkshopPurchaseController;
 use App\Http\Controllers\WorkshopSalesRegisterController;
 use App\Http\Controllers\WorkshopOrderController;
@@ -404,6 +405,14 @@ Route::middleware('auth')->group(function () {
         ->names('recipe-book'); 
 
     Route::prefix('/admin/taller')->name('workshop.')->group(function () {
+        Route::get('/tablero-mantenimiento', [WorkshopMaintenanceBoardController::class, 'index'])->name('maintenance-board.index');
+        Route::post('/tablero-mantenimiento', [WorkshopMaintenanceBoardController::class, 'store'])->name('maintenance-board.store');
+        Route::post('/tablero-mantenimiento/{order}/iniciar', [WorkshopMaintenanceBoardController::class, 'start'])->name('maintenance-board.start');
+        Route::post('/tablero-mantenimiento/{order}/finalizar', [WorkshopMaintenanceBoardController::class, 'finish'])->name('maintenance-board.finish');
+        Route::get('/clientes', [WorkshopClientController::class, 'index'])->name('clients.index');
+        Route::post('/clientes', [WorkshopClientController::class, 'store'])->name('clients.store');
+        Route::put('/clientes/{person}', [WorkshopClientController::class, 'update'])->name('clients.update');
+        Route::delete('/clientes/{person}', [WorkshopClientController::class, 'destroy'])->name('clients.destroy');
         Route::get('/agenda', [WorkshopAppointmentController::class, 'index'])->name('appointments.index');
         Route::post('/agenda', [WorkshopAppointmentController::class, 'store'])->name('appointments.store');
         Route::put('/agenda/{appointment}', [WorkshopAppointmentController::class, 'update'])->name('appointments.update');

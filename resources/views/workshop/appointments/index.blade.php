@@ -20,8 +20,6 @@
                 <i class="ri-file-list-3-line"></i><span>Ordenes de servicio</span>
             </x-ui.link-button>
             <button type="button" class="h-10 rounded-lg bg-[#244BB3] px-3 text-sm font-medium text-white">Operacion: Ver</button>
-            <button type="button" class="h-10 rounded-lg bg-amber-600 px-3 text-sm font-medium text-white">Operacion: Editar</button>
-            <button type="button" class="h-10 rounded-lg bg-red-700 px-3 text-sm font-medium text-white">Operacion: Eliminar</button>
         </div>
 
         <form method="GET" class="mb-4 grid grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-white p-4 md:grid-cols-4 dark:border-gray-800 dark:bg-white/[0.02]">

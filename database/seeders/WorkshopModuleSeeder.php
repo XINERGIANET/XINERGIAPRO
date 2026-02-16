@@ -1,8 +1,9 @@
-﻿<?php
+<?php
 
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 class WorkshopModuleSeeder extends Seeder
@@ -31,6 +32,8 @@ class WorkshopModuleSeeder extends Seeder
         }
 
         $views = [
+            ['name' => 'Tablero Mantenimiento Taller', 'abbreviation' => 'TAL_TAB'],
+            ['name' => 'Clientes Taller', 'abbreviation' => 'TAL_CLI'],
             ['name' => 'Agenda/Citas Taller', 'abbreviation' => 'TAL_CITAS'],
             ['name' => 'Vehiculos Taller', 'abbreviation' => 'TAL_VEH'],
             ['name' => 'Ordenes de Servicio Taller', 'abbreviation' => 'TAL_OS'],
@@ -66,11 +69,26 @@ class WorkshopModuleSeeder extends Seeder
             ->value('id');
 
         if (!$workshopMovementTypeId) {
-            $workshopMovementTypeId = DB::table('movement_types')->insertGetId([
-                'description' => 'TALLER_OS',
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
+            try {
+                $workshopMovementTypeId = DB::table('movement_types')->insertGetId([
+                    'description' => 'TALLER_OS',
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            } catch (QueryException $exception) {
+                // PostgreSQL sequence desync guard.
+                DB::statement("
+                    SELECT setval(
+                        pg_get_serial_sequence('movement_types', 'id'),
+                        COALESCE((SELECT MAX(id) FROM movement_types), 1)
+                    )
+                ");
+                $workshopMovementTypeId = DB::table('movement_types')->insertGetId([
+                    'description' => 'TALLER_OS',
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
         }
 
         $osDocumentType = DB::table('document_types')
@@ -79,13 +97,29 @@ class WorkshopModuleSeeder extends Seeder
             ->first();
 
         if (!$osDocumentType) {
-            DB::table('document_types')->insert([
-                'name' => 'Orden de Servicio',
-                'stock' => 'none',
-                'movement_type_id' => $workshopMovementTypeId,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
+            try {
+                DB::table('document_types')->insert([
+                    'name' => 'Orden de Servicio',
+                    'stock' => 'none',
+                    'movement_type_id' => $workshopMovementTypeId,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            } catch (QueryException $exception) {
+                DB::statement("
+                    SELECT setval(
+                        pg_get_serial_sequence('document_types', 'id'),
+                        COALESCE((SELECT MAX(id) FROM document_types), 1)
+                    )
+                ");
+                DB::table('document_types')->insert([
+                    'name' => 'Orden de Servicio',
+                    'stock' => 'none',
+                    'movement_type_id' => $workshopMovementTypeId,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
         }
     }
 }

@@ -17,8 +17,6 @@
                 <i class="ri-add-line"></i><span>Nuevo servicio</span>
             </x-ui.button>
             <button type="button" class="h-10 rounded-lg bg-[#244BB3] px-3 text-sm font-medium text-white">Operacion: Ver</button>
-            <button type="button" class="h-10 rounded-lg bg-amber-600 px-3 text-sm font-medium text-white">Operacion: Editar</button>
-            <button type="button" class="h-10 rounded-lg bg-red-700 px-3 text-sm font-medium text-white">Operacion: Eliminar</button>
         </div>
 
         <form method="GET" class="mb-4 flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.02]">

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 namespace Database\Seeders;
 
@@ -16,6 +16,8 @@ class WorkshopMenuOptionSeeder extends Seeder
         }
 
         $items = [
+            ['name' => 'Tablero Mantenimiento', 'icon' => 'ri-dashboard-2-line', 'action' => 'workshop.maintenance-board.index', 'view' => 'TAL_TAB'],
+            ['name' => 'Clientes Taller', 'icon' => 'ri-user-3-line', 'action' => 'workshop.clients.index', 'view' => 'TAL_CLI'],
             ['name' => 'Agenda/Citas', 'icon' => 'ri-calendar-event-line', 'action' => 'workshop.appointments.index', 'view' => 'TAL_CITAS'],
             ['name' => 'Vehiculos', 'icon' => 'ri-motorbike-line', 'action' => 'workshop.vehicles.index', 'view' => 'TAL_VEH'],
             ['name' => 'Ordenes de Servicio', 'icon' => 'ri-file-list-3-line', 'action' => 'workshop.orders.index', 'view' => 'TAL_OS'],

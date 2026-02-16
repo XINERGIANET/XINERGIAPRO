@@ -10,6 +10,8 @@ class WorkshopIntakeInventory extends Model
 {
     use HasFactory, SoftDeletes;
 
+    protected $table = 'workshop_intake_inventory';
+
     protected $fillable = [
         'workshop_movement_id',
         'item_key',

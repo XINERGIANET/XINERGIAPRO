@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 namespace Database\Seeders;
 
@@ -13,6 +13,19 @@ class WorkshopOperationsSeeder extends Seeder
         $now = now();
 
         $operationsByView = [
+            'TAL_TAB' => [
+                ['name' => 'Ver tablero', 'icon' => 'ri-eye-line', 'action' => 'workshop.maintenance-board.index', 'color' => '#1d4ed8', 'status' => 1, 'type' => 'T'],
+                ['name' => 'Iniciar mantenimiento', 'icon' => 'ri-play-circle-line', 'action' => 'workshop.maintenance-board.store', 'color' => '#ea580c', 'status' => 1, 'type' => 'T'],
+                ['name' => 'Iniciar servicio', 'icon' => 'ri-tools-line', 'action' => 'workshop.maintenance-board.start', 'color' => '#d97706', 'status' => 1, 'type' => 'R'],
+                ['name' => 'Finalizar servicio', 'icon' => 'ri-checkbox-circle-line', 'action' => 'workshop.maintenance-board.finish', 'color' => '#059669', 'status' => 1, 'type' => 'R'],
+            ],
+            'TAL_CLI' => [
+                ['name' => 'Nuevo cliente', 'icon' => 'ri-add-line', 'action' => 'workshop.clients.store', 'color' => '#111827', 'status' => 1, 'type' => 'T'],
+                ['name' => 'Ver', 'icon' => 'ri-eye-line', 'action' => 'workshop.clients.index', 'color' => '#1d4ed8', 'status' => 1, 'type' => 'R'],
+                ['name' => 'Ver historial', 'icon' => 'ri-file-list-3-line', 'action' => 'workshop.clients.history', 'color' => '#334155', 'status' => 1, 'type' => 'R'],
+                ['name' => 'Editar', 'icon' => 'ri-edit-line', 'action' => 'workshop.clients.update', 'color' => '#0f766e', 'status' => 1, 'type' => 'R'],
+                ['name' => 'Eliminar', 'icon' => 'ri-delete-bin-line', 'action' => 'workshop.clients.destroy', 'color' => '#dc2626', 'status' => 1, 'type' => 'R'],
+            ],
             'TAL_CITAS' => [
                 ['name' => 'Nueva cita', 'icon' => 'ri-add-line', 'action' => 'open-create-modal', 'color' => '#111827', 'status' => 1, 'type' => 'T'],
                 ['name' => 'Ver', 'icon' => 'ri-eye-line', 'action' => 'workshop.appointments.index', 'color' => '#1d4ed8', 'status' => 1, 'type' => 'R'],
@@ -321,7 +334,7 @@ class WorkshopOperationsSeeder extends Seeder
                     $allowed = match ($profileName) {
                         'ADMIN' => true,
                         'RECEPCION' => true,
-                        'TECNICO' => !in_array($menuName, ['Reportes Taller'], true),
+                        'TECNICO' => !in_array($menuName, ['Reportes Taller', 'Clientes Taller'], true),
                         'CAJERO' => in_array($menuName, ['Ordenes de Servicio', 'Reportes Taller', 'Ventas Taller'], true),
                         'ALMACENERO' => in_array($menuName, ['Ordenes de Servicio', 'Armados Taller', 'Compras Taller'], true),
                         default => false,

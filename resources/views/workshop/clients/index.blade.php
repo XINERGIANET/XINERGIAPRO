@@ -1,0 +1,143 @@
+@extends('layouts.app')
+
+@section('content')
+<div x-data="{}">
+    <x-common.page-breadcrumb pageTitle="Clientes Taller" />
+
+    <x-common.component-card title="Clientes" desc="Gestion de clientes naturales y corporativos del taller.">
+        @if (session('status'))
+            <div class="mb-4 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-700">{{ session('status') }}</div>
+        @endif
+        @if ($errors->any())
+            <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first() }}</div>
+        @endif
+
+        <div class="mb-4 flex flex-wrap items-center gap-2">
+            <x-ui.button size="md" variant="primary" type="button" style="background-color:#00A389;color:#fff" @click="$dispatch('open-client-modal')">
+                <i class="ri-add-line"></i><span>Nuevo cliente</span>
+            </x-ui.button>
+        </div>
+
+        <form method="GET" class="mb-4 grid grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-white p-4 md:grid-cols-4 dark:border-gray-800 dark:bg-white/[0.02]">
+            <input name="search" value="{{ $search }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm md:col-span-2" placeholder="Buscar por nombre, DNI o RUC">
+            <select name="type" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
+                <option value="">Todos</option>
+                <option value="NATURAL" @selected($type === 'NATURAL')>Natural</option>
+                <option value="CORPORATIVO" @selected($type === 'CORPORATIVO')>Corporativo</option>
+            </select>
+            <div class="flex gap-2">
+                <button class="h-11 flex-1 rounded-lg bg-[#244BB3] px-4 text-sm font-medium text-white">Buscar</button>
+                <a href="{{ route('workshop.clients.index') }}" class="h-11 flex-1 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 inline-flex items-center justify-center">Limpiar</a>
+            </div>
+        </form>
+
+        <div class="table-responsive rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+            <table class="w-full min-w-[1050px]">
+                <thead>
+                    <tr>
+                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">ID</th>
+                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Tipo</th>
+                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Documento</th>
+                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Cliente</th>
+                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Telefono</th>
+                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Correo</th>
+                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($clients as $client)
+                        <tr class="border-t border-gray-100 dark:border-gray-800">
+                            <td class="px-4 py-3 text-sm">{{ $client->id }}</td>
+                            <td class="px-4 py-3 text-sm">{{ $client->person_type === 'RUC' ? 'CORPORATIVO' : 'NATURAL' }}</td>
+                            <td class="px-4 py-3 text-sm">{{ $client->person_type }}: {{ $client->document_number }}</td>
+                            <td class="px-4 py-3 text-sm">{{ $client->first_name }} {{ $client->last_name }}</td>
+                            <td class="px-4 py-3 text-sm">{{ $client->phone }}</td>
+                            <td class="px-4 py-3 text-sm">{{ $client->email }}</td>
+                            <td class="px-4 py-3 text-sm">
+                                <div class="flex flex-wrap gap-1.5">
+                                    <a href="{{ route('workshop.clients.history', $client) }}" class="rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-medium text-white">Historial</a>
+                                    <button type="button" @click="$dispatch('open-edit-client-modal', {{ $client->id }})" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white">Editar</button>
+                                    <form method="POST" action="{{ route('workshop.clients.destroy', $client) }}" onsubmit="return confirm('Eliminar cliente?')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="rounded-lg bg-red-700 px-3 py-1.5 text-xs font-medium text-white">Eliminar</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="7" class="px-4 py-4 text-sm text-gray-500">Sin clientes registrados.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mt-4">{{ $clients->links() }}</div>
+    </x-common.component-card>
+
+    <x-ui.modal x-data="{ open: false }" x-on:open-client-modal.window="open = true" :isOpen="false" :showCloseButton="false" class="max-w-6xl">
+        <div class="p-6 sm:p-8">
+            <div class="mb-6 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Registrar cliente</h3>
+                <button type="button" @click="open = false" class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
+                    <i class="ri-close-line text-xl"></i>
+                </button>
+            </div>
+
+            <form method="POST" action="{{ route('workshop.clients.store') }}" class="grid grid-cols-1 gap-2 md:grid-cols-3">
+                @csrf
+                <select name="person_type" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
+                    <option value="DNI">DNI</option>
+                    <option value="RUC">RUC</option>
+                    <option value="CARNET DE EXTRANGERIA">CARNET DE EXTRANGERIA</option>
+                    <option value="PASAPORTE">PASAPORTE</option>
+                </select>
+                <input name="document_number" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Documento" required>
+                <input name="first_name" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nombres / Razon social" required>
+                <input name="last_name" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Apellidos" required>
+                <input name="phone" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Telefono" required>
+                <input name="email" type="email" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Correo">
+                <input name="address" class="h-11 rounded-lg border border-gray-300 px-3 text-sm md:col-span-2" placeholder="Direccion" required>
+                <div class="md:col-span-3 mt-2 flex gap-2">
+                    <x-ui.button type="submit" size="md" variant="primary"><i class="ri-save-line"></i><span>Guardar</span></x-ui.button>
+                    <x-ui.button type="button" size="md" variant="outline" @click="open = false"><i class="ri-close-line"></i><span>Cancelar</span></x-ui.button>
+                </div>
+            </form>
+        </div>
+    </x-ui.modal>
+
+    @foreach($clients as $client)
+        <x-ui.modal x-data="{ open: false }" x-on:open-edit-client-modal.window="if ($event.detail === {{ $client->id }}) { open = true }" :isOpen="false" :showCloseButton="false" class="max-w-6xl">
+            <div class="p-6 sm:p-8">
+                <div class="mb-6 flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Editar cliente</h3>
+                    <button type="button" @click="open = false" class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
+                        <i class="ri-close-line text-xl"></i>
+                    </button>
+                </div>
+
+                <form method="POST" action="{{ route('workshop.clients.update', $client) }}" class="grid grid-cols-1 gap-2 md:grid-cols-3">
+                    @csrf
+                    @method('PUT')
+                    <select name="person_type" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
+                        <option value="DNI" @selected($client->person_type === 'DNI')>DNI</option>
+                        <option value="RUC" @selected($client->person_type === 'RUC')>RUC</option>
+                        <option value="CARNET DE EXTRANGERIA" @selected($client->person_type === 'CARNET DE EXTRANGERIA')>CARNET DE EXTRANGERIA</option>
+                        <option value="PASAPORTE" @selected($client->person_type === 'PASAPORTE')>PASAPORTE</option>
+                    </select>
+                    <input name="document_number" value="{{ $client->document_number }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Documento" required>
+                    <input name="first_name" value="{{ $client->first_name }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nombres / Razon social" required>
+                    <input name="last_name" value="{{ $client->last_name }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Apellidos" required>
+                    <input name="phone" value="{{ $client->phone }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Telefono" required>
+                    <input name="email" type="email" value="{{ $client->email }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Correo">
+                    <input name="address" value="{{ $client->address }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm md:col-span-2" placeholder="Direccion" required>
+                    <div class="md:col-span-3 mt-2 flex gap-2">
+                        <x-ui.button type="submit" size="md" variant="primary"><i class="ri-save-line"></i><span>Guardar cambios</span></x-ui.button>
+                        <x-ui.button type="button" size="md" variant="outline" @click="open = false"><i class="ri-close-line"></i><span>Cancelar</span></x-ui.button>
+                    </div>
+                </form>
+            </div>
+        </x-ui.modal>
+    @endforeach
+</div>
+@endsection

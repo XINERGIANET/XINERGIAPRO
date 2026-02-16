@@ -11,6 +11,8 @@
     }
 
     $workshopStaticItems = [
+        ['name' => 'Tablero Mantenimiento', 'route' => 'workshop.maintenance-board.index', 'icon' => '<i class="ri-dashboard-2-line text-lg"></i>'],
+        ['name' => 'Clientes Taller', 'route' => 'workshop.clients.index', 'icon' => '<i class="ri-user-3-line text-lg"></i>'],
         ['name' => 'Agenda/Citas', 'route' => 'workshop.appointments.index', 'icon' => '<i class="ri-calendar-event-line text-lg"></i>'],
         ['name' => 'Vehiculos', 'route' => 'workshop.vehicles.index', 'icon' => '<i class="ri-motorbike-line text-lg"></i>'],
         ['name' => 'Ordenes de Servicio', 'route' => 'workshop.orders.index', 'icon' => '<i class="ri-file-list-3-line text-lg"></i>'],
@@ -124,7 +126,7 @@ class="fixed flex flex-col mt-0 top-0 px-5 left-0 dark:bg-gray-900 dark:border-g
     <div class="flex-1 flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar px-1">
         <nav class="mb-8 mt-4">
             <div class="flex flex-col gap-6">
-                @foreach ($menuGroups as $groupIndex => $menuGroup)
+                {{-- @foreach ($menuGroups as $groupIndex => $menuGroup)
                     <div>
                         <h2 class="mb-3 px-4 text-[11px] font-bold uppercase tracking-widest flex leading-[20px] text-gray-400/80 dark:text-gray-500"
                             :class="(!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen) ?
@@ -226,7 +228,7 @@ class="fixed flex flex-col mt-0 top-0 px-5 left-0 dark:bg-gray-900 dark:border-g
                             @endforeach
                         </ul>
                     </div>
-                @endforeach
+                @endforeach --}}
 
                 @if (!empty($workshopStaticItems))
                     <div>
