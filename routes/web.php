@@ -44,6 +44,7 @@ use App\Http\Controllers\WorkshopExportController;
 use App\Http\Controllers\WorkshopReportController;
 use App\Http\Controllers\WorkshopServiceCatalogController;
 use App\Http\Controllers\WorkshopVehicleController;
+use App\Http\Controllers\OrderController;
 
 Route::prefix('restaurante')->name('restaurant.')->group(function () {
     Route::view('/', 'restaurant.home', ['title' => 'Xinergia Restaurante'])->name('home');
@@ -125,6 +126,17 @@ Route::middleware('auth')->group(function () {
         ->parameters(['ventas' => 'sale'])
         ->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
 
+    // POS: Pedidos
+    Route::group(['prefix' => 'admin/pedidos', 'as' => 'admin.orders.'], function () {
+        Route::get('/', [OrderController::class, 'index'])->name('index');
+        Route::get('/listado', [OrderController::class, 'list'])->name('list');
+        Route::get('/crear', [OrderController::class, 'create'])->name('create');
+        Route::post('/procesar', [OrderController::class, 'processOrder'])->name('process');
+        Route::post('/procesar-pago', [OrderController::class, 'processOrderPayment'])->name('processOrderPayment');
+        Route::get('/cobrar', [OrderController::class, 'charge'])->name('charge');
+        Route::post('/cancelar', [OrderController::class, 'cancelOrder'])->name('cancelOrder');
+    });
+
     // POS: vista de cobro (antes era modal)
     Route::get('/admin/ventas/cobrar', [SalesController::class, 'charge'])
         ->name('admin.sales.charge');
@@ -139,6 +151,15 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/admin/ventas/reporte', [SalesController::class, 'reportSales'])
         ->name('sales.report');
+
+    // Pedidos / Restaurante
+    Route::get('/admin/pedidos', [OrderController::class, 'index'])->name('admin.orders.index');
+    Route::get('/admin/pedidos/lista', [OrderController::class, 'list'])->name('admin.orders.list');
+    Route::get('/admin/pedidos/crear', [OrderController::class, 'create'])->name('admin.orders.create');
+    Route::post('/admin/pedidos/procesar', [OrderController::class, 'processOrder'])->name('admin.orders.process');
+    Route::get('/admin/pedidos/cobrar', [OrderController::class, 'charge'])->name('admin.orders.charge');
+    Route::post('/admin/pedidos/pagar', [OrderController::class, 'processOrderPayment'])->name('admin.orders.pay');
+    Route::post('/admin/pedidos/cancelar', [OrderController::class, 'cancelOrder'])->name('admin.orders.cancel');
 
     Route::resource('/admin/herramientas/tipos-movimiento', MovementTypeController::class)
         ->names('admin.movement-types')
