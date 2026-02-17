@@ -12,20 +12,18 @@ use Illuminate\Support\Facades\DB;
 class MenuHelper
 {
     private const DISABLED_ACTION_PREFIXES = [
-        'admin.orders.',
-        'orders.',
         'areas.',
         'tables.',
     ];
 
     private const DISABLED_PATH_PREFIXES = [
-        '/pedidos',
+        
         '/areas',
         '/mesas',
     ];
 
     private const DISABLED_MODULE_NAMES = [
-        'pedidos',
+       
         'areas',
         'mesas',
     ];
@@ -135,7 +133,7 @@ class MenuHelper
             }
         }
 
-        return str_contains($name, 'pedido') || str_contains($name, 'mesa') || str_contains($name, 'area');
+        return str_contains($name, 'mesa') || str_contains($name, 'area');
     }
 
     private static function isDisabledModule(?string $moduleName): bool

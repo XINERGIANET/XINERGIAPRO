@@ -27,9 +27,7 @@ class AppServiceProvider extends ServiceProvider
             $quickOptions = MenuOption::where('status', 1)
                 ->where('quick_access', 1)
                 ->where(function ($query) {
-                    $query->where('action', 'not like', 'admin.orders.%')
-                        ->where('action', 'not like', 'orders.%')
-                        ->where('action', 'not like', 'areas.%')
+                    $query->where('action', 'not like', 'areas.%')
                         ->where('action', 'not like', 'tables.%');
                 })
                 ->orderBy('id', 'asc')
@@ -37,7 +35,7 @@ class AppServiceProvider extends ServiceProvider
 
             $quickOptions = $quickOptions->filter(function ($option) {
                 $action = Str::lower((string) $option->action);
-                return !Str::startsWith($action, ['/pedidos', '/areas', '/mesas']);
+                return !Str::startsWith($action, [ '/areas', '/mesas']);
             })->values();
 
             $view->with('quickOptions', $quickOptions);
