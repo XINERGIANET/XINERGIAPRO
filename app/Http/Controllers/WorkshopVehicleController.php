@@ -49,11 +49,34 @@ class WorkshopVehicleController extends Controller
 
         $clients = Person::query()
             ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
+            ->whereHas('roles', function ($query) use ($branchId) {
+                $query->where('roles.id', 3);
+                if ($branchId > 0) {
+                    $query->where('role_person.branch_id', $branchId);
+                }
+            })
             ->orderBy('first_name')
             ->orderBy('last_name')
             ->get(['id', 'first_name', 'last_name', 'document_number']);
 
-        return view('workshop.vehicles.index', compact('vehicles', 'clients', 'search'));
+        $vehicleTypes = [
+            'moto lineal',
+            'moto deportiva',
+            'scooter',
+            'trimoto',
+            'mototaxi',
+            'cuatrimoto',
+            'bicimoto',
+            'auto',
+            'camioneta',
+            'furgon',
+            'camion',
+            'bus',
+            'minivan',
+            'otro',
+        ];
+
+        return view('workshop.vehicles.index', compact('vehicles', 'clients', 'search', 'vehicleTypes'));
     }
 
     public function store(StoreVehicleRequest $request): RedirectResponse

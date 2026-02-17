@@ -42,6 +42,7 @@ class WorkshopClientController extends Controller
 
         $search = trim((string) $request->input('search', ''));
         $type = (string) $request->input('type', '');
+        $roleId = (int) $request->input('role_id', 0);
 
         $clients = Person::query()
             ->where('branch_id', $branchId)
@@ -62,6 +63,12 @@ class WorkshopClientController extends Controller
                         ->orWhere('email', 'ILIKE', "%{$search}%");
                 });
             })
+            ->when($roleId > 0, function ($query) use ($roleId, $branchId) {
+                $query->whereHas('roles', function ($roleQuery) use ($roleId, $branchId) {
+                    $roleQuery->where('roles.id', $roleId)
+                        ->where('role_person.branch_id', $branchId);
+                });
+            })
             ->orderByDesc('id')
             ->paginate(15)
             ->withQueryString();
@@ -73,6 +80,7 @@ class WorkshopClientController extends Controller
             'clients' => $clients,
             'search' => $search,
             'type' => $type,
+            'roleId' => $roleId,
             'roles' => $roles,
             'profiles' => $profiles,
             'selectedRoleIds' => old('roles', []),

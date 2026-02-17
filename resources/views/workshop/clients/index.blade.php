@@ -18,12 +18,18 @@
             </x-ui.button>
         </div>
 
-        <form method="GET" class="mb-4 grid grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-white p-4 md:grid-cols-4 dark:border-gray-800 dark:bg-white/[0.02]">
+        <form method="GET" class="mb-4 grid grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-white p-4 md:grid-cols-5 dark:border-gray-800 dark:bg-white/[0.02]">
             <input name="search" value="{{ $search }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm md:col-span-2" placeholder="Buscar por nombre, DNI o RUC">
             <select name="type" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
                 <option value="">Todos</option>
                 <option value="NATURAL" @selected($type === 'NATURAL')>Natural</option>
                 <option value="CORPORATIVO" @selected($type === 'CORPORATIVO')>Corporativo</option>
+            </select>
+            <select name="role_id" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
+                <option value="">Rol: Todos</option>
+                @foreach($roles as $role)
+                    <option value="{{ $role->id }}" @selected((int)($roleId ?? 0) === (int)$role->id)>{{ $role->name }}</option>
+                @endforeach
             </select>
             <div class="flex gap-2">
                 <button class="h-11 flex-1 rounded-lg bg-[#244BB3] px-4 text-sm font-medium text-white">Buscar</button>

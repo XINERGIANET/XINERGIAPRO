@@ -108,6 +108,12 @@ class WorkshopAppointmentController extends Controller
 
         $clients = Person::query()
             ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
+            ->whereHas('roles', function ($query) use ($branchId) {
+                $query->where('roles.id', 3);
+                if ($branchId > 0) {
+                    $query->where('role_person.branch_id', $branchId);
+                }
+            })
             ->orderBy('first_name')
             ->orderBy('last_name')
             ->get(['id', 'first_name', 'last_name']);
@@ -204,4 +210,3 @@ class WorkshopAppointmentController extends Controller
         }
     }
 }
-

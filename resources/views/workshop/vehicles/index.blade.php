@@ -83,7 +83,13 @@
                         <option value="{{ $client->id }}">{{ $client->first_name }} {{ $client->last_name }}</option>
                     @endforeach
                 </select>
-                <input name="type" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" value="moto" required>
+                <select name="type" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
+                    @foreach($vehicleTypes as $vehicleType)
+                        <option value="{{ $vehicleType }}" @selected(old('type', 'moto lineal') === $vehicleType)>
+                            {{ ucfirst($vehicleType) }}
+                        </option>
+                    @endforeach
+                </select>
                 <input name="brand" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Marca" required>
                 <input name="model" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Modelo" required>
                 <input name="year" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Anio">
@@ -120,7 +126,13 @@
                             <option value="{{ $client->id }}" @selected((int)$vehicle->client_person_id === (int)$client->id)>{{ $client->first_name }} {{ $client->last_name }}</option>
                         @endforeach
                     </select>
-                    <input name="type" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->type }}" required>
+                    <select name="type" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
+                        @foreach($vehicleTypes as $vehicleType)
+                            <option value="{{ $vehicleType }}" @selected(old('type', $vehicle->type) === $vehicleType)>
+                                {{ ucfirst($vehicleType) }}
+                            </option>
+                        @endforeach
+                    </select>
                     <input name="brand" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->brand }}" placeholder="Marca" required>
                     <input name="model" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->model }}" placeholder="Modelo" required>
                     <input name="year" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->year }}" placeholder="Anio">

@@ -3,10 +3,28 @@
 @section('content')
 <div x-data="{
     vehicles: @js($vehicles->map(fn($v) => ['id' => $v->id, 'client_person_id' => $v->client_person_id, 'label' => trim($v->brand . ' ' . $v->model . ' ' . ($v->plate ? ('- ' . $v->plate) : '')) , 'km' => (int) ($v->current_mileage ?? 0)])),
+    vehicleTypes: @js(['moto lineal', 'moto deportiva', 'scooter', 'trimoto', 'mototaxi', 'cuatrimoto', 'bicimoto', 'auto', 'camioneta', 'furgon', 'camion', 'bus', 'minivan', 'otro']),
     servicesCatalog: @js($services->map(fn($s) => ['id' => $s->id, 'name' => $s->name, 'base_price' => (float) $s->base_price, 'type' => $s->type])),
     selectedVehicleId: '',
     selectedClientId: '',
     mileageIn: '',
+    creatingVehicle: false,
+    creatingVehicleLoading: false,
+    quickVehicleError: '',
+    quickVehicle: {
+        client_person_id: '',
+        type: 'moto lineal',
+        brand: '',
+        model: '',
+        year: '',
+        color: '',
+        plate: '',
+        vin: '',
+        engine_number: '',
+        chassis_number: '',
+        serial_number: '',
+        current_mileage: ''
+    },
     serviceLines: [{ service_id: '', qty: 1, unit_price: 0 }],
     syncVehicle() {
         const selected = this.vehicles.find(v => String(v.id) === String(this.selectedVehicleId));
@@ -36,6 +54,60 @@
     },
     estimatedTotal() {
         return this.serviceLines.reduce((sum, line) => sum + this.lineSubtotal(line), 0);
+    },
+    resetQuickVehicle() {
+        this.quickVehicle = {
+            client_person_id: this.selectedClientId || '',
+            type: 'moto lineal',
+            brand: '',
+            model: '',
+            year: '',
+            color: '',
+            plate: '',
+            vin: '',
+            engine_number: '',
+            chassis_number: '',
+            serial_number: '',
+            current_mileage: this.mileageIn || ''
+        };
+        this.quickVehicleError = '';
+    },
+    toggleQuickVehicle() {
+        this.creatingVehicle = !this.creatingVehicle;
+        if (this.creatingVehicle) {
+            this.resetQuickVehicle();
+        }
+    },
+    async saveQuickVehicle() {
+        this.quickVehicleError = '';
+        this.creatingVehicleLoading = true;
+        try {
+            const response = await fetch(@js(route('workshop.maintenance-board.vehicles.store')), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': @js(csrf_token()),
+                },
+                body: JSON.stringify(this.quickVehicle),
+            });
+            const payload = await response.json();
+            if (!response.ok) {
+                const message = payload?.message || 'No se pudo registrar el vehiculo.';
+                const firstError = payload?.errors ? Object.values(payload.errors)[0]?.[0] : null;
+                throw new Error(firstError || message);
+            }
+            this.vehicles.unshift(payload);
+            this.selectedVehicleId = String(payload.id);
+            this.selectedClientId = payload.client_person_id ? String(payload.client_person_id) : this.selectedClientId;
+            this.mileageIn = payload.km ? String(payload.km) : this.mileageIn;
+            this.creatingVehicle = false;
+            this.resetQuickVehicle();
+        } catch (error) {
+            this.quickVehicleError = error?.message || 'Error registrando vehiculo.';
+        } finally {
+            this.creatingVehicleLoading = false;
+        }
     }
 }">
     <x-common.page-breadcrumb pageTitle="Tablero de Mantenimiento" />
@@ -295,12 +367,22 @@
 
             <form method="POST" action="{{ route('workshop.maintenance-board.store') }}" class="grid grid-cols-1 gap-3 md:grid-cols-3">
                 @csrf
-                <select name="vehicle_id" x-model="selectedVehicleId" @change="syncVehicle()" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
-                    <option value="">Selecciona vehiculo</option>
-                    @foreach($vehicles as $vehicle)
-                        <option value="{{ $vehicle->id }}">{{ $vehicle->brand }} {{ $vehicle->model }} {{ $vehicle->plate ? ('- '.$vehicle->plate) : '(S/PLACA)' }}</option>
-                    @endforeach
-                </select>
+                <div class="md:col-span-1">
+                    <div class="flex items-center gap-2">
+                        <select name="vehicle_id" x-model="selectedVehicleId" @change="syncVehicle()" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                            <option value="">Selecciona vehiculo</option>
+                            <template x-for="vehicle in vehicles" :key="`v-${vehicle.id}`">
+                                <option :value="vehicle.id" x-text="vehicle.label || `Vehiculo #${vehicle.id}`"></option>
+                            </template>
+                        </select>
+                        <button type="button"
+                                @click="toggleQuickVehicle()"
+                                class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">
+                            <i class="ri-add-line"></i>
+                            <span class="ml-1 hidden sm:inline">Nuevo</span>
+                        </button>
+                    </div>
+                </div>
 
                 <select name="client_person_id" x-model="selectedClientId" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
                     <option value="">Selecciona cliente</option>
@@ -318,6 +400,50 @@
 
                 <input name="diagnosis_text" class="h-11 rounded-lg border border-gray-300 px-3 text-sm md:col-span-2" placeholder="Diagnostico inicial (opcional)">
                 <textarea name="observations" rows="3" class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-3" placeholder="Observaciones"></textarea>
+
+                <div x-show="creatingVehicle" x-cloak class="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 md:col-span-3">
+                    <div class="mb-3 flex items-center justify-between">
+                        <h4 class="text-sm font-semibold text-indigo-800">Registrar vehiculo rapido</h4>
+                        <button type="button" @click="creatingVehicle = false" class="text-xs font-medium text-indigo-700 hover:text-indigo-900">Cerrar</button>
+                    </div>
+
+                    <div x-show="quickVehicleError" class="mb-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700" x-text="quickVehicleError"></div>
+
+                    <div class="grid grid-cols-1 gap-2 md:grid-cols-4">
+                        <select x-model="quickVehicle.client_person_id" class="h-10 rounded-lg border border-gray-300 px-3 text-sm">
+                            <option value="">Cliente</option>
+                            @foreach($clients as $client)
+                                <option value="{{ $client->id }}">{{ $client->first_name }} {{ $client->last_name }}</option>
+                            @endforeach
+                        </select>
+                        <select x-model="quickVehicle.type" class="h-10 rounded-lg border border-gray-300 px-3 text-sm">
+                            <template x-for="type in vehicleTypes" :key="`type-${type}`">
+                                <option :value="type" x-text="type"></option>
+                            </template>
+                        </select>
+                        <input x-model="quickVehicle.brand" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Marca">
+                        <input x-model="quickVehicle.model" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Modelo">
+                        <input x-model="quickVehicle.year" type="number" min="1900" max="2100" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Anio">
+                        <input x-model="quickVehicle.color" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Color">
+                        <input x-model="quickVehicle.plate" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Placa">
+                        <input x-model="quickVehicle.vin" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="VIN">
+                        <input x-model="quickVehicle.engine_number" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nro motor">
+                        <input x-model="quickVehicle.chassis_number" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nro chasis">
+                        <input x-model="quickVehicle.serial_number" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Serial">
+                        <input x-model="quickVehicle.current_mileage" type="number" min="0" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="KM actual">
+                    </div>
+
+                    <div class="mt-3 flex items-center gap-2">
+                        <button type="button"
+                                @click="saveQuickVehicle()"
+                                :disabled="creatingVehicleLoading"
+                                class="inline-flex h-10 items-center rounded-lg bg-indigo-700 px-4 text-xs font-semibold text-white hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60">
+                            <i class="ri-save-line"></i>
+                            <span class="ml-1" x-text="creatingVehicleLoading ? 'Guardando...' : 'Guardar vehiculo'"></span>
+                        </button>
+                        <span class="text-xs text-gray-600">Se agregara y seleccionara automaticamente.</span>
+                    </div>
+                </div>
 
                 <div class="rounded-xl border border-gray-200 bg-gray-50/50 p-4 md:col-span-3">
                     <div class="mb-3 flex items-center justify-between">

@@ -12,10 +12,12 @@ use App\Models\WorkshopMovement;
 use App\Models\WorkshopService;
 use App\Services\Workshop\WorkshopFlowService;
 use App\Support\WorkshopAuthorization;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 
 class WorkshopMaintenanceBoardController extends Controller
 {
@@ -59,6 +61,10 @@ class WorkshopMaintenanceBoardController extends Controller
 
         $clients = Person::query()
             ->where('branch_id', $branchId)
+            ->whereHas('roles', function ($query) use ($branchId) {
+                $query->where('roles.id', 3)
+                    ->where('role_person.branch_id', $branchId);
+            })
             ->orderBy('first_name')
             ->orderBy('last_name')
             ->get(['id', 'first_name', 'last_name', 'document_number', 'person_type']);
@@ -200,6 +206,82 @@ class WorkshopMaintenanceBoardController extends Controller
         }
 
         return back()->with('status', 'Servicio de mantenimiento iniciado correctamente.');
+    }
+
+    public function storeVehicleQuick(Request $request): JsonResponse
+    {
+        [$branchId, $companyId] = $this->branchScope();
+
+        $validated = $request->validate([
+            'client_person_id' => [
+                'required',
+                'integer',
+                Rule::exists('people', 'id')->where(fn ($query) => $query->where('branch_id', $branchId)),
+            ],
+            'type' => ['required', 'string', 'max:50'],
+            'brand' => ['required', 'string', 'max:255'],
+            'model' => ['required', 'string', 'max:255'],
+            'year' => ['nullable', 'integer', 'digits:4'],
+            'color' => ['nullable', 'string', 'max:100'],
+            'plate' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::unique('vehicles', 'plate')->where(fn ($query) => $query->where('company_id', $companyId)),
+            ],
+            'vin' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::unique('vehicles', 'vin')->where(fn ($query) => $query->where('company_id', $companyId)),
+            ],
+            'engine_number' => ['nullable', 'string', 'max:255'],
+            'chassis_number' => ['nullable', 'string', 'max:255'],
+            'serial_number' => ['nullable', 'string', 'max:255'],
+            'current_mileage' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $hasClientRole = Person::query()
+            ->where('id', (int) $validated['client_person_id'])
+            ->where('branch_id', $branchId)
+            ->whereHas('roles', function ($query) use ($branchId) {
+                $query->where('roles.id', 3)
+                    ->where('role_person.branch_id', $branchId);
+            })
+            ->exists();
+
+        if (!$hasClientRole) {
+            return response()->json([
+                'message' => 'La persona seleccionada no tiene rol de cliente.',
+            ], 422);
+        }
+
+        if (
+            trim((string) ($validated['plate'] ?? '')) === ''
+            && trim((string) ($validated['vin'] ?? '')) === ''
+            && trim((string) ($validated['engine_number'] ?? '')) === ''
+        ) {
+            return response()->json([
+                'message' => 'Debe registrar placa o VIN o numero de motor.',
+            ], 422);
+        }
+
+        $vehicle = Vehicle::query()->create(array_merge(
+            $validated,
+            [
+                'company_id' => $companyId,
+                'branch_id' => $branchId,
+                'status' => 'active',
+                'current_mileage' => (int) ($validated['current_mileage'] ?? 0),
+            ]
+        ));
+
+        return response()->json([
+            'id' => $vehicle->id,
+            'client_person_id' => (int) $vehicle->client_person_id,
+            'label' => trim($vehicle->brand . ' ' . $vehicle->model . ' ' . ($vehicle->plate ? ('- ' . $vehicle->plate) : '')),
+            'km' => (int) ($vehicle->current_mileage ?? 0),
+        ]);
     }
 
     public function start(WorkshopMovement $order): RedirectResponse
