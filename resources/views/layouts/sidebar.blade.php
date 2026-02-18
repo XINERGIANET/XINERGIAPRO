@@ -18,7 +18,6 @@
         ['name' => 'Ordenes de Servicio', 'route' => 'workshop.orders.index', 'icon' => '<i class="ri-file-list-3-line text-lg"></i>'],
         ['name' => 'Servicios Taller', 'route' => 'workshop.services.index', 'icon' => '<i class="ri-settings-4-line text-lg"></i>'],
         ['name' => 'Compras Taller', 'route' => 'workshop.purchases.index', 'icon' => '<i class="ri-file-list-2-line text-lg"></i>'],
-        ['name' => 'Ventas Taller', 'route' => 'admin.sales.index', 'icon' => '<i class="ri-file-chart-line text-lg"></i>'],
         ['name' => 'Armados Taller', 'route' => 'workshop.assemblies.index', 'icon' => '<i class="ri-hammer-line text-lg"></i>'],
         ['name' => 'Reportes Taller', 'route' => 'workshop.reports.index', 'icon' => '<i class="ri-bar-chart-2-line text-lg"></i>'],
     ];

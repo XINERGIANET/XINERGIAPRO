@@ -125,6 +125,8 @@ Route::middleware('auth')->group(function () {
         ->names('admin.sales')
         ->parameters(['ventas' => 'sale'])
         ->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
+    Route::get('/admin/ventas/{sale}/imprimir/pdf', [SalesController::class, 'printPdf'])->name('admin.sales.print.pdf');
+    Route::get('/admin/ventas/{sale}/imprimir/ticket', [SalesController::class, 'printTicket'])->name('admin.sales.print.ticket');
 
     // POS: Pedidos
     Route::group(['prefix' => 'admin/pedidos', 'as' => 'admin.orders.'], function () {

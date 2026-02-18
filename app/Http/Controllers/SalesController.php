@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
+use Symfony\Component\Process\Process;
 
 class SalesController extends Controller
 {
@@ -1160,6 +1161,33 @@ class SalesController extends Controller
         ]);
     }
 
+    public function printPdf(Request $request, Movement $sale)
+    {
+        $sale = $this->resolvePrintableSale($sale);
+        $printData = $this->buildSalePrintData($sale, $request);
+
+        $html = view('sales.print.pdf', $printData)->render();
+        $pdfBinary = $this->renderPdfWithWkhtmltopdf($html, 'A4');
+
+        if ($pdfBinary === null) {
+            return view('sales.print.pdf', $printData);
+        }
+
+        $docName = strtoupper(substr($sale->documentType?->name ?? 'C', 0, 1)) . ($sale->salesMovement?->series ?? '001') . '-' . $sale->number;
+        return response($pdfBinary, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $docName . '.pdf"',
+        ]);
+    }
+
+    public function printTicket(Request $request, Movement $sale)
+    {
+        $sale = $this->resolvePrintableSale($sale);
+        $printData = $this->buildSalePrintData($sale, $request);
+
+        return view('sales.print.ticket', $printData);
+    }
+
     /**
      * Genera numero de venta en formato correlativo simple: 00000127.
      * Mantiene compatibilidad leyendo tambien numeros historicos con formato antiguo.
@@ -1335,5 +1363,165 @@ class SalesController extends Controller
         $nextSequence = $lastNumber ? ((int) $lastNumber + 1) : 1;
 
         return str_pad((string) $nextSequence, 8, '0', STR_PAD_LEFT);
+    }
+
+    private function resolvePrintableSale(Movement $sale): Movement
+    {
+        $sale->loadMissing([
+            'documentType',
+            'person',
+            'branch',
+            'salesMovement.details.unit',
+            'salesMovement.details.product',
+            'salesMovement.details.taxRate',
+        ]);
+
+        if ((int) $sale->movement_type_id !== 2 || !$sale->salesMovement) {
+            abort(404, 'Venta no encontrada.');
+        }
+
+        return $sale;
+    }
+
+    private function buildSalePrintData(Movement $sale, Request $request): array
+    {
+        $sessionBranchId = (int) session('branch_id');
+        $sessionBranch = $sessionBranchId ? Branch::find($sessionBranchId) : null;
+        $branchForLogo = $sessionBranch ?: $sale->branch;
+
+        $logoUrl = null;
+        $logoFileUrl = null;
+        if ($branchForLogo?->logo) {
+            $logoUrl = str_starts_with($branchForLogo->logo, 'http')
+                ? $branchForLogo->logo
+                : asset('storage/' . ltrim((string) $branchForLogo->logo, '/'));
+
+            if (!str_starts_with((string) $branchForLogo->logo, 'http')) {
+                $localLogoPath = storage_path('app/public/' . ltrim((string) $branchForLogo->logo, '/'));
+                if (file_exists($localLogoPath)) {
+                    $normalized = str_replace('\\', '/', $localLogoPath);
+                    $logoFileUrl = 'file:///' . ltrim($normalized, '/');
+                }
+            }
+        }
+
+        $details = $sale->salesMovement->details
+            ->sortBy('id')
+            ->values();
+
+        return [
+            'sale' => $sale,
+            'details' => $details,
+            'branchForLogo' => $branchForLogo,
+            'logoUrl' => $logoUrl,
+            'logoFileUrl' => $logoFileUrl,
+            'printedAt' => now(),
+            'paymentLabel' => $this->resolveSalePaymentLabel($sale),
+            'viewId' => $request->input('view_id'),
+        ];
+    }
+
+    private function resolveSalePaymentLabel(Movement $sale): string
+    {
+        if (($sale->salesMovement?->payment_type ?? null) === 'CREDIT') {
+            return 'Credito';
+        }
+
+        $cashMovement = $sale->cashMovement ?: $this->resolveCashMovementBySaleMovement($sale->id);
+        if (!$cashMovement) {
+            return 'No especificado';
+        }
+
+        $methodName = DB::table('cash_movement_details as cmd')
+            ->leftJoin('payment_methods as pm', 'pm.id', '=', 'cmd.payment_method_id')
+            ->where('cmd.cash_movement_id', $cashMovement->id)
+            ->where('cmd.status', 'A')
+            ->where('cmd.type', '!=', 'DEUDA')
+            ->orderBy('cmd.id')
+            ->value('pm.description');
+
+        return $methodName ?: 'Mixto';
+    }
+
+    private function renderPdfWithWkhtmltopdf(string $html, string $pageSize = 'A4'): ?string
+    {
+        $binary = $this->resolveWkhtmltopdfBinary();
+        if (!$binary) {
+            return null;
+        }
+
+        $tmpDir = storage_path('app/tmp');
+        if (!is_dir($tmpDir)) {
+            @mkdir($tmpDir, 0775, true);
+        }
+
+        $htmlFile = tempnam($tmpDir, 'sale_html_');
+        $pdfFile = tempnam($tmpDir, 'sale_pdf_');
+
+        if ($htmlFile === false || $pdfFile === false) {
+            return null;
+        }
+
+        $htmlPath = $htmlFile . '.html';
+        $pdfPath = $pdfFile . '.pdf';
+        @rename($htmlFile, $htmlPath);
+        @rename($pdfFile, $pdfPath);
+
+        file_put_contents($htmlPath, $html);
+
+        $process = new Process([
+            $binary,
+            '--enable-local-file-access',
+            '--load-error-handling', 'ignore',
+            '--load-media-error-handling', 'ignore',
+            '--encoding', 'utf-8',
+            '--margin-top', '10',
+            '--margin-right', '10',
+            '--margin-bottom', '10',
+            '--margin-left', '10',
+            '--page-size', $pageSize,
+            $htmlPath,
+            $pdfPath,
+        ]);
+
+        try {
+            $process->setTimeout(30);
+            $process->run();
+            $pdfExists = file_exists($pdfPath) && filesize($pdfPath) > 0;
+            if (!$pdfExists) {
+                Log::warning('wkhtmltopdf fallo al generar PDF', [
+                    'error' => $process->getErrorOutput(),
+                    'output' => $process->getOutput(),
+                ]);
+                return null;
+            }
+
+            $content = file_get_contents($pdfPath);
+            return $content === false ? null : $content;
+        } catch (\Throwable $e) {
+            Log::warning('Error ejecutando wkhtmltopdf: ' . $e->getMessage());
+            return null;
+        } finally {
+            @unlink($htmlPath);
+            @unlink($pdfPath);
+        }
+    }
+
+    private function resolveWkhtmltopdfBinary(): ?string
+    {
+        $candidates = array_filter([
+            env('WKHTMLTOPDF_BINARY'),
+            base_path('wkhtmltopdf/bin/wkhtmltopdf.exe'),
+            'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe',
+            'C:\Snappy\wkhtmltopdf.exe',
+        ]);
+
+        foreach ($candidates as $candidate) {
+            if (is_string($candidate) && file_exists($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 }
