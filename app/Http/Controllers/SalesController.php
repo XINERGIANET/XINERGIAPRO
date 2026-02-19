@@ -1165,6 +1165,7 @@ class SalesController extends Controller
     {
         $sale = $this->resolvePrintableSale($sale);
         $printData = $this->buildSalePrintData($sale, $request);
+        $printData['autoPrint'] = false;
 
         $html = view('sales.print.pdf', $printData)->render();
         $pdfBinary = $this->renderPdfWithWkhtmltopdf($html, 'A4');
@@ -1184,8 +1185,31 @@ class SalesController extends Controller
     {
         $sale = $this->resolvePrintableSale($sale);
         $printData = $this->buildSalePrintData($sale, $request);
+        $printData['autoPrint'] = false;
 
-        return view('sales.print.ticket', $printData);
+        $html = view('sales.print.ticket', $printData)->render();
+        $pdfBinary = $this->renderPdfWithWkhtmltopdf($html, null, [
+            '--page-width', '80mm',
+            '--page-height', '220mm',
+            '--margin-top', '0',
+            '--margin-right', '0',
+            '--margin-bottom', '0',
+            '--margin-left', '0',
+            '--print-media-type',
+            '--disable-smart-shrinking',
+            '--dpi', '203',
+        ]);
+
+        if ($pdfBinary === null) {
+            $printData['autoPrint'] = true;
+            return view('sales.print.ticket', $printData);
+        }
+
+        $docName = strtoupper(substr($sale->documentType?->name ?? 'T', 0, 1)) . ($sale->salesMovement?->series ?? '001') . '-' . $sale->number;
+        return response($pdfBinary, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $docName . '-ticket.pdf"',
+        ]);
     }
 
     /**
@@ -1443,7 +1467,7 @@ class SalesController extends Controller
         return $methodName ?: 'Mixto';
     }
 
-    private function renderPdfWithWkhtmltopdf(string $html, string $pageSize = 'A4'): ?string
+    private function renderPdfWithWkhtmltopdf(string $html, ?string $pageSize = 'A4', array $extraArgs = []): ?string
     {
         $binary = $this->resolveWkhtmltopdfBinary();
         if (!$binary) {
@@ -1469,9 +1493,10 @@ class SalesController extends Controller
 
         file_put_contents($htmlPath, $html);
 
-        $process = new Process([
+        $args = array_merge([
             $binary,
             '--enable-local-file-access',
+            '--disable-javascript',
             '--load-error-handling', 'ignore',
             '--load-media-error-handling', 'ignore',
             '--encoding', 'utf-8',
@@ -1479,13 +1504,22 @@ class SalesController extends Controller
             '--margin-right', '10',
             '--margin-bottom', '10',
             '--margin-left', '10',
-            '--page-size', $pageSize,
+        ], $extraArgs);
+
+        if (!empty($pageSize)) {
+            $args[] = '--page-size';
+            $args[] = $pageSize;
+        }
+
+        $args = array_merge($args, [
             $htmlPath,
             $pdfPath,
         ]);
 
+        $process = new Process($args);
+
         try {
-            $process->setTimeout(30);
+            $process->setTimeout(120);
             $process->run();
             $pdfExists = file_exists($pdfPath) && filesize($pdfPath) > 0;
             if (!$pdfExists) {

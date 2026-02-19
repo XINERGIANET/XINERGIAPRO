@@ -517,6 +517,7 @@
 
                     @include('products._form', [
                         'product' => null,
+                        'defaultCode' => $nextProductCode ?? '1',
                         'currentBranch' => $currentBranch ?? null,
                         'taxRates' => $taxRates ?? collect(),
                         'productBranch' => null,

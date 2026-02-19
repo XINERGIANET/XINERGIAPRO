@@ -35,6 +35,20 @@ class WorkshopMaintenanceBoardController extends Controller
     public function index(Request $request)
     {
         [$branchId, $companyId] = $this->branchScope();
+        $allowedStatuses = [
+            'draft',
+            'diagnosis',
+            'awaiting_approval',
+            'approved',
+            'in_progress',
+            'finished',
+            'delivered',
+            'cancelled',
+        ];
+        $selectedStatus = (string) $request->query('status', 'in_progress');
+        if ($selectedStatus !== 'all' && !in_array($selectedStatus, $allowedStatuses, true)) {
+            $selectedStatus = 'in_progress';
+        }
 
         $cards = WorkshopMovement::query()
             ->with(['movement', 'vehicle', 'client'])
@@ -46,7 +60,11 @@ class WorkshopMaintenanceBoardController extends Controller
             ], 'total')
             ->where('company_id', $companyId)
             ->where('branch_id', $branchId)
-            ->whereNotIn('status', ['delivered', 'cancelled'])
+            ->when(
+                $selectedStatus !== 'all',
+                fn ($query) => $query->where('status', $selectedStatus),
+                fn ($query) => $query->whereNotIn('status', ['delivered', 'cancelled'])
+            )
             ->orderByRaw("CASE status WHEN 'in_progress' THEN 1 WHEN 'approved' THEN 2 WHEN 'awaiting_approval' THEN 3 WHEN 'diagnosis' THEN 4 ELSE 5 END")
             ->orderByDesc('id')
             ->paginate(18)
@@ -110,7 +128,8 @@ class WorkshopMaintenanceBoardController extends Controller
             'services',
             'documentTypes',
             'cashRegisters',
-            'paymentMethods'
+            'paymentMethods',
+            'selectedStatus'
         ));
     }
 

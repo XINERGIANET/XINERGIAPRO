@@ -100,8 +100,10 @@
     <p style="margin-top:14px; color:#475569;">Impreso el {{ $printedAt->format('d/m/Y H:i:s') }}</p>
 </div>
 
+@if(($autoPrint ?? true) === true)
 <script>
     window.addEventListener('load', function () { window.print(); });
 </script>
+@endif
 </body>
 </html>

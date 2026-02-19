@@ -67,6 +67,7 @@ class ProductController extends Controller
         $units = Unit::query()->orderBy('description')->get();
         $taxRates = TaxRate::query()->where('status', true)->orderBy('order_num')->get();
         $currentBranch = Branch::find(session('branch_id'));
+        $nextProductCode = $this->nextBranchProductCode((int) $branchId);
 
         return view('products.index', [
             'products' => $products,
@@ -74,6 +75,7 @@ class ProductController extends Controller
             'units' => $units,
             'taxRates' => $taxRates,
             'currentBranch' => $currentBranch,
+            'nextProductCode' => $nextProductCode,
             'search' => $search,
             'perPage' => $perPage,
             'operaciones' => $operaciones,
@@ -313,5 +315,39 @@ class ProductController extends Controller
             'stock' => $validated['stock'],
             'price' => $validated['price'],
         ];
+    }
+
+    private function nextBranchProductCode(int $branchId): string
+    {
+        if ($branchId <= 0) {
+            return '1';
+        }
+
+        $lastCode = Product::query()
+            ->join('product_branch', 'product_branch.product_id', '=', 'products.id')
+            ->where('product_branch.branch_id', $branchId)
+            ->whereNull('product_branch.deleted_at')
+            ->orderByDesc('products.id')
+            ->value('products.code');
+
+        if (!$lastCode) {
+            return '1';
+        }
+
+        $code = trim((string) $lastCode);
+
+        if (preg_match('/^(.*?)(\d+)$/', $code, $matches)) {
+            $prefix = $matches[1];
+            $number = $matches[2];
+            $next = (string) ((int) $number + 1);
+
+            return $prefix . str_pad($next, strlen($number), '0', STR_PAD_LEFT);
+        }
+
+        if (is_numeric($code)) {
+            return (string) ((int) $code + 1);
+        }
+
+        return '1';
     }
 }

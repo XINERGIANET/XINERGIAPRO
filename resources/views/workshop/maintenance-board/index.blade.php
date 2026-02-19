@@ -120,13 +120,38 @@
             <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first() }}</div>
         @endif
 
-        <div class="mb-6 flex flex-wrap items-center gap-2">
-            <x-ui.button size="md" variant="primary" type="button" style="background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff" @click="$dispatch('open-board-create-modal')">
-                <i class="ri-add-circle-line"></i><span>Agregar Vehiculo e Iniciar</span>
-            </x-ui.button>
-            <x-ui.link-button size="md" variant="outline" href="{{ route('workshop.orders.index') }}">
-                <i class="ri-file-list-3-line"></i><span>Ir a Ordenes de Servicio</span>
-            </x-ui.link-button>
+        <div class="mb-6 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div class="flex flex-wrap items-center gap-2">
+                <x-ui.button size="md" variant="primary" type="button" style="background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff" @click="$dispatch('open-board-create-modal')">
+                    <i class="ri-add-circle-line"></i><span>Agregar Vehiculo e Iniciar</span>
+                </x-ui.button>
+                <x-ui.link-button size="md" variant="outline" href="{{ route('workshop.orders.index') }}">
+                    <i class="ri-file-list-3-line"></i><span>Ir a Ordenes de Servicio</span>
+                </x-ui.link-button>
+            </div>
+
+            <form method="GET" class="flex flex-wrap items-center gap-2">
+                <label for="status" class="text-sm font-medium text-slate-700">Filtrar por estado:</label>
+                <select
+                    id="status"
+                    name="status"
+                    class="h-10 min-w-[220px] rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 focus:border-orange-400 focus:outline-none"
+                    onchange="this.form.submit()"
+                >
+                    <option value="all" @selected(($selectedStatus ?? 'in_progress') === 'all')>Todos</option>
+                    <option value="draft" @selected(($selectedStatus ?? 'in_progress') === 'draft')>Borrador</option>
+                    <option value="diagnosis" @selected(($selectedStatus ?? 'in_progress') === 'diagnosis')>Diagnostico</option>
+                    <option value="awaiting_approval" @selected(($selectedStatus ?? 'in_progress') === 'awaiting_approval')>Esperando aprobacion</option>
+                    <option value="approved" @selected(($selectedStatus ?? 'in_progress') === 'approved')>Aprobado</option>
+                    <option value="in_progress" @selected(($selectedStatus ?? 'in_progress') === 'in_progress')>En reparacion</option>
+                    <option value="finished" @selected(($selectedStatus ?? 'in_progress') === 'finished')>Terminado</option>
+                    <option value="delivered" @selected(($selectedStatus ?? 'in_progress') === 'delivered')>Entregado</option>
+                    <option value="cancelled" @selected(($selectedStatus ?? 'in_progress') === 'cancelled')>Anulado</option>
+                </select>
+                <x-ui.link-button size="sm" variant="outline" href="{{ route('workshop.maintenance-board.index', ['status' => 'in_progress']) }}">
+                    <i class="ri-refresh-line"></i><span>Limpiar</span>
+                </x-ui.link-button>
+            </form>
         </div>
 
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -153,6 +178,8 @@
                         'approved' => ['Aprobado', 'bg-emerald-100 text-emerald-700 border-emerald-200'],
                         'in_progress' => ['En reparacion', 'bg-orange-100 text-orange-700 border-orange-200'],
                         'finished' => ['Terminado', 'bg-cyan-100 text-cyan-700 border-cyan-200'],
+                        'delivered' => ['Entregado', 'bg-green-100 text-green-700 border-green-200'],
+                        'cancelled' => ['Anulado', 'bg-rose-100 text-rose-700 border-rose-200'],
                     ];
                     [$statusLabel, $statusClass] = $statusMap[$status] ?? [strtoupper($status), 'bg-gray-100 text-gray-700 border-gray-200'];
                 @endphp
