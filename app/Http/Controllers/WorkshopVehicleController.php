@@ -6,6 +6,7 @@ use App\Http\Requests\Workshop\StoreVehicleRequest;
 use App\Http\Requests\Workshop\UpdateVehicleRequest;
 use App\Models\Person;
 use App\Models\Vehicle;
+use App\Models\VehicleType;
 use App\Support\WorkshopAuthorization;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,7 +33,7 @@ class WorkshopVehicleController extends Controller
         $search = trim((string) $request->input('search', ''));
 
         $vehicles = Vehicle::query()
-            ->with(['client', 'branch'])
+            ->with(['client', 'branch', 'vehicleType'])
             ->when($companyId > 0, fn ($query) => $query->where('company_id', $companyId))
             ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
             ->when($search !== '', function ($query) use ($search) {
@@ -59,22 +60,23 @@ class WorkshopVehicleController extends Controller
             ->orderBy('last_name')
             ->get(['id', 'first_name', 'last_name', 'document_number']);
 
-        $vehicleTypes = [
-            'moto lineal',
-            'moto deportiva',
-            'scooter',
-            'trimoto',
-            'mototaxi',
-            'cuatrimoto',
-            'bicimoto',
-            'auto',
-            'camioneta',
-            'furgon',
-            'camion',
-            'bus',
-            'minivan',
-            'otro',
-        ];
+        $vehicleTypes = VehicleType::query()
+            ->where(function ($query) use ($companyId, $branchId) {
+                $query->whereNull('company_id')
+                    ->orWhere(function ($scope) use ($companyId, $branchId) {
+                        $scope->where('company_id', $companyId)
+                            ->where(function ($branchScope) use ($branchId) {
+                                $branchScope->whereNull('branch_id')
+                                    ->orWhere('branch_id', $branchId);
+                            });
+                    });
+            })
+            ->where('active', true)
+            ->orderBy('company_id')
+            ->orderBy('branch_id')
+            ->orderBy('order_num')
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
         return view('workshop.vehicles.index', compact('vehicles', 'clients', 'search', 'vehicleTypes'));
     }
@@ -84,15 +86,16 @@ class WorkshopVehicleController extends Controller
         $branchId = (int) session('branch_id');
         $branch = \App\Models\Branch::query()->findOrFail($branchId);
 
-        Vehicle::query()->create(array_merge(
-            $request->validated(),
-            [
-                'company_id' => $branch->company_id,
-                'branch_id' => $branchId,
-                'status' => $request->input('status', 'active'),
-                'current_mileage' => (int) $request->input('current_mileage', 0),
-            ]
-        ));
+        $data = $request->validated();
+        $vehicleType = VehicleType::query()->findOrFail((int) $data['vehicle_type_id']);
+        $data['type'] = $vehicleType->name;
+
+        Vehicle::query()->create(array_merge($data, [
+            'company_id' => $branch->company_id,
+            'branch_id' => $branchId,
+            'status' => $request->input('status', 'active'),
+            'current_mileage' => (int) $request->input('current_mileage', 0),
+        ]));
 
         return back()->with('status', 'Vehiculo registrado correctamente.');
     }
@@ -100,7 +103,10 @@ class WorkshopVehicleController extends Controller
     public function update(UpdateVehicleRequest $request, Vehicle $vehicle): RedirectResponse
     {
         $this->assertVehicleScope($vehicle);
-        $vehicle->update($request->validated());
+        $data = $request->validated();
+        $vehicleType = VehicleType::query()->findOrFail((int) $data['vehicle_type_id']);
+        $data['type'] = $vehicleType->name;
+        $vehicle->update($data);
 
         return back()->with('status', 'Vehiculo actualizado correctamente.');
     }

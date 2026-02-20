@@ -38,6 +38,12 @@ class WorkshopOperationsSeeder extends Seeder
                 ['name' => 'Editar', 'icon' => 'ri-edit-line', 'action' => 'workshop.vehicles.update', 'color' => '#0f766e', 'status' => 1, 'type' => 'R'],
                 ['name' => 'Eliminar', 'icon' => 'ri-delete-bin-line', 'action' => 'workshop.vehicles.destroy', 'color' => '#dc2626', 'status' => 1, 'type' => 'R'],
             ],
+            'TAL_VTYPE' => [
+                ['name' => 'Nuevo tipo', 'icon' => 'ri-add-line', 'action' => 'workshop.vehicle-types.store', 'color' => '#111827', 'status' => 1, 'type' => 'T'],
+                ['name' => 'Ver', 'icon' => 'ri-eye-line', 'action' => 'workshop.vehicle-types.index', 'color' => '#1d4ed8', 'status' => 1, 'type' => 'R'],
+                ['name' => 'Editar', 'icon' => 'ri-edit-line', 'action' => 'workshop.vehicle-types.update', 'color' => '#0f766e', 'status' => 1, 'type' => 'R'],
+                ['name' => 'Eliminar', 'icon' => 'ri-delete-bin-line', 'action' => 'workshop.vehicle-types.destroy', 'color' => '#dc2626', 'status' => 1, 'type' => 'R'],
+            ],
             'TAL_OS' => [
                 ['name' => 'Crear', 'icon' => 'ri-add-line', 'action' => 'workshop.orders.create', 'color' => '#111827', 'status' => 1, 'type' => 'T'],
                 ['name' => 'Ver', 'icon' => 'ri-eye-line', 'action' => 'workshop.orders.show', 'color' => '#1d4ed8', 'status' => 1, 'type' => 'R'],

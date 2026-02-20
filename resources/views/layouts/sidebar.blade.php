@@ -10,29 +10,7 @@
         $profileName = Profile::where('id', auth()->user()->profile_id)->value('name');
     }
 
-    $workshopStaticItems = [
-        ['name' => 'Tablero Mantenimiento', 'route' => 'workshop.maintenance-board.index', 'icon' => '<i class="ri-dashboard-2-line text-lg"></i>'],
-        ['name' => 'Personas', 'route' => 'workshop.clients.index', 'icon' => '<i class="ri-user-3-line text-lg"></i>'],
-        ['name' => 'Agenda/Citas', 'route' => 'workshop.appointments.index', 'icon' => '<i class="ri-calendar-event-line text-lg"></i>'],
-        ['name' => 'Vehiculos', 'route' => 'workshop.vehicles.index', 'icon' => '<i class="ri-motorbike-line text-lg"></i>'],
-        ['name' => 'Ordenes de Servicio', 'route' => 'workshop.orders.index', 'icon' => '<i class="ri-file-list-3-line text-lg"></i>'],
-        ['name' => 'Servicios Taller', 'route' => 'workshop.services.index', 'icon' => '<i class="ri-settings-4-line text-lg"></i>'],
-        ['name' => 'Compras Taller', 'route' => 'workshop.purchases.index', 'icon' => '<i class="ri-file-list-2-line text-lg"></i>'],
-        ['name' => 'Armados Taller', 'route' => 'workshop.assemblies.index', 'icon' => '<i class="ri-hammer-line text-lg"></i>'],
-        ['name' => 'Reportes Taller', 'route' => 'workshop.reports.index', 'icon' => '<i class="ri-bar-chart-2-line text-lg"></i>'],
-    ];
-
-    $workshopStaticItems = collect($workshopStaticItems)
-        ->filter(fn ($item) => \Illuminate\Support\Facades\Route::has($item['route']))
-        ->map(fn ($item) => [
-            'name' => $item['name'],
-            'path' => route($item['route']),
-            'icon' => $item['icon'],
-        ])
-        ->values()
-        ->all();
-
-    $workshopGroupIndex = count($menuGroups);
+  
 @endphp
 
 <aside id="sidebar"
@@ -55,13 +33,7 @@ class="fixed flex flex-col mt-0 top-0 px-5 left-0 dark:bg-gray-900 dark:border-g
                 @endforeach
             @endforeach
 
-            @if (!empty($workshopStaticItems))
-                @foreach ($workshopStaticItems as $subItem)
-                    if (this.isActive('{{ $subItem['path'] }}')) {
-                        this.openSubmenus['{{ $workshopGroupIndex }}-0'] = true;
-                    }
-                @endforeach
-            @endif
+         
         },
         keepSubmenuOpen(groupIndex, itemIndex) {
             const key = groupIndex + '-' + itemIndex;
@@ -268,26 +240,7 @@ class="fixed flex flex-col mt-0 top-0 px-5 left-0 dark:bg-gray-900 dark:border-g
                                     </svg>
                                 </button>
 
-                                <div x-show="isSubmenuOpen({{ $workshopGroupIndex }}, 0) && ($store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen)"
-                                     x-transition:enter="transition ease-out duration-200"
-                                     x-transition:enter-start="opacity-0 -translate-y-2"
-                                     x-transition:enter-end="opacity-100 translate-y-0">
-                                    <ul class="mt-1.5 space-y-1 ml-10 border-l border-gray-100 dark:border-gray-800/50 pl-2">
-                                        @foreach ($workshopStaticItems as $item)
-                                            <li>
-                                                <a href="{{ $item['path'] }}"
-                                                    @click="keepSubmenuOpen({{ $workshopGroupIndex }}, 0)"
-                                                    class="menu-dropdown-item group/sub"
-                                                    :class="isActiveExact('{{ $item['path'] }}') ? 'menu-dropdown-item-active' : 'menu-dropdown-item-inactive'">
-                                                    <span class="w-5 h-5 flex items-center justify-center opacity-70 group-hover/sub:opacity-100 transition-opacity">
-                                                        {!! $item['icon'] !!}
-                                                    </span>
-                                                    {{ $item['name'] }}
-                                                </a>
-                                            </li>
-                                        @endforeach
-                                    </ul>
-                                </div>
+                           
                             </li>
                         </ul>
                  
