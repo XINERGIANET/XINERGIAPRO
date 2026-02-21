@@ -270,6 +270,16 @@
         <div class="mt-5">{{ $cards->links() }}</div>
     </x-common.component-card>
 
+    @php
+        $defaultDocumentTypeId = optional(
+            $documentTypes->first(function ($documentType) {
+                return str_contains(mb_strtolower((string) $documentType->name), 'ticket');
+            }) ?? $documentTypes->first()
+        )->id;
+        $defaultCashRegisterId = optional($cashRegisters->first())->id;
+        $defaultPaymentMethodId = optional($paymentMethods->first())->id;
+    @endphp
+
     <x-ui.modal
         x-data="{
             open: false,
@@ -293,11 +303,12 @@
         "
         :isOpen="false"
         :showCloseButton="false"
-        class="max-w-3xl">
+        class="max-w-4xl">
         <div class="p-6 sm:p-8">
-            <div class="mb-5 flex items-center justify-between">
+            <div class="mb-6 flex items-center justify-between">
                 <div>
-                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Venta y cobro rapido</h3>
+                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Cierre Comercial</p>
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white">Venta y cobro rapido</h3>
                     <p class="text-sm text-gray-500" x-text="order_label"></p>
                 </div>
                 <button type="button" @click="open = false" class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
@@ -305,10 +316,19 @@
                 </button>
             </div>
 
-            <div class="mb-4 grid grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm md:grid-cols-3">
-                <p>Total OS: <strong x-text="`S/ ${total.toFixed(2)}`"></strong></p>
-                <p>Pagado: <strong x-text="`S/ ${paid_total.toFixed(2)}`"></strong></p>
-                <p>Pendiente: <strong x-text="`S/ ${debt.toFixed(2)}`"></strong></p>
+            <div class="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Total OS</p>
+                    <p class="mt-1 text-xl font-extrabold text-slate-800" x-text="`S/ ${total.toFixed(2)}`"></p>
+                </div>
+                <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Pagado</p>
+                    <p class="mt-1 text-xl font-extrabold text-emerald-700" x-text="`S/ ${paid_total.toFixed(2)}`"></p>
+                </div>
+                <div class="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Pendiente</p>
+                    <p class="mt-1 text-xl font-extrabold text-amber-700" x-text="`S/ ${debt.toFixed(2)}`"></p>
+                </div>
             </div>
 
             <form method="POST" :action="action" class="space-y-4">
@@ -316,15 +336,16 @@
 
                 <input type="hidden" name="generate_sale" :value="pending_billing_count > 0 ? 1 : 0">
 
-                <div x-show="pending_billing_count > 0">
-                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Documento de venta</label>
-                    <select name="document_type_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" :required="pending_billing_count > 0">
-                        <option value="">Selecciona documento</option>
+                <div x-show="pending_billing_count > 0" class="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4">
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-indigo-700">Documento de venta</label>
+                    <select name="document_type_id" class="h-11 w-full rounded-lg border border-indigo-200 bg-white px-3 text-sm font-medium text-slate-800" :required="pending_billing_count > 0">
                         @foreach($documentTypes as $documentType)
-                            <option value="{{ $documentType->id }}">{{ $documentType->name }}</option>
+                            <option value="{{ $documentType->id }}" @selected((int) $defaultDocumentTypeId === (int) $documentType->id)>
+                                {{ $documentType->name }}
+                            </option>
                         @endforeach
                     </select>
-                    <p class="mt-1 text-xs text-gray-500" x-text="`Se facturaran ${pending_billing_count} linea(s) pendiente(s), total aprox: S/ ${pending_billing_total.toFixed(2)}.`"></p>
+                    <p class="mt-2 text-xs text-indigo-700" x-text="`Se facturaran ${pending_billing_count} linea(s) pendiente(s), total aprox: S/ ${pending_billing_total.toFixed(2)}.`"></p>
                 </div>
 
                 <div x-show="pending_billing_count <= 0" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
@@ -336,26 +357,30 @@
                     <input name="sale_comment" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Venta desde tablero de mantenimiento">
                 </div>
 
-                <div>
-                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Caja</label>
-                    <select name="cash_register_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
-                        <option value="">Selecciona caja</option>
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Caja</label>
+                        <select name="cash_register_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm font-medium text-slate-800" required>
                         @foreach($cashRegisters as $cashRegister)
-                            <option value="{{ $cashRegister->id }}">{{ $cashRegister->number }} {{ $cashRegister->status ? '(Activa)' : '' }}</option>
+                            <option value="{{ $cashRegister->id }}" @selected((int) $defaultCashRegisterId === (int) $cashRegister->id)>
+                                {{ $cashRegister->number }} {{ $cashRegister->status ? '(Activa)' : '' }}
+                            </option>
                         @endforeach
-                    </select>
-                </div>
-
-                <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
-                    <div class="md:col-span-1">
+                        </select>
+                    </div>
+                    <div>
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Metodo de pago</label>
-                        <select name="payment_methods[0][payment_method_id]" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
-                            <option value="">Selecciona metodo</option>
+                        <select name="payment_methods[0][payment_method_id]" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm font-medium text-slate-800" required>
                             @foreach($paymentMethods as $paymentMethod)
-                                <option value="{{ $paymentMethod->id }}">{{ $paymentMethod->description }}</option>
+                                <option value="{{ $paymentMethod->id }}" @selected((int) $defaultPaymentMethodId === (int) $paymentMethod->id)>
+                                    {{ $paymentMethod->description }}
+                                </option>
                             @endforeach
                         </select>
                     </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
                     <div class="md:col-span-1">
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Monto</label>
                         <input type="number" step="0.01" min="0.01" name="payment_methods[0][amount]" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" :value="debt.toFixed(2)" required>
@@ -372,7 +397,7 @@
                 </div>
 
                 <div class="flex flex-wrap gap-2 pt-1">
-                    <x-ui.button type="submit" size="md" variant="primary" style="background:linear-gradient(90deg,#1d4ed8,#4338ca);color:#fff">
+                    <x-ui.button type="submit" size="md" variant="primary" style="background:linear-gradient(90deg,#0ea5e9,#2563eb);color:#fff">
                         <i class="ri-cash-line"></i><span>Confirmar venta y cobro</span>
                     </x-ui.button>
                     <x-ui.button type="button" size="md" variant="outline" @click="open = false">

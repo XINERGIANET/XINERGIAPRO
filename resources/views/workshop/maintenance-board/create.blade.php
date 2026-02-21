@@ -2,7 +2,18 @@
 
 @section('content')
 <div x-data="{
-    vehicles: @js($vehicles->map(fn($v) => ['id' => $v->id, 'client_person_id' => $v->client_person_id, 'label' => trim($v->brand . ' ' . $v->model . ' ' . ($v->plate ? ('- ' . $v->plate) : '')) , 'km' => (int) ($v->current_mileage ?? 0)])),
+    vehicles: @js($vehicles->map(function ($v) use ($clients) {
+        $client = $clients->firstWhere('id', $v->client_person_id);
+        $clientName = trim(((string) ($client->first_name ?? '')) . ' ' . ((string) ($client->last_name ?? '')));
+        return [
+            'id' => $v->id,
+            'client_person_id' => $v->client_person_id,
+            'client_name' => $clientName,
+            'label' => trim($v->brand . ' ' . $v->model . ' ' . ($v->plate ? ('- ' . $v->plate) : '')),
+            'display_label' => trim($v->brand . ' ' . $v->model . ' ' . ($v->plate ? ('- ' . $v->plate) : '')) . ($clientName !== '' ? ' (Cliente: ' . $clientName . ')' : ''),
+            'km' => (int) ($v->current_mileage ?? 0),
+        ];
+    })),
     clientsList: @js($clients->map(fn($c) => ['id' => $c->id, 'first_name' => $c->first_name, 'last_name' => $c->last_name, 'person_type' => $c->person_type, 'document_number' => $c->document_number, 'label' => trim($c->first_name . ' ' . $c->last_name . ' - ' . $c->person_type . ' ' . $c->document_number)])),
     departments: @js($departments ?? []),
     provinces: @js($provinces ?? []),
@@ -10,6 +21,8 @@
     vehicleTypes: @js($vehicleTypes->map(fn($type) => ['id' => $type->id, 'name' => $type->name])),
     servicesCatalog: @js($services->map(fn($s) => ['id' => $s->id, 'name' => $s->name, 'base_price' => (float) $s->base_price, 'type' => $s->type])),
     selectedVehicleId: @js((string) old('vehicle_id', '')),
+    vehicleSearch: '',
+    vehicleDropdownOpen: false,
     selectedClientId: @js((string) old('client_person_id', '')),
     mileageIn: @js((string) old('mileage_in', '')),
     creatingVehicle: false,
@@ -54,6 +67,34 @@
         if (!selected) return;
         this.selectedClientId = selected.client_person_id ? String(selected.client_person_id) : '';
         this.mileageIn = selected.km ? String(selected.km) : '';
+        this.vehicleSearch = selected.display_label || selected.label || '';
+    },
+    get filteredVehicles() {
+        const q = String(this.vehicleSearch || '').trim().toLowerCase();
+        if (!q) return this.vehicles.slice(0, 30);
+        return this.vehicles
+            .filter(v => {
+                const vehicleText = String(v.label || '').toLowerCase();
+                const clientText = String(v.client_name || '').toLowerCase();
+                return vehicleText.includes(q) || clientText.includes(q);
+            })
+            .slice(0, 30);
+    },
+    selectVehicle(vehicle) {
+        this.selectedVehicleId = String(vehicle.id);
+        this.vehicleSearch = vehicle.display_label || vehicle.label || '';
+        this.vehicleDropdownOpen = false;
+        this.syncVehicle();
+    },
+    onVehicleSearchInput() {
+        this.vehicleDropdownOpen = true;
+        if (!String(this.vehicleSearch || '').trim()) {
+            this.selectedVehicleId = '';
+            this.selectedClientId = '';
+        }
+    },
+    closeVehicleDropdown() {
+        this.vehicleDropdownOpen = false;
     },
     addServiceLine() {
         this.serviceLines.push({ service_id: '', qty: 1, unit_price: 0 });
@@ -134,9 +175,14 @@
                 throw new Error(firstError || message);
             }
             this.vehicles.unshift(payload);
+            const quickClient = this.clientsList.find(c => String(c.id) === String(payload.client_person_id));
+            const quickClientName = quickClient ? `${quickClient.first_name || ''} ${quickClient.last_name || ''}`.trim() : '';
+            this.vehicles[0].client_name = quickClientName;
+            this.vehicles[0].display_label = `${payload.label || `Vehiculo #${payload.id}`}${quickClientName ? ` (Cliente: ${quickClientName})` : ''}`;
             this.selectedVehicleId = String(payload.id);
             this.selectedClientId = payload.client_person_id ? String(payload.client_person_id) : this.selectedClientId;
             this.mileageIn = payload.km ? String(payload.km) : this.mileageIn;
+            this.vehicleSearch = this.vehicles[0].display_label || payload.label || '';
             this.creatingVehicle = false;
             this.resetQuickVehicle();
         } catch (error) {
@@ -225,8 +271,14 @@
             this.creatingClientLoading = false;
         }
     }
-}" x-init="if (selectedVehicleId && !selectedClientId) { syncVehicle() }">
-    <x-common.page-breadcrumb pageTitle="Nuevo Ingreso a Mantenimiento" />
+}" x-init="if (selectedVehicleId) { syncVehicle() }">
+    <x-common.page-breadcrumb
+        pageTitle="Nuevo Ingreso a Mantenimiento"
+        :crumbs="[
+            ['label' => 'Tablero de Mantenimiento', 'url' => route('workshop.maintenance-board.index')],
+            ['label' => 'Nuevo Ingreso a Mantenimiento'],
+        ]"
+    />
 
     <x-common.component-card title="Nuevo ingreso a mantenimiento" desc="Registra el vehiculo, cliente y servicios para iniciar la OS desde una vista completa.">
         @if (session('status'))
@@ -236,11 +288,7 @@
             <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first() }}</div>
         @endif
 
-        <div class="mb-5 flex flex-wrap gap-2">
-            <x-ui.link-button size="md" variant="outline" href="{{ route('workshop.maintenance-board.index') }}">
-                <i class="ri-arrow-left-line"></i><span>Volver al tablero</span>
-            </x-ui.link-button>
-        </div>
+   
 
         <form method="POST" action="{{ route('workshop.maintenance-board.store') }}" class="grid grid-cols-1 gap-3 md:grid-cols-3">
             @csrf
@@ -298,13 +346,45 @@
                 </div>
             </div>
             <div class="md:col-span-1">
-                <div class="flex items-center gap-2">
-                    <select name="vehicle_id" x-model="selectedVehicleId" @change="syncVehicle()" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
-                        <option value="">Selecciona vehiculo</option>
-                        <template x-for="vehicle in vehicles" :key="`v-${vehicle.id}`">
-                            <option :value="vehicle.id" x-text="vehicle.label || `Vehiculo #${vehicle.id}`"></option>
-                        </template>
-                    </select>
+                <div class="relative flex items-center gap-2">
+                    <input type="hidden" name="vehicle_id" x-model="selectedVehicleId" required>
+                    <div class="relative w-full">
+                        <input
+                            x-model="vehicleSearch"
+                            @focus="vehicleDropdownOpen = true"
+                            @click="vehicleDropdownOpen = true"
+                            @input="onVehicleSearchInput()"
+                            class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                            placeholder="Buscar vehiculo o cliente"
+                            autocomplete="off"
+                            required
+                        >
+                        <div
+                            x-show="vehicleDropdownOpen"
+                            x-cloak
+                            class="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg"
+                        >
+                            <div class="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-3 py-2">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-gray-600">Vehiculos</p>
+                                <button type="button" @click="closeVehicleDropdown()" class="text-xs font-semibold text-gray-500 hover:text-gray-700">
+                                    Cerrar
+                                </button>
+                            </div>
+                            <template x-if="filteredVehicles.length === 0">
+                                <p class="px-3 py-2 text-sm text-gray-500">Sin resultados.</p>
+                            </template>
+                            <template x-for="vehicle in filteredVehicles" :key="`vehicle-search-${vehicle.id}`">
+                                <button
+                                    type="button"
+                                    @click="selectVehicle(vehicle)"
+                                    class="flex w-full items-start justify-between border-b border-gray-100 px-3 py-2 text-left text-sm hover:bg-indigo-50"
+                                >
+                                    <span class="font-medium text-gray-800" x-text="vehicle.label || `Vehiculo #${vehicle.id}`"></span>
+                                    <span class="ml-3 text-xs text-gray-500" x-text="vehicle.client_name ? `(${vehicle.client_name})` : ''"></span>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
                     <button type="button"
                             @click="toggleQuickVehicle()"
                             class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">
@@ -323,10 +403,65 @@
                 Ingreso en grua
             </label>
 
-            <input name="diagnosis_text" class="h-11 rounded-lg border border-gray-300 px-3 text-sm md:col-span-2" placeholder="Diagnostico inicial (opcional)">
+            <input name="diagnosis_text" class="h-11 rounded-lg border border-gray-300 px-3 text-sm md:col-span-3   " placeholder="Diagnostico inicial (opcional)">
             <textarea name="observations" rows="3" class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-3" placeholder="Observaciones"></textarea>
 
-        
+            <div class="rounded-xl border border-gray-200 bg-white p-4 md:col-span-3">
+                <div class="mb-3">
+                    <h4 class="text-sm font-semibold text-gray-800">Inspeccion e inventario recibido</h4>
+                    <p class="text-xs text-gray-500">Estos datos se guardan al iniciar el mantenimiento.</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 md:grid-cols-4">
+                    @foreach ([
+                        'ESPEJOS' => 'Espejos',
+                        'FARO_DELANTERO' => 'Faro delantero',
+                        'DIRECCIONALES' => 'Direccionales',
+                        'TAPON_GASOLINA' => 'Tapon de gasolina',
+                        'PEDALES' => 'Pedales',
+                        'CLAXON' => 'Claxon',
+                        'ASIENTOS' => 'Asientos',
+                        'LUZ_STOP_TRASERA' => 'Luz stop trasera',
+                        'CUBIERTAS_COMPLETAS' => 'Cubiertas completas',
+                        'TACOMETROS' => 'Tacometros',
+                        'STEREO' => 'Stereo',
+                        'PARABRISAS' => 'Parabrisas',
+                        'TAPON_RADIADORES' => 'Tapon de radiadores',
+                        'FILTRO_AIRE' => 'Filtro de aire',
+                        'BATERIA' => 'Bateria',
+                        'LLAVES' => 'Llaves',
+                    ] as $key => $label)
+                        <label class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700">
+                            <input type="checkbox" name="inventory[{{ $key }}]" value="1" class="h-4 w-4 rounded border-gray-300">
+                            <span>{{ $label }}</span>
+                        </label>
+                    @endforeach
+                </div>
+
+                <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-600">Daños preexistentes por lado</p>
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        @foreach ([
+                            0 => ['value' => 'RIGHT', 'label' => 'Lado derecho'],
+                            1 => ['value' => 'LEFT', 'label' => 'Lado izquierdo'],
+                            2 => ['value' => 'FRONT', 'label' => 'Frente'],
+                            3 => ['value' => 'BACK', 'label' => 'Atras'],
+                        ] as $idx => $side)
+                            <div class="rounded-lg border border-gray-200 bg-white p-3">
+                                <input type="hidden" name="damages[{{ $idx }}][side]" value="{{ $side['value'] }}">
+                                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">{{ $side['label'] }}</label>
+                                <textarea name="damages[{{ $idx }}][description]" rows="2" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Describe daño preexistente (opcional)"></textarea>
+                                <select name="damages[{{ $idx }}][severity]" class="mt-2 h-10 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                                    <option value="">Severidad</option>
+                                    <option value="LOW">Baja</option>
+                                    <option value="MED">Media</option>
+                                    <option value="HIGH">Alta</option>
+                                </select>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
 
             <div class="rounded-xl border border-gray-200 bg-gray-50/50 p-4 md:col-span-3">
                 <div class="mb-3 flex items-center justify-between">

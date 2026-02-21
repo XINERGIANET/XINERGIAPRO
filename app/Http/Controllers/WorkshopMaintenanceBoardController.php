@@ -228,6 +228,12 @@ class WorkshopMaintenanceBoardController extends Controller
             'tow_in' => ['nullable', 'boolean'],
             'diagnosis_text' => ['nullable', 'string'],
             'observations' => ['nullable', 'string'],
+            'inventory' => ['nullable', 'array'],
+            'inventory.*' => ['nullable', 'boolean'],
+            'damages' => ['nullable', 'array'],
+            'damages.*.side' => ['nullable', 'in:RIGHT,LEFT,FRONT,BACK'],
+            'damages.*.description' => ['nullable', 'string'],
+            'damages.*.severity' => ['nullable', 'in:LOW,MED,HIGH'],
             'service_lines' => ['nullable', 'array'],
             'service_lines.*.service_id' => ['required_with:service_lines', 'integer', 'exists:workshop_services,id'],
             'service_lines.*.qty' => ['required_with:service_lines', 'numeric', 'gt:0'],
@@ -291,6 +297,12 @@ class WorkshopMaintenanceBoardController extends Controller
                 'comment' => 'OS iniciada desde tablero de mantenimiento',
             ], $branchId, (int) $user?->id, (string) ($user?->name ?? 'Sistema'));
 
+            $this->flowService->syncIntakeAndDamages(
+                $workshop,
+                (array) ($validated['inventory'] ?? []),
+                (array) ($validated['damages'] ?? [])
+            );
+
             $serviceCatalog = WorkshopService::query()
                 ->whereIn('id', $serviceLines->pluck('service_id')->map(fn ($value) => (int) $value)->all())
                 ->get()
@@ -317,7 +329,9 @@ class WorkshopMaintenanceBoardController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
 
-        return back()->with('status', 'Servicio de mantenimiento iniciado correctamente.');
+        return redirect()
+            ->route('workshop.maintenance-board.index')
+            ->with('status', 'Servicio de mantenimiento iniciado correctamente.');
     }
 
     public function storeVehicleQuick(Request $request): JsonResponse
@@ -535,6 +549,10 @@ class WorkshopMaintenanceBoardController extends Controller
             'payment_methods.*.payment_method_id' => ['required', 'integer', 'exists:payment_methods,id'],
             'payment_methods.*.amount' => ['required', 'numeric', 'min:0.01'],
             'payment_methods.*.reference' => ['nullable', 'string', 'max:100'],
+            'payment_methods.*.payment_gateway_id' => ['nullable', 'integer', 'exists:payment_gateways,id'],
+            'payment_methods.*.card_id' => ['nullable', 'integer', 'exists:cards,id'],
+            'payment_methods.*.bank_id' => ['nullable', 'integer', 'exists:banks,id'],
+            'payment_methods.*.digital_wallet_id' => ['nullable', 'integer', 'exists:digital_wallets,id'],
             'payment_comment' => ['nullable', 'string'],
         ]);
 
@@ -548,7 +566,17 @@ class WorkshopMaintenanceBoardController extends Controller
                     ->lockForUpdate()
                     ->firstOrFail();
 
+                $pendingLines = (int) $lockedOrder->details()
+                    ->whereNull('sales_movement_id')
+                    ->count();
+
+                // Mantener la misma lógica operativa del módulo de ventas:
+                // si aún no existe venta asociada o hay líneas pendientes, primero se factura.
                 $mustGenerateSale = (bool) ($validated['generate_sale'] ?? false);
+                if ((int) ($lockedOrder->sales_movement_id ?? 0) <= 0 || $pendingLines > 0) {
+                    $mustGenerateSale = true;
+                }
+
                 if ($mustGenerateSale) {
                     if (empty($validated['document_type_id'])) {
                         throw new \RuntimeException('Debe seleccionar tipo de documento para generar la venta.');
@@ -574,7 +602,7 @@ class WorkshopMaintenanceBoardController extends Controller
                     $branchId,
                     (int) $user?->id,
                     (string) ($user?->name ?? 'Sistema'),
-                    $validated['payment_comment'] ?? null
+                    $validated['payment_comment'] ?? ($validated['sale_comment'] ?? null)
                 );
             });
         } catch (\Throwable $e) {
