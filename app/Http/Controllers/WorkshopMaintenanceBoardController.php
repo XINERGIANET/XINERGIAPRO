@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\Branch;
 use App\Models\CashRegister;
 use App\Models\DocumentType;
+use App\Models\Location;
 use App\Models\PaymentMethod;
 use App\Models\Person;
 use App\Models\Vehicle;
+use App\Models\VehicleType;
 use App\Models\WorkshopMovement;
 use App\Models\WorkshopService;
 use App\Services\Workshop\WorkshopFlowService;
@@ -70,12 +72,49 @@ class WorkshopMaintenanceBoardController extends Controller
             ->paginate(18)
             ->withQueryString();
 
+        $formData = $this->maintenanceFormData($branchId, $companyId);
+
+        return view('workshop.maintenance-board.index', compact(
+            'cards',
+            'selectedStatus'
+        ) + $formData);
+    }
+
+    public function create(): \Illuminate\View\View
+    {
+        [$branchId, $companyId] = $this->branchScope();
+        $formData = $this->maintenanceFormData($branchId, $companyId);
+
+        return view('workshop.maintenance-board.create', $formData);
+    }
+
+    private function maintenanceFormData(int $branchId, int $companyId): array
+    {
+        $branch = Branch::query()->findOrFail($branchId);
         $vehicles = Vehicle::query()
             ->where('company_id', $companyId)
             ->where('branch_id', $branchId)
             ->orderBy('brand')
             ->orderBy('model')
             ->get(['id', 'client_person_id', 'brand', 'model', 'plate', 'current_mileage']);
+
+        $vehicleTypes = VehicleType::query()
+            ->where(function ($query) use ($companyId, $branchId) {
+                $query->whereNull('company_id')
+                    ->orWhere(function ($scope) use ($companyId, $branchId) {
+                        $scope->where('company_id', $companyId)
+                            ->where(function ($branchScope) use ($branchId) {
+                                $branchScope->whereNull('branch_id')
+                                    ->orWhere('branch_id', $branchId);
+                            });
+                    });
+            })
+            ->where('active', true)
+            ->orderBy('company_id')
+            ->orderBy('branch_id')
+            ->orderBy('order_num')
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
         $clients = Person::query()
             ->where('branch_id', $branchId)
@@ -121,28 +160,80 @@ class WorkshopMaintenanceBoardController extends Controller
             ->orderBy('order_num')
             ->get(['id', 'description']);
 
-        return view('workshop.maintenance-board.index', compact(
-            'cards',
+        $departments = Location::query()
+            ->where('type', 'department')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $provinces = Location::query()
+            ->where('type', 'province')
+            ->orderBy('name')
+            ->get(['id', 'name', 'parent_location_id']);
+
+        $districts = Location::query()
+            ->where('type', 'district')
+            ->orderBy('name')
+            ->get(['id', 'name', 'parent_location_id']);
+
+        $selectedDistrictId = $branch->location_id;
+        $selectedProvinceId = null;
+        $selectedDepartmentId = null;
+        $selectedDistrictName = null;
+        $selectedProvinceName = null;
+        $selectedDepartmentName = null;
+
+        if ($selectedDistrictId) {
+            $district = Location::query()->find($selectedDistrictId);
+            $selectedDistrictName = $district?->name;
+            $selectedProvinceId = $district?->parent_location_id;
+            if ($selectedProvinceId) {
+                $province = Location::query()->find($selectedProvinceId);
+                $selectedProvinceName = $province?->name;
+                $selectedDepartmentId = $province?->parent_location_id;
+                if ($selectedDepartmentId) {
+                    $department = Location::query()->find($selectedDepartmentId);
+                    $selectedDepartmentName = $department?->name;
+                }
+            }
+        }
+
+        return compact(
             'vehicles',
             'clients',
             'services',
+            'vehicleTypes',
             'documentTypes',
             'cashRegisters',
             'paymentMethods',
-            'selectedStatus'
-        ));
+            'departments',
+            'provinces',
+            'districts',
+            'selectedDepartmentId',
+            'selectedProvinceId',
+            'selectedDistrictId',
+            'selectedDepartmentName',
+            'selectedProvinceName',
+            'selectedDistrictName'
+        );
     }
+            
 
     public function store(Request $request): RedirectResponse
     {
         [$branchId, $companyId] = $this->branchScope();
         $validated = $request->validate([
             'vehicle_id' => ['required', 'integer', 'exists:vehicles,id'],
-            'client_person_id' => ['required', 'integer', 'exists:people,id'],
+            'client_person_id' => ['nullable', 'integer', 'exists:people,id'],
             'mileage_in' => ['nullable', 'integer', 'min:0'],
             'tow_in' => ['nullable', 'boolean'],
             'diagnosis_text' => ['nullable', 'string'],
             'observations' => ['nullable', 'string'],
+            'inventory' => ['nullable', 'array'],
+            'inventory.*' => ['nullable', 'boolean'],
+            'damages' => ['nullable', 'array'],
+            'damages.*.side' => ['nullable', 'in:RIGHT,LEFT,FRONT,BACK'],
+            'damages.*.description' => ['nullable', 'string'],
+            'damages.*.severity' => ['nullable', 'in:LOW,MED,HIGH'],
             'service_lines' => ['nullable', 'array'],
             'service_lines.*.service_id' => ['required_with:service_lines', 'integer', 'exists:workshop_services,id'],
             'service_lines.*.qty' => ['required_with:service_lines', 'numeric', 'gt:0'],
@@ -155,7 +246,15 @@ class WorkshopMaintenanceBoardController extends Controller
             ->where('branch_id', $branchId)
             ->firstOrFail();
 
-        if ((int) $vehicle->client_person_id !== (int) $validated['client_person_id']) {
+        $clientPersonId = isset($validated['client_person_id']) && (int) $validated['client_person_id'] > 0
+            ? (int) $validated['client_person_id']
+            : (int) $vehicle->client_person_id;
+
+        if ($clientPersonId <= 0) {
+            return back()->withErrors(['error' => 'El vehiculo seleccionado no tiene cliente asociado.']);
+        }
+
+        if ((int) $vehicle->client_person_id !== $clientPersonId) {
             return back()->withErrors(['error' => 'El vehiculo no pertenece al cliente seleccionado.']);
         }
 
@@ -188,7 +287,7 @@ class WorkshopMaintenanceBoardController extends Controller
         try {
             $workshop = $this->flowService->createOrder([
                 'vehicle_id' => (int) $validated['vehicle_id'],
-                'client_person_id' => (int) $validated['client_person_id'],
+                'client_person_id' => $clientPersonId,
                 'intake_date' => now()->format('Y-m-d H:i:s'),
                 'mileage_in' => $validated['mileage_in'] ?? null,
                 'tow_in' => (bool) ($validated['tow_in'] ?? false),
@@ -197,6 +296,12 @@ class WorkshopMaintenanceBoardController extends Controller
                 'status' => 'in_progress',
                 'comment' => 'OS iniciada desde tablero de mantenimiento',
             ], $branchId, (int) $user?->id, (string) ($user?->name ?? 'Sistema'));
+
+            $this->flowService->syncIntakeAndDamages(
+                $workshop,
+                (array) ($validated['inventory'] ?? []),
+                (array) ($validated['damages'] ?? [])
+            );
 
             $serviceCatalog = WorkshopService::query()
                 ->whereIn('id', $serviceLines->pluck('service_id')->map(fn ($value) => (int) $value)->all())
@@ -224,7 +329,9 @@ class WorkshopMaintenanceBoardController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
 
-        return back()->with('status', 'Servicio de mantenimiento iniciado correctamente.');
+        return redirect()
+            ->route('workshop.maintenance-board.index')
+            ->with('status', 'Servicio de mantenimiento iniciado correctamente.');
     }
 
     public function storeVehicleQuick(Request $request): JsonResponse
@@ -237,7 +344,23 @@ class WorkshopMaintenanceBoardController extends Controller
                 'integer',
                 Rule::exists('people', 'id')->where(fn ($query) => $query->where('branch_id', $branchId)),
             ],
-            'type' => ['required', 'string', 'max:50'],
+            'vehicle_type_id' => [
+                'required',
+                'integer',
+                Rule::exists('vehicle_types', 'id')->where(function ($query) use ($companyId, $branchId) {
+                    $query->whereNull('deleted_at')
+                        ->where(function ($inner) use ($companyId, $branchId) {
+                            $inner->whereNull('company_id')
+                                ->orWhere(function ($scope) use ($companyId, $branchId) {
+                                    $scope->where('company_id', $companyId)
+                                        ->where(function ($branchScope) use ($branchId) {
+                                            $branchScope->whereNull('branch_id')
+                                                ->orWhere('branch_id', $branchId);
+                                        });
+                                });
+                        });
+                }),
+            ],
             'brand' => ['required', 'string', 'max:255'],
             'model' => ['required', 'string', 'max:255'],
             'year' => ['nullable', 'integer', 'digits:4'],
@@ -285,21 +408,99 @@ class WorkshopMaintenanceBoardController extends Controller
             ], 422);
         }
 
-        $vehicle = Vehicle::query()->create(array_merge(
-            $validated,
-            [
-                'company_id' => $companyId,
-                'branch_id' => $branchId,
-                'status' => 'active',
-                'current_mileage' => (int) ($validated['current_mileage'] ?? 0),
-            ]
-        ));
+        $vehicleType = VehicleType::query()->findOrFail((int) $validated['vehicle_type_id']);
+        $validated['type'] = $vehicleType->name;
+
+        $vehicle = Vehicle::query()->create(array_merge($validated, [
+            'company_id' => $companyId,
+            'branch_id' => $branchId,
+            'status' => 'active',
+            'current_mileage' => (int) ($validated['current_mileage'] ?? 0),
+        ]));
 
         return response()->json([
             'id' => $vehicle->id,
             'client_person_id' => (int) $vehicle->client_person_id,
             'label' => trim($vehicle->brand . ' ' . $vehicle->model . ' ' . ($vehicle->plate ? ('- ' . $vehicle->plate) : '')),
             'km' => (int) ($vehicle->current_mileage ?? 0),
+        ]);
+    }
+
+    public function storeClientQuick(Request $request): JsonResponse
+    {
+        [$branchId, $companyId] = $this->branchScope();
+        $branch = Branch::query()->findOrFail($branchId);
+
+        $validated = $request->validate([
+            'person_type' => ['required', 'in:DNI,RUC,CARNET DE EXTRANGERIA,PASAPORTE'],
+            'document_number' => ['required', 'string', 'max:50'],
+            'first_name' => ['required', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'location_id' => ['nullable', 'integer', 'exists:locations,id'],
+            'genero' => ['nullable', 'string', 'max:30'],
+            'fecha_nacimiento' => ['nullable', 'date'],
+        ]);
+
+        $branchDistrictId = (int) ($branch->location_id ?? 0);
+        if ($branchDistrictId <= 0) {
+            return response()->json([
+                'message' => 'La sucursal no tiene distrito configurado.',
+            ], 422);
+        }
+
+        $existingPerson = Person::query()
+            ->join('branches', 'branches.id', '=', 'people.branch_id')
+            ->select('people.*')
+            ->where('branches.company_id', $companyId)
+            ->where('people.document_number', (string) $validated['document_number'])
+            ->whereNull('people.deleted_at')
+            ->first();
+
+        if ($existingPerson) {
+            $existingPerson->roles()->syncWithoutDetaching([
+                3 => ['branch_id' => $branchId], // Cliente
+            ]);
+
+            return response()->json([
+                'id' => (int) $existingPerson->id,
+                'person_type' => (string) $existingPerson->person_type,
+                'document_number' => (string) $existingPerson->document_number,
+                'first_name' => (string) $existingPerson->first_name,
+                'last_name' => (string) ($existingPerson->last_name ?? ''),
+                'name' => trim(((string) $existingPerson->first_name) . ' ' . ((string) $existingPerson->last_name)),
+                'label' => trim(((string) $existingPerson->first_name) . ' ' . ((string) $existingPerson->last_name) . ' - ' . ((string) $existingPerson->person_type) . ' ' . ((string) $existingPerson->document_number)),
+            ]);
+        }
+
+        $validated['phone'] = (string) ($validated['phone'] ?? '');
+        $validated['email'] = (string) ($validated['email'] ?? '');
+        $validated['address'] = trim((string) ($validated['address'] ?? '')) ?: '-';
+        $validated['location_id'] = $branchDistrictId;
+
+        $person = DB::transaction(function () use ($validated, $branchId) {
+            $person = Person::query()->create(array_merge(
+                $validated,
+                ['branch_id' => $branchId]
+            ));
+
+            $person->roles()->syncWithoutDetaching([
+                3 => ['branch_id' => $branchId], // Cliente
+            ]);
+
+            return $person;
+        });
+
+        return response()->json([
+            'id' => (int) $person->id,
+            'person_type' => (string) $person->person_type,
+            'document_number' => (string) $person->document_number,
+            'first_name' => (string) $person->first_name,
+            'last_name' => (string) ($person->last_name ?? ''),
+            'name' => trim(((string) $person->first_name) . ' ' . ((string) $person->last_name)),
+            'label' => trim(((string) $person->first_name) . ' ' . ((string) $person->last_name) . ' - ' . ((string) $person->person_type) . ' ' . ((string) $person->document_number)),
         ]);
     }
 
@@ -348,6 +549,10 @@ class WorkshopMaintenanceBoardController extends Controller
             'payment_methods.*.payment_method_id' => ['required', 'integer', 'exists:payment_methods,id'],
             'payment_methods.*.amount' => ['required', 'numeric', 'min:0.01'],
             'payment_methods.*.reference' => ['nullable', 'string', 'max:100'],
+            'payment_methods.*.payment_gateway_id' => ['nullable', 'integer', 'exists:payment_gateways,id'],
+            'payment_methods.*.card_id' => ['nullable', 'integer', 'exists:cards,id'],
+            'payment_methods.*.bank_id' => ['nullable', 'integer', 'exists:banks,id'],
+            'payment_methods.*.digital_wallet_id' => ['nullable', 'integer', 'exists:digital_wallets,id'],
             'payment_comment' => ['nullable', 'string'],
         ]);
 
@@ -361,7 +566,17 @@ class WorkshopMaintenanceBoardController extends Controller
                     ->lockForUpdate()
                     ->firstOrFail();
 
+                $pendingLines = (int) $lockedOrder->details()
+                    ->whereNull('sales_movement_id')
+                    ->count();
+
+                // Mantener la misma lógica operativa del módulo de ventas:
+                // si aún no existe venta asociada o hay líneas pendientes, primero se factura.
                 $mustGenerateSale = (bool) ($validated['generate_sale'] ?? false);
+                if ((int) ($lockedOrder->sales_movement_id ?? 0) <= 0 || $pendingLines > 0) {
+                    $mustGenerateSale = true;
+                }
+
                 if ($mustGenerateSale) {
                     if (empty($validated['document_type_id'])) {
                         throw new \RuntimeException('Debe seleccionar tipo de documento para generar la venta.');
@@ -387,7 +602,7 @@ class WorkshopMaintenanceBoardController extends Controller
                     $branchId,
                     (int) $user?->id,
                     (string) ($user?->name ?? 'Sistema'),
-                    $validated['payment_comment'] ?? null
+                    $validated['payment_comment'] ?? ($validated['sale_comment'] ?? null)
                 );
             });
         } catch (\Throwable $e) {

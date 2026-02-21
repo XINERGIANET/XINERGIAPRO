@@ -43,6 +43,7 @@ use App\Http\Controllers\WorkshopOrderController;
 use App\Http\Controllers\WorkshopExportController;
 use App\Http\Controllers\WorkshopReportController;
 use App\Http\Controllers\WorkshopServiceCatalogController;
+use App\Http\Controllers\WorkshopVehicleTypeController;
 use App\Http\Controllers\WorkshopVehicleController;
 use App\Http\Controllers\OrderController;
 
@@ -75,6 +76,8 @@ Route::view('/signup', 'pages.auth.signup', ['title' => 'Sign Up'])
     ->name('signup');
 
 Route::middleware('auth')->group(function () {
+    Route::get('api/reniec', [PersonController::class, 'apiReniec'])->name('api.reniec');
+
     Route::resource('/admin/herramientas/empresas', CompanyController::class)
         ->names('admin.companies')
         ->parameters(['empresas' => 'company']);
@@ -387,8 +390,10 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('/admin/taller')->name('workshop.')->group(function () {
         Route::get('/tablero-mantenimiento', [WorkshopMaintenanceBoardController::class, 'index'])->name('maintenance-board.index');
+        Route::get('/tablero-mantenimiento/nuevo', [WorkshopMaintenanceBoardController::class, 'create'])->name('maintenance-board.create');
         Route::post('/tablero-mantenimiento', [WorkshopMaintenanceBoardController::class, 'store'])->name('maintenance-board.store');
         Route::post('/tablero-mantenimiento/vehiculos', [WorkshopMaintenanceBoardController::class, 'storeVehicleQuick'])->name('maintenance-board.vehicles.store');
+        Route::post('/tablero-mantenimiento/clientes', [WorkshopMaintenanceBoardController::class, 'storeClientQuick'])->name('maintenance-board.clients.store');
         Route::post('/tablero-mantenimiento/{order}/iniciar', [WorkshopMaintenanceBoardController::class, 'start'])->name('maintenance-board.start');
         Route::post('/tablero-mantenimiento/{order}/finalizar', [WorkshopMaintenanceBoardController::class, 'finish'])->name('maintenance-board.finish');
         Route::post('/tablero-mantenimiento/{order}/venta-cobro', [WorkshopMaintenanceBoardController::class, 'checkout'])->name('maintenance-board.checkout');
@@ -403,10 +408,14 @@ Route::middleware('auth')->group(function () {
         Route::delete('/agenda/{appointment}', [WorkshopAppointmentController::class, 'destroy'])->name('appointments.destroy');
         Route::post('/agenda/{appointment}/convertir-os', [WorkshopAppointmentController::class, 'convertToOrder'])->name('appointments.convert');
 
-        Route::get('/vehiculos', [WorkshopVehicleController::class, 'index'])->name('vehicles.index');
-        Route::post('/vehiculos', [WorkshopVehicleController::class, 'store'])->name('vehicles.store');
-        Route::put('/vehiculos/{vehicle}', [WorkshopVehicleController::class, 'update'])->name('vehicles.update');
-        Route::delete('/vehiculos/{vehicle}', [WorkshopVehicleController::class, 'destroy'])->name('vehicles.destroy');
+    Route::get('/vehiculos', [WorkshopVehicleController::class, 'index'])->name('vehicles.index');
+    Route::post('/vehiculos', [WorkshopVehicleController::class, 'store'])->name('vehicles.store');
+    Route::put('/vehiculos/{vehicle}', [WorkshopVehicleController::class, 'update'])->name('vehicles.update');
+    Route::delete('/vehiculos/{vehicle}', [WorkshopVehicleController::class, 'destroy'])->name('vehicles.destroy');
+    Route::get('/tipos-vehiculo', [WorkshopVehicleTypeController::class, 'index'])->name('vehicle-types.index');
+    Route::post('/tipos-vehiculo', [WorkshopVehicleTypeController::class, 'store'])->name('vehicle-types.store');
+    Route::put('/tipos-vehiculo/{vehicleType}', [WorkshopVehicleTypeController::class, 'update'])->name('vehicle-types.update');
+    Route::delete('/tipos-vehiculo/{vehicleType}', [WorkshopVehicleTypeController::class, 'destroy'])->name('vehicle-types.destroy');
         Route::get('/clientes/{person}/historial', [WorkshopClientController::class, 'show'])->name('clients.history');
         Route::get('/compras', [WorkshopPurchaseController::class, 'index'])->name('purchases.index');
         Route::get('/ventas', [WorkshopSalesRegisterController::class, 'index'])->name('sales-register.index');

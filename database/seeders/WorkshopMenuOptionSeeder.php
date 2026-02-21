@@ -20,6 +20,7 @@ class WorkshopMenuOptionSeeder extends Seeder
             ['name' => 'Clientes Taller', 'icon' => 'ri-user-3-line', 'action' => 'workshop.clients.index', 'view' => 'TAL_CLI'],
             ['name' => 'Agenda/Citas', 'icon' => 'ri-calendar-event-line', 'action' => 'workshop.appointments.index', 'view' => 'TAL_CITAS'],
             ['name' => 'Vehiculos', 'icon' => 'ri-motorbike-line', 'action' => 'workshop.vehicles.index', 'view' => 'TAL_VEH'],
+            ['name' => 'Tipos de Vehiculo', 'icon' => 'ri-steering-2-line', 'action' => 'workshop.vehicle-types.index', 'view' => 'TAL_VTYPE'],
             ['name' => 'Ordenes de Servicio', 'icon' => 'ri-file-list-3-line', 'action' => 'workshop.orders.index', 'view' => 'TAL_OS'],
             ['name' => 'Servicios Taller', 'icon' => 'ri-settings-4-line', 'action' => 'workshop.services.index', 'view' => 'TAL_SERV'],
             ['name' => 'Compras Taller', 'icon' => 'ri-file-list-2-line', 'action' => 'workshop.purchases.index', 'view' => 'TAL_COMP'],

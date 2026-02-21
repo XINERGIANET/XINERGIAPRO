@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
         $this->call(WorkshopMenuOptionSeeder::class);
         $this->call(WorkshopOperationsSeeder::class);
         $this->call(WorkshopChecklistSeeder::class);
+        $this->call(WorkshopVehicleTypeSeeder::class);
         $this->call(WorkshopParameterSeeder::class);
         $this->call(WorkshopAssemblySeeder::class);
     }

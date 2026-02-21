@@ -20,7 +20,23 @@ class StoreVehicleRequest extends FormRequest
 
         return [
             'client_person_id' => ['required', 'integer', 'exists:people,id'],
-            'type' => ['required', 'string', 'max:30'],
+            'vehicle_type_id' => [
+                'required',
+                'integer',
+                Rule::exists('vehicle_types', 'id')->where(function ($query) use ($companyId, $branchId) {
+                    $query->whereNull('deleted_at')
+                        ->where(function ($inner) use ($companyId, $branchId) {
+                            $inner->whereNull('company_id')
+                                ->orWhere(function ($scope) use ($companyId, $branchId) {
+                                    $scope->where('company_id', $companyId)
+                                        ->where(function ($branchScope) use ($branchId) {
+                                            $branchScope->whereNull('branch_id')
+                                                ->orWhere('branch_id', $branchId);
+                                        });
+                                });
+                        });
+                }),
+            ],
             'brand' => ['required', 'string', 'max:255'],
             'model' => ['required', 'string', 'max:255'],
             'year' => ['nullable', 'integer', 'digits:4'],

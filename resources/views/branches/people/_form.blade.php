@@ -31,6 +31,12 @@
         profiles: JSON.parse($el.dataset.profiles || '[]'),
         selectedRoleIds: JSON.parse($el.dataset.selectedRoles || '[]'),
         selectedProfileId: JSON.parse($el.dataset.selectedProfile || 'null') || '',
+        personType: @js(old('person_type', $person->person_type ?? 'DNI')),
+        documentNumber: @js(old('document_number', $person->document_number ?? '')),
+        firstName: @js(old('first_name', $person->first_name ?? '')),
+        lastName: @js(old('last_name', $person->last_name ?? '')),
+        reniecLoading: false,
+        reniecError: '',
         roleToAdd: '',
         userRoleId: 1,
         init() {
@@ -77,6 +83,42 @@
         },
         onProvinceChange() {
             this.districtId = '';
+        },
+        splitName(fullName) {
+            const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
+            if (parts.length <= 1) return { first_name: parts[0] || '', last_name: '' };
+            if (parts.length === 2) return { first_name: parts[0], last_name: parts[1] };
+            if (parts.length === 3) return { first_name: parts[0], last_name: parts.slice(1).join(' ') };
+            return { first_name: parts.slice(0, 2).join(' '), last_name: parts.slice(2).join(' ') };
+        },
+        async fetchReniec() {
+            this.reniecError = '';
+            if (String(this.personType).toUpperCase() !== 'DNI') {
+                this.reniecError = 'La busqueda RENIEC solo aplica para DNI.';
+                return;
+            }
+            const dni = String(this.documentNumber || '').trim();
+            if (!/^\d{8}$/.test(dni)) {
+                this.reniecError = 'Ingrese un DNI valido de 8 digitos.';
+                return;
+            }
+            this.reniecLoading = true;
+            try {
+                const response = await fetch(`/api/reniec?dni=${encodeURIComponent(dni)}`, {
+                    headers: { 'Accept': 'application/json' }
+                });
+                const payload = await response.json();
+                if (!response.ok || !payload?.status || !payload?.name) {
+                    throw new Error(payload?.message || 'No se encontro informacion en RENIEC.');
+                }
+                const parsed = this.splitName(payload.name);
+                this.firstName = parsed.first_name;
+                this.lastName = parsed.last_name;
+            } catch (error) {
+                this.reniecError = error?.message || 'Error consultando RENIEC.';
+            } finally {
+                this.reniecLoading = false;
+            }
         }
     }"
     x-init="init()"
@@ -85,14 +127,14 @@
         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Tipo de persona</label>
         <select
             name="person_type"
+            x-model="personType"
             required
             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         >
-            <option value="">Seleccione tipo</option>
-            <option value="DNI" @selected(old('person_type', $person->person_type ?? '') === 'DNI')>DNI</option>
-            <option value="RUC" @selected(old('person_type', $person->person_type ?? '') === 'RUC')>RUC</option>
-            <option value="CARNET DE EXTRANGERIA" @selected(old('person_type', $person->person_type ?? '') === 'CARNET DE EXTRANGERIA')>CARNET DE EXTRANGERIA</option>
-            <option value="PASAPORTE" @selected(old('person_type', $person->person_type ?? '') === 'PASAPORTE')>PASAPORTE</option>
+            <option value="DNI" @selected(old('person_type', $person->person_type ?? 'DNI') === 'DNI')>DNI</option>
+            <option value="RUC" @selected(old('person_type', $person->person_type ?? 'DNI') === 'RUC')>RUC</option>
+            <option value="CARNET DE EXTRANGERIA" @selected(old('person_type', $person->person_type ?? 'DNI') === 'CARNET DE EXTRANGERIA')>CARNET DE EXTRANGERIA</option>
+            <option value="PASAPORTE" @selected(old('person_type', $person->person_type ?? 'DNI') === 'PASAPORTE')>PASAPORTE</option>
         </select>
         @error('person_type')
             <p class="mt-1 text-xs text-error-500">{{ $message }}</p>
@@ -101,14 +143,26 @@
 
     <div>
         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Documento</label>
-        <input
-            type="text"
-            name="document_number"
-            value="{{ old('document_number', $person->document_number ?? '') }}"
-            required
-            placeholder="Ingrese el documento"
-            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
-        />
+        <div class="flex items-center gap-2">
+            <input
+                type="text"
+                name="document_number"
+                x-model="documentNumber"
+                required
+                placeholder="Ingrese el documento"
+                class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+            />
+            <button
+                type="button"
+                @click="fetchReniec()"
+                :disabled="reniecLoading"
+                class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-[#244BB3] px-4 text-sm font-medium text-white hover:bg-[#1f3f98] disabled:opacity-60"
+            >
+                <i class="ri-search-line"></i>
+                <span class="ml-1" x-text="reniecLoading ? 'Buscando...' : 'Buscar'"></span>
+            </button>
+        </div>
+        <p x-show="reniecError" x-cloak class="mt-1 text-xs text-red-600" x-text="reniecError"></p>
         @error('document_number')
             <p class="mt-1 text-xs text-error-500">{{ $message }}</p>
         @enderror
@@ -118,7 +172,7 @@
         <input
             type="text"
             name="first_name"
-            value="{{ old('first_name', $person->first_name ?? '') }}"
+            x-model="firstName"
             required
             placeholder="Ingrese los nombres"
             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
@@ -134,7 +188,7 @@
         <input
             type="text"
             name="last_name"
-            value="{{ old('last_name', $person->last_name ?? '') }}"
+            x-model="lastName"
             required
             placeholder="Ingrese los apellidos"
             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
@@ -184,7 +238,6 @@
             type="text"
             name="phone"
             value="{{ old('phone', $person->phone ?? '') }}"
-            required
             placeholder="Ingrese el telefono"
             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
         />
@@ -199,7 +252,6 @@
             type="email"
             name="email"
             value="{{ old('email', $person->email ?? '') }}"
-            required
             placeholder="Ingrese el email"
             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
         />
@@ -341,4 +393,3 @@
         </div>
     </template>
 </div>
-

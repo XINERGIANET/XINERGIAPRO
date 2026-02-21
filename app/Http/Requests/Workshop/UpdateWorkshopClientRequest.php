@@ -21,7 +21,7 @@ class UpdateWorkshopClientRequest extends FormRequest
             'document_number' => ['required', 'string', 'max:50'],
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
-            'phone' => ['required', 'string', 'max:50'],
+            'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:255'],
             'address' => ['required', 'string', 'max:255'],
             'location_id' => ['nullable', 'integer', 'exists:locations,id'],

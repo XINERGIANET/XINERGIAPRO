@@ -12,6 +12,7 @@ use App\Models\Vehicle;
 use App\Models\WorkshopMovement;
 use App\Models\Profile;
 use App\Models\Role;
+use Illuminate\Support\Facades\Http;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -88,11 +89,36 @@ class PersonController extends Controller
             'operaciones' => $operaciones,
         ] + $this->getLocationData(null, $branch->location_id));
     }
+        public function apiReniec(Request $request)
+    {
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . config('apireniec.token')
+        ])->get(config('apireniec.url'), [
+            'numero' => $request->dni
+        ]);
+
+        $data = $response->json();
+
+        if ($response->successful()) {
+
+            return response()->json([
+                'status' => true,
+                'name' => $data['nombres'] . ' ' . $data['apellidoPaterno'] . ' ' . $data['apellidoMaterno']
+            ]);
+        } else {
+
+            return response()->json([
+                'status' => false
+            ]);
+        }
+    }
 
     public function store(Request $request, Company $company, Branch $branch)
     {
         $branch = $this->resolveBranch($company, $branch);
         $data = $this->validatePerson($request, $branch);
+        $data['phone'] = (string) ($data['phone'] ?? '');
+        $data['email'] = (string) ($data['email'] ?? '');
         $data['branch_id'] = $branch->id;
         $roleIds = $this->validateRoles($request);
         $hasUserRole = in_array(1, $roleIds, true);
@@ -146,6 +172,8 @@ class PersonController extends Controller
         $branch = $this->resolveBranch($company, $branch);
         $person = $this->resolvePerson($branch, $person);
         $data = $this->validatePerson($request, $branch, $person);
+        $data['phone'] = (string) ($data['phone'] ?? '');
+        $data['email'] = (string) ($data['email'] ?? '');
         $roleIds = $this->validateRoles($request);
         $hasUserRole = in_array(1, $roleIds, true);
         $userData = $this->validateUserData($request, $hasUserRole, $person);
@@ -250,8 +278,8 @@ class PersonController extends Controller
             'fecha_nacimiento' => ['nullable', 'date'],
             'genero' => ['nullable', 'string', 'max:30'],
             'person_type' => ['required', 'string', 'max:100'],
-            'phone' => ['required', 'string', 'max:50'],
-            'email' => ['required', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'email' => ['nullable', 'email', 'max:255'],
             'document_number' => [
                 'required',
                 'string',

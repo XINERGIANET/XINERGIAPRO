@@ -42,7 +42,7 @@
                         <tr class="border-t border-gray-100 dark:border-gray-800">
                             <td class="px-4 py-3 text-sm">{{ $vehicle->id }}</td>
                             <td class="px-4 py-3 text-sm">{{ $vehicle->client?->first_name }} {{ $vehicle->client?->last_name }}</td>
-                            <td class="px-4 py-3 text-sm">{{ $vehicle->brand }} {{ $vehicle->model }} ({{ $vehicle->type }})</td>
+                            <td class="px-4 py-3 text-sm">{{ $vehicle->brand }} {{ $vehicle->model }} ({{ ucfirst($vehicle->vehicleType?->name ?? $vehicle->type) }})</td>
                             <td class="px-4 py-3 text-sm">{{ $vehicle->plate }}</td>
                             <td class="px-4 py-3 text-sm">{{ $vehicle->current_mileage }}</td>
                             <td class="px-4 py-3 text-sm">
@@ -83,10 +83,10 @@
                         <option value="{{ $client->id }}">{{ $client->first_name }} {{ $client->last_name }}</option>
                     @endforeach
                 </select>
-                <select name="type" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
+                <select name="vehicle_type_id" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
                     @foreach($vehicleTypes as $vehicleType)
-                        <option value="{{ $vehicleType }}" @selected(old('type', 'moto lineal') === $vehicleType)>
-                            {{ ucfirst($vehicleType) }}
+                        <option value="{{ $vehicleType->id }}" @selected((int) old('vehicle_type_id', optional($vehicleTypes->firstWhere('name', 'moto lineal'))->id) === (int) $vehicleType->id)>
+                            {{ ucfirst($vehicleType->name) }}
                         </option>
                     @endforeach
                 </select>
@@ -126,10 +126,10 @@
                             <option value="{{ $client->id }}" @selected((int)$vehicle->client_person_id === (int)$client->id)>{{ $client->first_name }} {{ $client->last_name }}</option>
                         @endforeach
                     </select>
-                    <select name="type" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
+                    <select name="vehicle_type_id" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
                         @foreach($vehicleTypes as $vehicleType)
-                            <option value="{{ $vehicleType }}" @selected(old('type', $vehicle->type) === $vehicleType)>
-                                {{ ucfirst($vehicleType) }}
+                            <option value="{{ $vehicleType->id }}" @selected((int) old('vehicle_type_id', $vehicle->vehicle_type_id) === (int) $vehicleType->id)>
+                                {{ ucfirst($vehicleType->name) }}
                             </option>
                         @endforeach
                     </select>

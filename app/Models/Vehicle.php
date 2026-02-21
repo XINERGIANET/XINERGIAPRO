@@ -14,6 +14,7 @@ class Vehicle extends Model
         'company_id',
         'branch_id',
         'client_person_id',
+        'vehicle_type_id',
         'type',
         'brand',
         'model',
@@ -41,6 +42,11 @@ class Vehicle extends Model
     public function client()
     {
         return $this->belongsTo(Person::class, 'client_person_id');
+    }
+
+    public function vehicleType()
+    {
+        return $this->belongsTo(VehicleType::class, 'vehicle_type_id');
     }
 
     public function appointments()

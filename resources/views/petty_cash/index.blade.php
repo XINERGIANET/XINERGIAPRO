@@ -446,7 +446,20 @@
                                             <div class="grid grid-cols-2 border-b border-gray-200 py-2 dark:border-gray-700"><span class="font-semibold">Persona</span><span>{{ $movement->person_name ?: '-' }}</span></div>
                                             <div class="grid grid-cols-2 border-b border-gray-200 py-2 dark:border-gray-700"><span class="font-semibold">Responsable</span><span>{{ $movement->responsible_name ?: '-' }}</span></div>
                                             <div class="grid grid-cols-2 border-b border-gray-200 py-2 dark:border-gray-700"><span class="font-semibold">Moneda</span><span>{{ $movement->cashMovement?->currency ?: 'PEN' }}</span></div>
-                                            <div class="grid grid-cols-2 border-b border-gray-200 py-2 dark:border-gray-700"><span class="font-semibold">Origen</span><span>{{ $movement->movement?->movementType?->description ?? '-' }} - {{ strtoupper(substr($movement->movement?->documentType?->name , 0, 1))?? '-' }}{{ $movement->movement?->salesMovement->series }}-{{ $movement->number }}</span></div>
+                                            <div class="grid grid-cols-2 border-b border-gray-200 py-2 dark:border-gray-700">
+                                                <span class="font-semibold">Origen</span>
+                                                <span>
+                                                    @php
+                                                        $originMovement = $movement->movement;
+                                                        $originType = $originMovement?->movementType?->description ?? '-';
+                                                        $originDocPrefix = $originMovement?->documentType?->name
+                                                            ? strtoupper(substr($originMovement->documentType->name, 0, 1))
+                                                            : '-';
+                                                        $originSeries = $originMovement?->salesMovement?->series;
+                                                    @endphp
+                                                    {{ $originType }} - {{ $originDocPrefix }}{{ $originSeries ? $originSeries.'-' : '' }}{{ $movement->number }}
+                                                </span>
+                                            </div>
                                             <div class="grid grid-cols-2 border-b border-gray-200 py-2 dark:border-gray-700"><span class="font-semibold">T. cambio</span><span>{{ number_format((float) ($movement->cashMovement?->exchange_rate ?? 1), 3) }}</span></div>
                                             <div class="grid grid-cols-2 py-2"><span class="font-semibold">Comentario</span><span>{{ $movement->comment ?: '-' }}</span></div>
                                         </div>

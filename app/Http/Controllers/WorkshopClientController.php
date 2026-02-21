@@ -93,6 +93,8 @@ class WorkshopClientController extends Controller
     {
         [$branchId] = $this->branchScope();
         $data = $request->validated();
+        $data['phone'] = (string) ($data['phone'] ?? '');
+        $data['email'] = (string) ($data['email'] ?? '');
         $roleIds = $this->validateRoles($request);
         $hasUserRole = in_array(1, $roleIds, true);
         $userData = $this->validateUserData($request, $hasUserRole, null);
@@ -123,6 +125,8 @@ class WorkshopClientController extends Controller
         [$branchId] = $this->branchScope();
         $this->assertClientScope($person, $branchId);
         $data = $request->validated();
+        $data['phone'] = (string) ($data['phone'] ?? '');
+        $data['email'] = (string) ($data['email'] ?? '');
         $roleIds = $this->validateRoles($request);
         $hasUserRole = in_array(1, $roleIds, true);
         $userData = $this->validateUserData($request, $hasUserRole, $person);
