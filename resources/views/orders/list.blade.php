@@ -126,7 +126,7 @@
                 </div>
             </div>
 
-            <div x-data="{ openRow: null }" class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+            <div x-data="{ openRow: null }" class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
                 <table class="w-full min-w-[1480px]">
                     <thead class="bg-[#363d46]">
                         <tr class="text-white"  style="background-color: #63B7EC; color: #FFFFFF;">
@@ -159,7 +159,7 @@
                                 $situationColor = in_array($situationStatus, ['A', '1'], true) ? 'success' : 'error';
                                 $situationText = in_array($situationStatus, ['A', '1'], true) ? 'Activado' : 'Inactivo';
                             @endphp
-                            <tr class="border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5">
+                            <tr class="group/row border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5 relative hover:z-[60]">
                                 <td class="px-4 py-4">
                                     <div class="flex items-center gap-2">
                                         <button type="button"
@@ -218,14 +218,20 @@
                                                         <x-ui.button size="icon" variant="{{ $variant }}" type="submit" className="rounded-xl" style="{{ $buttonStyle }}" aria-label="{{ $operation->name }}">
                                                             <i class="{{ $operation->icon }}"></i>
                                                         </x-ui.button>
-                                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">{{ $operation->name }}</span>
+                                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                            {{ $operation->name }}
+                                                            <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                        </span>
                                                     </form>
                                                 @else
                                                     <div class="relative group">
                                                         <x-ui.link-button size="icon" variant="{{ $variant }}" href="{{ $actionUrl }}" className="rounded-xl" style="{{ $buttonStyle }}" aria-label="{{ $operation->name }}">
                                                             <i class="{{ $operation->icon }}"></i>
                                                         </x-ui.link-button>
-                                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">{{ $operation->name }}</span>
+                                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                            {{ $operation->name }}
+                                                            <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                        </span>
                                                     </div>
                                                 @endif
                                             @endforeach
@@ -265,6 +271,13 @@
                             </tr>
                         @endforelse
                     </tbody>
+                    @if ($orders->count() > 0)
+                        <tfoot>
+                            <tr>
+                                <td colspan="15" class="h-12"></td>
+                            </tr>
+                        </tfoot>
+                    @endif
                 </table>
             </div>
 

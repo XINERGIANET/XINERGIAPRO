@@ -149,7 +149,7 @@
                 </div>
             </div>
 
-            <div class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+            <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
                 <table class="w-full min-w-max">
                     <thead>
                         <tr class="text-white">
@@ -166,7 +166,7 @@
                     </thead>
                     <tbody>
                         @forelse ($roles as $role)
-                            <tr class="group/row border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5">
+                            <tr class="group/row border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5 relative hover:z-[60]">
                                 <td class="px-3 py-4 sm:px-6 text-center sticky-left">
                                     <p class="font-medium text-gray-800 text-theme-sm dark:text-white/90 truncate" title="{{ $role->name }}">{{ $role->name }}</p>
                                 </td>
@@ -212,7 +212,10 @@
                                                     >
                                                         <i class="{{ $operation->icon }}"></i>
                                                     </x-ui.button>
-                                                    <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">{{ $operation->name }}</span>
+                                                    <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                        {{ $operation->name }}
+                                                        <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                    </span>
                                                 </form>
                                             @else
                                                 <div class="relative group">
@@ -226,7 +229,10 @@
                                                     >
                                                         <i class="{{ $operation->icon }}"></i>
                                                     </x-ui.link-button>
-                                                    <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">{{ $operation->name }}</span>
+                                                    <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                        {{ $operation->name }}
+                                                        <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                    </span>
                                                 </div>
                                             @endif
                                         @endforeach
@@ -251,6 +257,13 @@
                             </tr>
                         @endforelse
                     </tbody>
+                    @if ($roles->count() > 0)
+                        <tfoot>
+                            <tr>
+                                <td colspan="3" class="h-12"></td>
+                            </tr>
+                        </tfoot>
+                    @endif
                 </table>
             </div>
 

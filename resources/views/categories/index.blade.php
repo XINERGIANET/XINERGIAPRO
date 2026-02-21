@@ -141,7 +141,7 @@
                 </div>
             </div>
 
-            <div class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+            <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
                 <table class="w-full min-w-[1100px]">
                     <thead>
                         <tr class="text-white">
@@ -161,7 +161,7 @@
                     </thead>
                     <tbody>
                         @forelse ($categories as $category)
-                            <tr class="border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5">
+                            <tr class="group/row border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5 relative hover:z-[60]">
                                  <td class="px-6 py-4 whitespace-nowrap sticky-left">
                                     <div class="flex items-center">
                                         @if($category->image)
@@ -223,7 +223,10 @@
                                                         >
                                                             <i class="{{ $operation->icon }}"></i>
                                                         </x-ui.button>
-                                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">{{ $operation->name }}</span>
+                                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                            {{ $operation->name }}
+                                                            <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                        </span>
                                                     </form>
                                                 @else
                                                     <div class="relative group">
@@ -237,7 +240,10 @@
                                                         >
                                                             <i class="{{ $operation->icon }}"></i>
                                                         </x-ui.link-button>
-                                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">{{ $operation->name }}</span>
+                                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                            {{ $operation->name }}
+                                                            <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                        </span>
                                                     </div>
                                                 @endif
                                             @endforeach
@@ -253,7 +259,10 @@
                                                 >
                                                     <i class="ri-pencil-line"></i>
                                                 </x-ui.link-button>
-                                                <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">Editar</span>
+                                                <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                    Editar
+                                                    <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                </span>
                                             </div>
                                             <form
                                                 method="POST"
@@ -281,7 +290,10 @@
                                                 >
                                                     <i class="ri-delete-bin-line"></i>
                                                 </x-ui.button>
-                                                <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">Eliminar</span>
+                                                <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                    Eliminar
+                                                    <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                </span>
                                             </form>
                                         @endif
                                     </div>
@@ -305,6 +317,13 @@
                             </tr>
                         @endforelse
                     </tbody>
+                    @if ($categories->count() > 0)
+                        <tfoot>
+                            <tr>
+                                <td colspan="4" class="h-12"></td>
+                            </tr>
+                        </tfoot>
+                    @endif
                 </table>
             </div>
 

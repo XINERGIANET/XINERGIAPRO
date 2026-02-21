@@ -126,7 +126,7 @@
                 </div>
             </div>
 
-            <div x-data="{ openRow: null }" class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+            <div x-data="{ openRow: null }" class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
                 <table class="w-full min-w-[1100px]">
                     <thead>
                         <tr class="text-white">
@@ -158,7 +158,7 @@
                     </thead>
                     <tbody>
                         @forelse ($sales as $sale)
-                            <tr class="border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5">
+                            <tr class="group/row border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5 relative hover:z-[60]">
                                 <td class="px-4 py-4 sm:px-6 sticky-left">
                                     <div class="flex items-center gap-2">
                                         <button type="button"
@@ -255,42 +255,54 @@
                                                         <x-ui.button size="icon" variant="{{ $variant }}" type="submit" className="rounded-xl" style="{{ $buttonStyle }}" aria-label="{{ $operation->name }}">
                                                             <i class="{{ $operation->icon }}"></i>
                                                         </x-ui.button>
-                                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">{{ $operation->name }}</span>
+                                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                            {{ $operation->name }}
+                                                            <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                        </span>
                                                     </form>
                                                 @else
                                                     <div class="relative group">
                                                         <x-ui.link-button size="icon" variant="{{ $variant }}" href="{{ $actionUrl }}" className="rounded-xl" style="{{ $buttonStyle }}" aria-label="{{ $operation->name }}">
                                                             <i class="{{ $operation->icon }}"></i>
                                                         </x-ui.link-button>
-                                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">{{ $operation->name }}</span>
+                                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                            {{ $operation->name }}
+                                                            <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                        </span>
                                                     </div>
                                                 @endif
                                             @endforeach
 
                                             <div class="relative group">
-                                                <x-ui.link-button
-                                                    size="icon"
-                                                    variant="outline"
-                                                    href="{{ route('admin.sales.print.pdf', array_merge([$sale], $viewId ? ['view_id' => $viewId] : [])) }}"
-                                                    className="rounded-xl border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
-                                                    aria-label="Imprimir PDF" target="_blank"
-                                                >
-                                                    <i class="ri-file-pdf-2-line"></i>
-                                                </x-ui.link-button>
-                                                <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">PDF</span>
-                                            </div>
+                                                    <x-ui.link-button
+                                                        size="icon"
+                                                        variant="outline"
+                                                        href="{{ route('admin.sales.print.pdf', array_merge([$sale], $viewId ? ['view_id' => $viewId] : [])) }}"
+                                                        className="rounded-xl border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                                                        aria-label="Imprimir PDF" target="_blank"
+                                                    >
+                                                        <i class="ri-file-pdf-2-line"></i>
+                                                    </x-ui.link-button>
+                                                    <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                        PDF
+                                                        <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                    </span>
+                                                </div>
                                             <div class="relative group">
-                                                <x-ui.link-button
-                                                    size="icon"
-                                                    variant="outline"
-                                                    href="{{ route('admin.sales.print.ticket', array_merge([$sale], $viewId ? ['view_id' => $viewId] : [])) }}"
-                                                    className="rounded-xl border border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100"
-                                                    aria-label="Imprimir Ticket" target="_blank"
-                                                >
-                                                    <i class="ri-printer-line"></i>
-                                                </x-ui.link-button>
-                                                <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">Ticket</span>
-                                            </div>
+                                                    <x-ui.link-button
+                                                        size="icon"
+                                                        variant="outline"
+                                                        href="{{ route('admin.sales.print.ticket', array_merge([$sale], $viewId ? ['view_id' => $viewId] : [])) }}"
+                                                        className="rounded-xl border border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                                                        aria-label="Imprimir Ticket" target="_blank"
+                                                    >
+                                                        <i class="ri-printer-line"></i>
+                                                    </x-ui.link-button>
+                                                    <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                        Ticket
+                                                        <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                    </span>
+                                                </div>
                                         @else
                                             @if(($sale->status ?? 'A') === 'P')
                                                 <div class="relative group">
@@ -304,7 +316,10 @@
                                                     >
                                                         <i class="ri-money-dollar-circle-line"></i>
                                                     </x-ui.link-button>
-                                                    <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">Cobrar</span>
+                                                    <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                        Cobrar
+                                                        <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                    </span>
                                                 </div>
                                             @endif
                                             <div class="relative group">
@@ -318,7 +333,10 @@
                                                 >
                                                     <i class="ri-pencil-line"></i>
                                                 </x-ui.link-button>
-                                                <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">Editar</span>
+                                                <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                    Editar
+                                                    <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                </span>
                                             </div>
                                             <form
                                                 method="POST"
@@ -346,7 +364,10 @@
                                                 >
                                                     <i class="ri-delete-bin-line"></i>
                                                 </x-ui.button>
-                                                <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">Eliminar</span>
+                                                <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                    Eliminar
+                                                    <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                </span>
                                             </form>
 
                                             <div class="relative group">
@@ -359,7 +380,10 @@
                                                 >
                                                     <i class="ri-file-pdf-2-line"></i>
                                                 </x-ui.link-button>
-                                                <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">PDF</span>
+                                                <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                    PDF
+                                                    <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                </span>
                                             </div>
                                             <div class="relative group">
                                                 <x-ui.link-button
@@ -371,7 +395,10 @@
                                                 >
                                                     <i class="ri-printer-line"></i>
                                                 </x-ui.link-button>
-                                                <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">Ticket</span>
+                                                <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                    Ticket
+                                                    <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                </span>
                                             </div>
                                         @endif
                                     </div>
@@ -449,6 +476,13 @@
                             </tr>
                         @endforelse
                     </tbody>
+                    @if ($sales->count() > 0)
+                        <tfoot>
+                            <tr>
+                                <td colspan="9" class="h-12"></td>
+                            </tr>
+                        </tfoot>
+                    @endif
                 </table>
             </div>
 

@@ -131,7 +131,7 @@
             </div>
         </div>
         @if ($parameters->count() > 0)
-            <div class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+            <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
                 <table class="w-full min-w-max">
                         <thead class="text-left text-theme-xs dark:text-gray-400">
                             <tr class="border-b border-gray-100 dark:border-gray-800">
@@ -161,7 +161,7 @@
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                             @foreach ($parameters as $parameter)
                                 <tr
-                                    class="border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5">
+                                    class="group/row border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5 relative hover:z-[60]">
                                     <td class="px-5 py-4 sm:px-6 text-center sticky-left">
                                         <p class="font-medium text-gray-900 text-theme-sm dark:text-white/90">
                                             {{ $parameter->id }}</p>
@@ -220,7 +220,10 @@
                                                             aria-label="{{ $operation->name }}">
                                                             <i class="{{ $operation->icon }}"></i>
                                                         </x-ui.button>
-                                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">{{ $operation->name }}</span>
+                                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                            {{ $operation->name }}
+                                                            <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                        </span>
                                                     </form>
                                                 @elseif ($isEdit)
                                                     <div class="relative group">
@@ -231,7 +234,10 @@
                                                             x-on:click.prevent="$dispatch('open-edit-parameter-modal', {{ Illuminate\Support\Js::from(['id' => $parameter->id, 'description' => $parameter->description, 'value' => $parameter->value, 'parameter_category_id' => $parameter->parameterCategory?->id, 'status' => $parameter->status]) }})">
                                                             <i class="{{ $operation->icon }}"></i>
                                                         </x-ui.button>
-                                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">{{ $operation->name }}</span>
+                                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                            {{ $operation->name }}
+                                                            <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                        </span>
                                                     </div>
                                                 @else
                                                     <div class="relative group">
@@ -242,7 +248,10 @@
                                                             aria-label="{{ $operation->name }}">
                                                             <i class="{{ $operation->icon }}"></i>
                                                         </x-ui.link-button>
-                                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">{{ $operation->name }}</span>
+                                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                            {{ $operation->name }}
+                                                            <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                        </span>
                                                     </div>
                                                 @endif
                                             @endforeach
@@ -250,7 +259,15 @@
                                     </td>
                                 </tr>
                             @endforeach
+                        @endforeach
                         </tbody>
+                        @if ($parameters->count() > 0)
+                            <tfoot>
+                                <tr>
+                                    <td colspan="7" class="h-12"></td>
+                                </tr>
+                            </tfoot>
+                        @endif
                 </table>
             </div>
         @else

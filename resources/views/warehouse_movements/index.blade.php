@@ -152,7 +152,7 @@
                     </x-ui.link-button>
                 @endif
             </div>
-            <div class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+            <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
                     <table class="w-full min-w-[1100px]">
                         <thead style="background-color: #63B7EC; color: #FFFFFF;">
                             <tr>
@@ -191,7 +191,7 @@
                                     ];
                                     $statusColor = $statusColors[$warehouseMovement->status] ?? 'info';
                                 @endphp
-                                <tr class="group/row transition hover:bg-gray-50/80 dark:hover:bg-white/5">
+                                <tr class="group/row transition hover:bg-gray-50/80 dark:hover:bg-white/5 relative hover:z-[60]">
                                     <td class="px-5 py-4 align-middle">
                                         <div class="flex items-center gap-2">
                                             <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-500 dark:bg-brand-500/10 shrink-0">
@@ -267,7 +267,10 @@
                                                             >
                                                                 <i class="{{ $operation->icon }}"></i>
                                                             </x-ui.button>
-                                                            <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">{{ $operation->name }}</span>
+                                                            <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                                {{ $operation->name }}
+                                                                <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                            </span>
                                                         </form>
                                                     @else
                                                         <div class="relative group">
@@ -281,7 +284,10 @@
                                                             >
                                                                 <i class="{{ $operation->icon }}"></i>
                                                             </x-ui.link-button>
-                                                            <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">{{ $operation->name }}</span>
+                                                            <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                                {{ $operation->name }}
+                                                                <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                            </span>
                                                         </div>
                                                     @endif
                                                 @endforeach
@@ -293,6 +299,10 @@
                                                         aria-label="Ver Registro">
                                                         <i class="ri-eye-line"></i>
                                                     </a>
+                                                    <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                        Ver Registro
+                                                        <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                    </span>
                                                 </div>
                                                 <div class="relative group"> <a
                                                         href="{{ route('warehouse_movements.edit', array_merge(['warehouseMovement' => $warehouseMovement->id], $viewId ? ['view_id' => $viewId] : [])) }}"
@@ -301,6 +311,10 @@
                                                         aria-label="Editar Registro">
                                                         <i class="ri-pencil-line"></i>
                                                     </a>
+                                                    <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                        Editar Registro
+                                                        <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                    </span>
                                                 </div>
                                             @endif
                                         </div>
@@ -322,6 +336,13 @@
                                 </tr>
                             @endforelse
                         </tbody>
+                        @if ($warehouseMovements->count() > 0)
+                            <tfoot>
+                                <tr>
+                                    <td colspan="7" class="h-12"></td>
+                                </tr>
+                            </tfoot>
+                        @endif
                     </table>
             </div>
         </x-common.component-card>

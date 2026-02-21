@@ -204,7 +204,7 @@
                 </div>
             </div>
 
-            <div class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+            <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
                 <table class="w-full min-w-[880px]">
                     <thead>
                         <tr class="text-white">
@@ -224,7 +224,7 @@
                     </thead>
                     <tbody>
                         @forelse ($assignedViews as $view)
-                            <tr class="border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5">
+                            <tr class="group/row border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5 relative hover:z-[60]">
                                 <td class="px-5 py-4 sm:px-6 sticky-left">
                                     <p class="font-medium text-gray-800 text-theme-sm dark:text-white/90">{{ $view->name }}</p>
                                 </td>
@@ -331,6 +331,13 @@
                             </tr>
                         @endforelse
                     </tbody>
+                    @if ($assignedViews->count() > 0)
+                        <tfoot>
+                            <tr>
+                                <td colspan="4" class="h-12"></td>
+                            </tr>
+                        </tfoot>
+                    @endif
                 </table>
             </div>
 
@@ -393,7 +400,7 @@
                         <input type="hidden" name="icon" value="{{ $requestIcon }}">
                     @endif
 
-                     <div class="table-responsive mt-4 min-h-0 flex-1 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+                     <div class="table-responsive lg:!overflow-visible mt-4 min-h-0 flex-1 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
                         <table class="w-full min-w-[700px]">
                             <thead>
                                 <tr class="text-white">

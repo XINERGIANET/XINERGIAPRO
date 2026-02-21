@@ -14,6 +14,8 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 
 window.Alpine = Alpine;
+
+
 window.ApexCharts = ApexCharts;
 window.flatpickr = flatpickr;
 

@@ -142,7 +142,7 @@
                 </div>
             </div>
 
-            <div class="mt-4 table-responsive rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+            <div class="mt-4 table-responsive lg:!overflow-visible rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
                 <table class="w-full min-w-max">
                     <thead>
                         <tr class="border-b border-gray-100 dark:border-gray-800">
@@ -171,7 +171,7 @@
                     </thead>
                     <tbody>
                         @forelse ($tables as $table)
-                            <tr class="border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5">
+                            <tr class="group/row border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5 relative hover:z-[60]">
                                 <td class="px-5 py-4 sm:px-6 sticky-left">
                                     <p class="font-medium text-gray-800 text-theme-sm dark:text-white/90">{{ $table->name }}</p>
                                 </td>
@@ -264,7 +264,10 @@
                                                 >
                                                     <i class="ri-pencil-line"></i>
                                                 </x-ui.link-button>
-                                                <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">Editar</span>
+                                                <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                    Editar
+                                                    <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                </span>
                                             </div>
                                             <form
                                                 method="POST"
@@ -292,7 +295,10 @@
                                                 >
                                                     <i class="ri-delete-bin-line"></i>
                                                 </x-ui.button>
-                                                <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">Eliminar</span>
+                                                <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                    Eliminar
+                                                    <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                </span>
                                             </form>
                                         @endif
                                     </div>
@@ -316,6 +322,13 @@
                             </tr>
                         @endforelse
                     </tbody>
+                    @if ($tables->count() > 0)
+                        <tfoot>
+                            <tr>
+                                <td colspan="7" class="h-12"></td>
+                            </tr>
+                        </tfoot>
+                    @endif
                 </table>
             </div>
 

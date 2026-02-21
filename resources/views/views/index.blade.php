@@ -153,7 +153,7 @@
         </div>
 
         {{-- TABLA DE DATOS --}}
-        <div class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+        <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
                 <table class="w-full min-w-[880px]">
                     <thead>
                         <tr class="text-white">
@@ -168,7 +168,7 @@
                     </thead>
                     <tbody>
                         @forelse ($views as $view)
-                            <tr class="group/row border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5">
+                            <tr class="group/row border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5 relative hover:z-[60]">
                                 <td class="px-3 py-4 sm:px-6 sticky-left">
                                     <span class="font-bold text-gray-700 dark:text-gray-200 truncate block text-xs" title="#{{ $view->id }}">#{{ $view->id }}</span>
                                 </td>
@@ -216,9 +216,9 @@
                                                         <i class="{{ $operation->icon }} text-lg"></i>
                                                     </x-ui.button>
                                                     <span
-                                                        class="invisible group-hover:visible absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[11px] font-medium text-white shadow-xl z-50">
+                                                        class="pointer-events-none opacity-0 group-hover:opacity-100 absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[11px] font-medium text-white shadow-xl z-50 transition">
                                                         {{ $operation->name }}
-                                                        <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
+                                                        <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
                                                     </span>
                                                 </form>
                                             @else
@@ -231,9 +231,9 @@
                                                         <i class="{{ $operation->icon }} text-lg"></i>
                                                     </x-ui.link-button>
                                                     <span
-                                                        class="invisible group-hover:visible absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[11px] font-medium text-white shadow-xl z-50">
+                                                        class="pointer-events-none opacity-0 group-hover:opacity-100 absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[11px] font-medium text-white shadow-xl z-50 transition">
                                                         {{ $operation->name }}
-                                                        <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
+                                                        <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
                                                     </span>
                                                 </div>
                                             @endif
@@ -249,6 +249,13 @@
                             </tr>
                         @endforelse
                     </tbody>
+                    @if ($views->count() > 0)
+                        <tfoot>
+                            <tr>
+                                <td colspan="5" class="h-12"></td>
+                            </tr>
+                        </tfoot>
+                    @endif
                 </table>
             </div>
 

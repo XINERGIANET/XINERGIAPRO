@@ -318,7 +318,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 @utility table-responsive {
-  @apply w-full overflow-x-auto overflow-y-hidden custom-scrollbar;
+  @apply w-full overflow-x-auto custom-scrollbar;
 }
 
 @utility sticky-left {
