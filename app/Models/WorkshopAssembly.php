@@ -29,6 +29,7 @@ class WorkshopAssembly extends Model
         'exit_at',
         'notes',
         'created_by',
+        'sales_movement_id',
     ];
 
     protected $casts = [

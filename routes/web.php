@@ -436,6 +436,7 @@ Route::middleware('auth')->group(function () {
         Route::post('armados/{assembly}/start', [WorkshopAssemblyController::class, 'startAssembly'])->name('armados.start');
         Route::post('armados/{assembly}/finish', [WorkshopAssemblyController::class, 'finishAssembly'])->name('armados.finish');
         Route::post('armados/{assembly}/exit', [WorkshopAssemblyController::class, 'registerExit'])->name('armados.exit');
+        Route::post('armados/venta-masiva', [WorkshopAssemblyController::class, 'processMassiveSale'])->name('assemblies.massive_sale');
 
         Route::get('/ordenes', [WorkshopOrderController::class, 'index'])->name('orders.index');
         Route::get('/ordenes/crear', [WorkshopOrderController::class, 'create'])->name('orders.create');
