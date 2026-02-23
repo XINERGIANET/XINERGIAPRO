@@ -64,141 +64,132 @@
         <div class="mt-6">
             <h2 class="mb-5 text-lg font-bold text-gray-800 dark:text-white/90 px-1">Detalle de armados</h2>
             
-            <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
                 @forelse($assemblies as $assembly)
                     @php
-                        $statusText = 'PENDIENTE';
-                        $statusClass = 'bg-slate-100 text-slate-500';
+                        $statusText = 'En proceso';
+                        $statusClass = 'bg-orange-500/20 text-orange-300 border border-orange-500/30';
                         if($assembly->exit_at) {
-                            $statusText = 'COMPLETADO';
-                            $statusClass = 'bg-green-100 text-green-700';
+                            $statusText = 'Completado';
+                            $statusClass = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
                         } elseif($assembly->finished_at) {
-                            $statusText = 'FINALIZADO';
-                            $statusClass = 'bg-blue-100 text-blue-700';
-                        } elseif($assembly->started_at) {
-                            $statusText = 'EN PROCESO';
-                            $statusClass = 'bg-orange-100 text-orange-700';
+                            $statusText = 'Finalizado';
+                            $statusClass = 'bg-blue-500/20 text-blue-300 border border-blue-500/30';
+                        } elseif(!$assembly->started_at) {
+                            $statusText = 'Pendiente';
+                            $statusClass = 'bg-white/10 text-white border border-white/20';
                         }
                     @endphp
-                    <div class="relative flex flex-col rounded-[1.6rem] border border-slate-200 bg-[#F1F5F9] p-4 shadow-sm transition-all hover:shadow-md dark:border-gray-800 dark:bg-white/[0.02]">
-                        <div class="absolute -top-px left-0 right-0 h-1 rounded-t-[1.6rem] bg-gradient-to-r from-[#1E293B] to-[#334155]"></div>
+                    <div class="relative flex flex-col p-6 shadow-2xl transition-all hover:shadow-[0_20px_50px_rgba(131,75,26,0.3)] hover:-translate-y-1 border" 
+                         style="background: linear-gradient(135deg, #231B18 0%, #442B1E 50%, #834B1A 100%); border-radius: 2.5rem; border-color: #3D2B22;">
                         
-                        <!-- Checkbox -->
-                        <div class="absolute right-4 top-4 z-10">
-                            <input type="checkbox" :value="{{ $assembly->id }}" x-model="selectedAssemblies" class="h-5 w-5 rounded-lg border-2 border-gray-300 text-[#244BB3] focus:ring-[#244BB3] bg-white cursor-pointer transition-all hover:border-[#244BB3]">
-                        </div>
-
-                        <!-- Header -->
-                        <div class="mb-3 mt-1">
-                            <div class="flex items-center justify-between mb-1">
-                                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Orden de Armado</span>
-                            </div>
-                            <div class="flex items-center justify-between gap-2">
-                                <h3 class="text-base font-black text-[#1E293B] dark:text-white">#{{ str_pad($assembly->id, 6, '0', STR_PAD_LEFT) }}</h3>
-                                <div class="flex flex-col items-end gap-1">
-                                    <span class="rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-tight {{ $statusClass }}">
+                        <!-- Header & Controls -->
+                        <div class="mb-5 flex items-start justify-between">
+                            <div class="flex-1">
+                                <span class="text-[9px] font-bold uppercase tracking-widest text-white">ORDEN DE ARMADO</span>
+                                <div class="flex items-center gap-2 mt-0.5">
+                                    <h3 class="text-sm font-black text-white">ORD #{{ str_pad($assembly->id, 8, '0', STR_PAD_LEFT) }}</h3>
+                                    <span class="rounded-full px-2.5 py-0.5 text-[8px] font-bold uppercase tracking-tight {{ $statusClass }}">
                                         {{ $statusText }}
                                     </span>
-                                    @if($assembly->sales_movement_id)
-                                        <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-tight text-white shadow-sm" style="background-color: #10B981;">
-                                            <i class="ri-checkbox-circle-line text-[10px]"></i> PAGADO
-                                        </span>
-                                    @else
-                                        <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-tight border" style="background-color: #FFFBEB; color: #D97706; border-color: #FDE68A;">
-                                            <i class="ri-time-line text-[10px]"></i> NO PAGADO
-                                        </span>
-                                    @endif
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                @if($assembly->sales_movement_id)
+                                    <span class="flex h-5 items-center gap-1 rounded-full px-2 text-[8px] font-bold border" style="background-color: rgba(16, 185, 129, 0.15); color: #6EE7B7; border-color: rgba(16, 185, 129, 0.2);">
+                                        <i class="ri-checkbox-circle-fill"></i> PAGADO
+                                    </span>
+                                @else
+                                    <span class="flex h-5 items-center gap-1 rounded-full px-2 text-[8px] font-bold border" style="background-color: rgba(245, 158, 11, 0.15); color: #FCD34D; border-color: rgba(245, 158, 11, 0.2);">
+                                        <i class="ri-error-warning-fill"></i> DEUDA
+                                    </span>
+                                @endif
+                                <input type="checkbox" :value="{{ $assembly->id }}" x-model="selectedAssemblies" class="h-5 w-5 rounded-lg border-2 border-white/20 text-[#834B1A] focus:ring-[#834B1A] bg-white/10 cursor-pointer transition-all hover:border-[#834B1A]">
+                            </div>
+                        </div>
+
+                        <!-- Vehicle Identity Block (White Premium) -->
+                        <div class="mb-5 flex items-center gap-4 rounded-3xl p-4 shadow-lg border" style="background-color: #FFFFFF; border-color: rgba(255, 255, 255, 0.1);">
+                            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl shadow-inner border" style="background-color: #FBF9F7; border-color: #F3EBE4;">
+                                <i class="ri-motorbike-line text-2xl text-[#3D261C]"></i>
+                            </div>
+                            <div class="flex-1 overflow-hidden">
+                                <h4 class="truncate font-black text-[#3D261C] uppercase tracking-tight text-xs">{{ $assembly->model ?: 'Sin modelo' }}</h4>
+                                <div class="flex items-center gap-2">
+                                     <span class="text-[9px] font-bold text-[#7D6658] uppercase tracking-wide">{{ $assembly->brand_company }}</span>
+                                     <span class="h-1 w-1 rounded-full bg-[#CAA994]"></span>
+                                     <p class="truncate font-mono text-[9px] text-[#8B7366]">{{ $assembly->vin ?: 'No asignado' }}</p>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Main Vehicle Info -->
-                        <div class="mb-3 flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm dark:bg-gray-800 border border-slate-200/50">
-                            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600 dark:bg-orange-500/10">
-                                <i class="ri-motorbike-line text-xl"></i>
-                            </div>
-                            <div class="flex-1 overflow-hidden">
-                                <h4 class="truncate text-sm font-black text-[#1E293B] dark:text-white uppercase">{{ $assembly->model ?: 'MODELO NO REGISTRADO' }}</h4>
-                                <p class="truncate font-mono text-[10px] text-slate-400 font-bold italic">{{ $assembly->vin ?: 'SIN VIN ASIGNADO' }}</p>
-                            </div>
-                        </div>
-
                         <!-- Info Grid -->
-                        <div class="mb-3 grid grid-cols-2 gap-2.5">
-                            <div class="rounded-xl bg-white/70 p-2.5 dark:bg-white/5 border border-white">
-                                <span class="block text-[9px] font-bold uppercase text-slate-400 mb-0.5">Marca</span>
-                                <span class="block truncate text-xs font-bold text-slate-700 dark:text-slate-300">{{ $assembly->brand_company }}</span>
+                        <div class="mb-4 grid grid-cols-2 gap-3">
+                            <div class="rounded-2xl p-3 border" style="background-color: rgba(255, 255, 255, 0.03); border-color: rgba(255, 255, 255, 0.05);">
+                                <span class="block text-[8px] font-bold uppercase mb-1" style="color: #FDE6D2;">MARCA</span>
+                                <span class="block truncate text-xs font-black text-white uppercase">{{ $assembly->brand_company }}</span>
                             </div>
-                            <div class="rounded-xl bg-white/70 p-2.5 dark:bg-white/5 border border-white">
-                                <span class="block text-[9px] font-bold uppercase text-slate-400 mb-0.5">Ingreso</span>
-                                <span class="block text-xs font-bold text-slate-700 dark:text-slate-300">{{ optional($assembly->entry_at)->format('d/m/Y') ?: '--' }}</span>
-                            </div>
-                        </div>
-
-                        <!-- Values -->
-                        <div class="mb-4 grid grid-cols-3 gap-2">
-                            <div class="flex flex-col items-center justify-center rounded-xl bg-white py-2 shadow-xs border border-gray-100 dark:bg-gray-800">
-                                <span class="text-[8px] font-bold uppercase text-slate-400 mb-0.5">Cant</span>
-                                <span class="text-sm font-black text-slate-800 dark:text-white">{{ $assembly->quantity }}</span>
-                            </div>
-                            <div class="flex flex-col items-center justify-center rounded-xl bg-emerald-50/50 py-2 border border-emerald-100 dark:bg-emerald-900/5">
-                                <span class="text-[8px] font-bold uppercase text-emerald-600/70 mb-0.5">Uni</span>
-                                <span class="text-sm font-black text-emerald-600">S/{{ number_format($assembly->unit_cost, 0) }}</span>
-                            </div>
-                            <div class="flex flex-col items-center justify-center rounded-xl bg-orange-50/50 py-2 border border-orange-100 dark:bg-orange-900/5">
-                                <span class="text-[8px] font-bold uppercase text-orange-600/70 mb-0.5">Tot</span>
-                                <span class="text-sm font-black text-orange-600">S/{{ number_format($assembly->total_cost, 0) }}</span>
+                            <div class="rounded-2xl p-3 border" style="background-color: rgba(255, 255, 255, 0.03); border-color: rgba(255, 255, 255, 0.05);">
+                                <span class="block text-[8px] font-bold uppercase mb-1" style="color: #FDE6D2;">INGRESO</span>
+                                <span class="block text-xs font-black text-white leading-tight">{{ optional($assembly->entry_at)->format('d/m/y H:i') ?: '--' }}</span>
                             </div>
                         </div>
 
-                        <!-- Bottom Specs -->
-                        <div class="flex items-center gap-2 mb-4 px-1">
-                            @if($assembly->displacement)
-                                <span class="text-[10px] font-bold text-slate-500 bg-white/80 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200/50 shadow-xs">{{ $assembly->displacement }}cc</span>
-                            @endif
-                            @if($assembly->color)
-                                <span class="text-[10px] font-bold text-slate-500 bg-white/80 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200/50 shadow-xs uppercase">{{ $assembly->color }}</span>
-                            @endif
+                        <!-- Values Row (High Contrast) -->
+                        <div class="mb-5 grid grid-cols-3 gap-4">
+                            <div class="flex flex-col items-center justify-center rounded-2xl py-2.5 border shadow-sm" style="background-color: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1);">
+                                <span class="text-[7px] font-bold uppercase mb-0.5" style="color: #EAD7CA;">CANT</span>
+                                <span class="text-xs font-black" style="color: #FFFFFF;">{{ $assembly->quantity }}</span>
+                            </div>
+                            <div class="flex flex-col items-center justify-center rounded-2xl py-2.5 border" style="background-color: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2);">
+                                <span class="text-[7px] font-bold uppercase mb-0.5" style="color: #A7F3D0;">UNIT</span>
+                                <span class="text-xs font-black" style="color: #A7F3D0;">S/{{ number_format($assembly->unit_cost, 0) }}</span>
+                            </div>
+                            <div class="flex flex-col items-center justify-center rounded-2xl py-2.5 border" style="background-color: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.2);">
+                                <span class="text-[7px] font-bold uppercase mb-0.5" style="color: #FDE6D2;">TOTAL</span>
+                                <span class="text-xs font-black" style="color: #FDE6D2;">S/{{ number_format($assembly->total_cost, 0) }}</span>
+                            </div>
                         </div>
 
                         <!-- Action Bar -->
-                        <div class="mt-auto flex items-center gap-2">
+                        <div class="mt-auto flex flex-wrap items-center gap-2">
                             @if(!$assembly->started_at)
                                 <form method="POST" action="{{ route('workshop.armados.start', $assembly) }}" class="flex-1">
                                     @csrf
-                                    <button class="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold text-white shadow-md transition-all hover:opacity-90 active:scale-95" style="background-color: #1e293b;">
-                                        <i class="ri-play-fill text-sm"></i>
-                                        <span>Iniciar Armado</span>
+                                    <button class="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-[11px] font-bold text-white shadow-lg transition-all hover:brightness-110 active:scale-95" style="background: linear-gradient(135deg, #10B981 0%, #059669 100%);">
+                                        <i class="ri-play-fill"></i>
+                                        <span>Iniciar</span>
                                     </button>
                                 </form>
                             @elseif(!$assembly->finished_at)
                                 <form method="POST" action="{{ route('workshop.armados.finish', $assembly) }}" class="flex-1">
                                     @csrf
-                                    <button class="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold text-white shadow-md transition-all hover:opacity-90 active:scale-95" style="background-color: #10b981;">
-                                        <i class="ri-check-line text-sm"></i>
-                                        <span>Finalizar Tarea</span>
+                                    <button class="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-[11px] font-bold text-white shadow-lg transition-all hover:brightness-110 active:scale-95" style="background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);">
+                                        <i class="ri-check-line"></i>
+                                        <span>Finalizar</span>
                                     </button>
                                 </form>
                             @elseif(!$assembly->exit_at)
                                 <form method="POST" action="{{ route('workshop.armados.exit', $assembly) }}" class="flex-1">
                                     @csrf
-                                    <button class="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold text-white shadow-md transition-all hover:opacity-90 active:scale-95" style="background-color: #f59e0b;">
-                                        <i class="ri-external-link-line text-sm"></i>
-                                        <span>Registrar Salida</span>
+                                    <button class="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-[11px] font-bold text-white shadow-lg transition-all hover:brightness-110 active:scale-95" style="background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);">
+                                        <i class="ri-external-link-line"></i>
+                                        <span>Salida</span>
                                     </button>
                                 </form>
-                            @else
-                                <div class="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-100 py-2.5 text-xs font-bold text-slate-400 dark:bg-slate-700/50 border border-slate-200">
-                                    <i class="ri-checkbox-circle-fill text-sm"></i>
-                                    <span>Tarea Completada</span>
-                                </div>
+                            @endif
+
+                            @if(!$assembly->sales_movement_id)
+                                <button type="button" class="flex-1 rounded-xl py-2.5 text-[11px] font-bold text-white transition-all hover:brightness-110 shadow-lg" style="background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);" @click="$dispatch('open-massive-sale-modal'); selectedAssemblies = [{{ $assembly->id }}]">
+                                    <i class="ri-shopping-cart-line mr-1"></i>Venta
+                                </button>
                             @endif
 
                             <form method="POST" action="{{ route('workshop.assemblies.destroy', $assembly) }}" onsubmit="return confirm('¿Eliminar este registro?')" class="flex items-center">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 shadow-sm transition-all hover:bg-red-50 hover:text-red-500 hover:border-red-100 dark:bg-gray-800 dark:border-gray-700">
-                                    <i class="ri-delete-bin-6-line text-lg"></i>
+                                <button type="submit" class="flex h-10 w-10 items-center justify-center rounded-xl border transition-all hover:bg-red-600 hover:text-white hover:border-red-600" style="background-color: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); color: #94A3B8;">
+                                    <i class="ri-delete-bin-line text-lg"></i>
                                 </button>
                             </form>
                         </div>
