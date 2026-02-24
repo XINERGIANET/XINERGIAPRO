@@ -8,7 +8,7 @@
 
     <title>{{ $title ?? 'Xinergia Restaurante' }}</title>
 
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/js/app.js'])
 </head>
 
 <body class="min-h-screen bg-[#f6efe7] text-[#2b1c16] font-manrope antialiased">
