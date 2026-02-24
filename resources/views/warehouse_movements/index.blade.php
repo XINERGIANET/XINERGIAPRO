@@ -152,7 +152,7 @@
                     </x-ui.link-button>
                 @endif
             </div>
-            <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+            <div class="overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
                     <table class="w-full min-w-[1100px]">
                         <thead style="background-color: #63B7EC; color: #FFFFFF;">
                             <tr>
@@ -267,7 +267,7 @@
                                                             >
                                                                 <i class="{{ $operation->icon }}"></i>
                                                             </x-ui.button>
-                                                            <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                            <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
                                                                 {{ $operation->name }}
                                                                 <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
                                                             </span>
@@ -284,7 +284,7 @@
                                                             >
                                                                 <i class="{{ $operation->icon }}"></i>
                                                             </x-ui.link-button>
-                                                            <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                            <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
                                                                 {{ $operation->name }}
                                                                 <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
                                                             </span>
@@ -292,25 +292,34 @@
                                                     @endif
                                                 @endforeach
                                             @else
-                                                <div class="relative group"> <a
+                                                <div class="relative group">
+                                                    <x-ui.link-button
+                                                        size="icon"
+                                                        variant="primary"
                                                         href="{{ route('warehouse_movements.show', array_merge(['warehouseMovement' => $warehouseMovement->id], $viewId ? ['view_id' => $viewId] : [])) }}"
-                                                        class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-info-500 text-white hover:bg-info-600 transition-colors shadow-sm"
+                                                        className="rounded-xl w-8 h-8"
                                                         style="background-color: #63B7EC; color: #FFFFFF;"
-                                                        aria-label="Ver Registro">
+                                                        aria-label="Ver Registro"
+                                                    >
                                                         <i class="ri-eye-line"></i>
-                                                    </a>
-                                                    <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                    </x-ui.link-button>
+                                                    <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
                                                         Ver Registro
                                                         <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
                                                     </span>
                                                 </div>
-                                                <div class="relative group"> <a
+
+                                                <div class="relative group">
+                                                    <x-ui.link-button
+                                                        size="icon"
+                                                        variant="edit"
                                                         href="{{ route('warehouse_movements.edit', array_merge(['warehouseMovement' => $warehouseMovement->id], $viewId ? ['view_id' => $viewId] : [])) }}"
-                                                        class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-warning-500 text-white hover:bg-warning-600 transition-colors shadow-sm"
+                                                        className="rounded-xl w-8 h-8"
                                                         style="background-color: #FBBF24; color: #111827;"
-                                                        aria-label="Editar Registro">
+                                                        aria-label="Editar Registro"
+                                                    >
                                                         <i class="ri-pencil-line"></i>
-                                                    </a>
+                                                    </x-ui.link-button>
                                                     <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
                                                         Editar Registro
                                                         <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>

@@ -53,7 +53,7 @@
                href="{{ route('workshop.reports.export.purchases', ['month' => $month, 'supplier_id' => $supplierId ?: null, 'document_kind' => $documentKind ?: null, 'branch_id' => $scopeBranchId]) }}">Exportar</a>
         </div>
 
-        <div class="table-responsive rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+        <div class="overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
             <table class="w-full min-w-[1100px]">
                 <thead>
                     <tr>
@@ -71,7 +71,7 @@
                 </thead>
                 <tbody>
                     @forelse($records as $record)
-                        <tr class="border-t border-gray-100 dark:border-gray-800">
+                        <tr class="relative hover:z-[60] border-t border-gray-100 dark:border-gray-800">
                             <td class="px-4 py-3 text-sm">{{ optional($record->issued_at)->format('Y-m-d') }}</td>
                             <td class="px-4 py-3 text-sm">{{ $record->document_kind }}</td>
                             <td class="px-4 py-3 text-sm">{{ ($record->series ? $record->series.'-' : '') . $record->document_number }}</td>
@@ -82,15 +82,94 @@
                             <td class="px-4 py-3 text-sm">{{ number_format((float)$record->igv, 2) }}</td>
                             <td class="px-4 py-3 text-sm">{{ number_format((float)$record->total, 2) }}</td>
                             <td class="px-4 py-3 text-sm">
-                                <div class="flex flex-wrap gap-1.5">
+                                <div class="flex items-center justify-end gap-2">
                                     @if($record->movement_id)
-                                        <a href="{{ route('warehouse_movements.show', $record->movement_id) }}" class="rounded-lg bg-indigo-700 px-3 py-1.5 text-xs font-medium text-white">Ver</a>
-                                        <a href="{{ route('warehouse_movements.edit', $record->movement_id) }}" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white">Editar</a>
+                                        <div class="relative group">
+                                            <x-ui.link-button
+                                                size="icon"
+                                                variant="primary"
+                                                href="{{ route('warehouse_movements.show', $record->movement_id) }}"
+                                                className="rounded-xl"
+                                                style="background-color: #4F46E5; color: #FFFFFF;"
+                                                aria-label="Ver"
+                                            >
+                                                <i class="ri-eye-line"></i>
+                                            </x-ui.link-button>
+                                            <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
+                                                Ver Detalle
+                                                <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                            </span>
+                                        </div>
+
+                                        <div class="relative group">
+                                            <x-ui.link-button
+                                                size="icon"
+                                                variant="edit"
+                                                href="{{ route('warehouse_movements.edit', $record->movement_id) }}"
+                                                className="rounded-xl"
+                                                style="background-color: #FBBF24; color: #111827;"
+                                                aria-label="Editar"
+                                            >
+                                                <i class="ri-pencil-line"></i>
+                                            </x-ui.link-button>
+                                            <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
+                                                Editar
+                                                <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                            </span>
+                                        </div>
                                     @else
-                                        <button type="button" class="rounded-lg bg-indigo-700 px-3 py-1.5 text-xs font-medium text-white opacity-60">Ver</button>
-                                        <button type="button" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white opacity-60">Editar</button>
+                                        <div class="relative group">
+                                            <x-ui.button
+                                                size="icon"
+                                                variant="primary"
+                                                type="button"
+                                                className="rounded-xl opacity-60 cursor-not-allowed"
+                                                style="background-color: #4F46E5; color: #FFFFFF;"
+                                                aria-label="Ver"
+                                            >
+                                                <i class="ri-eye-line"></i>
+                                            </x-ui.button>
+                                            <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                No disponible
+                                                <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                            </span>
+                                        </div>
+
+                                        <div class="relative group">
+                                            <x-ui.button
+                                                size="icon"
+                                                variant="edit"
+                                                type="button"
+                                                className="rounded-xl opacity-60 cursor-not-allowed"
+                                                style="background-color: #FBBF24; color: #111827;"
+                                                aria-label="Editar"
+                                            >
+                                                <i class="ri-pencil-line"></i>
+                                            </x-ui.button>
+                                            <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                No disponible
+                                                <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                            </span>
+                                        </div>
                                     @endif
-                                    <button type="button" onclick="alert('Operacion Eliminar disponible en el modulo origen de movimientos.');" class="rounded-lg bg-red-700 px-3 py-1.5 text-xs font-medium text-white">Eliminar</button>
+
+                                    <div class="relative group">
+                                        <x-ui.button
+                                            size="icon"
+                                            variant="eliminate"
+                                            type="button"
+                                            className="rounded-xl"
+                                            style="background-color: #EF4444; color: #FFFFFF;"
+                                            onclick="alert('Operacion Eliminar disponible en el modulo origen de movimientos.');"
+                                            aria-label="Eliminar"
+                                        >
+                                            <i class="ri-delete-bin-line"></i>
+                                        </x-ui.button>
+                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
+                                            Eliminar
+                                            <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                        </span>
+                                    </div>
                                 </div>
                             </td>
                         </tr>
