@@ -33,17 +33,17 @@
 
         <div class="mb-4 rounded-xl border border-gray-200 bg-white p-4">
             <h3 class="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-700">Ordenes de Servicio</h3>
-            <div class="overflow-x-auto rounded border border-gray-200">
+            <div class="overflow-x-auto overflow-y-hidden rounded border border-gray-200">
                 <table class="w-full min-w-[900px] text-sm">
-                    <thead class="bg-gray-100">
+                    <thead style="background-color:#1e293b" class="text-white">
                         <tr>
-                            <th class="p-2 text-left">OS</th>
-                            <th class="p-2 text-left">Fecha</th>
-                            <th class="p-2 text-left">Vehiculo</th>
-                            <th class="p-2 text-left">Estado</th>
-                            <th class="p-2 text-left">Total</th>
-                            <th class="p-2 text-left">Pagado</th>
-                            <th class="p-2 text-left">Deuda</th>
+                            <th class="p-2 text-left text-xs font-semibold uppercase tracking-wider first:rounded-tl">OS</th>
+                            <th class="p-2 text-left text-xs font-semibold uppercase tracking-wider">Fecha</th>
+                            <th class="p-2 text-left text-xs font-semibold uppercase tracking-wider">Vehiculo</th>
+                            <th class="p-2 text-left text-xs font-semibold uppercase tracking-wider">Estado</th>
+                            <th class="p-2 text-left text-xs font-semibold uppercase tracking-wider">Total</th>
+                            <th class="p-2 text-left text-xs font-semibold uppercase tracking-wider">Pagado</th>
+                            <th class="p-2 text-left text-xs font-semibold uppercase tracking-wider last:rounded-tr">Deuda</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -67,13 +67,13 @@
 
         <div class="mb-4 rounded-xl border border-gray-200 bg-white p-4">
             <h3 class="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-700">Ventas</h3>
-            <div class="overflow-x-auto rounded border border-gray-200">
+            <div class="overflow-x-auto overflow-y-hidden rounded border border-gray-200">
                 <table class="w-full min-w-[700px] text-sm">
-                    <thead class="bg-gray-100">
+                    <thead style="background-color:#1e293b" class="text-white">
                         <tr>
-                            <th class="p-2 text-left">Fecha</th>
-                            <th class="p-2 text-left">Doc</th>
-                            <th class="p-2 text-left">Total</th>
+                            <th class="p-2 text-left text-xs font-semibold uppercase tracking-wider first:rounded-tl">Fecha</th>
+                            <th class="p-2 text-left text-xs font-semibold uppercase tracking-wider">Doc</th>
+                            <th class="p-2 text-left text-xs font-semibold uppercase tracking-wider last:rounded-tr">Total</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -93,13 +93,13 @@
 
         <div class="mb-4 rounded-xl border border-gray-200 bg-white p-4">
             <h3 class="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-700">Compras</h3>
-            <div class="overflow-x-auto rounded border border-gray-200">
+            <div class="overflow-x-auto overflow-y-hidden rounded border border-gray-200">
                 <table class="w-full min-w-[700px] text-sm">
-                    <thead class="bg-gray-100">
+                    <thead style="background-color:#1e293b" class="text-white">
                         <tr>
-                            <th class="p-2 text-left">Fecha</th>
-                            <th class="p-2 text-left">Doc</th>
-                            <th class="p-2 text-left">Total</th>
+                            <th class="p-2 text-left text-xs font-semibold uppercase tracking-wider first:rounded-tl">Fecha</th>
+                            <th class="p-2 text-left text-xs font-semibold uppercase tracking-wider">Doc</th>
+                            <th class="p-2 text-left text-xs font-semibold uppercase tracking-wider last:rounded-tr">Total</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -119,13 +119,13 @@
 
         <div class="rounded-xl border border-gray-200 bg-white p-4">
             <h3 class="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-700">Pagos</h3>
-            <div class="overflow-x-auto rounded border border-gray-200">
+            <div class="overflow-x-auto overflow-y-hidden rounded border border-gray-200">
                 <table class="w-full min-w-[700px] text-sm">
-                    <thead class="bg-gray-100">
+                    <thead style="background-color:#1e293b" class="text-white">
                         <tr>
-                            <th class="p-2 text-left">Fecha</th>
-                            <th class="p-2 text-left">Comprobante</th>
-                            <th class="p-2 text-left">Total</th>
+                            <th class="p-2 text-left text-xs font-semibold uppercase tracking-wider first:rounded-tl">Fecha</th>
+                            <th class="p-2 text-left text-xs font-semibold uppercase tracking-wider">Comprobante</th>
+                            <th class="p-2 text-left text-xs font-semibold uppercase tracking-wider last:rounded-tr">Total</th>
                         </tr>
                     </thead>
                     <tbody>
