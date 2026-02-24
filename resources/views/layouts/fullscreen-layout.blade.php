@@ -7,7 +7,7 @@
 <meta name="turbo-cache-control" content="no-preview">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ $title ?? 'Dashboard' }} | Xinergia FOOD</title>
+    <title>{{ $title ?? 'Dashboard' }} | Xinergia PRO</title>
 
     <!-- Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])

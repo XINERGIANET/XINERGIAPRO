@@ -1,0 +1,4 @@
+- en daños preexitenctes agregar la opcion de tomarle foto al vehiuclo en cada lado, y se peuda subir y guardar como evidencia de como ingresa el vechiculo al taller, en cada lado puede ser muchas imagenes que sea multiple
+- agregar en la inspeccino inciiar 1 campos para que firmen, ya que sera usado en tablets que se pueda firmar del cliente
+- en el tlero agregar la busqueda por cliente o por nombre del vehiculo asi pueda rapido buscarlo y filtrar
+- en caja debe salir el monto que tengo y al cerrar no lo esta chapando 
