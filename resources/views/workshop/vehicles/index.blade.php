@@ -25,7 +25,7 @@
             <a href="{{ route('workshop.vehicles.index') }}" class="h-11 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 inline-flex items-center">Limpiar</a>
         </form>
 
-        <div class="table-responsive rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+        <div class="overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
             <table class="w-full min-w-[900px]">
                 <thead>
                     <tr>
@@ -39,19 +39,59 @@
                 </thead>
                 <tbody>
                     @forelse($vehicles as $vehicle)
-                        <tr class="border-t border-gray-100 dark:border-gray-800">
+                        <tr class="relative hover:z-[60] border-t border-gray-100 dark:border-gray-800">
                             <td class="px-4 py-3 text-sm">{{ $vehicle->id }}</td>
                             <td class="px-4 py-3 text-sm">{{ $vehicle->client?->first_name }} {{ $vehicle->client?->last_name }}</td>
                             <td class="px-4 py-3 text-sm">{{ $vehicle->brand }} {{ $vehicle->model }} ({{ ucfirst($vehicle->vehicleType?->name ?? $vehicle->type) }})</td>
                             <td class="px-4 py-3 text-sm">{{ $vehicle->plate }}</td>
                             <td class="px-4 py-3 text-sm">{{ $vehicle->current_mileage }}</td>
                             <td class="px-4 py-3 text-sm">
-                                <div class="flex flex-wrap gap-1.5">
-                                    <button type="button" @click="$dispatch('open-edit-vehicle-modal', {{ $vehicle->id }})" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white">Editar</button>
-                                    <form method="POST" action="{{ route('workshop.vehicles.destroy', $vehicle) }}" onsubmit="return confirm('Eliminar vehiculo?')">
+                                <div class="flex items-center justify-end gap-2">
+                                    <div class="relative group">
+                                        <x-ui.button
+                                            size="icon"
+                                            variant="edit"
+                                            type="button"
+                                            @click="$dispatch('open-edit-vehicle-modal', {{ $vehicle->id }})"
+                                            className="rounded-xl"
+                                            style="background-color: #FBBF24; color: #111827;"
+                                            aria-label="Editar"
+                                        >
+                                            <i class="ri-pencil-line"></i>
+                                        </x-ui.button>
+                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
+                                            Editar
+                                            <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                        </span>
+                                    </div>
+
+                                    <form
+                                        method="POST"
+                                        action="{{ route('workshop.vehicles.destroy', $vehicle) }}"
+                                        class="relative group js-swal-delete"
+                                        data-swal-title="Eliminar vehiculo?"
+                                        data-swal-text="Se eliminara este vehiculo. Esta accion no se puede deshacer."
+                                        data-swal-confirm="Si, eliminar"
+                                        data-swal-cancel="Cancelar"
+                                        data-swal-confirm-color="#ef4444"
+                                        data-swal-cancel-color="#6b7280"
+                                    >
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="rounded-lg bg-red-700 px-3 py-1.5 text-xs font-medium text-white">Eliminar</button>
+                                        <x-ui.button
+                                            size="icon"
+                                            variant="eliminate"
+                                            type="submit"
+                                            className="rounded-xl"
+                                            style="background-color: #EF4444; color: #FFFFFF;"
+                                            aria-label="Eliminar"
+                                        >
+                                            <i class="ri-delete-bin-line"></i>
+                                        </x-ui.button>
+                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
+                                            Eliminar
+                                            <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                        </span>
                                     </form>
                                 </div>
                             </td>

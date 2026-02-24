@@ -89,7 +89,7 @@
         <div class="grid grid-cols-1 gap-6">
             <!-- Table View -->
             <div x-show="view === 'table'" x-transition x-cloak class="space-y-4">
-                <div class="table-responsive rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] overflow-hidden shadow-sm">
+                <div class="overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] shadow-sm">
                     <table class="w-full">
                         <thead>
                             <tr class="bg-brand-500">
@@ -101,7 +101,7 @@
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                             @forelse($appointments as $appointment)
-                                <tr class="hover:bg-gray-50/50 dark:hover:bg-white/[0.01] transition-colors">
+                                <tr class="relative hover:z-[60] hover:bg-gray-50/50 dark:hover:bg-white/[0.01] transition-colors">
                                     <td class="px-4 py-2">
                                         <div class="text-sm font-bold text-gray-900 line-height-tight">{{ $appointment->start_at?->format('d/m/Y') }}</div>
                                         <div class="text-[10px] text-gray-500 font-medium">{{ $appointment->start_at?->format('H:i') }} - {{ $appointment->end_at?->format('H:i') }}</div>
@@ -129,24 +129,72 @@
                                         </span>
                                     </td>
                                     <td class="px-4 py-2">
-                                        <div class="flex items-center justify-end gap-1">
-                                            <button type="button" @click="$dispatch('open-edit-appointment-modal', {{ $appointment->id }})" class="p-1 text-amber-500 hover:bg-amber-50 rounded transition-colors">
-                                                <i class="ri-edit-2-line"></i>
-                                            </button>
+                                        <div class="flex items-center justify-end gap-2">
                                             @if(!$appointment->movement_id)
-                                                <form method="POST" action="{{ route('workshop.appointments.convert', $appointment) }}" class="inline">
+                                                <form method="POST" action="{{ route('workshop.appointments.convert', $appointment) }}" class="relative group">
                                                     @csrf
-                                                    <button class="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors">
+                                                    <x-ui.button
+                                                        size="icon"
+                                                        variant="primary"
+                                                        type="submit"
+                                                        className="rounded-xl w-8 h-8"
+                                                        style="background-color: #3B82F6; color: #FFFFFF;"
+                                                        aria-label="Convertir a OS"
+                                                    >
                                                         <i class="ri-refresh-line"></i>
-                                                    </button>
+                                                    </x-ui.button>
+                                                    <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
+                                                        Convertir a OS
+                                                        <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                    </span>
                                                 </form>
                                             @endif
-                                            <form method="POST" action="{{ route('workshop.appointments.destroy', $appointment) }}" class="inline js-swal-delete" data-swal-title="¿Eliminar cita?">
+
+                                            <div class="relative group">
+                                                <x-ui.button
+                                                    size="icon"
+                                                    variant="edit"
+                                                    type="button"
+                                                    @click="$dispatch('open-edit-appointment-modal', {{ $appointment->id }})"
+                                                    className="rounded-xl w-8 h-8"
+                                                    style="background-color: #FBBF24; color: #111827;"
+                                                    aria-label="Editar"
+                                                >
+                                                    <i class="ri-pencil-line"></i>
+                                                </x-ui.button>
+                                                <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
+                                                    Editar
+                                                    <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                </span>
+                                            </div>
+
+                                            <form
+                                                method="POST"
+                                                action="{{ route('workshop.appointments.destroy', $appointment) }}"
+                                                class="relative group js-swal-delete"
+                                                data-swal-title="¿Eliminar cita?"
+                                                data-swal-text="Se eliminara esta cita. Esta accion no se puede deshacer."
+                                                data-swal-confirm="Si, eliminar"
+                                                data-swal-cancel="Cancelar"
+                                                data-swal-confirm-color="#ef4444"
+                                                data-swal-cancel-color="#6b7280"
+                                            >
                                                 @csrf
                                                 @method('DELETE')
-                                                <button class="p-1 text-red-500 hover:bg-red-50 rounded transition-colors">
-                                                    <i class="ri-delete-bin-6-line"></i>
-                                                </button>
+                                                <x-ui.button
+                                                    size="icon"
+                                                    variant="eliminate"
+                                                    type="submit"
+                                                    className="rounded-xl w-8 h-8"
+                                                    style="background-color: #EF4444; color: #FFFFFF;"
+                                                    aria-label="Eliminar"
+                                                >
+                                                    <i class="ri-delete-bin-line"></i>
+                                                </x-ui.button>
+                                                <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
+                                                    Eliminar
+                                                    <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                </span>
                                             </form>
                                         </div>
                                     </td>

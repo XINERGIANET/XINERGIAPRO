@@ -37,17 +37,17 @@
             </div>
         </form>
 
-        <div class="table-responsive rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+        <div class="overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
             <table class="w-full min-w-[1050px]">
                 <thead>
                     <tr>
-                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">ID</th>
-                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Tipo</th>
-                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Documento</th>
-                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Cliente</th>
-                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Telefono</th>
-                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Correo</th>
-                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Acciones</th>
+                        <th style="background-color:#363d46" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">ID</th>
+                        <th style="background-color:#363d46" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Tipo</th>
+                        <th style="background-color:#363d46" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Documento</th>
+                        <th style="background-color:#363d46" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Cliente</th>
+                        <th style="background-color:#363d46" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Telefono</th>
+                        <th style="background-color:#363d46" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Correo</th>
+                        <th style="background-color:#363d46" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -60,13 +60,69 @@
                             <td class="px-4 py-3 text-sm">{{ $client->phone }}</td>
                             <td class="px-4 py-3 text-sm">{{ $client->email }}</td>
                             <td class="px-4 py-3 text-sm">
-                                <div class="flex flex-wrap gap-1.5">
-                                    <a href="{{ route('workshop.clients.history', $client) }}" class="rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-medium text-white">Historial</a>
-                                    <button type="button" @click="$dispatch('open-edit-client-modal', {{ $client->id }})" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white">Editar</button>
-                                    <form method="POST" action="{{ route('workshop.clients.destroy', $client) }}" onsubmit="return confirm('Eliminar cliente?')">
+                                <div class="flex items-center justify-end gap-2">
+                                    <div class="relative group hover:z-[100]">
+                                        <x-ui.link-button
+                                            size="icon"
+                                            variant="primary"
+                                            href="{{ route('workshop.clients.history', $client) }}"
+                                            className="rounded-xl"
+                                            style="background-color: #334155; color: #FFFFFF;"
+                                            aria-label="Ver historial"
+                                        >
+                                            <i class="ri-history-line"></i>
+                                        </x-ui.link-button>
+                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[1000] shadow-xl">
+                                            Historial
+                                            <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                        </span>
+                                    </div>
+
+                                    <div class="relative group hover:z-[100]">
+                                        <x-ui.button
+                                            size="icon"
+                                            variant="edit"
+                                            type="button"
+                                            @click="$dispatch('open-edit-client-modal', {{ $client->id }})"
+                                            className="rounded-xl"
+                                            style="background-color: #FBBF24; color: #111827;"
+                                            aria-label="Editar"
+                                        >
+                                            <i class="ri-pencil-line"></i>
+                                        </x-ui.button>
+                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[1000] shadow-xl">
+                                            Editar
+                                            <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                        </span>
+                                    </div>
+
+                                    <form
+                                        method="POST"
+                                        action="{{ route('workshop.clients.destroy', $client) }}"
+                                        class="relative group hover:z-[100] js-swal-delete"
+                                        data-swal-title="Eliminar cliente?"
+                                        data-swal-text="Se eliminara este cliente. Esta accion no se puede deshacer."
+                                        data-swal-confirm="Si, eliminar"
+                                        data-swal-cancel="Cancelar"
+                                        data-swal-confirm-color="#ef4444"
+                                        data-swal-cancel-color="#6b7280"
+                                    >
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="rounded-lg bg-red-700 px-3 py-1.5 text-xs font-medium text-white">Eliminar</button>
+                                        <x-ui.button
+                                            size="icon"
+                                            variant="eliminate"
+                                            type="submit"
+                                            className="rounded-xl"
+                                            style="background-color: #EF4444; color: #FFFFFF;"
+                                            aria-label="Eliminar"
+                                        >
+                                            <i class="ri-delete-bin-line"></i>
+                                        </x-ui.button>
+                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[1000] shadow-xl">
+                                            Eliminar
+                                            <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                        </span>
                                     </form>
                                 </div>
                             </td>
