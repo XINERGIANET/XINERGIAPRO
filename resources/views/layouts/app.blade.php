@@ -63,7 +63,17 @@
             }
         });
     </script>
-    @vite(['resources/js/app.js'])
+    @php
+        $viteEntries = ['resources/js/app.js'];
+        $manifestPath = public_path('build/manifest.json');
+        if (file_exists($manifestPath)) {
+            $manifest = json_decode(file_get_contents($manifestPath), true) ?: [];
+            if (isset($manifest['resources/css/app.css'])) {
+                $viteEntries = ['resources/css/app.css', 'resources/js/app.js'];
+            }
+        }
+    @endphp
+    @vite($viteEntries)
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.5.0/fonts/remixicon.css">
 
     <!-- Alpine.js -->
@@ -356,8 +366,6 @@ body.swal2-shown #sidebar { z-index: 1 !important; }
     @stack('scripts')
 
 </html>
-
-
 
 
 
