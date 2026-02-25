@@ -155,8 +155,8 @@ class PettyCashController extends Controller
             ->where('m.branch_id', $branchId)
             ->whereNull('m.deleted_at')
             ->where(function ($query) {
-                $query->whereRaw("COALESCE(pm.description, cmd.payment_method, '') ILIKE '%efectivo%'")
-                    ->orWhereRaw("COALESCE(pm.description, cmd.payment_method, '') ILIKE '%cash%'");
+                $query->whereRaw("LOWER(COALESCE(pm.description, cmd.payment_method, '')) LIKE '%efectivo%'")
+                    ->orWhereRaw("LOWER(COALESCE(pm.description, cmd.payment_method, '')) LIKE '%cash%'");
             })
             ->selectRaw("
                 COALESCE(
