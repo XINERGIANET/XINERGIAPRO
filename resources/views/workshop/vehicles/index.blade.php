@@ -115,31 +115,67 @@
                 </button>
             </div>
 
-            <form method="POST" action="{{ route('workshop.vehicles.store') }}" class="grid grid-cols-1 gap-2 md:grid-cols-4">
+            <form method="POST" action="{{ route('workshop.vehicles.store') }}" class="grid grid-cols-1 gap-4 md:grid-cols-4">
                 @csrf
-                <select name="client_person_id" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
-                   
-                    @foreach($clients as $client)
-                        <option value="{{ $client->id }}">{{ $client->first_name }} {{ $client->last_name }}</option>
-                    @endforeach
-                </select>
-                <select name="vehicle_type_id" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
-                    @foreach($vehicleTypes as $vehicleType)
-                        <option value="{{ $vehicleType->id }}" @selected((int) old('vehicle_type_id', optional($vehicleTypes->firstWhere('name', 'moto lineal'))->id) === (int) $vehicleType->id)>
-                            {{ ucfirst($vehicleType->name) }}
-                        </option>
-                    @endforeach
-                </select>
-                <input name="brand" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Marca" required>
-                <input name="model" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Modelo" required>
-                <input name="year" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Anio">
-                <input name="color" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Color">
-                <input name="plate" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Placa">
-                <input name="vin" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="VIN">
-                <input name="engine_number" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nro motor">
-                <input name="chassis_number" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nro chasis">
-                <input name="serial_number" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Serial">
-                <input name="current_mileage" type="number" min="0" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Kilometraje">
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Cliente <span class="text-red-500">*</span></label>
+                    <select name="client_person_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                        <option value="">Seleccione cliente</option>
+                        @foreach($clients as $client)
+                            <option value="{{ $client->id }}">{{ $client->first_name }} {{ $client->last_name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Tipo de vehiculo <span class="text-red-500">*</span></label>
+                    <select name="vehicle_type_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                        @foreach($vehicleTypes as $vehicleType)
+                            <option value="{{ $vehicleType->id }}" @selected((int) old('vehicle_type_id', optional($vehicleTypes->firstWhere('name', 'moto lineal'))->id) === (int) $vehicleType->id)>
+                                {{ ucfirst($vehicleType->name) }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Marca <span class="text-red-500">*</span></label>
+                    <input name="brand" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Marca" required>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Modelo <span class="text-red-500">*</span></label>
+                    <input name="model" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Modelo" required>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Año</label>
+                    <input name="year" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Anio">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Color</label>
+                    <input name="color" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Color">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Placa</label>
+                    <input name="plate" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Placa">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">VIN</label>
+                    <input name="vin" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="VIN">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Nro motor</label>
+                    <input name="engine_number" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nro motor">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Nro chasis</label>
+                    <input name="chassis_number" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nro chasis">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Serial</label>
+                    <input name="serial_number" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Serial">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Kilometraje</label>
+                    <input name="current_mileage" type="number" min="0" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Kilometraje">
+                </div>
                 <div class="md:col-span-4 mt-2 flex gap-2">
                     <x-ui.button type="submit" size="md" variant="primary"><i class="ri-save-line"></i><span>Guardar</span></x-ui.button>
                     <x-ui.button type="button" size="md" variant="outline" @click="open = false"><i class="ri-close-line"></i><span>Cancelar</span></x-ui.button>
@@ -158,31 +194,67 @@
                     </button>
                 </div>
 
-                <form method="POST" action="{{ route('workshop.vehicles.update', $vehicle) }}" class="grid grid-cols-1 gap-2 md:grid-cols-4">
+                <form method="POST" action="{{ route('workshop.vehicles.update', $vehicle) }}" class="grid grid-cols-1 gap-4 md:grid-cols-4">
                     @csrf
                     @method('PUT')
-                    <select name="client_person_id" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
-                        @foreach($clients as $client)
-                            <option value="{{ $client->id }}" @selected((int)$vehicle->client_person_id === (int)$client->id)>{{ $client->first_name }} {{ $client->last_name }}</option>
-                        @endforeach
-                    </select>
-                    <select name="vehicle_type_id" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
-                        @foreach($vehicleTypes as $vehicleType)
-                            <option value="{{ $vehicleType->id }}" @selected((int) old('vehicle_type_id', $vehicle->vehicle_type_id) === (int) $vehicleType->id)>
-                                {{ ucfirst($vehicleType->name) }}
-                            </option>
-                        @endforeach
-                    </select>
-                    <input name="brand" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->brand }}" placeholder="Marca" required>
-                    <input name="model" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->model }}" placeholder="Modelo" required>
-                    <input name="year" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->year }}" placeholder="Anio">
-                    <input name="color" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->color }}" placeholder="Color">
-                    <input name="plate" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->plate }}" placeholder="Placa">
-                    <input name="vin" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->vin }}" placeholder="VIN">
-                    <input name="engine_number" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->engine_number }}" placeholder="Nro motor">
-                    <input name="chassis_number" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->chassis_number }}" placeholder="Nro chasis">
-                    <input name="serial_number" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->serial_number }}" placeholder="Serial">
-                    <input name="current_mileage" type="number" min="0" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" value="{{ (float) $vehicle->current_mileage }}" placeholder="Kilometraje">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Cliente <span class="text-red-500">*</span></label>
+                        <select name="client_person_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                            @foreach($clients as $client)
+                                <option value="{{ $client->id }}" @selected((int)$vehicle->client_person_id === (int)$client->id)>{{ $client->first_name }} {{ $client->last_name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Tipo de vehiculo <span class="text-red-500">*</span></label>
+                        <select name="vehicle_type_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                            @foreach($vehicleTypes as $vehicleType)
+                                <option value="{{ $vehicleType->id }}" @selected((int) old('vehicle_type_id', $vehicle->vehicle_type_id) === (int) $vehicleType->id)>
+                                    {{ ucfirst($vehicleType->name) }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Marca <span class="text-red-500">*</span></label>
+                        <input name="brand" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->brand }}" placeholder="Marca" required>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Modelo <span class="text-red-500">*</span></label>
+                        <input name="model" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->model }}" placeholder="Modelo" required>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Año</label>
+                        <input name="year" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->year }}" placeholder="Anio">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Color</label>
+                        <input name="color" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->color }}" placeholder="Color">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Placa</label>
+                        <input name="plate" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->plate }}" placeholder="Placa">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">VIN</label>
+                        <input name="vin" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->vin }}" placeholder="VIN">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Nro motor</label>
+                        <input name="engine_number" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->engine_number }}" placeholder="Nro motor">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Nro chasis</label>
+                        <input name="chassis_number" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->chassis_number }}" placeholder="Nro chasis">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Serial</label>
+                        <input name="serial_number" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->serial_number }}" placeholder="Serial">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Kilometraje</label>
+                        <input name="current_mileage" type="number" min="0" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" value="{{ (float) $vehicle->current_mileage }}" placeholder="Kilometraje">
+                    </div>
                     <div class="md:col-span-4 mt-2 flex gap-2">
                         <x-ui.button type="submit" size="md" variant="primary"><i class="ri-save-line"></i><span>Guardar cambios</span></x-ui.button>
                         <x-ui.button type="button" size="md" variant="outline" @click="open = false"><i class="ri-close-line"></i><span>Cancelar</span></x-ui.button>

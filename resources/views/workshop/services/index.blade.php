@@ -115,17 +115,28 @@
                 </button>
             </div>
 
-            <form method="POST" action="{{ route('workshop.services.store') }}" class="grid grid-cols-1 gap-2 md:grid-cols-5">
+            <form method="POST" action="{{ route('workshop.services.store') }}" class="grid grid-cols-1 gap-4 md:grid-cols-4">
                 @csrf
-                <input name="name" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nombre" required>
-                <select name="type" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
-                    <option value="preventivo">preventivo</option>
-                    <option value="correctivo">correctivo</option>
-                </select>
-                <input type="number" step="0.01" min="0" name="base_price" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Precio base" required>
-                <input type="number" min="0" name="estimated_minutes" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Minutos" required>
-                <button class="h-11 rounded-lg bg-emerald-700 px-4 text-sm font-medium text-white">Agregar</button>
-                <div class="md:col-span-5 mt-2 flex gap-2">
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Nombre <span class="text-red-500">*</span></label>
+                    <input name="name" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nombre" required>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Tipo <span class="text-red-500">*</span></label>
+                    <select name="type" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                        <option value="preventivo">preventivo</option>
+                        <option value="correctivo">correctivo</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Precio base <span class="text-red-500">*</span></label>
+                    <input type="number" step="0.01" min="0" name="base_price" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Precio base" required>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Minutos <span class="text-red-500">*</span></label>
+                    <input type="number" min="0" name="estimated_minutes" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Minutos" required>
+                </div>
+                <div class="md:col-span-4 mt-2 flex gap-2">
                     <x-ui.button type="submit" size="md" variant="primary"><i class="ri-save-line"></i><span>Guardar</span></x-ui.button>
                     <x-ui.button type="button" size="md" variant="outline" @click="open = false"><i class="ri-close-line"></i><span>Cancelar</span></x-ui.button>
                 </div>
@@ -143,22 +154,37 @@
                     </button>
                 </div>
 
-                <form method="POST" action="{{ route('workshop.services.update', $service) }}" class="grid grid-cols-1 gap-2 md:grid-cols-5">
+                <form method="POST" action="{{ route('workshop.services.update', $service) }}" class="grid grid-cols-1 gap-4 md:grid-cols-4">
                     @csrf
                     @method('PUT')
-                    <input name="name" value="{{ $service->name }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nombre" required>
-                    <select name="type" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
-                        <option value="preventivo" @selected($service->type === 'preventivo')>preventivo</option>
-                        <option value="correctivo" @selected($service->type === 'correctivo')>correctivo</option>
-                    </select>
-                    <input type="number" step="0.01" min="0" name="base_price" value="{{ (float) $service->base_price }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Precio base" required>
-                    <input type="number" min="0" name="estimated_minutes" value="{{ (int) $service->estimated_minutes }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Minutos" required>
-                    <select name="active" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
-                        <option value="1" @selected((int)$service->active === 1)>SI</option>
-                        <option value="0" @selected((int)$service->active === 0)>NO</option>
-                    </select>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Nombre <span class="text-red-500">*</span></label>
+                        <input name="name" value="{{ $service->name }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nombre" required>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Tipo <span class="text-red-500">*</span></label>
+                        <select name="type" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                            <option value="preventivo" @selected($service->type === 'preventivo')>preventivo</option>
+                            <option value="correctivo" @selected($service->type === 'correctivo')>correctivo</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Precio base <span class="text-red-500">*</span></label>
+                        <input type="number" step="0.01" min="0" name="base_price" value="{{ (float) $service->base_price }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Precio base" required>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Minutos <span class="text-red-500">*</span></label>
+                        <input type="number" min="0" name="estimated_minutes" value="{{ (int) $service->estimated_minutes }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Minutos" required>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Activo <span class="text-red-500">*</span></label>
+                        <select name="active" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                            <option value="1" @selected((int)$service->active === 1)>SI</option>
+                            <option value="0" @selected((int)$service->active === 0)>NO</option>
+                        </select>
+                    </div>
 
-                    <div class="md:col-span-5 mt-2 flex gap-2">
+                    <div class="md:col-span-4 mt-2 flex gap-2">
                         <x-ui.button type="submit" size="md" variant="primary"><i class="ri-save-line"></i><span>Guardar cambios</span></x-ui.button>
                         <x-ui.button type="button" size="md" variant="outline" @click="open = false"><i class="ri-close-line"></i><span>Cancelar</span></x-ui.button>
                     </div>

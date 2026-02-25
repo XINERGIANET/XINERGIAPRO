@@ -228,37 +228,61 @@
                 </button>
             </div>
 
-            <form method="POST" action="{{ route('workshop.appointments.store') }}" class="grid grid-cols-1 gap-2 md:grid-cols-3">
+            <form method="POST" action="{{ route('workshop.appointments.store') }}" class="grid grid-cols-1 gap-4 md:grid-cols-3">
                 @csrf
-                <select name="vehicle_id" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
-                    <option value="">Vehiculo</option>
-                    @foreach($vehicles as $vehicle)
-                        <option value="{{ $vehicle->id }}">{{ $vehicle->brand }} {{ $vehicle->model }} - {{ $vehicle->plate }}</option>
-                    @endforeach
-                </select>
-                <select name="client_person_id" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
-                    <option value="">Cliente</option>
-                    @foreach($clients as $client)
-                        <option value="{{ $client->id }}">{{ $client->first_name }} {{ $client->last_name }}</option>
-                    @endforeach
-                </select>
-                <select name="technician_person_id" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
-                    <option value="">Tecnico</option>
-                    @foreach($technicians as $tech)
-                        <option value="{{ $tech->id }}">{{ $tech->first_name }} {{ $tech->last_name }}</option>
-                    @endforeach
-                </select>
-                <input type="datetime-local" name="start_at" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
-                <input type="datetime-local" name="end_at" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
-                <input name="reason" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Motivo" required>
-                <input name="notes" class="h-11 rounded-lg border border-gray-300 px-3 text-sm md:col-span-2" placeholder="Notas">
-                <select name="status" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
-                    <option value="pending">pending</option>
-                    <option value="confirmed">confirmed</option>
-                    <option value="arrived">arrived</option>
-                    <option value="cancelled">cancelled</option>
-                    <option value="no_show">no_show</option>
-                </select>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Vehiculo <span class="text-red-500">*</span></label>
+                    <select name="vehicle_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                        <option value="">Seleccione vehiculo</option>
+                        @foreach($vehicles as $vehicle)
+                            <option value="{{ $vehicle->id }}">{{ $vehicle->brand }} {{ $vehicle->model }} - {{ $vehicle->plate }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Cliente <span class="text-red-500">*</span></label>
+                    <select name="client_person_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                        <option value="">Seleccione cliente</option>
+                        @foreach($clients as $client)
+                            <option value="{{ $client->id }}">{{ $client->first_name }} {{ $client->last_name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Tecnico</label>
+                    <select name="technician_person_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                        <option value="">Seleccione tecnico</option>
+                        @foreach($technicians as $tech)
+                            <option value="{{ $tech->id }}">{{ $tech->first_name }} {{ $tech->last_name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Inicio <span class="text-red-500">*</span></label>
+                    <input type="datetime-local" name="start_at" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Fin <span class="text-red-500">*</span></label>
+                    <input type="datetime-local" name="end_at" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Motivo <span class="text-red-500">*</span></label>
+                    <input name="reason" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Motivo" required>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Notas</label>
+                    <input name="notes" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Notas">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Estado</label>
+                    <select name="status" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                        <option value="pending">pending</option>
+                        <option value="confirmed">confirmed</option>
+                        <option value="arrived">arrived</option>
+                        <option value="cancelled">cancelled</option>
+                        <option value="no_show">no_show</option>
+                    </select>
+                </div>
                 <div class="md:col-span-3 mt-2 flex gap-2">
                     <x-ui.button type="submit" size="md" variant="primary"><i class="ri-save-line"></i><span>Guardar</span></x-ui.button>
                     <x-ui.button type="button" size="md" variant="outline" @click="open = false"><i class="ri-close-line"></i><span>Cancelar</span></x-ui.button>
@@ -277,36 +301,60 @@
                     </button>
                 </div>
 
-                <form method="POST" action="{{ route('workshop.appointments.update', $appointment) }}" class="grid grid-cols-1 gap-2 md:grid-cols-3">
+                <form method="POST" action="{{ route('workshop.appointments.update', $appointment) }}" class="grid grid-cols-1 gap-4 md:grid-cols-3">
                     @csrf
                     @method('PUT')
-                    <select name="vehicle_id" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
-                        @foreach($vehicles as $vehicle)
-                            <option value="{{ $vehicle->id }}" @selected((int)$appointment->vehicle_id === (int)$vehicle->id)>{{ $vehicle->brand }} {{ $vehicle->model }} - {{ $vehicle->plate }}</option>
-                        @endforeach
-                    </select>
-                    <select name="client_person_id" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
-                        @foreach($clients as $client)
-                            <option value="{{ $client->id }}" @selected((int)$appointment->client_person_id === (int)$client->id)>{{ $client->first_name }} {{ $client->last_name }}</option>
-                        @endforeach
-                    </select>
-                    <select name="technician_person_id" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
-                        <option value="">Tecnico</option>
-                        @foreach($technicians as $tech)
-                            <option value="{{ $tech->id }}" @selected((int)$appointment->technician_person_id === (int)$tech->id)>{{ $tech->first_name }} {{ $tech->last_name }}</option>
-                        @endforeach
-                    </select>
-                    <input type="datetime-local" name="start_at" value="{{ optional($appointment->start_at)->format('Y-m-d\\TH:i') }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
-                    <input type="datetime-local" name="end_at" value="{{ optional($appointment->end_at)->format('Y-m-d\\TH:i') }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
-                    <input name="reason" value="{{ $appointment->reason }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Motivo" required>
-                    <input name="notes" value="{{ $appointment->notes }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm md:col-span-2" placeholder="Notas">
-                    <select name="status" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
-                        <option value="pending" @selected($appointment->status === 'pending')>pending</option>
-                        <option value="confirmed" @selected($appointment->status === 'confirmed')>confirmed</option>
-                        <option value="arrived" @selected($appointment->status === 'arrived')>arrived</option>
-                        <option value="cancelled" @selected($appointment->status === 'cancelled')>cancelled</option>
-                        <option value="no_show" @selected($appointment->status === 'no_show')>no_show</option>
-                    </select>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Vehiculo <span class="text-red-500">*</span></label>
+                        <select name="vehicle_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                            @foreach($vehicles as $vehicle)
+                                <option value="{{ $vehicle->id }}" @selected((int)$appointment->vehicle_id === (int)$vehicle->id)>{{ $vehicle->brand }} {{ $vehicle->model }} - {{ $vehicle->plate }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Cliente <span class="text-red-500">*</span></label>
+                        <select name="client_person_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                            @foreach($clients as $client)
+                                <option value="{{ $client->id }}" @selected((int)$appointment->client_person_id === (int)$client->id)>{{ $client->first_name }} {{ $client->last_name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Tecnico</label>
+                        <select name="technician_person_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                            <option value="">Seleccione tecnico</option>
+                            @foreach($technicians as $tech)
+                                <option value="{{ $tech->id }}" @selected((int)$appointment->technician_person_id === (int)$tech->id)>{{ $tech->first_name }} {{ $tech->last_name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Inicio <span class="text-red-500">*</span></label>
+                        <input type="datetime-local" name="start_at" value="{{ optional($appointment->start_at)->format('Y-m-d\\TH:i') }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Fin <span class="text-red-500">*</span></label>
+                        <input type="datetime-local" name="end_at" value="{{ optional($appointment->end_at)->format('Y-m-d\\TH:i') }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Motivo <span class="text-red-500">*</span></label>
+                        <input name="reason" value="{{ $appointment->reason }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Motivo" required>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Notas</label>
+                        <input name="notes" value="{{ $appointment->notes }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Notas">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Estado</label>
+                        <select name="status" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                            <option value="pending" @selected($appointment->status === 'pending')>pending</option>
+                            <option value="confirmed" @selected($appointment->status === 'confirmed')>confirmed</option>
+                            <option value="arrived" @selected($appointment->status === 'arrived')>arrived</option>
+                            <option value="cancelled" @selected($appointment->status === 'cancelled')>cancelled</option>
+                            <option value="no_show" @selected($appointment->status === 'no_show')>no_show</option>
+                        </select>
+                    </div>
                     <div class="md:col-span-3 mt-2 flex gap-2">
                         <x-ui.button type="submit" size="md" variant="primary"><i class="ri-save-line"></i><span>Guardar cambios</span></x-ui.button>
                         <x-ui.button type="button" size="md" variant="outline" @click="open = false"><i class="ri-close-line"></i><span>Cancelar</span></x-ui.button>

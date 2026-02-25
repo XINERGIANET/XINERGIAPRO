@@ -20,27 +20,18 @@
         document.addEventListener('alpine:init', () => {
             Alpine.store('theme', {
                 init() {
-                    const forceLight = @json($forceLightMode ?? false);
-                    const savedTheme = localStorage.getItem('theme');
-                    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-                    this.theme = forceLight ? 'light' : (savedTheme || systemTheme);
+                    this.theme = 'light';
                     this.updateTheme();
                 },
+                theme: 'light',
                 toggle() {
-                    this.theme = this.theme === 'light' ? 'dark' : 'light';
-                    localStorage.setItem('theme', this.theme);
-                    this.updateTheme();
+                    // Dark mode disabled
                 },
                 updateTheme() {
                     const html = document.documentElement;
                     const body = document.body;
-                    if (this.theme === 'dark') {
-                        html.classList.add('dark');
-                        body.classList.add('dark', 'bg-gray-900');
-                    } else {
-                        html.classList.remove('dark');
-                        body.classList.remove('dark', 'bg-gray-900');
-                    }
+                    html.classList.remove('dark');
+                    body.classList.remove('dark', 'bg-gray-900');
                 }
             });
 
@@ -75,32 +66,17 @@
         });
     </script>
 
-    <!-- Apply dark mode immediately to prevent flash -->
+    <!-- Force light mode immediately to prevent flash -->
     <script>
         (function() {
-            const forceLight = @json($forceLightMode ?? false);
-            const savedTheme = localStorage.getItem('theme');
-            const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-            const theme = forceLight ? 'light' : (savedTheme || systemTheme);
             const root = document.documentElement;
+            root.classList.remove('dark');
             const applyBody = () => {
                 const body = document.body;
-                if (!body) {
-                    return;
-                }
-                if (theme === 'dark') {
-                    body.classList.add('dark', 'bg-gray-900');
-                } else {
+                if (body) {
                     body.classList.remove('dark', 'bg-gray-900');
                 }
             };
-
-            if (theme === 'dark') {
-                root.classList.add('dark');
-            } else {
-                root.classList.remove('dark');
-            }
-
             if (document.body) {
                 applyBody();
             } else {

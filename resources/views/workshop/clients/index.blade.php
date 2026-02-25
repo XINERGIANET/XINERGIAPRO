@@ -172,32 +172,53 @@
                     </button>
                 </div>
 
-                <form method="POST" action="{{ route('workshop.clients.update', $client) }}" class="grid grid-cols-1 gap-2 md:grid-cols-3">
+                <form method="POST" action="{{ route('workshop.clients.update', $client) }}" class="grid grid-cols-1 gap-4 md:grid-cols-3">
                     @csrf
                     @method('PUT')
-                    <select name="person_type" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
-                        <option value="DNI" @selected($client->person_type === 'DNI')>DNI</option>
-                        <option value="RUC" @selected($client->person_type === 'RUC')>RUC</option>
-                        <option value="CARNET DE EXTRANGERIA" @selected($client->person_type === 'CARNET DE EXTRANGERIA')>CARNET DE EXTRANGERIA</option>
-                        <option value="PASAPORTE" @selected($client->person_type === 'PASAPORTE')>PASAPORTE</option>
-                    </select>
-                    <div class="md:col-span-2 flex items-center gap-2">
-                        <input name="document_number" value="{{ $client->document_number }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Documento" required>
-                        <button
-                            type="button"
-                            onclick="fetchReniecForClientEdit(this)"
-                            class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-[#244BB3] px-4 text-sm font-medium text-white hover:bg-[#1f3f98] disabled:opacity-60"
-                        >
-                            <i class="ri-search-line"></i>
-                            <span class="ml-1">Buscar</span>
-                        </button>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Tipo <span class="text-red-500">*</span></label>
+                        <select name="person_type" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                            <option value="DNI" @selected($client->person_type === 'DNI')>DNI</option>
+                            <option value="RUC" @selected($client->person_type === 'RUC')>RUC</option>
+                            <option value="CARNET DE EXTRANGERIA" @selected($client->person_type === 'CARNET DE EXTRANGERIA')>CARNET DE EXTRANGERIA</option>
+                            <option value="PASAPORTE" @selected($client->person_type === 'PASAPORTE')>PASAPORTE</option>
+                        </select>
                     </div>
-                    <input name="first_name" value="{{ $client->first_name }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nombres / Razon social" required>
-                    <input name="last_name" value="{{ $client->last_name }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Apellidos" required>
+                    <div class="md:col-span-2">
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Documento <span class="text-red-500">*</span></label>
+                        <div class="flex items-center gap-2">
+                            <input name="document_number" value="{{ $client->document_number }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Documento" required>
+                            <button
+                                type="button"
+                                onclick="fetchReniecForClientEdit(this)"
+                                class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-[#244BB3] px-4 text-sm font-medium text-white hover:bg-[#1f3f98] disabled:opacity-60"
+                            >
+                                <i class="ri-search-line"></i>
+                                <span class="ml-1">Buscar</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Nombres <span class="text-red-500">*</span></label>
+                        <input name="first_name" value="{{ $client->first_name }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nombres / Razon social" required>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Apellidos <span class="text-red-500">*</span></label>
+                        <input name="last_name" value="{{ $client->last_name }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Apellidos" required>
+                    </div>
                     <p class="md:col-span-3 text-xs text-red-600 hidden js-reniec-error"></p>
-                    <input name="phone" value="{{ $client->phone }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Telefono">
-                    <input name="email" type="email" value="{{ $client->email }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Correo">
-                    <input name="address" value="{{ $client->address }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm md:col-span-2" placeholder="Direccion" required>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Telefono</label>
+                        <input name="phone" value="{{ $client->phone }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Telefono">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Correo</label>
+                        <input name="email" type="email" value="{{ $client->email }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Correo">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Direccion <span class="text-red-500">*</span></label>
+                        <input name="address" value="{{ $client->address }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Direccion" required>
+                    </div>
                     <div class="md:col-span-3 mt-2 flex gap-2">
                         <x-ui.button type="submit" size="md" variant="primary"><i class="ri-save-line"></i><span>Guardar cambios</span></x-ui.button>
                         <x-ui.button type="button" size="md" variant="outline" @click="open = false"><i class="ri-close-line"></i><span>Cancelar</span></x-ui.button>
