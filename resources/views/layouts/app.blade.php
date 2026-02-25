@@ -63,7 +63,7 @@
             }
         });
     </script>
-    @vite(['resources/js/app.js'])
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.5.0/fonts/remixicon.css">
 
     <!-- Alpine.js -->
@@ -380,7 +380,6 @@ body.swal2-shown #sidebar { z-index: 1 !important; }
     @stack('scripts')
 
 </html>
-
 
 
 

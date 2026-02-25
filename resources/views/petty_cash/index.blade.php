@@ -95,6 +95,7 @@
     </style>
 
     <div x-data="{
+        openRow: null,
         open: {{ $errors->any() ? 'true' : 'false' }},
         formConcept: '{{ old('comment') }}',
         formConceptId: '{{ old('payment_concept_id') }}',
@@ -289,8 +290,8 @@
                     </select>
                 </form>
                 <div class="flex items-center gap-2 text-sm text-gray-500">
-                    <span>Total</span>
-                    <x-ui.badge size="sm" variant="light" color="info">{{ $movements->total() }}</x-ui.badge>
+                    <span>Efectivo en caja</span>
+                    <x-ui.badge size="sm" variant="light" color="success">S/ {{ number_format((float) ($cashEfectivoTotal ?? 0), 2) }}</x-ui.badge>
                 </div>
             </div>
 
@@ -318,13 +319,13 @@
                                 <th style="background-color: #63B7EC; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6">
                                     <p class="font-semibold text-white text-theme-xs uppercase">Fecha</p>
                                 </th>
-                                <th style="background-color: #63B7EC; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6">
+                                <th style="background-color: #63B7EC; color: #FFFFFF;" class="hidden px-5 py-3 text-left sm:px-6">
                                     <p class="font-semibold text-white text-theme-xs uppercase">Usuario</p>
                                 </th>
-                                <th style="background-color: #63B7EC; color: #FFFFFF;" class="hidden lg:table-cell px-5 py-3 text-left sm:px-6">
+                                <th style="background-color: #63B7EC; color: #FFFFFF;" class="hidden px-5 py-3 text-left sm:px-6">
                                     <p class="font-semibold text-white text-theme-xs uppercase">Caja</p>
                                 </th>
-                                <th style="background-color: #63B7EC; color: #FFFFFF;" class="hidden xl:table-cell px-5 py-3 text-left sm:px-6">
+                                <th style="background-color: #63B7EC; color: #FFFFFF;" class="hidden px-5 py-3 text-left sm:px-6">
                                     <p class="font-semibold text-white text-theme-xs uppercase">Turno</p>
                                 </th>
                                 <th style="background-color: #63B7EC; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6">
@@ -378,13 +379,13 @@
                                             <p class="text-gray-500 text-[10px] dark:text-gray-400">{{ $movement->moved_at ? $movement->moved_at->format('h:i:s A') : '' }}</p>
                                         </div>
                                     </td>
-                                    <td class="px-5 py-4 sm:px-6 align-middle">
+                                    <td class="hidden px-5 py-4 sm:px-6 align-middle">
                                         <p class="text-gray-800 text-[11px] font-bold dark:text-white/90">{{ $movement->user_name ?: '-' }}</p>
                                     </td>
-                                    <td class="hidden lg:table-cell px-5 py-4 sm:px-6 align-middle">
+                                    <td class="hidden px-5 py-4 sm:px-6 align-middle">
                                         <p class="text-gray-500 text-[10px] dark:text-gray-400 capitalize">{{ $movement->cashMovement?->cash_register ?: '-' }}</p>
                                     </td>
-                                    <td class="hidden xl:table-cell px-5 py-4 sm:px-6 align-middle">
+                                    <td class="hidden px-5 py-4 sm:px-6 align-middle">
                                         <p class="text-gray-500 text-[10px] dark:text-gray-400 capitalize">{{ $movement->cashMovement?->shift?->name ?: '-' }}</p>
                                     </td>
                                     <td class="px-5 py-4 sm:px-6 align-middle">
@@ -451,6 +452,10 @@
                                                 <p class="font-medium text-gray-700 dark:text-gray-200">{{ $movement->responsible_name ?: '-' }}</p>
                                             </div>
                                             <div>
+                                                <p class="text-xs uppercase tracking-wide text-gray-400">Usuario</p>
+                                                <p class="font-medium text-gray-700 dark:text-gray-200">{{ $movement->user_name ?: '-' }}</p>
+                                            </div>
+                                            <div>
                                                 <p class="text-xs uppercase tracking-wide text-gray-400">Moneda</p>
                                                 <p class="font-medium text-gray-700 dark:text-gray-200">{{ $movement->cashMovement?->currency ?: 'PEN' }}</p>
                                             </div>
@@ -471,6 +476,18 @@
                                             <div>
                                                 <p class="text-xs uppercase tracking-wide text-gray-400">T. cambio</p>
                                                 <p class="font-medium text-gray-700 dark:text-gray-200">{{ number_format((float) ($movement->cashMovement?->exchange_rate ?? 1), 3) }}</p>
+                                            </div>
+                                            <div>
+                                                <p class="text-xs uppercase tracking-wide text-gray-400">Caja</p>
+                                                <p class="font-medium text-gray-700 dark:text-gray-200">{{ $movement->cashMovement?->cash_register ?: '-' }}</p>
+                                            </div>
+                                            <div>
+                                                <p class="text-xs uppercase tracking-wide text-gray-400">Turno</p>
+                                                <p class="font-medium text-gray-700 dark:text-gray-200">{{ $movement->cashMovement?->shift?->name ?: '-' }}</p>
+                                            </div>
+                                            <div class="sm:col-span-2 lg:col-span-3">
+                                                <p class="text-xs uppercase tracking-wide text-gray-400">Metodos de pago</p>
+                                                <p class="font-medium text-gray-700 dark:text-gray-200">{{ $paymentSummary ?: '-' }}</p>
                                             </div>
                                             <div class="sm:col-span-2 lg:col-span-3">
                                                 <p class="text-xs uppercase tracking-wide text-gray-400">Comentario</p>

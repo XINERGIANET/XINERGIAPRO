@@ -146,6 +146,31 @@ class PettyCashController extends Controller
 
         $cards = Card::where('status', true)->orderBy('order_num', 'asc')->get();
 
+        $cashEfectivoTotal = (float) DB::table('cash_movement_details as cmd')
+            ->join('cash_movements as cm', 'cm.id', '=', 'cmd.cash_movement_id')
+            ->join('movements as m', 'm.id', '=', 'cm.movement_id')
+            ->leftJoin('document_types as dt', 'dt.id', '=', 'm.document_type_id')
+            ->leftJoin('payment_methods as pm', 'pm.id', '=', 'cmd.payment_method_id')
+            ->where('cm.cash_register_id', $selectedBoxId)
+            ->where('m.branch_id', $branchId)
+            ->whereNull('m.deleted_at')
+            ->where(function ($query) {
+                $query->whereRaw("COALESCE(pm.description, cmd.payment_method, '') ILIKE '%efectivo%'")
+                    ->orWhereRaw("COALESCE(pm.description, cmd.payment_method, '') ILIKE '%cash%'");
+            })
+            ->selectRaw("
+                COALESCE(
+                    SUM(
+                        CASE
+                            WHEN LOWER(COALESCE(dt.name, '')) LIKE '%egreso%' THEN -cmd.amount
+                            ELSE cmd.amount
+                        END
+                    ),
+                    0
+                ) as total
+            ")
+            ->value('total');
+
         return view('petty_cash.index', [
             'title'           => 'Caja Chica',
             'movements'       => $movements,
@@ -166,6 +191,7 @@ class PettyCashController extends Controller
             'cards'           => $cards,
             'operaciones'     => $operaciones,
             'perPage'         => $perPage,
+            'cashEfectivoTotal' => $cashEfectivoTotal,
         ]);
     }
 
