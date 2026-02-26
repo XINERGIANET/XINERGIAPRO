@@ -37,7 +37,7 @@
             <x-ui.button size="md" variant="primary" type="button" style="background-color:#244BB3;color:#fff" @click="$dispatch('open-costs-table-modal')">
                 <i class="ri-settings-4-line"></i><span>Configuración de Costos</span>
             </x-ui.button>
-            <x-ui.button size="md" variant="primary" type="button" style="background-color:#63B7EC;color:#fff" @click="$dispatch('open-summary-modal')">
+            <x-ui.button size="md" variant="primary" type="button" style="background-color:#334155;color:#fff" @click="$dispatch('open-summary-modal')">
                 <i class="ri-bar-chart-2-line"></i><span>Resumen por Tipo</span>
             </x-ui.button>
             <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.assemblies.export', ['month' => $month]) }}" style="background-color:#166534;color:#fff">
@@ -192,9 +192,9 @@
                                     <button type="submit" class="flex h-10 w-10 items-center justify-center rounded-xl border transition-all hover:bg-red-600 hover:text-white hover:border-red-600" style="background-color: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); color: #94A3B8;">
                                         <i class="ri-delete-bin-line text-lg"></i>
                                     </button>
-                                    <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                    <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
                                         Eliminar
-                                        <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                        <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
                                     </span>
                                 </div>
                             </form>
@@ -372,10 +372,10 @@
                 <table class="w-full min-w-[500px]">
                     <thead>
                         <tr>
-                            <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">Empresa/Marca</th>
-                            <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Tipo</th>
-                            <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Costo Unitario</th>
-                            <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl w-10"></th>
+                            <th style="background-color:#334155" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">Empresa/Marca</th>
+                            <th style="background-color:#334155" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Tipo</th>
+                            <th style="background-color:#334155" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Costo Unitario</th>
+                            <th style="background-color:#334155" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl w-10"></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -421,10 +421,10 @@
                 <table class="w-full min-w-[650px]">
                     <thead>
                         <tr>
-                            <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">Empresa/Marca</th>
-                            <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Tipo</th>
-                            <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Cantidad</th>
-                            <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Costo Total</th>
+                            <th style="background-color:#334155" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">Empresa/Marca</th>
+                            <th style="background-color:#334155" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Tipo</th>
+                            <th style="background-color:#334155" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Cantidad</th>
+                            <th style="background-color:#334155" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Costo Total</th>
                         </tr>
                     </thead>
                     <tbody>

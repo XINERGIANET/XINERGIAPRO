@@ -99,7 +99,7 @@
                                     </template>
                                 </div>
 
-                                {{-- Badge PÃ­ldora (Derecha - Estilo exacto imagen) --}}
+                                {{-- Badge Píldora (Derecha - Estilo exacto imagen) --}}
                                 <span class="ml-auto flex items-center gap-1 rounded-full py-0.5 pl-2 pr-2.5 text-xs font-medium"
                                         :class="table.situation === 'ocupada' 
                                         ? 'text-gray-800' 
@@ -135,7 +135,7 @@
 
         </div>
     </div>    
-{{-- SCRIPT LÃ“GICA --}}
+{{-- SCRIPT LÓGICA --}}
 <script>
     @php
         $areasData = $areas ?? [];

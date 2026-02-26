@@ -177,23 +177,23 @@
                 <table class="w-full min-w-[1100px]">
                     <thead>
                         <tr class="text-white">
-                            <th style="background-color: #63B7EC; color: #FFFFFF;" class="w-12 px-4 py-4 text-center first:rounded-tl-xl"></th>
-                            <th style="background-color: #63B7EC; color: #FFFFFF;" class="hidden md:table-cell px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="w-12 px-4 py-4 text-center first:rounded-tl-xl"></th>
+                            <th style="background-color: #334155; color: #FFFFFF;" class="hidden md:table-cell px-5 py-3 text-left sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Código</p>
                             </th>
-                            <th style="background-color: #63B7EC; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Descripción</p>
                             </th>
-                            <th style="background-color: #63B7EC; color: #FFFFFF;" class="hidden sm:table-cell px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="hidden sm:table-cell px-5 py-3 text-left sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Categoría</p>
                             </th>
-                            <th style="background-color: #63B7EC; color: #FFFFFF;" class="hidden lg:table-cell px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="hidden lg:table-cell px-5 py-3 text-left sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Unidad base</p>
                             </th>
-                            <th style="background-color: #63B7EC; color: #FFFFFF;" class="hidden xl:table-cell px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="hidden xl:table-cell px-5 py-3 text-left sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Tipo</p>
                             </th>
-                            <th style="background-color: #63B7EC; color: #FFFFFF;" class="px-5 py-3 text-right sm:px-6 last:rounded-tr-xl">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-right sm:px-6 last:rounded-tr-xl">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Acciones</p>
                             </th>
                         </tr>
@@ -241,7 +241,7 @@
                                                 <i class="ri-store-line"></i>
                                             </x-ui.button>
                                             <span
-                                                class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50"
+                                                class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50"
                                                 style="transition-delay: 0.5s;">Agregar a sucursal</span>
                                         </div> --}}
                                         @if ($rowOperations->isNotEmpty())
@@ -273,7 +273,7 @@
                                                             <i class="{{ $operation->icon }}"></i>
                                                         </x-ui.button>
                                                         <span
-                                                            class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50"
+                                                            class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50"
                                                             style="transition-delay: 0.5s;">{{ $operation->name }}</span>
                                                     </form>
                                                 @else
@@ -286,7 +286,7 @@
                                                             <i class="{{ $operation->icon }}"></i>
                                                         </x-ui.link-button>
                                                         <span
-                                                            class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50"
+                                                            class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50"
                                                             style="transition-delay: 0.5s;">{{ $operation->name }}</span>
                                                     </div>
                                                 @endif

@@ -210,6 +210,42 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
 }
 
+/* Uniform table header color across index/list tables */
+.table-responsive table thead th,
+.overflow-x-auto table thead th,
+.custom-scrollbar table thead th {
+  background-color: #334155 !important;
+  color: #FFFFFF !important;
+}
+
+.table-responsive table thead th p,
+.overflow-x-auto table thead th p,
+.custom-scrollbar table thead th p {
+  color: #FFFFFF !important;
+}
+
+.table-responsive table thead,
+.overflow-x-auto table thead,
+.custom-scrollbar table thead,
+.table-responsive table thead tr,
+.overflow-x-auto table thead tr,
+.custom-scrollbar table thead tr {
+  background-color: #334155 !important;
+}
+
+.table-responsive table thead th[style*="#63B7EC"],
+.overflow-x-auto table thead th[style*="#63B7EC"],
+.custom-scrollbar table thead th[style*="#63B7EC"] {
+  background-color: #334155 !important;
+}
+
+.table-responsive table thead th[style*="#63b7ec"],
+.overflow-x-auto table thead th[style*="#63b7ec"],
+.custom-scrollbar table thead th[style*="#63b7ec"] {
+  background-color: #334155 !important;
+  color: #FFFFFF !important;
+}
+
 @utility menu-item {
   @apply relative flex items-center w-full gap-3.5 px-4 py-2.5 font-medium rounded-xl text-theme-sm transition-all duration-200 ease-in-out;
   font-family: var(--font-manrope);

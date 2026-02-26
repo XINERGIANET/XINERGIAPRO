@@ -193,14 +193,14 @@
                 <table class="w-full min-w-max border-separate border-spacing-0">
                     <thead>
                         <tr class="border-b border-gray-100 dark:border-gray-800 text-white">
-                            <th style="background-color: #63B7EC;" class="w-12 px-4 py-3 text-center first:rounded-tl-2xl sticky-left-header"></th>
-                            <th style="background-color: #63B7EC;" class="px-3 py-3 text-left sm:px-6 whitespace-nowrap">Nombres</th>
-                            <th style="background-color: #63B7EC;" class="px-5 py-3 text-left sm:px-6 whitespace-nowrap">Tipo</th>
-                            <th style="background-color: #63B7EC;" class="px-5 py-3 text-left sm:px-6 whitespace-nowrap">Nro. Documento</th>
-                            <th style="background-color: #63B7EC;" class="px-5 py-3 text-left sm:px-6 whitespace-nowrap">Fecha nac.</th>
-                            <th style="background-color: #63B7EC;" class="px-5 py-3 text-left sm:px-6 whitespace-nowrap">Genero</th>
-                            <th style="background-color: #63B7EC;" class="px-5 py-3 text-left sm:px-6 whitespace-nowrap">Ubicacion</th>
-                            <th style="background-color: #63B7EC;" class="px-5 py-3 text-right sm:px-6 whitespace-nowrap last:rounded-tr-2xl">Acciones</th>
+                            <th style="background-color: #334155;" class="w-12 px-4 py-3 text-center first:rounded-tl-2xl sticky-left-header"></th>
+                            <th style="background-color: #334155;" class="px-3 py-3 text-left sm:px-6 whitespace-nowrap">Nombres</th>
+                            <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6 whitespace-nowrap">Tipo</th>
+                            <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6 whitespace-nowrap">Nro. Documento</th>
+                            <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6 whitespace-nowrap">Fecha nac.</th>
+                            <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6 whitespace-nowrap">Genero</th>
+                            <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6 whitespace-nowrap">Ubicacion</th>
+                            <th style="background-color: #334155;" class="px-5 py-3 text-right sm:px-6 whitespace-nowrap last:rounded-tr-2xl">Acciones</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -272,9 +272,9 @@
                                                     >
                                                         <i class="{{ $operation->icon }}"></i>
                                                     </button>
-                                                    <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                    <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
                                                         {{ $operation->name }}
-                                                        <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                        <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
                                                     </span>
                                                 </div>
                                                 @continue
@@ -290,9 +290,9 @@
                                                     >
                                                         <i class="{{ $operation->icon }}"></i>
                                                     </button>
-                                                    <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                    <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
                                                         {{ $operation->name }}
-                                                        <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                        <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
                                                     </span>
                                                 </div>
                                                 @continue
@@ -324,9 +324,9 @@
                                                     >
                                                         <i class="{{ $operation->icon }}"></i>
                                                     </x-ui.button>
-                                                    <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                    <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
                                                         {{ $operation->name }}
-                                                        <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                        <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
                                                     </span>
                                                 </form>
                                             @else
@@ -341,9 +341,9 @@
                                                     >
                                                         <i class="{{ $operation->icon }}"></i>
                                                     </x-ui.link-button>
-                                                    <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                    <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
                                                         {{ $operation->name }}
-                                                        <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                        <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
                                                     </span>
                                                 </div>
                                             @endif
@@ -388,12 +388,7 @@
                         @endforelse
                         </tbody>
                     @if ($people->count() > 0)
-                        <tfoot>
-                            <tr>
-                                <td colspan="8" class="h-12"></td>
-                            </tr>
-                        </tfoot>
-                    @endif
+@endif
                 </table>
             </div>
 

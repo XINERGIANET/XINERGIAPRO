@@ -153,10 +153,10 @@
                 <table class="w-full min-w-[1100px]">
                     <thead>
                         <tr class="border-b border-gray-100 dark:border-gray-800 text-left">
-                            <th style="background-color: #63B7EC; color: #FFFFFF;" class="px-5 py-3 font-medium text-theme-xs first:rounded-tl-xl sticky-left-header">Nombre / Abr.</th>
-                            <th style="background-color: #63B7EC; color: #FFFFFF;" class="px-5 py-3 font-medium text-theme-xs">Sucursal</th>
-                            <th style="background-color: #63B7EC; color: #FFFFFF;" class="px-5 py-3 font-medium text-theme-xs">Horario</th>
-                            <th style="background-color: #63B7EC; color: #FFFFFF;" class="px-5 py-3 font-medium text-theme-xs text-right last:rounded-tr-xl">Acciones</th>
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 font-medium text-theme-xs first:rounded-tl-xl sticky-left-header">Nombre / Abr.</th>
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 font-medium text-theme-xs">Sucursal</th>
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 font-medium text-theme-xs">Horario</th>
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 font-medium text-theme-xs text-right last:rounded-tr-xl">Acciones</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -222,9 +222,9 @@
                                                         >
                                                             <i class="{{ $operation->icon }}"></i>
                                                         </x-ui.button>
-                                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                        <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
                                                             {{ $operation->name }}
-                                                            <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                            <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
                                                         </span>
                                                     </form>
                                                 @else
@@ -239,9 +239,9 @@
                                                         >
                                                             <i class="{{ $operation->icon }}"></i>
                                                         </x-ui.link-button>
-                                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                        <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
                                                             {{ $operation->name }}
-                                                            <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                            <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
                                                         </span>
                                                     </div>
                                                 @endif
@@ -258,9 +258,9 @@
                                                 >
                                                     <i class="ri-pencil-line"></i>
                                                 </x-ui.link-button>
-                                                <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
                                                     Editar
-                                                    <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                    <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
                                                 </span>
                                             </div>
 
@@ -290,9 +290,9 @@
                                                 >
                                                     <i class="ri-delete-bin-line"></i>
                                                 </x-ui.button>
-                                                <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
                                                     Eliminar
-                                                    <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                    <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
                                                 </span>
                                             </form>
                                         @endif
@@ -308,12 +308,7 @@
                         @endforelse
                     </tbody>
                     @if ($shifts->count() > 0)
-                        <tfoot>
-                            <tr>
-                                <td colspan="4" class="h-12"></td>
-                            </tr>
-                        </tfoot>
-                    @endif
+@endif
                 </table>
             </div>
 

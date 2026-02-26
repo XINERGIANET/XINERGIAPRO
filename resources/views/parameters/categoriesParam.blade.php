@@ -123,10 +123,10 @@
                     <table class="w-full min-w-[880px]">
                         <thead class="text-left text-theme-xs dark:text-gray-400">
                             <tr class="border-b border-gray-100 dark:border-gray-800">
-                                <th style="background-color: #63B7EC; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">ID</th>
-                                <th style="background-color: #63B7EC; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">Descripcion</th>
-                                <th style="background-color: #63B7EC; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">Fecha de creacion</th>
-                                <th style="background-color: #63B7EC; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">Acciones</th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">ID</th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">Descripcion</th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">Fecha de creacion</th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -160,7 +160,7 @@
                                                                 aria-label="{{ $operationRow->name }}">
                                                                 <i class="{{ $operationRow->icon }}"></i>
                                                             </x-ui.button>
-                                                            <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50">{{ $operationRow->name }}</span>
+                                                            <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50">{{ $operationRow->name }}</span>
                                                         </div>
                                                     @elseif ($isDeleteOp($operationRow))
                                                         <form action="{{ $viewId ? route('admin.parameters.categories.destroy', $parameterCategory) . '?view_id=' . $viewId : route('admin.parameters.categories.destroy', $parameterCategory) }}"
@@ -177,7 +177,7 @@
                                                             <x-ui.button size="icon" variant="eliminate" type="submit" style="{{ $buttonStyle }}" aria-label="{{ $operationRow->name }}">
                                                                 <i class="{{ $operationRow->icon }}"></i>
                                                             </x-ui.button>
-                                                            <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50">{{ $operationRow->name }}</span>
+                                                            <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50">{{ $operationRow->name }}</span>
                                                         </form>
                                                     @else
                                                         <div class="relative group">
@@ -186,7 +186,7 @@
                                                                 aria-label="{{ $operationRow->name }}">
                                                                 <i class="{{ $operationRow->icon }}"></i>
                                                             </x-ui.link-button>
-                                                            <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50">{{ $operationRow->name }}</span>
+                                                            <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50">{{ $operationRow->name }}</span>
                                                         </div>
                                                     @endif
                                                 @endforeach
@@ -196,7 +196,7 @@
                                                         x-on:click.prevent="$dispatch('open-edit-category-modal', {{ Illuminate\Support\Js::from(['id' => $parameterCategory->id, 'description' => $parameterCategory->description]) }})">
                                                         <i class="ri-pencil-line"></i>
                                                     </x-ui.button>
-                                                    <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50">Editar</span>
+                                                    <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50">Editar</span>
                                                 </div>
                                                 <form action="{{ route('admin.parameters.categories.destroy', $parameterCategory) }}" method="POST" data-swal-title="Eliminar categoria?"
                                                     class="relative group js-swal-delete"
@@ -210,7 +210,7 @@
                                                     <x-ui.button size="icon" variant="eliminate" type="submit">
                                                         <i class="ri-delete-bin-line"></i>
                                                     </x-ui.button>
-                                                    <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50">Eliminar</span>
+                                                    <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50">Eliminar</span>
                                                 </form>
                                             @endif
                                         </div>

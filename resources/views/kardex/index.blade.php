@@ -42,7 +42,7 @@
                     />
                 </div>
                 <div class="flex items-end gap-2">
-                    <x-ui.button type="submit" size="md" variant="primary" class="h-11 px-6" style="background-color: #63B7EC; border-color: #63B7EC;">
+                    <x-ui.button type="submit" size="md" variant="primary" class="h-11 px-6" style="background-color: #334155; border-color: #334155;">
                         <i class="ri-search-line"></i>
                         <span>Consultar</span>
                     </x-ui.button>
@@ -59,7 +59,7 @@
         <div class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] overflow-x-auto">
             <table class="w-full min-w-[1100px]">
                     <thead>
-                        <tr class="text-white text-center" style="background-color: #63B7EC;">
+                        <tr class="text-white text-center" style="background-color: #334155;">
                             @if ($showAllProducts ?? false)
                                 <th class="px-3 py-3 text-xs font-semibold uppercase sm:px-4 first:rounded-tl-xl">Producto</th>
                             @endif

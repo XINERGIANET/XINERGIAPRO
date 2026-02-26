@@ -56,22 +56,22 @@
                 <table class="w-full">
                     <thead>
                         <tr class="border-b border-gray-100 dark:border-gray-800">
-                            <th style="background-color: #63B7EC;" class="px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6">
                                 <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">Nombre</p>
                             </th>
-                            <th style="background-color: #63B7EC;" class="px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6">
                                 <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">Capacidad</p>
                             </th>
-                            <th style="background-color: #63B7EC;" class="px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6">
                                 <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">Estado</p>
                             </th>
-                            <th style="background-color: #63B7EC;" class="px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6">
                                 <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">Situacion</p>
                             </th>
-                            <th style="background-color: #63B7EC;" class="px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6">
                                 <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">Hora apertura</p>
                             </th>
-                            <th style="background-color: #63B7EC;" class="px-5 py-3 text-right sm:px-6">
+                            <th style="background-color: #334155;" class="px-5 py-3 text-right sm:px-6">
                                 <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">Acciones</p>
                             </th>
                         </tr>
@@ -111,7 +111,7 @@
                                             >
                                                 <i class="ri-pencil-line"></i>
                                             </x-ui.link-button>
-                                            <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">Editar</span>
+                                            <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">Editar</span>
                                         </div>
                                         <form
                                             method="POST"
@@ -136,7 +136,7 @@
                                             >
                                                 <i class="ri-delete-bin-line"></i>
                                             </x-ui.button>
-                                            <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">Eliminar</span>
+                                            <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">Eliminar</span>
                                         </form>
                                     </div>
                                 </td>

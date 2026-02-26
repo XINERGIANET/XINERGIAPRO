@@ -153,7 +153,7 @@
                                             >
                                                 <i class="{{ $operation->status ? 'ri-eye-line' : 'ri-eye-off-line' }}"></i>
                                             </x-ui.button>
-                                            <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">
+                                            <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">
                                                 {{ $operation->status ? 'Desactivar' : 'Activar' }}
                                             </span>
                                         </form>

@@ -157,13 +157,13 @@
                 <table class="w-full min-w-[880px]">
                     <thead>
                         <tr class="text-white">
-                            <th style="background-color: #63B7EC;" class="px-3 py-3 text-left sm:px-6 first:rounded-tl-xl sticky-left-header">
+                            <th style="background-color: #334155;" class="px-3 py-3 text-left sm:px-6 first:rounded-tl-xl sticky-left-header">
                                 <p class="font-semibold text-white text-theme-xs truncate">ID</p>
                             </th>
-                            <th style="background-color: #63B7EC;" class="px-5 py-3 text-left sm:px-6"><p class="font-semibold text-white text-theme-xs uppercase">Nombre</p></th>
-                            <th style="background-color: #63B7EC;" class="px-5 py-3 text-left sm:px-6"><p class="font-semibold text-white text-theme-xs uppercase">Abreviatura</p></th>
-                            <th style="background-color: #63B7EC;" class="px-5 py-3 text-left sm:px-6"><p class="font-semibold text-white text-theme-xs uppercase">Estado</p></th>
-                            <th style="background-color: #63B7EC;" class="px-5 py-3 text-right sm:px-6 last:rounded-tr-xl"><p class="font-semibold text-white text-theme-xs uppercase">Acciones</p></th>
+                            <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6"><p class="font-semibold text-white text-theme-xs uppercase">Nombre</p></th>
+                            <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6"><p class="font-semibold text-white text-theme-xs uppercase">Abreviatura</p></th>
+                            <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6"><p class="font-semibold text-white text-theme-xs uppercase">Estado</p></th>
+                            <th style="background-color: #334155;" class="px-5 py-3 text-right sm:px-6 last:rounded-tr-xl"><p class="font-semibold text-white text-theme-xs uppercase">Acciones</p></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -216,9 +216,9 @@
                                                         <i class="{{ $operation->icon }} text-lg"></i>
                                                     </x-ui.button>
                                                     <span
-                                                        class="pointer-events-none opacity-0 group-hover:opacity-100 absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[11px] font-medium text-white shadow-xl z-50 transition">
+                                                        class="pointer-events-none opacity-0 group-hover:opacity-100 absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[11px] font-medium text-white shadow-xl z-50 transition">
                                                         {{ $operation->name }}
-                                                        <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                        <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
                                                     </span>
                                                 </form>
                                             @else
@@ -231,9 +231,9 @@
                                                         <i class="{{ $operation->icon }} text-lg"></i>
                                                     </x-ui.link-button>
                                                     <span
-                                                        class="pointer-events-none opacity-0 group-hover:opacity-100 absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[11px] font-medium text-white shadow-xl z-50 transition">
+                                                        class="pointer-events-none opacity-0 group-hover:opacity-100 absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-[11px] font-medium text-white shadow-xl z-50 transition">
                                                         {{ $operation->name }}
-                                                        <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                                        <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
                                                     </span>
                                                 </div>
                                             @endif
@@ -250,12 +250,7 @@
                         @endforelse
                     </tbody>
                     @if ($views->count() > 0)
-                        <tfoot>
-                            <tr>
-                                <td colspan="5" class="h-12"></td>
-                            </tr>
-                        </tfoot>
-                    @endif
+@endif
                 </table>
             </div>
 

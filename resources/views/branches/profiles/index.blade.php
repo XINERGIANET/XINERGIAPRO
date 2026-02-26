@@ -215,13 +215,13 @@
                 <table class="w-full min-w-max">
                     <thead>
                         <tr class="text-white">
-                            <th style="background-color: #63B7EC;" class="px-5 py-3 text-center sm:px-6 first:rounded-tl-xl sticky-left-header">
+                            <th style="background-color: #334155;" class="px-5 py-3 text-center sm:px-6 first:rounded-tl-xl sticky-left-header">
                                 <p class="font-semibold text-gray-100 text-theme-xs uppercase">Nombre</p>
                             </th>
-                            <th style="background-color: #63B7EC;" class="px-5 py-3 text-center sm:px-6">
+                            <th style="background-color: #334155;" class="px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-gray-100 text-theme-xs uppercase">Estado</p>
                             </th>
-                            <th style="background-color: #63B7EC;" class="px-5 py-3 text-center sm:px-6 last:rounded-tr-xl">
+                            <th style="background-color: #334155;" class="px-5 py-3 text-center sm:px-6 last:rounded-tr-xl">
                                 <p class="font-semibold text-gray-100 text-theme-xs uppercase">Acciones</p>
                             </th>
                         </tr>

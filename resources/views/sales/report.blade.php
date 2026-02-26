@@ -136,7 +136,7 @@
                                                         <i class="ri-money-dollar-circle-line"></i>
                                                     </x-ui.link-button>
                                                     <span
-                                                        class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50"
+                                                        class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50"
                                                         style="transition-delay: 0.5s;">Cobrar</span>
                                                 </div>
                                             @endif
@@ -149,7 +149,7 @@
                                                     <i class="ri-pencil-line"></i>
                                                 </x-ui.link-button>
                                                 <span
-                                                    class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50"
+                                                    class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50"
                                                     style="transition-delay: 0.5s;">Editar</span>
                                             </div>
                                             <form method="POST"
@@ -170,7 +170,7 @@
                                                     <i class="ri-delete-bin-line"></i>
                                                 </x-ui.button>
                                                 <span
-                                                    class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50"
+                                                    class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50"
                                                     style="transition-delay: 0.5s;">Eliminar</span>
                                             </form>
                                         </div>

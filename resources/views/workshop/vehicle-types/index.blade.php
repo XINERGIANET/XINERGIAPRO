@@ -28,12 +28,12 @@
             <table class="w-full min-w-[720px]">
                 <thead>
                     <tr>
-                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">ID</th>
-                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Tipo</th>
-                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Orden</th>
-                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Estado</th>
-                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Origen</th>
-                        <th style="background-color:#63B7EC" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Acciones</th>
+                        <th style="background-color:#334155" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">ID</th>
+                        <th style="background-color:#334155" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Tipo</th>
+                        <th style="background-color:#334155" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Orden</th>
+                        <th style="background-color:#334155" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Estado</th>
+                        <th style="background-color:#334155" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Origen</th>
+                        <th style="background-color:#334155" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -59,9 +59,9 @@
                                         >
                                             <i class="ri-pencil-line"></i>
                                         </x-ui.button>
-                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
+                                        <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
                                             Editar
-                                            <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                            <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
                                         </span>
                                     </div>
 
@@ -88,9 +88,9 @@
                                         >
                                             <i class="ri-delete-bin-line"></i>
                                         </x-ui.button>
-                                        <span class="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                        <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
                                             Eliminar
-                                            <span class="absolute bottom-full left-1/2 -ml-1 border-4 border-transparent border-b-gray-900"></span>
+                                            <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
                                         </span>
                                     </form>
                                 </div>

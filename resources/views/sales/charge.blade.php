@@ -1335,7 +1335,7 @@
                                     errorMessage = validationErrors || errorMessage;
                                 }
                                 if (r.status >= 500 && (!errorMessage || errorMessage === 'Error al procesar la venta')) {
-                                    errorMessage = 'Ocurri� un error interno al procesar la venta. Por favor, int�ntalo nuevamente en unos minutos.';
+                                    errorMessage = 'Ocurrió un error interno al procesar la venta. Por favor, inténtalo nuevamente en unos minutos.';
                                 }
                                 throw new Error(errorMessage);
                             }
@@ -1344,7 +1344,7 @@
 
                         await r.text();
                         if (!r.ok) {
-                            throw new Error('Ocurri� un error interno al procesar la venta. Por favor, int�ntalo nuevamente en unos minutos.');
+                            throw new Error('Ocurrió un error interno al procesar la venta. Por favor, inténtalo nuevamente en unos minutos.');
                         }
                         throw new Error('Respuesta inesperada del servidor.');
                     })
