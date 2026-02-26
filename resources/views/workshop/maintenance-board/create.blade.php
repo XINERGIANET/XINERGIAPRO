@@ -321,6 +321,14 @@
     syncSignature() {
         if (!this.signatureCanvas) return;
         this.clientSignatureData = this.signatureCanvas.toDataURL('image/png');
+    },
+    damagePreviews: { 0: [], 1: [], 2: [], 3: [] },
+    updateDamagePreviews(index, event) {
+        const files = Array.from(event?.target?.files || []);
+        this.damagePreviews[index] = files.map(file => ({
+            name: file.name,
+            url: URL.createObjectURL(file),
+        }));
     }
 }" x-init="$nextTick(() => { if (selectedVehicleId) { syncVehicle() } initSignaturePad() })">
     <x-common.page-breadcrumb
@@ -516,6 +524,7 @@
                                        accept="image/*"
                                        capture="environment"
                                        multiple
+                                       @change="updateDamagePreviews({{ $idx }}, $event)"
                                        class="hidden">
                                 <button type="button"
                                         @click="$refs.damageCameraInput{{ $idx }}.click()"
@@ -524,6 +533,13 @@
                                     <span>Abrir camara</span>
                                 </button>
                                 <p class="mt-1 text-[11px] text-gray-500">Toma una o varias fotos por cada lado.</p>
+                                <div class="mt-2 flex flex-wrap gap-2" x-show="(damagePreviews[{{ $idx }}] || []).length > 0">
+                                    <template x-for="(preview, pIndex) in (damagePreviews[{{ $idx }}] || [])" :key="`damage-preview-{{ $idx }}-${pIndex}`">
+                                        <a :href="preview.url" target="_blank" class="block h-16 w-16 overflow-hidden rounded border border-gray-200">
+                                            <img :src="preview.url" :alt="preview.name" class="h-full w-full object-cover">
+                                        </a>
+                                    </template>
+                                </div>
                             </div>
                         @endforeach
                     </div>

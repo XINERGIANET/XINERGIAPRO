@@ -132,6 +132,14 @@
                           sync() {
                               if (!this.signatureCanvas) return;
                               this.clientSignatureData = this.signatureCanvas.toDataURL('image/png');
+                          },
+                          damagePreviews: { 0: [], 1: [], 2: [], 3: [] },
+                          updateDamagePreviews(index, event) {
+                              const files = Array.from(event?.target?.files || []);
+                              this.damagePreviews[index] = files.map(file => ({
+                                  name: file.name,
+                                  url: URL.createObjectURL(file),
+                              }));
                           }
                       }"
                       x-init="init()"
@@ -163,6 +171,7 @@
                                        accept="image/*"
                                        capture="environment"
                                        multiple
+                                       @change="updateDamagePreviews({{ $idx }}, $event)"
                                        class="hidden">
                                 <button type="button"
                                         @click="$refs.damageCameraInput{{ $idx }}.click()"
@@ -171,6 +180,13 @@
                                     <span>Abrir camara</span>
                                 </button>
                                 <p class="mt-1 text-[11px] text-gray-500">Toma una o varias fotos por cada lado.</p>
+                                <div class="mt-2 flex flex-wrap gap-2" x-show="(damagePreviews[{{ $idx }}] || []).length > 0">
+                                    <template x-for="(preview, pIndex) in (damagePreviews[{{ $idx }}] || [])" :key="`order-damage-preview-{{ $idx }}-${pIndex}`">
+                                        <a :href="preview.url" target="_blank" class="block h-14 w-14 overflow-hidden rounded border border-gray-200">
+                                            <img :src="preview.url" :alt="preview.name" class="h-full w-full object-cover">
+                                        </a>
+                                    </template>
+                                </div>
                                 @if($existingDamage && $existingDamage->photos->count())
                                     <div class="mt-2 flex flex-wrap gap-2">
                                         @foreach($existingDamage->photos as $photo)
