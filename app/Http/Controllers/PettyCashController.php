@@ -123,11 +123,12 @@ class PettyCashController extends Controller
                 $query->where('cash_register_id', $selectedBoxId);
             })
             ->when($search, function ($query, $search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('person_name', 'ILIKE', "%{$search}%")
-                        ->orWhere('user_name', 'ILIKE', "%{$search}%")
-                        ->orWhere('responsible_name', 'ILIKE', "%{$search}%")
-                        ->orWhere('number', 'ILIKE', "%{$search}%");
+                $needle = mb_strtolower((string) $search, 'UTF-8');
+                $query->where(function ($q) use ($needle) {
+                    $q->whereRaw('LOWER(COALESCE(person_name, \'\')) LIKE ?', ["%{$needle}%"])
+                        ->orWhereRaw('LOWER(COALESCE(user_name, \'\')) LIKE ?', ["%{$needle}%"])
+                        ->orWhereRaw('LOWER(COALESCE(responsible_name, \'\')) LIKE ?', ["%{$needle}%"])
+                        ->orWhereRaw('LOWER(COALESCE(number, \'\')) LIKE ?', ["%{$needle}%"]);
                 });
             })
             ->orderBy('moved_at', 'desc')
@@ -245,7 +246,15 @@ class PettyCashController extends Controller
                 $nextSequence = $lastRecord ? intval($lastRecord->number) + 1 : 1;
                 $generatedNumber = str_pad($nextSequence, 8, '0', STR_PAD_LEFT);
 
-                $totalAmount = collect($request->payments)->sum('amount');
+                $totalAmount = (float) collect($request->payments)->sum('amount');
+                $concept = PaymentConcept::findOrFail((int) $validated['payment_concept_id']);
+                $conceptName = mb_strtolower((string) $concept->description, 'UTF-8');
+                $isClosingConcept = str_contains($conceptName, 'cierre');
+
+                // En cierre se registra automaticamente el efectivo real disponible en caja.
+                if ($isClosingConcept) {
+                    $totalAmount = (float) $this->resolveCurrentCashAmount((int) $cash_register_id, (int) session('branch_id'));
+                }
 
                 $movement = Movement::create([
                     'number'             => $generatedNumber,
@@ -281,7 +290,21 @@ class PettyCashController extends Controller
                     'branch_id'          => session('branch_id'),
                 ]);
 
-                foreach ($request->payments as $paymentData) {
+                $payments = $request->payments;
+                if ($isClosingConcept) {
+                    $payments = [[
+                        'amount' => $totalAmount,
+                        'payment_method_id' => 1,
+                        'payment_method' => 'Efectivo',
+                        'number' => null,
+                        'card_id' => null,
+                        'bank_id' => null,
+                        'digital_wallet_id' => null,
+                        'payment_gateway_id' => null,
+                    ]];
+                }
+
+                foreach ($payments as $paymentData) {
 
                     $cardName = !empty($paymentData['card_id'])
                         ? Card::find($paymentData['card_id'])?->description
@@ -333,9 +356,6 @@ class PettyCashController extends Controller
                 }
 
                 // LÓGICA DE APERTURA / CIERRE
-                $concept = PaymentConcept::find($validated['payment_concept_id']);
-                $conceptName = strtolower($concept->description);
-
                 if (str_contains($conceptName, 'apertura')) {
                     CashShiftRelation::create([
                         'started_at'             => now(),
@@ -346,6 +366,9 @@ class PettyCashController extends Controller
                 } elseif (str_contains($conceptName, 'cierre')) {
                     $openRelation = CashShiftRelation::where('branch_id', session('branch_id'))
                         ->where('status', '1')
+                        ->whereHas('cashMovementStart', function ($query) use ($cash_register_id) {
+                            $query->where('cash_register_id', $cash_register_id);
+                        })
                         ->latest('id')
                         ->first();
 
@@ -544,5 +567,33 @@ class PettyCashController extends Controller
         } catch (\Exception $e) {
             return back()->withErrors(['error' => 'Error al eliminar: ' . $e->getMessage()]);
         }
+    }
+
+    private function resolveCurrentCashAmount(int $cashRegisterId, int $branchId): float
+    {
+        return (float) DB::table('cash_movement_details as cmd')
+            ->join('cash_movements as cm', 'cm.id', '=', 'cmd.cash_movement_id')
+            ->join('movements as m', 'm.id', '=', 'cm.movement_id')
+            ->leftJoin('document_types as dt', 'dt.id', '=', 'm.document_type_id')
+            ->leftJoin('payment_methods as pm', 'pm.id', '=', 'cmd.payment_method_id')
+            ->where('cm.cash_register_id', $cashRegisterId)
+            ->where('m.branch_id', $branchId)
+            ->whereNull('m.deleted_at')
+            ->where(function ($query) {
+                $query->whereRaw("LOWER(COALESCE(pm.description, cmd.payment_method, '')) LIKE '%efectivo%'")
+                    ->orWhereRaw("LOWER(COALESCE(pm.description, cmd.payment_method, '')) LIKE '%cash%'");
+            })
+            ->selectRaw("
+                COALESCE(
+                    SUM(
+                        CASE
+                            WHEN LOWER(COALESCE(dt.name, '')) LIKE '%egreso%' THEN -cmd.amount
+                            ELSE cmd.amount
+                        END
+                    ),
+                    0
+                ) as total
+            ")
+            ->value('total');
     }
 }

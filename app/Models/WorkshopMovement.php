@@ -25,6 +25,7 @@ class WorkshopMovement extends Model
         'tow_in',
         'diagnosis_text',
         'observations',
+        'intake_client_signature_path',
         'status',
         'approval_status',
         'approved_at',

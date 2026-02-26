@@ -399,9 +399,9 @@ class WorkshopFlowService
         });
     }
 
-    public function syncIntakeAndDamages(WorkshopMovement $order, array $inventory, array $damages): void
+    public function syncIntakeAndDamages(WorkshopMovement $order, array $inventory, array $damages, array $meta = []): void
     {
-        DB::transaction(function () use ($order, $inventory, $damages) {
+        DB::transaction(function () use ($order, $inventory, $damages, $meta) {
             $order = WorkshopMovement::query()->lockForUpdate()->findOrFail($order->id);
             $this->assertWorkshopInCurrentBranch($order);
 
@@ -428,16 +428,35 @@ class WorkshopFlowService
             WorkshopPreexistingDamage::query()->where('workshop_movement_id', $order->id)->delete();
             foreach ($damages as $damage) {
                 $description = trim((string) ($damage['description'] ?? ''));
+                $photos = collect($damage['photos'] ?? [])
+                    ->map(fn ($path) => trim((string) $path))
+                    ->filter()
+                    ->values();
                 if ($description === '') {
-                    continue;
+                    if ($photos->isEmpty()) {
+                        continue;
+                    }
+                    $description = '-';
                 }
 
-                WorkshopPreexistingDamage::query()->create([
+                $damageRecord = WorkshopPreexistingDamage::query()->create([
                     'workshop_movement_id' => $order->id,
                     'side' => strtoupper((string) ($damage['side'] ?? 'FRONT')),
                     'description' => $description,
                     'severity' => $damage['severity'] ?? null,
                     'photo_path' => $damage['photo_path'] ?? null,
+                ]);
+
+                foreach ($photos as $photoPath) {
+                    $damageRecord->photos()->create([
+                        'photo_path' => $photoPath,
+                    ]);
+                }
+            }
+
+            if (!empty($meta['intake_client_signature_path'])) {
+                $order->update([
+                    'intake_client_signature_path' => (string) $meta['intake_client_signature_path'],
                 ]);
             }
         });
@@ -2100,4 +2119,3 @@ class WorkshopFlowService
         return (int) ($user?->profile_id ?? 0) === 1 || str_contains($profileName, 'ADMIN');
     }
 }
-

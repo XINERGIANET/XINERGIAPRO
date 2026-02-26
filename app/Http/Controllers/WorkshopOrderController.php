@@ -28,6 +28,7 @@ use App\Services\Workshop\WorkshopFlowService;
 use App\Support\WorkshopAuthorization;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Schema;
 
 class WorkshopOrderController extends Controller
@@ -145,6 +146,7 @@ class WorkshopOrderController extends Controller
             'details.technician',
             'checklists.items',
             'damages',
+            'damages.photos',
             'intakeInventory',
             'sale.details',
             'cash.details',
@@ -289,13 +291,23 @@ class WorkshopOrderController extends Controller
             'damages.*.description' => ['nullable', 'string'],
             'damages.*.severity' => ['nullable', 'in:LOW,MED,HIGH'],
             'damages.*.photo_path' => ['nullable', 'string'],
+            'damages.*.photos' => ['nullable', 'array'],
+            'damages.*.photos.*' => ['nullable', 'image', 'max:6144'],
+            'client_signature_data' => ['nullable', 'string'],
         ]);
 
         try {
+            $branchId = (int) session('branch_id');
+            $damagesWithPhotos = $this->uploadDamagePhotos($request, (array) ($data['damages'] ?? []), $branchId);
+            $signaturePath = $this->storeSignatureFromDataUri((string) ($data['client_signature_data'] ?? ''), $branchId);
+
             $this->flowService->syncIntakeAndDamages(
                 $order,
                 $data['inventory'] ?? [],
-                $data['damages'] ?? []
+                $damagesWithPhotos,
+                [
+                    'intake_client_signature_path' => $signaturePath,
+                ]
             );
         } catch (\Throwable $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
@@ -616,6 +628,59 @@ class WorkshopOrderController extends Controller
         if ($branch && (int) $order->company_id !== (int) $branch->company_id) {
             abort(404);
         }
+    }
+
+    private function uploadDamagePhotos(Request $request, array $damages, int $branchId): array
+    {
+        foreach ($damages as $index => $damage) {
+            $files = $request->file("damages.{$index}.photos", []);
+            if (!is_array($files) || empty($files)) {
+                continue;
+            }
+
+            $paths = [];
+            foreach ($files as $file) {
+                if (!$file) {
+                    continue;
+                }
+                $paths[] = $file->store("workshop/intake/damages/{$branchId}", 'public');
+            }
+
+            if (!empty($paths)) {
+                $damages[$index]['photos'] = $paths;
+                $damages[$index]['photo_path'] = $paths[0];
+            }
+        }
+
+        return $damages;
+    }
+
+    private function storeSignatureFromDataUri(string $signatureData, int $branchId): ?string
+    {
+        $signatureData = trim($signatureData);
+        if ($signatureData === '' || !str_contains($signatureData, 'base64,')) {
+            return null;
+        }
+
+        [$meta, $encoded] = explode('base64,', $signatureData, 2);
+        if (!str_contains($meta, 'image/')) {
+            return null;
+        }
+
+        $binary = base64_decode($encoded, true);
+        if ($binary === false || strlen($binary) < 16) {
+            return null;
+        }
+
+        $extension = 'png';
+        if (str_contains($meta, 'image/jpeg')) {
+            $extension = 'jpg';
+        }
+
+        $path = "workshop/intake/signatures/{$branchId}/sig_" . now()->format('YmdHisv') . '_' . mt_rand(1000, 9999) . ".{$extension}";
+        Storage::disk('public')->put($path, $binary);
+
+        return $path;
     }
 }
 

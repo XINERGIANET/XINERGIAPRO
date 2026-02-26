@@ -131,12 +131,17 @@
             </div>
 
             <form method="GET" class="flex flex-wrap items-center gap-2">
-                <label for="status" class="text-sm font-medium text-slate-700">Filtrar por estado:</label>
+                <input
+                    type="text"
+                    name="search"
+                    value="{{ $search ?? '' }}"
+                    class="h-10 min-w-[260px] rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 focus:border-orange-400 focus:outline-none"
+                    placeholder="Buscar por cliente o vehiculo"
+                >
                 <select
                     id="status"
                     name="status"
                     class="h-10 min-w-[220px] rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 focus:border-orange-400 focus:outline-none"
-                    onchange="this.form.submit()"
                 >
                     <option value="all" @selected(($selectedStatus ?? 'in_progress') === 'all')>Todos</option>
                     <option value="draft" @selected(($selectedStatus ?? 'in_progress') === 'draft')>Borrador</option>
@@ -148,7 +153,10 @@
                     <option value="delivered" @selected(($selectedStatus ?? 'in_progress') === 'delivered')>Entregado</option>
                     <option value="cancelled" @selected(($selectedStatus ?? 'in_progress') === 'cancelled')>Anulado</option>
                 </select>
-                <x-ui.link-button size="sm" variant="outline" href="{{ route('workshop.maintenance-board.index', ['status' => 'in_progress']) }}">
+                <x-ui.button size="sm" variant="primary" type="submit" className="h-10">
+                    <i class="ri-search-line"></i><span>Filtrar</span>
+                </x-ui.button>
+                <x-ui.link-button size="sm" variant="outline" href="{{ route('workshop.maintenance-board.index', ['status' => 'in_progress']) }}" className="h-10">
                     <i class="ri-refresh-line"></i><span>Limpiar</span>
                 </x-ui.link-button>
             </form>

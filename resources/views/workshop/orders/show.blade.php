@@ -83,26 +83,123 @@
 
             <div class="rounded-xl border border-gray-200 bg-white p-4">
                 <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-700">Inspeccion e Inventario</h3>
-                <form method="POST" action="{{ route('workshop.orders.intake.update', $order) }}" class="space-y-3">
+                <form method="POST" action="{{ route('workshop.orders.intake.update', $order) }}" enctype="multipart/form-data" class="space-y-3"
+                      x-data="{
+                          clientSignatureData: '',
+                          signatureCanvas: null,
+                          signatureCtx: null,
+                          isSigning: false,
+                          init() {
+                              this.signatureCanvas = this.$refs.clientSignatureCanvas || null;
+                              if (!this.signatureCanvas) return;
+                              this.signatureCtx = this.signatureCanvas.getContext('2d');
+                              if (!this.signatureCtx) return;
+                              this.signatureCtx.lineWidth = 2;
+                              this.signatureCtx.lineCap = 'round';
+                              this.signatureCtx.strokeStyle = '#111827';
+                          },
+                          point(evt) {
+                              const rect = this.signatureCanvas.getBoundingClientRect();
+                              const src = evt.touches?.[0] ?? evt;
+                              return { x: src.clientX - rect.left, y: src.clientY - rect.top };
+                          },
+                          start(evt) {
+                              if (!this.signatureCtx) return;
+                              evt.preventDefault();
+                              this.isSigning = true;
+                              const p = this.point(evt);
+                              this.signatureCtx.beginPath();
+                              this.signatureCtx.moveTo(p.x, p.y);
+                          },
+                          draw(evt) {
+                              if (!this.isSigning || !this.signatureCtx) return;
+                              evt.preventDefault();
+                              const p = this.point(evt);
+                              this.signatureCtx.lineTo(p.x, p.y);
+                              this.signatureCtx.stroke();
+                          },
+                          stop() {
+                              if (!this.signatureCtx) return;
+                              this.isSigning = false;
+                              this.signatureCtx.closePath();
+                              this.sync();
+                          },
+                          clear() {
+                              if (!this.signatureCtx || !this.signatureCanvas) return;
+                              this.signatureCtx.clearRect(0, 0, this.signatureCanvas.width, this.signatureCanvas.height);
+                              this.clientSignatureData = '';
+                          },
+                          sync() {
+                              if (!this.signatureCanvas) return;
+                              this.clientSignatureData = this.signatureCanvas.toDataURL('image/png');
+                          }
+                      }"
+                      x-init="init()"
+                      @submit="sync()">
                     @csrf
+                    <input type="hidden" name="client_signature_data" x-model="clientSignatureData">
                     <div class="grid grid-cols-2 gap-2 md:grid-cols-5">
                         @foreach(['ESPEJOS','FARO_DELANTERO','LLAVES','BATERIA','DOCUMENTOS'] as $item)
                             <label class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm"><input type="checkbox" name="inventory[{{ $item }}]" value="1" @checked((bool) optional($order->intakeInventory->firstWhere('item_key', $item))->present)>{{ $item }}</label>
                         @endforeach
                     </div>
-                    <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
-                        <select name="damages[0][side]" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
-                            <option value="RIGHT">RIGHT</option>
-                            <option value="LEFT">LEFT</option>
-                            <option value="FRONT">FRONT</option>
-                            <option value="BACK">BACK</option>
-                        </select>
-                        <input name="damages[0][description]" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Descripcion de dano">
-                        <select name="damages[0][severity]" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
-                            <option value="LOW">LOW</option>
-                            <option value="MED">MED</option>
-                            <option value="HIGH">HIGH</option>
-                        </select>
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        @foreach ([0 => ['value' => 'RIGHT', 'label' => 'Lado derecho'], 1 => ['value' => 'LEFT', 'label' => 'Lado izquierdo'], 2 => ['value' => 'FRONT', 'label' => 'Frente'], 3 => ['value' => 'BACK', 'label' => 'Atras']] as $idx => $side)
+                            @php($existingDamage = $order->damages->firstWhere('side', $side['value']))
+                            <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                                <input type="hidden" name="damages[{{ $idx }}][side]" value="{{ $side['value'] }}">
+                                <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-600">{{ $side['label'] }}</p>
+                                <textarea name="damages[{{ $idx }}][description]" rows="2" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Descripcion del dano">{{ $existingDamage->description ?? '' }}</textarea>
+                                <select name="damages[{{ $idx }}][severity]" class="mt-2 h-10 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                                    <option value="">Severidad</option>
+                                    <option value="LOW" @selected(($existingDamage->severity ?? '') === 'LOW')>Baja</option>
+                                    <option value="MED" @selected(($existingDamage->severity ?? '') === 'MED')>Media</option>
+                                    <option value="HIGH" @selected(($existingDamage->severity ?? '') === 'HIGH')>Alta</option>
+                                </select>
+                                <label class="mt-2 block text-xs font-medium text-gray-700">Evidencia fotografica (camara)</label>
+                                <input type="file"
+                                       x-ref="damageCameraInput{{ $idx }}"
+                                       name="damages[{{ $idx }}][photos][]"
+                                       accept="image/*"
+                                       capture="environment"
+                                       multiple
+                                       class="hidden">
+                                <button type="button"
+                                        @click="$refs.damageCameraInput{{ $idx }}.click()"
+                                        class="mt-2 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700">
+                                    <i class="ri-camera-line"></i>
+                                    <span>Abrir camara</span>
+                                </button>
+                                <p class="mt-1 text-[11px] text-gray-500">Toma una o varias fotos por cada lado.</p>
+                                @if($existingDamage && $existingDamage->photos->count())
+                                    <div class="mt-2 flex flex-wrap gap-2">
+                                        @foreach($existingDamage->photos as $photo)
+                                            <a href="{{ asset('storage/' . $photo->photo_path) }}" target="_blank" class="block h-14 w-14 overflow-hidden rounded border border-gray-200">
+                                                <img src="{{ asset('storage/' . $photo->photo_path) }}" alt="Foto dano" class="h-full w-full object-cover">
+                                            </a>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                    <div class="rounded-lg border border-gray-200 bg-white p-3">
+                        <div class="mb-2 flex items-center justify-between">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-600">Firma cliente</p>
+                            <button type="button" @click="clear()" class="rounded border border-gray-200 px-2 py-1 text-xs">Limpiar</button>
+                        </div>
+                        <canvas x-ref="clientSignatureCanvas" width="700" height="180"
+                                @mousedown="start($event)" @mousemove="draw($event)" @mouseup="stop()" @mouseleave="stop()"
+                                @touchstart.prevent="start($event)" @touchmove.prevent="draw($event)" @touchend="stop()"
+                                class="w-full rounded border border-dashed border-gray-300"></canvas>
+                        @if($order->intake_client_signature_path)
+                            <div class="mt-2">
+                                <p class="mb-1 text-xs text-gray-500">Firma actual</p>
+                                <a href="{{ asset('storage/' . $order->intake_client_signature_path) }}" target="_blank" class="inline-block rounded border border-gray-200">
+                                    <img src="{{ asset('storage/' . $order->intake_client_signature_path) }}" alt="Firma cliente" class="h-16 object-contain">
+                                </a>
+                            </div>
+                        @endif
                     </div>
                     <button class="rounded-lg bg-slate-700 px-3 py-2 text-xs font-semibold text-white">Guardar inspeccion</button>
                 </form>

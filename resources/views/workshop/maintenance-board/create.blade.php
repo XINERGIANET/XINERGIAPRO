@@ -270,8 +270,59 @@
         } finally {
             this.creatingClientLoading = false;
         }
+    },
+    clientSignatureData: '',
+    signatureCanvas: null,
+    signatureCtx: null,
+    isSigning: false,
+    initSignaturePad() {
+        this.signatureCanvas = this.$refs.clientSignatureCanvas || null;
+        if (!this.signatureCanvas) return;
+        this.signatureCtx = this.signatureCanvas.getContext('2d');
+        if (!this.signatureCtx) return;
+        this.signatureCtx.lineWidth = 2;
+        this.signatureCtx.lineCap = 'round';
+        this.signatureCtx.strokeStyle = '#111827';
+    },
+    signaturePoint(evt) {
+        const rect = this.signatureCanvas.getBoundingClientRect();
+        const source = evt.touches?.[0] ?? evt;
+        return {
+            x: source.clientX - rect.left,
+            y: source.clientY - rect.top,
+        };
+    },
+    startSignature(evt) {
+        if (!this.signatureCtx) return;
+        evt.preventDefault();
+        this.isSigning = true;
+        const point = this.signaturePoint(evt);
+        this.signatureCtx.beginPath();
+        this.signatureCtx.moveTo(point.x, point.y);
+    },
+    drawSignature(evt) {
+        if (!this.isSigning || !this.signatureCtx) return;
+        evt.preventDefault();
+        const point = this.signaturePoint(evt);
+        this.signatureCtx.lineTo(point.x, point.y);
+        this.signatureCtx.stroke();
+    },
+    stopSignature() {
+        if (!this.signatureCtx) return;
+        this.isSigning = false;
+        this.signatureCtx.closePath();
+        this.syncSignature();
+    },
+    clearSignature() {
+        if (!this.signatureCtx || !this.signatureCanvas) return;
+        this.signatureCtx.clearRect(0, 0, this.signatureCanvas.width, this.signatureCanvas.height);
+        this.clientSignatureData = '';
+    },
+    syncSignature() {
+        if (!this.signatureCanvas) return;
+        this.clientSignatureData = this.signatureCanvas.toDataURL('image/png');
     }
-}" x-init="if (selectedVehicleId) { syncVehicle() }">
+}" x-init="$nextTick(() => { if (selectedVehicleId) { syncVehicle() } initSignaturePad() })">
     <x-common.page-breadcrumb
         pageTitle="Nuevo Ingreso a Mantenimiento"
         :crumbs="[
@@ -290,9 +341,10 @@
 
    
 
-        <form method="POST" action="{{ route('workshop.maintenance-board.store') }}" class="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <form method="POST" action="{{ route('workshop.maintenance-board.store') }}" enctype="multipart/form-data" @submit="syncSignature()" class="grid grid-cols-1 gap-3 md:grid-cols-3">
             @csrf
             <input type="hidden" name="client_person_id" x-model="selectedClientId">
+            <input type="hidden" name="client_signature_data" x-model="clientSignatureData">
                 <div x-show="creatingVehicle" x-cloak class="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 md:col-span-3">
                 <div class="mb-3 flex items-center justify-between">
                     <h4 class="text-sm font-semibold text-indigo-800">Registrar vehiculo rapido</h4>
@@ -306,7 +358,7 @@
                         <div class="flex items-center gap-2">
                             <select x-model="quickVehicle.client_person_id" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm">
                                 <template x-for="client in clientsList" :key="`quick-client-${client.id}`">
-                                    <option :value="client.id" x-text="`${client.first_name} ${client.last_name}`"></option>
+                                    <option :value="client.id" x-text="`${client.first_name || ''} ${client.last_name || ''}`.trim() || `Cliente #${client.id}`"></option>
                                 </template>
                             </select>
                             <button class="inline-flex items-center justify-center font-medium gap-2 rounded-xl transition px-5 py-3.5 text-sm bg-brand-500 text-white shadow-theme-xs hover:bg-brand-600 disabled:bg-brand-300"
@@ -348,7 +400,7 @@
             <div class="md:col-span-1">
                 <div class="relative flex items-center gap-2">
                     <input type="hidden" name="vehicle_id" x-model="selectedVehicleId" required>
-                    <div class="relative w-full">
+                    <div class="relative w-full" @click.outside="closeVehicleDropdown()">
                         <input
                             x-model="vehicleSearch"
                             @focus="vehicleDropdownOpen = true"
@@ -457,9 +509,45 @@
                                     <option value="MED">Media</option>
                                     <option value="HIGH">Alta</option>
                                 </select>
+                                <label class="mt-2 block text-xs font-medium text-gray-700">Evidencia fotografica (camara)</label>
+                                <input type="file"
+                                       x-ref="damageCameraInput{{ $idx }}"
+                                       name="damages[{{ $idx }}][photos][]"
+                                       accept="image/*"
+                                       capture="environment"
+                                       multiple
+                                       class="hidden">
+                                <button type="button"
+                                        @click="$refs.damageCameraInput{{ $idx }}.click()"
+                                        class="mt-2 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700">
+                                    <i class="ri-camera-line"></i>
+                                    <span>Abrir camara</span>
+                                </button>
+                                <p class="mt-1 text-[11px] text-gray-500">Toma una o varias fotos por cada lado.</p>
                             </div>
                         @endforeach
                     </div>
+                </div>
+
+                <div class="mt-4 rounded-lg border border-gray-200 bg-white p-3">
+                    <div class="mb-2 flex items-center justify-between">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-600">Firma del cliente</p>
+                        <button type="button" @click="clearSignature()" class="rounded-md border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50">Limpiar firma</button>
+                    </div>
+                    <canvas
+                        x-ref="clientSignatureCanvas"
+                        width="700"
+                        height="180"
+                        @mousedown="startSignature($event)"
+                        @mousemove="drawSignature($event)"
+                        @mouseup="stopSignature()"
+                        @mouseleave="stopSignature()"
+                        @touchstart.prevent="startSignature($event)"
+                        @touchmove.prevent="drawSignature($event)"
+                        @touchend="stopSignature()"
+                        class="w-full rounded-lg border border-dashed border-gray-300 bg-white"
+                    ></canvas>
+                    <p class="mt-1 text-[11px] text-gray-500">Conformidad de ingreso del vehiculo.</p>
                 </div>
             </div>
 

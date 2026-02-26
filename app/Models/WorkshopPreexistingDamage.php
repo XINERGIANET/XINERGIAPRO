@@ -22,5 +22,10 @@ class WorkshopPreexistingDamage extends Model
     {
         return $this->belongsTo(WorkshopMovement::class);
     }
+
+    public function photos()
+    {
+        return $this->hasMany(WorkshopPreexistingDamagePhoto::class, 'workshop_preexisting_damage_id');
+    }
 }
 

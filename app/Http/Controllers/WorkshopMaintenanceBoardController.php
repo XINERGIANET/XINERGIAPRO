@@ -19,6 +19,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class WorkshopMaintenanceBoardController extends Controller
@@ -48,6 +49,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'cancelled',
         ];
         $selectedStatus = (string) $request->query('status', 'in_progress');
+        $search = trim((string) $request->query('search', ''));
         if ($selectedStatus !== 'all' && !in_array($selectedStatus, $allowedStatuses, true)) {
             $selectedStatus = 'in_progress';
         }
@@ -62,6 +64,22 @@ class WorkshopMaintenanceBoardController extends Controller
             ], 'total')
             ->where('company_id', $companyId)
             ->where('branch_id', $branchId)
+            ->when($search !== '', function ($query) use ($search) {
+                $needle = mb_strtolower($search, 'UTF-8');
+                $query->where(function ($inner) use ($needle) {
+                    $inner->whereHas('client', function ($clientQuery) use ($needle) {
+                        $clientQuery
+                            ->whereRaw('LOWER(COALESCE(first_name, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(last_name, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(document_number, \'\')) LIKE ?', ["%{$needle}%"]);
+                    })->orWhereHas('vehicle', function ($vehicleQuery) use ($needle) {
+                        $vehicleQuery
+                            ->whereRaw('LOWER(COALESCE(brand, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(model, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(plate, \'\')) LIKE ?', ["%{$needle}%"]);
+                    });
+                });
+            })
             ->when(
                 $selectedStatus !== 'all',
                 fn ($query) => $query->where('status', $selectedStatus),
@@ -76,7 +94,8 @@ class WorkshopMaintenanceBoardController extends Controller
 
         return view('workshop.maintenance-board.index', compact(
             'cards',
-            'selectedStatus'
+            'selectedStatus',
+            'search'
         ) + $formData);
     }
 
@@ -234,6 +253,9 @@ class WorkshopMaintenanceBoardController extends Controller
             'damages.*.side' => ['nullable', 'in:RIGHT,LEFT,FRONT,BACK'],
             'damages.*.description' => ['nullable', 'string'],
             'damages.*.severity' => ['nullable', 'in:LOW,MED,HIGH'],
+            'damages.*.photos' => ['nullable', 'array'],
+            'damages.*.photos.*' => ['nullable', 'image', 'max:6144'],
+            'client_signature_data' => ['nullable', 'string'],
             'service_lines' => ['nullable', 'array'],
             'service_lines.*.service_id' => ['required_with:service_lines', 'integer', 'exists:workshop_services,id'],
             'service_lines.*.qty' => ['required_with:service_lines', 'numeric', 'gt:0'],
@@ -285,6 +307,9 @@ class WorkshopMaintenanceBoardController extends Controller
 
         $user = auth()->user();
         try {
+            $damagesWithPhotos = $this->uploadDamagePhotos($request, (array) ($validated['damages'] ?? []), $branchId);
+            $signaturePath = $this->storeSignatureFromDataUri((string) ($validated['client_signature_data'] ?? ''), $branchId);
+
             $workshop = $this->flowService->createOrder([
                 'vehicle_id' => (int) $validated['vehicle_id'],
                 'client_person_id' => $clientPersonId,
@@ -300,7 +325,10 @@ class WorkshopMaintenanceBoardController extends Controller
             $this->flowService->syncIntakeAndDamages(
                 $workshop,
                 (array) ($validated['inventory'] ?? []),
-                (array) ($validated['damages'] ?? [])
+                $damagesWithPhotos,
+                [
+                    'intake_client_signature_path' => $signaturePath,
+                ]
             );
 
             $serviceCatalog = WorkshopService::query()
@@ -626,5 +654,58 @@ class WorkshopMaintenanceBoardController extends Controller
         $branch = Branch::query()->findOrFail($branchId);
 
         return [$branchId, (int) $branch->company_id];
+    }
+
+    private function uploadDamagePhotos(Request $request, array $damages, int $branchId): array
+    {
+        foreach ($damages as $index => $damage) {
+            $files = $request->file("damages.{$index}.photos", []);
+            if (!is_array($files) || empty($files)) {
+                continue;
+            }
+
+            $paths = [];
+            foreach ($files as $file) {
+                if (!$file) {
+                    continue;
+                }
+                $paths[] = $file->store("workshop/intake/damages/{$branchId}", 'public');
+            }
+
+            if (!empty($paths)) {
+                $damages[$index]['photos'] = $paths;
+                $damages[$index]['photo_path'] = $paths[0];
+            }
+        }
+
+        return $damages;
+    }
+
+    private function storeSignatureFromDataUri(string $signatureData, int $branchId): ?string
+    {
+        $signatureData = trim($signatureData);
+        if ($signatureData === '' || !str_contains($signatureData, 'base64,')) {
+            return null;
+        }
+
+        [$meta, $encoded] = explode('base64,', $signatureData, 2);
+        if (!str_contains($meta, 'image/')) {
+            return null;
+        }
+
+        $binary = base64_decode($encoded, true);
+        if ($binary === false || strlen($binary) < 16) {
+            return null;
+        }
+
+        $extension = 'png';
+        if (str_contains($meta, 'image/jpeg')) {
+            $extension = 'jpg';
+        }
+
+        $path = "workshop/intake/signatures/{$branchId}/sig_" . now()->format('YmdHisv') . '_' . mt_rand(1000, 9999) . ".{$extension}";
+        Storage::disk('public')->put($path, $binary);
+
+        return $path;
     }
 }
