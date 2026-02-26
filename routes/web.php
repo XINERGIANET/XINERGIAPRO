@@ -24,6 +24,7 @@ use App\Http\Controllers\PaymentConceptController;
 use App\Http\Controllers\PaymentGatewaysController;
 use App\Http\Controllers\PaymentMethodController;
 use App\Http\Controllers\ProductBranchController;
+use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\ViewsController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\TaxRateController;
@@ -127,6 +128,10 @@ Route::middleware('auth')->group(function () {
     Route::resource('/admin/ventas', SalesController::class)
         ->names('admin.sales')
         ->parameters(['ventas' => 'sale'])
+        ->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
+    Route::resource('/admin/compras', PurchaseController::class)
+        ->names('admin.purchases')
+        ->parameters(['compras' => 'purchase'])
         ->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
     Route::get('/admin/ventas/{sale}/imprimir/pdf', [SalesController::class, 'printPdf'])->name('admin.sales.print.pdf');
     Route::get('/admin/ventas/{sale}/imprimir/ticket', [SalesController::class, 'printTicket'])->name('admin.sales.print.ticket');
