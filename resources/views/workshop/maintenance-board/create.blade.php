@@ -61,7 +61,8 @@
     branchDepartmentName: @js($selectedDepartmentName ?? ''),
     branchProvinceName: @js($selectedProvinceName ?? ''),
     branchDistrictName: @js($selectedDistrictName ?? ''),
-    serviceLines: [{ service_id: '', qty: 1, unit_price: 0 }],
+    selectedServiceIds: @js(collect(old('service_lines', []))->pluck('service_id')->filter()->map(fn($id) => (string) $id)->values()),
+    serviceLines: [],
     syncVehicle() {
         const selected = this.vehicles.find(v => String(v.id) === String(this.selectedVehicleId));
         if (!selected) return;
@@ -96,20 +97,30 @@
     closeVehicleDropdown() {
         this.vehicleDropdownOpen = false;
     },
-    addServiceLine() {
-        this.serviceLines.push({ service_id: '', qty: 1, unit_price: 0 });
+    isServiceSelected(serviceId) {
+        return this.selectedServiceIds.includes(String(serviceId));
     },
-    removeServiceLine(index) {
-        if (this.serviceLines.length === 1) {
-            this.serviceLines = [{ service_id: '', qty: 1, unit_price: 0 }];
-            return;
+    toggleService(serviceId) {
+        const id = String(serviceId);
+        if (this.isServiceSelected(id)) {
+            this.selectedServiceIds = this.selectedServiceIds.filter(item => item !== id);
+        } else {
+            this.selectedServiceIds.push(id);
         }
-        this.serviceLines.splice(index, 1);
+        this.syncServiceLinesFromSelection();
     },
-    onServiceChange(index) {
-        const service = this.servicesCatalog.find(s => String(s.id) === String(this.serviceLines[index].service_id));
-        if (!service) return;
-        this.serviceLines[index].unit_price = Number(service.base_price || 0);
+    syncServiceLinesFromSelection() {
+        this.serviceLines = this.selectedServiceIds
+            .map(id => {
+                const service = this.servicesCatalog.find(s => String(s.id) === String(id));
+                if (!service) return null;
+                return {
+                    service_id: String(service.id),
+                    qty: 1,
+                    unit_price: Number(service.base_price || 0),
+                };
+            })
+            .filter(Boolean);
     },
     lineSubtotal(line) {
         const qty = Number(line.qty || 0);
@@ -353,7 +364,7 @@
             url: URL.createObjectURL(file),
         }));
     }
-}" x-init="$nextTick(() => { if (selectedVehicleId) { syncVehicle() } initSignaturePad() })">
+}" x-init="$nextTick(() => { if (selectedVehicleId) { syncVehicle() } initSignaturePad(); syncServiceLinesFromSelection(); })">
     <x-common.page-breadcrumb
         pageTitle="Nuevo Ingreso a Mantenimiento"
         :crumbs="[
@@ -592,34 +603,33 @@
 
             <div class="rounded-xl border border-gray-200 bg-gray-50/50 p-4 md:col-span-3">
                 <div class="mb-3 flex items-center justify-between">
-                    <h4 class="text-sm font-semibold text-gray-800">Servicios a realizar</h4>
-                    <button type="button" @click="addServiceLine()" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white">Agregar servicio</button>
+                    <h4 class="text-sm font-semibold uppercase tracking-wide text-gray-800">Trabajo a realizar</h4>
+                    <span class="rounded-full bg-gray-200 px-3 py-1 text-xs font-semibold text-gray-700" x-text="`${selectedServiceIds.length} seleccionado(s)`"></span>
                 </div>
-                <template x-for="(line, index) in serviceLines" :key="index">
-                    <div class="mb-2 grid grid-cols-1 gap-2 md:grid-cols-12">
-                        <div class="md:col-span-6">
-                            <select :name="`service_lines[${index}][service_id]`" x-model="line.service_id" @change="onServiceChange(index)" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
-                                <option value="">Selecciona servicio</option>
-                                <template x-for="service in servicesCatalog" :key="service.id">
-                                    <option :value="service.id" x-text="`${service.name} (${service.type})`"></option>
-                                </template>
-                            </select>
-                        </div>
-                        <div class="md:col-span-2">
-                            <input type="number" step="0.01" min="0.01" :name="`service_lines[${index}][qty]`" x-model="line.qty" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Cant.">
-                        </div>
-                        <div class="md:col-span-3">
-                            <input type="number" step="0.01" min="0" :name="`service_lines[${index}][unit_price]`" x-model="line.unit_price" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Precio">
-                        </div>
-                        <div class="md:col-span-1">
-                            <button type="button" @click="removeServiceLine(index)" class="h-11 w-full rounded-lg bg-red-600 text-white">X</button>
-                        </div>
-                        <div class="md:col-span-12 text-right text-xs text-gray-600">
-                            Subtotal linea: S/ <span x-text="lineSubtotal(line).toFixed(2)"></span>
-                        </div>
+
+                <div class="grid grid-cols-1 gap-x-6 gap-y-2 md:grid-cols-3">
+                    <template x-for="service in servicesCatalog" :key="`service-check-${service.id}`">
+                        <label class="inline-flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 hover:border-indigo-300">
+                            <span class="truncate" x-text="service.name"></span>
+                            <input
+                                type="checkbox"
+                                :checked="isServiceSelected(service.id)"
+                                @change="toggleService(service.id)"
+                                class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                            >
+                        </label>
+                    </template>
+                </div>
+
+                <template x-for="(line, index) in serviceLines" :key="`line-hidden-${index}`">
+                    <div>
+                        <input type="hidden" :name="`service_lines[${index}][service_id]`" :value="line.service_id">
+                        <input type="hidden" :name="`service_lines[${index}][qty]`" :value="line.qty">
+                        <input type="hidden" :name="`service_lines[${index}][unit_price]`" :value="line.unit_price">
                     </div>
                 </template>
-                <div class="mt-2 border-t border-gray-200 pt-2 text-right text-sm font-semibold text-gray-800">
+
+                <div class="mt-3 border-t border-gray-200 pt-2 text-right text-sm font-semibold text-gray-800">
                     Total estimado: S/ <span x-text="estimatedTotal().toFixed(2)"></span>
                 </div>
             </div>

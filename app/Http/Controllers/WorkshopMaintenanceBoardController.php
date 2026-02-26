@@ -8,6 +8,7 @@ use App\Models\DocumentType;
 use App\Models\Location;
 use App\Models\PaymentMethod;
 use App\Models\Person;
+use App\Models\ProductBranch;
 use App\Models\Vehicle;
 use App\Models\VehicleType;
 use App\Models\WorkshopMovement;
@@ -55,7 +56,16 @@ class WorkshopMaintenanceBoardController extends Controller
         }
 
         $cards = WorkshopMovement::query()
-            ->with(['movement', 'vehicle', 'client'])
+            ->with([
+                'movement',
+                'vehicle',
+                'client',
+                'details' => fn ($query) => $query
+                    ->where('line_type', 'SERVICE')
+                    ->whereNull('deleted_at')
+                    ->orderBy('id'),
+                'details.service:id,name,type,base_price',
+            ])
             ->withCount([
                 'details as pending_billing_count' => fn ($query) => $query->whereNull('sales_movement_id'),
             ])
@@ -179,6 +189,30 @@ class WorkshopMaintenanceBoardController extends Controller
             ->orderBy('order_num')
             ->get(['id', 'description']);
 
+        $products = ProductBranch::query()
+            ->join('products', 'products.id', '=', 'product_branch.product_id')
+            ->where('product_branch.branch_id', $branchId)
+            ->whereNull('product_branch.deleted_at')
+            ->whereNull('products.deleted_at')
+            ->orderBy('products.description')
+            ->get([
+                'product_branch.product_id',
+                'product_branch.price',
+                'product_branch.stock',
+                'product_branch.tax_rate_id',
+                'products.code',
+                'products.description',
+            ])
+            ->map(fn ($row) => [
+                'id' => (int) $row->product_id,
+                'code' => (string) ($row->code ?? ''),
+                'description' => (string) ($row->description ?? ''),
+                'price' => (float) ($row->price ?? 0),
+                'stock' => (float) ($row->stock ?? 0),
+                'tax_rate_id' => $row->tax_rate_id ? (int) $row->tax_rate_id : null,
+            ])
+            ->values();
+
         $departments = Location::query()
             ->where('type', 'department')
             ->orderBy('name')
@@ -224,6 +258,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'documentTypes',
             'cashRegisters',
             'paymentMethods',
+            'products',
             'departments',
             'provinces',
             'districts',
@@ -318,8 +353,8 @@ class WorkshopMaintenanceBoardController extends Controller
                 'tow_in' => (bool) ($validated['tow_in'] ?? false),
                 'diagnosis_text' => $validated['diagnosis_text'] ?? null,
                 'observations' => $validated['observations'] ?? null,
-                'status' => 'in_progress',
-                'comment' => 'OS iniciada desde tablero de mantenimiento',
+                'status' => 'awaiting_approval',
+                'comment' => 'OS creada desde tablero y enviada a espera de aprobación',
             ], $branchId, (int) $user?->id, (string) ($user?->name ?? 'Sistema'));
 
             $this->flowService->syncIntakeAndDamages(
@@ -359,7 +394,80 @@ class WorkshopMaintenanceBoardController extends Controller
 
         return redirect()
             ->route('workshop.maintenance-board.index')
-            ->with('status', 'Servicio de mantenimiento iniciado correctamente.');
+            ->with('status', 'Servicio registrado y enviado a espera de aprobación.');
+    }
+
+    public function quotation(Request $request, WorkshopMovement $order): RedirectResponse
+    {
+        $this->assertOrderScope($order);
+
+        $validated = $request->validate([
+            'quote_lines' => ['required', 'array', 'min:1'],
+            'quote_lines.*.detail_id' => ['required', 'integer', 'exists:workshop_movement_details,id'],
+            'quote_lines.*.qty' => ['required', 'numeric', 'gt:0'],
+            'quote_lines.*.unit_price' => ['required', 'numeric', 'gte:0'],
+            'quote_note' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $branchId = (int) session('branch_id');
+        $user = auth()->user();
+
+        try {
+            DB::transaction(function () use ($order, $validated, $branchId, $user) {
+                $lockedOrder = WorkshopMovement::query()
+                    ->where('id', $order->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                $editableStatuses = ['awaiting_approval', 'approved', 'in_progress'];
+                if (!in_array((string) $lockedOrder->status, $editableStatuses, true)) {
+                    throw new \RuntimeException('La cotizacion solo se puede editar en espera de aprobacion, aprobado o en reparacion.');
+                }
+
+                $detailsById = $lockedOrder->details()
+                    ->where('line_type', 'SERVICE')
+                    ->whereNull('sales_movement_id')
+                    ->get()
+                    ->keyBy('id');
+
+                foreach ((array) $validated['quote_lines'] as $line) {
+                    $detailId = (int) $line['detail_id'];
+                    $detail = $detailsById->get($detailId);
+                    if (!$detail) {
+                        throw new \RuntimeException('Uno de los servicios ya no esta disponible para cotizacion.');
+                    }
+
+                    $this->flowService->updateDetail(
+                        $detail,
+                        [
+                            'qty' => (float) $line['qty'],
+                            'unit_price' => (float) $line['unit_price'],
+                        ],
+                        $branchId,
+                        (int) ($user?->id ?? 0),
+                        (string) ($user?->name ?? 'Sistema')
+                    );
+                }
+
+                if ((string) $lockedOrder->status === 'awaiting_approval' && !empty($validated['quote_note'])) {
+                    $this->flowService->updateOrder($lockedOrder, [
+                        'observations' => trim(((string) $lockedOrder->observations . "\n" . '[Cotizacion] ' . (string) $validated['quote_note'])),
+                    ]);
+                }
+
+                // Al aprobar cotización desde tablero, la OS pasa a estado aprobado.
+                if ((string) $lockedOrder->status === 'awaiting_approval') {
+                    $this->flowService->updateOrder($lockedOrder, [
+                        'status' => 'approved',
+                        'comment' => 'Cotizacion aprobada desde tablero',
+                    ]);
+                }
+            });
+        } catch (\Throwable $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+
+        return back()->with('status', 'Cotización aprobada correctamente.');
     }
 
     public function storeVehicleQuick(Request $request): JsonResponse
@@ -582,6 +690,10 @@ class WorkshopMaintenanceBoardController extends Controller
             'payment_methods.*.bank_id' => ['nullable', 'integer', 'exists:banks,id'],
             'payment_methods.*.digital_wallet_id' => ['nullable', 'integer', 'exists:digital_wallets,id'],
             'payment_comment' => ['nullable', 'string'],
+            'product_lines' => ['nullable', 'array'],
+            'product_lines.*.product_id' => ['required_with:product_lines', 'integer', 'exists:products,id'],
+            'product_lines.*.qty' => ['required_with:product_lines', 'numeric', 'gt:0'],
+            'product_lines.*.unit_price' => ['required_with:product_lines', 'numeric', 'gte:0'],
         ]);
 
         $user = auth()->user();
@@ -593,6 +705,45 @@ class WorkshopMaintenanceBoardController extends Controller
                     ->where('id', $order->id)
                     ->lockForUpdate()
                     ->firstOrFail();
+
+                if ((string) $lockedOrder->status !== 'finished') {
+                    throw new \RuntimeException('Solo se puede registrar venta y cobro cuando la OS esta terminada.');
+                }
+
+                $productLines = collect($validated['product_lines'] ?? [])
+                    ->filter(fn ($line) => !empty($line['product_id']))
+                    ->values();
+
+                if ($productLines->isNotEmpty()) {
+                    $productBranchIndex = ProductBranch::query()
+                        ->where('branch_id', $branchId)
+                        ->whereIn('product_id', $productLines->pluck('product_id')->map(fn ($v) => (int) $v)->all())
+                        ->whereNull('deleted_at')
+                        ->get(['product_id', 'tax_rate_id'])
+                        ->keyBy('product_id');
+
+                    foreach ($productLines as $line) {
+                        $productId = (int) $line['product_id'];
+                        $productBranch = $productBranchIndex->get($productId);
+                        if (!$productBranch) {
+                            throw new \RuntimeException('Uno de los productos no pertenece a la sucursal actual.');
+                        }
+
+                        $product = \App\Models\Product::query()->find($productId);
+                        if (!$product) {
+                            throw new \RuntimeException('No se encontro uno de los productos seleccionados.');
+                        }
+
+                        $this->flowService->addDetail($lockedOrder, [
+                            'line_type' => 'PART',
+                            'product_id' => $productId,
+                            'description' => (string) ($product->description ?? ('Producto #' . $productId)),
+                            'qty' => (float) $line['qty'],
+                            'unit_price' => (float) $line['unit_price'],
+                            'tax_rate_id' => $productBranch->tax_rate_id ? (int) $productBranch->tax_rate_id : null,
+                        ]);
+                    }
+                }
 
                 $pendingLines = (int) $lockedOrder->details()
                     ->whereNull('sales_movement_id')
@@ -632,12 +783,19 @@ class WorkshopMaintenanceBoardController extends Controller
                     (string) ($user?->name ?? 'Sistema'),
                     $validated['payment_comment'] ?? ($validated['sale_comment'] ?? null)
                 );
+
+                $afterPayment = WorkshopMovement::query()->findOrFail($lockedOrder->id);
+                $this->flowService->updateOrder($afterPayment, [
+                    'status' => 'delivered',
+                    'delivery_date' => now()->format('Y-m-d H:i:s'),
+                    'comment' => 'Entrega automatica al registrar venta y cobro desde tablero',
+                ]);
             });
         } catch (\Throwable $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
         }
 
-        return back()->with('status', 'Venta y cobro registrados correctamente desde el tablero.');
+        return back()->with('status', 'Venta y cobro registrados. La OS fue entregada automaticamente.');
     }
 
     private function assertOrderScope(WorkshopMovement $order): void

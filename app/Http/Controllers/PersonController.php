@@ -89,28 +89,88 @@ class PersonController extends Controller
             'operaciones' => $operaciones,
         ] + $this->getLocationData(null, $branch->location_id));
     }
-        public function apiReniec(Request $request)
+    public function apiReniec(Request $request)
     {
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . config('apireniec.token')
-        ])->get(config('apireniec.url'), [
-            'numero' => $request->dni
+        $dni = (string) $request->query('dni', '');
+        if (!preg_match('/^\d{8}$/', $dni)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'DNI invalido.',
+            ], 422);
+        }
+
+        $response = Http::timeout(15)->get((string) config('apireniec.url'), [
+            'document' => $dni,
+            'key' => (string) config('apireniec.key'),
         ]);
 
-        $data = $response->json();
-
-        if ($response->successful()) {
-
+        if (!$response->successful()) {
             return response()->json([
-                'status' => true,
-                'name' => $data['nombres'] . ' ' . $data['apellidoPaterno'] . ' ' . $data['apellidoMaterno']
-            ]);
-        } else {
-
-            return response()->json([
-                'status' => false
-            ]);
+                'status' => false,
+                'message' => 'No se pudo consultar RENIEC.',
+            ], 422);
         }
+
+        $data = (array) $response->json();
+        $estado = (bool) ($data['estado'] ?? $data['status'] ?? false);
+        $resultado = (array) ($data['resultado'] ?? []);
+        $mensaje = (string) ($data['mensaje'] ?? $data['message'] ?? '');
+
+        if (!$estado || empty($resultado)) {
+            return response()->json([
+                'status' => false,
+                'message' => $mensaje !== '' ? $mensaje : 'No se encontro informacion en RENIEC.',
+            ], 422);
+        }
+
+        $id = (string) ($resultado['id'] ?? $dni);
+        $nombres = trim((string) ($resultado['nombres'] ?? ''));
+        $apellidoPaterno = trim((string) ($resultado['apellido_paterno'] ?? ($resultado['apellidoPaterno'] ?? '')));
+        $apellidoMaterno = trim((string) ($resultado['apellido_materno'] ?? ($resultado['apellidoMaterno'] ?? '')));
+        $codigoVerificacion = trim((string) ($resultado['codigo_verificacion'] ?? ($resultado['codigoVerificacion'] ?? '')));
+
+        // Si el proveedor no separa nombres/apellidos, separamos desde "name".
+        if ($nombres === '' && $apellidoPaterno === '' && $apellidoMaterno === '') {
+            $full = trim((string) ($resultado['nombre_completo'] ?? ($resultado['name'] ?? '')));
+            if ($full !== '') {
+                $parts = preg_split('/\s+/', $full) ?: [];
+                if (count($parts) >= 4) {
+                    $nombres = trim(implode(' ', array_slice($parts, 0, count($parts) - 2)));
+                    $apellidoPaterno = (string) ($parts[count($parts) - 2] ?? '');
+                    $apellidoMaterno = (string) ($parts[count($parts) - 1] ?? '');
+                } elseif (count($parts) === 3) {
+                    $nombres = (string) ($parts[0] ?? '');
+                    $apellidoPaterno = (string) ($parts[1] ?? '');
+                    $apellidoMaterno = (string) ($parts[2] ?? '');
+                } elseif (count($parts) === 2) {
+                    $nombres = (string) ($parts[0] ?? '');
+                    $apellidoPaterno = (string) ($parts[1] ?? '');
+                } elseif (count($parts) === 1) {
+                    $nombres = (string) ($parts[0] ?? '');
+                }
+            }
+        }
+
+        $nombreCompleto = trim(implode(' ', array_filter([$nombres, $apellidoPaterno, $apellidoMaterno])));
+        if ($nombreCompleto === '') {
+            return response()->json([
+                'status' => false,
+                'message' => 'No se encontro informacion en RENIEC.',
+            ], 422);
+        }
+
+        return response()->json([
+            'status' => true,
+            // Formato solicitado
+            'id' => $id,
+            'nombres' => $nombres,
+            'apellido_paterno' => $apellidoPaterno,
+            'apellido_materno' => $apellidoMaterno,
+            'nombre_completo' => (string) ($resultado['nombre_completo'] ?? $nombreCompleto),
+            'codigo_verificacion' => $codigoVerificacion,
+            // Compatibilidad con frontend actual
+            'name' => $nombreCompleto,
+        ]);
     }
 
     public function store(Request $request, Company $company, Branch $branch)

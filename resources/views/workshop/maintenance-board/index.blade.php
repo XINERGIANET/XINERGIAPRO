@@ -1,115 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div x-data="{
-    vehicles: @js($vehicles->map(fn($v) => ['id' => $v->id, 'client_person_id' => $v->client_person_id, 'label' => trim($v->brand . ' ' . $v->model . ' ' . ($v->plate ? ('- ' . $v->plate) : '')) , 'km' => (int) ($v->current_mileage ?? 0)])),
-    vehicleTypes: @js($vehicleTypes->map(fn($type) => ['id' => $type->id, 'name' => $type->name])),
-    servicesCatalog: @js($services->map(fn($s) => ['id' => $s->id, 'name' => $s->name, 'base_price' => (float) $s->base_price, 'type' => $s->type])),
-    selectedVehicleId: '',
-    selectedClientId: '',
-    mileageIn: '',
-    creatingVehicle: false,
-    creatingVehicleLoading: false,
-    quickVehicleError: '',
-    quickVehicle: {
-        client_person_id: '',
-        vehicle_type_id: @js(optional($vehicleTypes->firstWhere('name', 'moto lineal'))->id ?? optional($vehicleTypes->first())->id ?? ''),
-        brand: '',
-        model: '',
-        year: '',
-        color: '',
-        plate: '',
-        vin: '',
-        engine_number: '',
-        chassis_number: '',
-        serial_number: '',
-        current_mileage: ''
-    },
-    serviceLines: [{ service_id: '', qty: 1, unit_price: 0 }],
-    syncVehicle() {
-        const selected = this.vehicles.find(v => String(v.id) === String(this.selectedVehicleId));
-        if (!selected) return;
-        this.selectedClientId = selected.client_person_id ? String(selected.client_person_id) : '';
-        this.mileageIn = selected.km ? String(selected.km) : '';
-    },
-    addServiceLine() {
-        this.serviceLines.push({ service_id: '', qty: 1, unit_price: 0 });
-    },
-    removeServiceLine(index) {
-        if (this.serviceLines.length === 1) {
-            this.serviceLines = [{ service_id: '', qty: 1, unit_price: 0 }];
-            return;
-        }
-        this.serviceLines.splice(index, 1);
-    },
-    onServiceChange(index) {
-        const service = this.servicesCatalog.find(s => String(s.id) === String(this.serviceLines[index].service_id));
-        if (!service) return;
-        this.serviceLines[index].unit_price = Number(service.base_price || 0);
-    },
-    lineSubtotal(line) {
-        const qty = Number(line.qty || 0);
-        const price = Number(line.unit_price || 0);
-        return qty * price;
-    },
-    estimatedTotal() {
-        return this.serviceLines.reduce((sum, line) => sum + this.lineSubtotal(line), 0);
-    },
-    resetQuickVehicle() {
-        this.quickVehicle = {
-            client_person_id: this.selectedClientId || '',
-            vehicle_type_id: @js(optional($vehicleTypes->firstWhere('name', 'moto lineal'))->id ?? optional($vehicleTypes->first())->id ?? ''),
-            brand: '',
-            model: '',
-            year: '',
-            color: '',
-            plate: '',
-            vin: '',
-            engine_number: '',
-            chassis_number: '',
-            serial_number: '',
-            current_mileage: this.mileageIn || ''
-        };
-        this.quickVehicleError = '';
-    },
-    toggleQuickVehicle() {
-        this.creatingVehicle = !this.creatingVehicle;
-        if (this.creatingVehicle) {
-            this.resetQuickVehicle();
-        }
-    },
-    async saveQuickVehicle() {
-        this.quickVehicleError = '';
-        this.creatingVehicleLoading = true;
-        try {
-            const response = await fetch(@js(route('workshop.maintenance-board.vehicles.store')), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': @js(csrf_token()),
-                },
-                body: JSON.stringify(this.quickVehicle),
-            });
-            const payload = await response.json();
-            if (!response.ok) {
-                const message = payload?.message || 'No se pudo registrar el vehiculo.';
-                const firstError = payload?.errors ? Object.values(payload.errors)[0]?.[0] : null;
-                throw new Error(firstError || message);
-            }
-            this.vehicles.unshift(payload);
-            this.selectedVehicleId = String(payload.id);
-            this.selectedClientId = payload.client_person_id ? String(payload.client_person_id) : this.selectedClientId;
-            this.mileageIn = payload.km ? String(payload.km) : this.mileageIn;
-            this.creatingVehicle = false;
-            this.resetQuickVehicle();
-        } catch (error) {
-            this.quickVehicleError = error?.message || 'Error registrando vehiculo.';
-        } finally {
-            this.creatingVehicleLoading = false;
-        }
-    }
-}">
+<div x-data="{}">
     <x-common.page-breadcrumb pageTitle="Tablero de Mantenimiento" />
 
     <x-common.component-card title="Tablero Circular de Servicios" desc="Inicia y finaliza mantenimientos con visual de moto y cliente en tiempo real.">
@@ -145,10 +37,10 @@
                 >
                     <option value="all" @selected(($selectedStatus ?? 'in_progress') === 'all')>Todos</option>
                     <option value="draft" @selected(($selectedStatus ?? 'in_progress') === 'draft')>Borrador</option>
-                    <option value="diagnosis" @selected(($selectedStatus ?? 'in_progress') === 'diagnosis')>Diagnostico</option>
-                    <option value="awaiting_approval" @selected(($selectedStatus ?? 'in_progress') === 'awaiting_approval')>Esperando aprobacion</option>
+                    <option value="diagnosis" @selected(($selectedStatus ?? 'in_progress') === 'diagnosis')>Diagnóstico</option>
+                    <option value="awaiting_approval" @selected(($selectedStatus ?? 'in_progress') === 'awaiting_approval')>Esperando aprobación</option>
                     <option value="approved" @selected(($selectedStatus ?? 'in_progress') === 'approved')>Aprobado</option>
-                    <option value="in_progress" @selected(($selectedStatus ?? 'in_progress') === 'in_progress')>En reparacion</option>
+                    <option value="in_progress" @selected(($selectedStatus ?? 'in_progress') === 'in_progress')>En reparación</option>
                     <option value="finished" @selected(($selectedStatus ?? 'in_progress') === 'finished')>Terminado</option>
                     <option value="delivered" @selected(($selectedStatus ?? 'in_progress') === 'delivered')>Entregado</option>
                     <option value="cancelled" @selected(($selectedStatus ?? 'in_progress') === 'cancelled')>Anulado</option>
@@ -168,23 +60,51 @@
                     $status = (string) $card->status;
                     $pendingDebtCard = max(0, (float) $card->total - (float) $card->paid_total);
                     $pendingBillingCountCard = (int) ($card->pending_billing_count ?? 0);
-                    $canCheckoutCard = in_array($card->status, ['in_progress', 'finished'], true)
-                        && ($pendingDebtCard > 0 || $pendingBillingCountCard > 0);
+                    $canQuoteCard = ((string) $card->status === 'awaiting_approval');
+                    $canCheckoutCard = ((string) $card->status === 'finished' && $pendingDebtCard > 0);
+                    $quotationPayload = [
+                        'action' => route('workshop.maintenance-board.quotation', $card),
+                        'order_label' => 'OS ' . ($card->movement?->number ?? ('#' . $card->id)) . ' - ' . trim(($card->vehicle?->brand ?? '') . ' ' . ($card->vehicle?->model ?? '')),
+                        'status' => (string) $card->status,
+                        'quote_lines' => $card->details
+                            ->where('line_type', 'SERVICE')
+                            ->whereNull('sales_movement_id')
+                            ->map(fn ($detail) => [
+                                'detail_id' => (int) $detail->id,
+                                'description' => (string) ($detail->description ?: ($detail->service?->name ?? 'Servicio')),
+                                'qty' => (float) $detail->qty,
+                                'unit_price' => (float) $detail->unit_price,
+                                'subtotal' => (float) $detail->total,
+                            ])
+                            ->values()
+                            ->all(),
+                    ];
                     $checkoutPayload = [
                         'action' => route('workshop.maintenance-board.checkout', $card),
                         'order_label' => 'OS ' . ($card->movement?->number ?? ('#' . $card->id)) . ' - ' . trim(($card->vehicle?->brand ?? '') . ' ' . ($card->vehicle?->model ?? '')),
-                        'total' => (float) ($card->total ?? 0),
-                        'paid_total' => (float) ($card->paid_total ?? 0),
-                        'debt' => $pendingDebtCard,
-                        'pending_billing_count' => $pendingBillingCountCard,
-                        'pending_billing_total' => (float) ($card->pending_billing_total ?? 0),
+                        'status' => (string) $card->status,
+                        'total' => (float) $card->total,
+                        'paid_total' => (float) $card->paid_total,
+                        'pending_total' => $pendingDebtCard,
+                        'pending_lines' => $card->details
+                            ->whereNull('sales_movement_id')
+                            ->map(fn ($detail) => [
+                                'detail_id' => (int) $detail->id,
+                                'line_type' => (string) $detail->line_type,
+                                'description' => (string) ($detail->description ?: ($detail->service?->name ?? 'Detalle')),
+                                'qty' => (float) $detail->qty,
+                                'unit_price' => (float) $detail->unit_price,
+                                'subtotal' => (float) $detail->total,
+                            ])
+                            ->values()
+                            ->all(),
                     ];
                     $statusMap = [
                         'draft' => ['Borrador', 'bg-slate-100 text-slate-700 border-slate-200'],
-                        'diagnosis' => ['Diagnostico', 'bg-indigo-100 text-indigo-700 border-indigo-200'],
-                        'awaiting_approval' => ['Esperando aprobacion', 'bg-amber-100 text-amber-700 border-amber-200'],
+                        'diagnosis' => ['Diagnóstico', 'bg-indigo-100 text-indigo-700 border-indigo-200'],
+                        'awaiting_approval' => ['Esperando aprobación', 'bg-amber-100 text-amber-700 border-amber-200'],
                         'approved' => ['Aprobado', 'bg-emerald-100 text-emerald-700 border-emerald-200'],
-                        'in_progress' => ['En reparacion', 'bg-orange-100 text-orange-700 border-orange-200'],
+                        'in_progress' => ['En reparación', 'bg-orange-100 text-orange-700 border-orange-200'],
                         'finished' => ['Terminado', 'bg-cyan-100 text-cyan-700 border-cyan-200'],
                         'delivered' => ['Entregado', 'bg-green-100 text-green-700 border-green-200'],
                         'cancelled' => ['Anulado', 'bg-rose-100 text-rose-700 border-rose-200'],
@@ -257,9 +177,16 @@
                                 <button class="rounded-xl bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-800">Finalizar servicio</button>
                             </form>
                         @endif
-                        @if($canCheckoutCard)
+                        @if($canQuoteCard)
                             <button type="button"
                                     class="rounded-xl bg-indigo-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-800"
+                                    @click="$dispatch('open-board-quotation-modal', @js($quotationPayload))">
+                                Cotización
+                            </button>
+                        @endif
+                        @if($canCheckoutCard)
+                            <button type="button"
+                                    class="rounded-xl bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-800"
                                     @click="$dispatch('open-board-checkout-modal', @js($checkoutPayload))">
                                 Venta y cobro
                             </button>
@@ -270,7 +197,7 @@
             @empty
                 <div class="col-span-full rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
                     <i class="ri-motorbike-line text-5xl text-gray-300"></i>
-                    <p class="mt-3 text-sm text-gray-600">No hay servicios activos. Agrega un vehiculo para iniciar mantenimiento.</p>
+                    <p class="mt-3 text-sm text-gray-600">No hay servicios activos. Agrega un vehículo para iniciar mantenimiento.</p>
                 </div>
             @endforelse
         </div>
@@ -278,45 +205,37 @@
         <div class="mt-5">{{ $cards->links() }}</div>
     </x-common.component-card>
 
-    @php
-        $defaultDocumentTypeId = optional(
-            $documentTypes->first(function ($documentType) {
-                return str_contains(mb_strtolower((string) $documentType->name), 'ticket');
-            }) ?? $documentTypes->first()
-        )->id;
-        $defaultCashRegisterId = optional($cashRegisters->first())->id;
-        $defaultPaymentMethodId = optional($paymentMethods->first())->id;
-    @endphp
-
     <x-ui.modal
         x-data="{
             open: false,
             action: '',
             order_label: '',
-            total: 0,
-            paid_total: 0,
-            debt: 0,
-            pending_billing_count: 0,
-            pending_billing_total: 0
+            status: '',
+            quote_lines: [],
+            lineSubtotal(line) {
+                const qty = Number(line.qty || 0);
+                const unitPrice = Number(line.unit_price || 0);
+                return qty * unitPrice;
+            },
+            quoteTotal() {
+                return this.quote_lines.reduce((sum, line) => sum + this.lineSubtotal(line), 0);
+            }
         }"
-        x-on:open-board-checkout-modal.window="
+        x-on:open-board-quotation-modal.window="
             open = true;
             action = $event.detail.action;
             order_label = $event.detail.order_label;
-            total = Number($event.detail.total || 0);
-            paid_total = Number($event.detail.paid_total || 0);
-            debt = Number($event.detail.debt || 0);
-            pending_billing_count = Number($event.detail.pending_billing_count || 0);
-            pending_billing_total = Number($event.detail.pending_billing_total || 0);
+            status = String($event.detail.status || '');
+            quote_lines = Array.isArray($event.detail.quote_lines) ? $event.detail.quote_lines : [];
         "
         :isOpen="false"
         :showCloseButton="false"
-        class="max-w-4xl">
+        class="max-w-5xl">
         <div class="p-6 sm:p-8">
             <div class="mb-6 flex items-center justify-between">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Cierre Comercial</p>
-                    <h3 class="text-xl font-bold text-gray-900 dark:text-white">Venta y cobro rapido</h3>
+                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Cotización de mantenimiento</p>
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white">Servicios seleccionados</h3>
                     <p class="text-sm text-gray-500" x-text="order_label"></p>
                 </div>
                 <button type="button" @click="open = false" class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
@@ -324,89 +243,336 @@
                 </button>
             </div>
 
-            <div class="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
-                <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                    <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Total OS</p>
-                    <p class="mt-1 text-xl font-extrabold text-slate-800" x-text="`S/ ${total.toFixed(2)}`"></p>
-                </div>
-                <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-                    <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Pagado</p>
-                    <p class="mt-1 text-xl font-extrabold text-emerald-700" x-text="`S/ ${paid_total.toFixed(2)}`"></p>
-                </div>
-                <div class="rounded-xl border border-amber-200 bg-amber-50 p-3">
-                    <p class="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Pendiente</p>
-                    <p class="mt-1 text-xl font-extrabold text-amber-700" x-text="`S/ ${debt.toFixed(2)}`"></p>
+            <div class="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/50 px-4 py-3 text-sm text-indigo-700">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        Estado actual:
+                        <span class="font-semibold" x-text="status === 'awaiting_approval' ? 'Esperando aprobación' : (status === 'approved' ? 'Aprobado' : (status === 'in_progress' ? 'En reparación' : status))"></span>
+                    </div>
+                    <div class="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-white px-3 py-1">
+                        <span class="text-[11px] font-semibold uppercase tracking-wide text-indigo-700">Servicios</span>
+                        <span class="rounded-full bg-indigo-600 px-2 py-0.5 text-xs font-bold text-white" x-text="quote_lines.length"></span>
+                    </div>
                 </div>
             </div>
 
             <form method="POST" :action="action" class="space-y-4">
                 @csrf
-
-                <input type="hidden" name="generate_sale" :value="pending_billing_count > 0 ? 1 : 0">
-
-                <div x-show="pending_billing_count > 0" class="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4">
-                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-indigo-700">Documento de venta</label>
-                    <select name="document_type_id" class="h-11 w-full rounded-lg border border-indigo-200 bg-white px-3 text-sm font-medium text-slate-800" :required="pending_billing_count > 0">
-                        @foreach($documentTypes as $documentType)
-                            <option value="{{ $documentType->id }}" @selected((int) $defaultDocumentTypeId === (int) $documentType->id)>
-                                {{ $documentType->name }}
-                            </option>
-                        @endforeach
-                    </select>
-                    <p class="mt-2 text-xs text-indigo-700" x-text="`Se facturaran ${pending_billing_count} linea(s) pendiente(s), total aprox: S/ ${pending_billing_total.toFixed(2)}.`"></p>
-                </div>
-
-                <div x-show="pending_billing_count <= 0" class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
-                    Esta OS ya no tiene lineas pendientes por facturar. Solo se registrara el cobro.
-                </div>
-
-                <div>
-                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Comentario venta (opcional)</label>
-                    <input name="sale_comment" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Venta desde tablero de mantenimiento">
+                <div class="overflow-hidden rounded-xl border border-slate-200">
+                    <table class="w-full">
+                        <thead class="bg-slate-800 text-white">
+                            <tr>
+                                <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide">Servicio</th>
+                                <th class="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide">Cantidad</th>
+                                <th class="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide">Precio</th>
+                                <th class="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide">Subtotal</th>
+                                <th class="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide">Quitar</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 bg-white">
+                            <template x-if="quote_lines.length === 0">
+                                <tr>
+                                    <td colspan="5" class="px-3 py-6 text-center text-sm text-slate-500">No hay servicios para cotizar en esta OS.</td>
+                                </tr>
+                            </template>
+                            <template x-for="(line, index) in quote_lines" :key="`quote-line-${line.detail_id}`">
+                                <tr>
+                                    <td class="px-3 py-2 text-sm font-medium text-slate-700" x-text="line.description"></td>
+                                    <td class="px-3 py-2">
+                                        <input type="hidden" :name="`quote_lines[${index}][detail_id]`" :value="line.detail_id">
+                                        <input type="number" step="0.01" min="0.01" :name="`quote_lines[${index}][qty]`" x-model="line.qty"
+                                               class="h-10 w-full rounded-lg border border-slate-300 px-2 text-center text-sm">
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        <input type="number" step="0.01" min="0" :name="`quote_lines[${index}][unit_price]`" x-model="line.unit_price"
+                                               class="h-10 w-full rounded-lg border border-slate-300 px-2 text-center text-sm">
+                                    </td>
+                                    <td class="px-3 py-2 text-right text-sm font-semibold text-slate-800" x-text="`S/ ${lineSubtotal(line).toFixed(2)}`"></td>
+                                    <td class="px-3 py-2 text-center">
+                                        <button
+                                            type="button"
+                                            @click="quote_lines.splice(index, 1)"
+                                            class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100">
+                                            <i class="ri-close-line"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
                 </div>
 
                 <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <div>
-                        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Caja</label>
-                        <select name="cash_register_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm font-medium text-slate-800" required>
-                        @foreach($cashRegisters as $cashRegister)
-                            <option value="{{ $cashRegister->id }}" @selected((int) $defaultCashRegisterId === (int) $cashRegister->id)>
-                                {{ $cashRegister->number }} {{ $cashRegister->status ? '(Activa)' : '' }}
-                            </option>
-                        @endforeach
-                        </select>
+                        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Nota de cotización (opcional)</label>
+                        <input name="quote_note" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Detalle para cliente">
                     </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Metodo de pago</label>
-                        <select name="payment_methods[0][payment_method_id]" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm font-medium text-slate-800" required>
-                            @foreach($paymentMethods as $paymentMethod)
-                                <option value="{{ $paymentMethod->id }}" @selected((int) $defaultPaymentMethodId === (int) $paymentMethod->id)>
-                                    {{ $paymentMethod->description }}
-                                </option>
-                            @endforeach
-                        </select>
+                    <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-right">
+                        <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Total cotización</p>
+                        <p class="mt-1 text-2xl font-extrabold text-emerald-700" x-text="`S/ ${quoteTotal().toFixed(2)}`"></p>
                     </div>
-                </div>
-
-                <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
-                    <div class="md:col-span-1">
-                        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Monto</label>
-                        <input type="number" step="0.01" min="0.01" name="payment_methods[0][amount]" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" :value="debt.toFixed(2)" required>
-                    </div>
-                    <div class="md:col-span-1">
-                        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Referencia</label>
-                        <input name="payment_methods[0][reference]" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Operacion / voucher">
-                    </div>
-                </div>
-
-                <div>
-                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Comentario cobro (opcional)</label>
-                    <input name="payment_comment" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Cobro registrado desde tablero">
                 </div>
 
                 <div class="flex flex-wrap gap-2 pt-1">
-                    <x-ui.button type="submit" size="md" variant="primary" style="background:linear-gradient(90deg,#0ea5e9,#2563eb);color:#fff">
-                        <i class="ri-cash-line"></i><span>Confirmar venta y cobro</span>
+                    <x-ui.button type="submit" size="md" variant="primary" style="background:linear-gradient(90deg,#0ea5e9,#2563eb);color:#fff" x-bind:disabled="quote_lines.length === 0">
+                        <i class="ri-checkbox-circle-line"></i><span>Aprobar cotización</span>
+                    </x-ui.button>
+                    <x-ui.button type="button" size="md" variant="outline" @click="open = false">
+                        <i class="ri-close-line"></i><span>Cancelar</span>
+                    </x-ui.button>
+                </div>
+            </form>
+        </div>
+    </x-ui.modal>
+
+    <x-ui.modal
+        x-data="{
+            open: false,
+            action: '',
+            order_label: '',
+            pending_lines: [],
+            products_catalog: @js(($products ?? collect())->values()->all()),
+            product_lines: [],
+            total_os: 0,
+            paid_os: 0,
+            pending_os: 0,
+            document_types: @js(($documentTypes ?? collect())->values()->map(fn($d) => ['id' => (int) $d->id, 'name' => (string) $d->name])->all()),
+            cash_registers: @js(($cashRegisters ?? collect())->values()->map(fn($c) => ['id' => (int) $c->id, 'number' => (string) $c->number])->all()),
+            payment_methods_catalog: @js(($paymentMethods ?? collect())->values()->map(fn($m) => ['id' => (int) $m->id, 'description' => (string) $m->description])->all()),
+            document_type_id: '',
+            cash_register_id: '',
+            payment_method_id: '',
+            payment_amount: 0,
+            payment_reference: '',
+            sale_comment: '',
+            payment_comment: '',
+            lineSubtotal(line) {
+                return Number(line.qty || 0) * Number(line.unit_price || 0);
+            },
+            pendingLinesTotal() {
+                return this.pending_lines.reduce((sum, line) => sum + this.lineSubtotal(line), 0);
+            },
+            productLinesTotal() {
+                return this.product_lines.reduce((sum, line) => sum + this.lineSubtotal(line), 0);
+            },
+            chargeTotal() {
+                return this.pendingLinesTotal() + this.productLinesTotal();
+            },
+            addProductLine() {
+                const first = this.products_catalog[0] || null;
+                this.product_lines.push({
+                    product_id: first ? String(first.id) : '',
+                    qty: 1,
+                    unit_price: first ? Number(first.price || 0) : 0
+                });
+                this.syncPaymentAmount();
+            },
+            removeProductLine(index) {
+                this.product_lines.splice(index, 1);
+                this.syncPaymentAmount();
+            },
+            onProductChange(index) {
+                const line = this.product_lines[index];
+                const product = this.products_catalog.find(p => String(p.id) === String(line.product_id));
+                if (product) {
+                    line.unit_price = Number(product.price || 0);
+                }
+                this.syncPaymentAmount();
+            },
+            syncPaymentAmount() {
+                this.payment_amount = Number(this.chargeTotal().toFixed(2));
+            }
+        }"
+        x-init="open = false"
+        x-on:open-board-checkout-modal.window="
+            if (!$event.detail || !$event.detail.action) { return; }
+            open = true;
+            action = $event.detail.action;
+            order_label = $event.detail.order_label || '';
+            pending_lines = Array.isArray($event.detail.pending_lines) ? $event.detail.pending_lines : [];
+            total_os = Number($event.detail.total || 0);
+            paid_os = Number($event.detail.paid_total || 0);
+            pending_os = Number($event.detail.pending_total || 0);
+            product_lines = [];
+            document_type_id = document_types.length ? String(document_types[0].id) : '';
+            cash_register_id = cash_registers.length ? String(cash_registers[0].id) : '';
+            payment_method_id = payment_methods_catalog.length ? String(payment_methods_catalog[0].id) : '';
+            sale_comment = 'Venta generada desde tablero de mantenimiento';
+            payment_comment = 'Cobro registrado desde tablero';
+            payment_reference = '';
+            syncPaymentAmount();
+        "
+        :isOpen="false"
+        :showCloseButton="false"
+        class="max-w-6xl">
+        <div class="p-6 sm:p-8">
+            <div class="mb-6 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-600">Venta y cobro</p>
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white">Servicios y productos a facturar</h3>
+                    <p class="text-sm text-gray-500" x-text="order_label"></p>
+                </div>
+                <button type="button" @click="open = false" class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
+                    <i class="ri-close-line text-xl"></i>
+                </button>
+            </div>
+
+            <form method="POST" :action="action" class="space-y-5">
+                @csrf
+                <input type="hidden" name="generate_sale" value="1">
+
+                <div class="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Total OS</p>
+                        <p class="mt-1 text-xl font-bold text-slate-800" x-text="`S/ ${total_os.toFixed(2)}`"></p>
+                    </div>
+                    <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                        <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Pagado</p>
+                        <p class="mt-1 text-xl font-bold text-emerald-700" x-text="`S/ ${paid_os.toFixed(2)}`"></p>
+                    </div>
+                    <div class="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                        <p class="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Pendiente</p>
+                        <p class="mt-1 text-xl font-bold text-amber-700" x-text="`S/ ${pending_os.toFixed(2)}`"></p>
+                    </div>
+                </div>
+
+                <div class="overflow-hidden rounded-xl border border-slate-200">
+                    <div class="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+                        Servicios/lineas pendientes a cobrar
+                    </div>
+                    <table class="w-full">
+                        <thead class="bg-slate-800 text-white">
+                            <tr>
+                                <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide">Descripcion</th>
+                                <th class="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide">Cant.</th>
+                                <th class="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide">P.Unit</th>
+                                <th class="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide">Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 bg-white">
+                            <template x-if="pending_lines.length === 0">
+                                <tr>
+                                    <td colspan="4" class="px-3 py-5 text-center text-sm text-slate-500">No hay lineas pendientes.</td>
+                                </tr>
+                            </template>
+                            <template x-for="line in pending_lines" :key="`pending-${line.detail_id}`">
+                                <tr>
+                                    <td class="px-3 py-2 text-sm text-slate-700">
+                                        <span x-text="line.description"></span>
+                                        <span class="ml-2 rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600" x-text="line.line_type"></span>
+                                    </td>
+                                    <td class="px-3 py-2 text-center text-sm text-slate-700" x-text="Number(line.qty || 0).toFixed(2)"></td>
+                                    <td class="px-3 py-2 text-center text-sm text-slate-700" x-text="`S/ ${Number(line.unit_price || 0).toFixed(2)}`"></td>
+                                    <td class="px-3 py-2 text-right text-sm font-semibold text-slate-800" x-text="`S/ ${lineSubtotal(line).toFixed(2)}`"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="overflow-hidden rounded-xl border border-indigo-200 bg-indigo-50/40">
+                    <div class="flex items-center justify-between border-b border-indigo-200 px-3 py-2">
+                        <p class="text-sm font-semibold text-indigo-800">Agregar productos al momento de facturar</p>
+                        <button type="button" @click="addProductLine()" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700">
+                            <i class="ri-add-line"></i> Agregar producto
+                        </button>
+                    </div>
+                    <div class="space-y-2 p-3">
+                        <template x-if="product_lines.length === 0">
+                            <p class="text-xs text-slate-500">Sin productos adicionales.</p>
+                        </template>
+                        <template x-for="(line, index) in product_lines" :key="`product-line-${index}`">
+                            <div class="grid grid-cols-12 gap-2 rounded-lg border border-indigo-100 bg-white p-2">
+                                <div class="col-span-12 md:col-span-6">
+                                    <input type="hidden" :name="`product_lines[${index}][product_id]`" :value="line.product_id">
+                                    <select x-model="line.product_id" @change="onProductChange(index)"
+                                            class="h-10 w-full rounded-lg border border-slate-300 px-2 text-sm">
+                                        <template x-for="product in products_catalog" :key="`product-option-${product.id}`">
+                                            <option :value="String(product.id)" x-text="`${product.code} - ${product.description}`"></option>
+                                        </template>
+                                    </select>
+                                </div>
+                                <div class="col-span-6 md:col-span-2">
+                                    <input type="number" step="0.01" min="0.01"
+                                           :name="`product_lines[${index}][qty]`"
+                                           x-model="line.qty"
+                                           @input="syncPaymentAmount()"
+                                           class="h-10 w-full rounded-lg border border-slate-300 px-2 text-center text-sm">
+                                </div>
+                                <div class="col-span-6 md:col-span-3">
+                                    <input type="number" step="0.01" min="0"
+                                           :name="`product_lines[${index}][unit_price]`"
+                                           x-model="line.unit_price"
+                                           @input="syncPaymentAmount()"
+                                           class="h-10 w-full rounded-lg border border-slate-300 px-2 text-center text-sm">
+                                </div>
+                                <div class="col-span-12 md:col-span-1">
+                                    <button type="button" @click="removeProductLine(index)" class="h-10 w-full rounded-lg border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100">
+                                        <i class="ri-close-line"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Documento de venta</label>
+                        <select name="document_type_id" x-model="document_type_id" required class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                            <template x-for="doc in document_types" :key="`doc-${doc.id}`">
+                                <option :value="String(doc.id)" x-text="doc.name"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Caja</label>
+                        <select name="cash_register_id" x-model="cash_register_id" required class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                            <template x-for="cash in cash_registers" :key="`cash-${cash.id}`">
+                                <option :value="String(cash.id)" x-text="`Caja ${cash.number}`"></option>
+                            </template>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Metodo de pago</label>
+                        <select name="payment_methods[0][payment_method_id]" x-model="payment_method_id" required class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                            <template x-for="method in payment_methods_catalog" :key="`pay-${method.id}`">
+                                <option :value="String(method.id)" x-text="method.description"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Monto</label>
+                        <input type="number" step="0.01" min="0.01" name="payment_methods[0][amount]" x-model="payment_amount" required class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Referencia (opcional)</label>
+                        <input type="text" name="payment_methods[0][reference]" x-model="payment_reference" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Operacion / voucher">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Comentario venta (opcional)</label>
+                        <input type="text" name="sale_comment" x-model="sale_comment" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Comentario cobro (opcional)</label>
+                        <input type="text" name="payment_comment" x-model="payment_comment" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                    </div>
+                </div>
+
+                <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-right">
+                    <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Total a cobrar ahora</p>
+                    <p class="mt-1 text-2xl font-extrabold text-emerald-700" x-text="`S/ ${chargeTotal().toFixed(2)}`"></p>
+                </div>
+
+                <div class="flex flex-wrap gap-2 pt-1">
+                    <x-ui.button type="submit" size="md" variant="primary" style="background:linear-gradient(90deg,#16a34a,#059669);color:#fff">
+                        <i class="ri-money-dollar-circle-line"></i><span>Confirmar venta, cobro y entrega</span>
                     </x-ui.button>
                     <x-ui.button type="button" size="md" variant="outline" @click="open = false">
                         <i class="ri-close-line"></i><span>Cancelar</span>

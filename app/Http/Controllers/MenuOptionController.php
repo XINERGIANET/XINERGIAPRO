@@ -157,7 +157,13 @@ class MenuOptionController extends Controller
     public function destroy(Module $module, MenuOption $menuOption)
     {
         $menuOption = $this->resolveScope($module, $menuOption);
-        $menuOption->delete();
+        DB::transaction(function () use ($menuOption) {
+            DB::table('user_permission')
+                ->where('menu_option_id', $menuOption->id)
+                ->delete();
+
+            $menuOption->delete();
+        });
 
         return redirect()
             ->route('admin.modules.menu_options.index', request('view_id') ? [$module, 'view_id' => request('view_id')] : $module)
