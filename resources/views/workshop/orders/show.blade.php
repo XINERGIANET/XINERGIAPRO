@@ -92,16 +92,43 @@
                           init() {
                               this.signatureCanvas = this.$refs.clientSignatureCanvas || null;
                               if (!this.signatureCanvas) return;
+                              this.resizeSignatureCanvas();
                               this.signatureCtx = this.signatureCanvas.getContext('2d');
                               if (!this.signatureCtx) return;
                               this.signatureCtx.lineWidth = 2;
                               this.signatureCtx.lineCap = 'round';
                               this.signatureCtx.strokeStyle = '#111827';
+                              window.addEventListener('resize', () => this.resizeSignatureCanvas());
+                          },
+                          resizeSignatureCanvas() {
+                              if (!this.signatureCanvas) return;
+                              const rect = this.signatureCanvas.getBoundingClientRect();
+                              const dpr = window.devicePixelRatio || 1;
+                              const width = Math.max(1, Math.round(rect.width * dpr));
+                              const height = Math.max(1, Math.round(rect.height * dpr));
+                              if (this.signatureCanvas.width !== width || this.signatureCanvas.height !== height) {
+                                  this.signatureCanvas.width = width;
+                                  this.signatureCanvas.height = height;
+                                  const ctx = this.signatureCanvas.getContext('2d');
+                                  if (ctx) {
+                                      ctx.setTransform(1, 0, 0, 1, 0, 0);
+                                      ctx.scale(dpr, dpr);
+                                      ctx.lineWidth = 2;
+                                      ctx.lineCap = 'round';
+                                      ctx.strokeStyle = '#111827';
+                                  }
+                              }
                           },
                           point(evt) {
                               const rect = this.signatureCanvas.getBoundingClientRect();
                               const src = evt.touches?.[0] ?? evt;
-                              return { x: src.clientX - rect.left, y: src.clientY - rect.top };
+                              const scaleX = this.signatureCanvas.width / rect.width;
+                              const scaleY = this.signatureCanvas.height / rect.height;
+                              const dpr = window.devicePixelRatio || 1;
+                              return {
+                                  x: ((src.clientX - rect.left) * scaleX) / dpr,
+                                  y: ((src.clientY - rect.top) * scaleY) / dpr
+                              };
                           },
                           start(evt) {
                               if (!this.signatureCtx) return;
