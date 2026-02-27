@@ -672,6 +672,49 @@ class WorkshopMaintenanceBoardController extends Controller
         return back()->with('status', 'Servicio finalizado. Puede continuar con cobro y entrega.');
     }
 
+    public function checkoutPage(WorkshopMovement $order): \Illuminate\View\View|RedirectResponse
+    {
+        $this->assertOrderScope($order);
+
+        if ((string) $order->status !== 'finished') {
+            return redirect()
+                ->route('workshop.maintenance-board.index')
+                ->withErrors(['error' => 'La venta y cobro solo esta disponible para OS terminadas.']);
+        }
+
+        [$branchId, $companyId] = $this->branchScope();
+        $formData = $this->maintenanceFormData($branchId, $companyId);
+
+        $order->load([
+            'movement',
+            'vehicle',
+            'client',
+            'details' => fn ($query) => $query
+                ->whereNull('sales_movement_id')
+                ->whereNull('deleted_at')
+                ->orderBy('id'),
+        ]);
+
+        $pendingLines = $order->details->map(function ($detail) {
+            return [
+                'detail_id' => (int) $detail->id,
+                'line_type' => (string) $detail->line_type,
+                'description' => (string) ($detail->description ?? 'Detalle'),
+                'qty' => (float) $detail->qty,
+                'unit_price' => (float) $detail->unit_price,
+                'subtotal' => (float) $detail->total,
+            ];
+        })->values();
+
+        return view('workshop.maintenance-board.checkout', array_merge($formData, [
+            'order' => $order,
+            'pendingLines' => $pendingLines,
+            'totalOs' => (float) $order->total,
+            'paidOs' => (float) $order->paid_total,
+            'pendingOs' => max(0, (float) $order->total - (float) $order->paid_total),
+        ]));
+    }
+
     public function checkout(Request $request, WorkshopMovement $order): RedirectResponse
     {
         $this->assertOrderScope($order);
@@ -795,7 +838,9 @@ class WorkshopMaintenanceBoardController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
 
-        return back()->with('status', 'Venta y cobro registrados. La OS fue entregada automaticamente.');
+        return redirect()
+            ->route('workshop.maintenance-board.index')
+            ->with('status', 'Venta y cobro registrados. La OS fue entregada automaticamente.');
     }
 
     private function assertOrderScope(WorkshopMovement $order): void

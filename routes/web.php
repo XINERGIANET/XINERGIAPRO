@@ -402,6 +402,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/tablero-mantenimiento/{order}/iniciar', [WorkshopMaintenanceBoardController::class, 'start'])->name('maintenance-board.start');
         Route::post('/tablero-mantenimiento/{order}/finalizar', [WorkshopMaintenanceBoardController::class, 'finish'])->name('maintenance-board.finish');
         Route::post('/tablero-mantenimiento/{order}/cotizacion', [WorkshopMaintenanceBoardController::class, 'quotation'])->name('maintenance-board.quotation');
+        Route::get('/tablero-mantenimiento/{order}/venta-cobro', [WorkshopMaintenanceBoardController::class, 'checkoutPage'])->name('maintenance-board.checkout.page');
         Route::post('/tablero-mantenimiento/{order}/venta-cobro', [WorkshopMaintenanceBoardController::class, 'checkout'])->name('maintenance-board.checkout');
         Route::get('/clientes', [WorkshopClientController::class, 'index'])->name('clients.index');
         Route::post('/clientes', [WorkshopClientController::class, 'store'])->name('clients.store');
