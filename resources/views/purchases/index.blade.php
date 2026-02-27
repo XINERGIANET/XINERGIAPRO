@@ -131,10 +131,17 @@
                                 <td class="px-5 py-4 sm:px-6 text-gray-800 text-theme-sm">{{ $purchase->moved_at ? $purchase->moved_at->format('Y-m-d H:i') : '-' }}</td>
                                 <td class="px-5 py-4 sm:px-6">
                                     <div class="flex items-center justify-end gap-2">
-                                        <a href="{{ route('admin.purchases.edit', array_merge([$purchase], $viewId ? ['view_id' => $viewId] : [])) }}"
-                                           class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#FBBF24] text-gray-900">
-                                            <i class="ri-pencil-line"></i>
-                                        </a>
+                                        <div class="relative group">
+                                            <a href="{{ route('admin.purchases.edit', array_merge([$purchase], $viewId ? ['view_id' => $viewId] : [])) }}"
+                                               class="inline-flex h-12 w-12 items-center justify-center rounded-2xl shadow-sm transition hover:brightness-95"
+                                               style="background-color:#fbbf24; color:#111827; border:1px solid #fbbf24;">
+                                                <i class="ri-pencil-line text-base" style="color:#111827 !important;"></i>
+                                            </a>
+                                            <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
+                                                Editar
+                                                <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
+                                            </span>
+                                        </div>
                                         <form method="POST" action="{{ route('admin.purchases.destroy', array_merge([$purchase], $viewId ? ['view_id' => $viewId] : [])) }}"
                                               class="relative group js-swal-delete"
                                               data-swal-title="Eliminar compra?"
@@ -145,9 +152,15 @@
                                               data-swal-cancel-color="#6b7280">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit" class="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#EF4444] text-white">
-                                                <i class="ri-delete-bin-line"></i>
+                                            <button type="submit"
+                                                class="inline-flex h-12 w-12 items-center justify-center rounded-2xl shadow-sm transition hover:brightness-95"
+                                                style="background-color:#ef4444; color:#ffffff; border:1px solid #ef4444;">
+                                                <i class="ri-delete-bin-line text-base" style="color:#ffffff !important;"></i>
                                             </button>
+                                            <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
+                                                Eliminar
+                                                <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
+                                            </span>
                                         </form>
                                     </div>
                                 </td>
@@ -227,4 +240,3 @@
         </x-common.component-card>
     </div>
 @endsection
-

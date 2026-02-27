@@ -42,7 +42,7 @@
     <div class="space-y-5">
         <div class="rounded-2xl border border-gray-200 bg-white p-4">
             <h3 class="mb-4 text-sm font-bold uppercase tracking-wide text-gray-700">Cabecera de compra</h3>
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-6">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-12">
                 <div class="md:col-span-2">
                     <x-form.date-picker
                         name="moved_at"
@@ -58,7 +58,7 @@
                         :compact="true"
                     />
                 </div>
-                <div class="md:col-span-2">
+                <div class="md:col-span-4">
                     <label class="mb-2 block text-sm font-medium text-gray-700">Proveedor</label>
                     <input type="hidden" name="person_id" x-model="selectedProviderId" required>
                     <div class="relative" @click.outside="providerOpen = false">
@@ -107,7 +107,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="md:col-span-1">
+                <div class="md:col-span-2">
                     <label class="mb-2 block text-sm font-medium text-gray-700">Documento</label>
                     <select name="document_type_id" class="h-10 w-full rounded-xl border border-gray-300 px-3 text-sm" required>
                         <option value="">Selecciona documento</option>
@@ -118,10 +118,21 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="md:col-span-1">
+                <div class="md:col-span-2">
                     <label class="mb-2 block text-sm font-medium text-gray-700">Serie</label>
                     <input type="text" name="series" class="h-10 w-full rounded-xl border border-gray-300 px-3 text-sm"
                            value="{{ old('series', $purchaseMovement->series ?? '001') }}" placeholder="001">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="mb-2 block text-sm font-medium text-gray-700">Numero</label>
+                    <input
+                        type="text"
+                        name="number"
+                        class="h-10 w-full rounded-xl border border-gray-300 px-3 text-sm"
+                        value="{{ old('number', $purchase->number ?? ($purchaseNumberPreview ?? '00000001')) }}"
+                        placeholder="00000001"
+                        required
+                    >
                 </div>
             </div>
         </div>
@@ -187,7 +198,7 @@
                                         <div
                                             x-show="item.product_open"
                                             x-cloak
-                                            class="absolute left-0 top-full z-[999] mt-1 max-h-56 min-w-[22rem] max-w-[30rem] overflow-y-auto overflow-x-hidden rounded-xl border border-gray-200 bg-white shadow-2xl"
+                                            class="absolute inset-x-0 top-full z-[999] mt-1 w-full max-h-56 overflow-y-auto overflow-x-hidden rounded-xl border border-gray-200 bg-white shadow-2xl"
                                         >
                                             <template x-if="filteredProducts(item).length === 0">
                                                 <p class="px-3 py-2 text-xs text-gray-500">Sin resultados</p>
@@ -220,7 +231,7 @@
                                            class="h-11 w-20 max-w-full rounded-lg border border-gray-300 px-2 text-center text-lg font-semibold" required>
                                 </td>
                                 <td class="px-2 py-1.5">
-                                    <input :name="`items[${idx}][amount]`" type="number" step="1" min="0" x-model.number="item.amount"
+                                    <input :name="`items[${idx}][amount]`" type="number" step="0.01" min="0" x-model.number="item.amount"
                                            class="h-11 w-20 max-w-full rounded-lg border border-gray-300 px-2 text-center text-lg font-semibold" required>
                                 </td>
                                 <td class="px-2 py-1.5">
@@ -256,7 +267,7 @@
                 <button type="button" class="bg-white py-2 text-gray-500">Resumen</button>
             </div>
 
-            <div class="mx-auto w-full max-w-5xl lg:max-w-none">
+            
                 <div class="grid grid-cols-1 gap-3 md:grid-cols-6">
                     <div class="md:col-span-2">
                         <label class="mb-1.5 block text-xs font-semibold uppercase text-gray-500">Tipo detalle</label>
@@ -287,8 +298,10 @@
                     </div>
                     <div>
                         <label class="mb-1.5 block text-xs font-semibold uppercase text-gray-500">Moneda</label>
-                        <input type="text" name="currency" class="h-10 w-full rounded-xl border border-gray-300 px-3 text-sm"
-                               value="{{ old('currency', $purchaseMovement->currency ?? 'PEN') }}" required>
+                        <select name="currency" class="h-10 w-full rounded-xl border border-gray-300 px-3 text-sm" required>
+                            <option value="PEN" @selected(old('currency', $purchaseMovement->currency ?? 'PEN') === 'PEN')>PEN</option>
+                            <option value="USD" @selected(old('currency', $purchaseMovement->currency ?? 'PEN') === 'USD')>USD</option>
+                        </select>
                     </div>
                     <div>
                         <label class="mb-1.5 block text-xs font-semibold uppercase text-gray-500">Tipo de cambio</label>
@@ -331,7 +344,7 @@
                         </div>
                     </div>
                 </div>
-            </div>
+           
         </div>
     </div>
 </div>

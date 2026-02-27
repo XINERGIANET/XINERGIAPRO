@@ -79,6 +79,9 @@ class PurchaseController extends Controller
             $movementType = $this->resolvePurchaseMovementType();
             $person = Person::query()->where('id', $validated['person_id'])->where('branch_id', $branchId)->firstOrFail();
             $documentType = DocumentType::query()->findOrFail($validated['document_type_id']);
+            $responsibleName = $user?->person
+                ? trim((string) (($user->person->first_name ?? '') . ' ' . ($user->person->last_name ?? '')))
+                : ($user?->name ?? 'Sistema');
 
             $totals = $this->calculateTotals(
                 $validated['items'],
@@ -87,12 +90,14 @@ class PurchaseController extends Controller
             );
 
             $movement = Movement::query()->create([
-                'number' => $this->generatePurchaseNumber((int) $documentType->id, $branchId),
+                'number' => $validated['number'],
                 'moved_at' => $validated['moved_at'],
                 'user_id' => $user?->id,
                 'user_name' => $user?->name ?? 'Sistema',
                 'person_id' => $person->id,
                 'person_name' => trim(($person->first_name ?? '') . ' ' . ($person->last_name ?? '')),
+                'responsible_id' => $user?->id,
+                'responsible_name' => $responsibleName,
                 'comment' => $validated['comment'] ?? null,
                 'status' => 'A',
                 'movement_type_id' => $movementType->id,
@@ -176,6 +181,10 @@ class PurchaseController extends Controller
         DB::transaction(function () use ($purchase, $validated, $branchId) {
             $documentType = DocumentType::query()->findOrFail($validated['document_type_id']);
             $person = Person::query()->where('id', $validated['person_id'])->where('branch_id', $branchId)->firstOrFail();
+            $user = request()->user();
+            $responsibleName = $user?->person
+                ? trim((string) (($user->person->first_name ?? '') . ' ' . ($user->person->last_name ?? '')))
+                : ($user?->name ?? 'Sistema');
 
             $oldPurchase = $purchase->purchaseMovement;
             $oldDetails = $oldPurchase->details;
@@ -195,9 +204,12 @@ class PurchaseController extends Controller
             );
 
             $purchase->update([
+                'number' => $validated['number'],
                 'moved_at' => $validated['moved_at'],
                 'person_id' => $person->id,
                 'person_name' => trim(($person->first_name ?? '') . ' ' . ($person->last_name ?? '')),
+                'responsible_id' => $user?->id,
+                'responsible_name' => $responsibleName,
                 'comment' => $validated['comment'] ?? null,
                 'document_type_id' => $documentType->id,
             ]);
@@ -290,6 +302,7 @@ class PurchaseController extends Controller
             'moved_at' => ['required', 'date'],
             'person_id' => ['required', 'integer', 'exists:people,id'],
             'document_type_id' => ['required', 'integer', 'exists:document_types,id'],
+            'number' => ['required', 'string', 'max:50'],
             'series' => ['nullable', 'string', 'max:20'],
             'detail_type' => ['required', Rule::in(['DETALLADO', 'GLOSA'])],
             'includes_tax' => ['required', Rule::in(['S', 'N'])],
@@ -329,7 +342,7 @@ class PurchaseController extends Controller
         $units = Unit::query()->orderBy('description')->get(['id', 'description']);
 
         $products = Product::query()
-            ->leftJoin('product_branch', function ($join) use ($branchId) {
+            ->join('product_branch', function ($join) use ($branchId) {
                 $join->on('product_branch.product_id', '=', 'products.id')
                     ->where('product_branch.branch_id', '=', $branchId);
             })
@@ -346,6 +359,9 @@ class PurchaseController extends Controller
             ]);
 
         $defaultTaxRate = (float) (TaxRate::query()->where('status', true)->orderBy('order_num')->value('tax_rate') ?? 18);
+        $purchaseNumberPreview = $documentTypes->isNotEmpty()
+            ? $this->generatePurchaseNumber((int) $documentTypes->first()->id, $branchId)
+            : '00000001';
 
         return [
             'viewId' => $request->input('view_id'),
@@ -354,6 +370,7 @@ class PurchaseController extends Controller
             'units' => $units,
             'products' => $products,
             'defaultTaxRate' => $defaultTaxRate,
+            'purchaseNumberPreview' => $purchaseNumberPreview,
         ];
     }
 

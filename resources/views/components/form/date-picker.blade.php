@@ -27,6 +27,7 @@
                     altInput: {{ $altInput ? 'true' : 'false' }},
                     altFormat: @js($altFormat),
                     enableTime: {{ $enableTime ? 'true' : 'false' }},
+                    minuteIncrement: 1,
                     time_24hr: {{ $time24hr ? 'true' : 'false' }},
                     locale: (() => {
                         const localeKey = @js($locale);
