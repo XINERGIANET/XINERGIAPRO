@@ -129,7 +129,7 @@
                                 </td>
                                 <td class="px-2 py-1.5 text-center w-[70px]">
                                     <button type="button" @click="removeItem(idx)" class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#EF4444] text-white hover:bg-red-600">
-                                        <i class="ri-delete-bin-line"></i>
+                                        <i class="ri-delete-bin-line text-white" style="color:#fff !important; opacity:1 !important;"></i>
                                     </button>
                                 </td>
                             </tr>
