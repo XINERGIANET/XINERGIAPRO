@@ -333,14 +333,14 @@ class PurchaseController extends Controller
                 $join->on('product_branch.product_id', '=', 'products.id')
                     ->where('product_branch.branch_id', '=', $branchId);
             })
-            ->leftJoin('units', 'units.id', '=', 'product_branch.unit_sale')
+            ->leftJoin('units', 'units.id', '=', 'products.base_unit_id')
             ->where('products.type', 'PRODUCT')
             ->orderBy('products.description')
             ->get([
                 'products.id',
                 'products.code',
                 'products.description',
-                'product_branch.unit_sale',
+                'products.base_unit_id as unit_sale',
                 'product_branch.price',
                 'units.description as unit_name',
             ]);
