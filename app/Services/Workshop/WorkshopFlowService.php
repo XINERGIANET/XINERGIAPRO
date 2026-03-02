@@ -1204,6 +1204,9 @@ class WorkshopFlowService
                 $card = !empty($payment['card_id'])
                     ? Card::query()->find((int) $payment['card_id'])
                     : null;
+                $digitalWallet = !empty($payment['digital_wallet_id'])
+                    ? \App\Models\DigitalWallet::query()->find((int) $payment['digital_wallet_id'])
+                    : null;
 
                 CashMovementDetail::query()->create([
                     'cash_movement_id' => $cashMovement->id,
@@ -1218,7 +1221,7 @@ class WorkshopFlowService
                     'bank_id' => $payment['bank_id'] ?? null,
                     'bank' => '',
                     'digital_wallet_id' => $payment['digital_wallet_id'] ?? null,
-                    'digital_wallet' => '',
+                    'digital_wallet' => $digitalWallet?->description ?? '',
                     'payment_gateway_id' => $gateway?->id,
                     'payment_gateway' => $gateway?->description ?? '',
                     'amount' => (float) $payment['amount'],
