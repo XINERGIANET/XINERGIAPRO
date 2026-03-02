@@ -172,7 +172,7 @@ class WorkshopOrderController extends Controller
             ->get();
 
         $products = Product::query()
-            ->where('type', 'PRODUCT')
+            ->where('classification', 'GOOD')
             ->with('baseUnit')
             ->orderBy('description')
             ->get();

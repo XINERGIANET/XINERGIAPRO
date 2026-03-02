@@ -201,7 +201,7 @@ class OrderController extends Controller
             $area = Area::find($request->query('area_id'));
         }
         
-        $products = Product::where('type', 'PRODUCT')
+        $products = Product::where('type', 'SELLABLE')
             ->with('category')
             ->get()
             ->map(function($product) use ($table, $tableId, $branchId) {
@@ -905,4 +905,3 @@ class OrderController extends Controller
         ]);
     }
 }
-

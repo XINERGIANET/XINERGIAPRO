@@ -95,7 +95,7 @@ class SalesController extends Controller
         $branchId = session('branch_id');
 
         $products = Product::query()
-            ->where('type', 'PRODUCT')
+            ->where('type', 'SELLABLE')
             ->with('category')
             ->orderBy('description')
             ->get()

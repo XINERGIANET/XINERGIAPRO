@@ -32,6 +32,7 @@
 
                 @include('products._form', [
                     'product' => $product,
+                    'productTypes' => $productTypes ?? collect(),
                     'currentBranch' => $currentBranch ?? null,
                     'taxRates' => $taxRates ?? collect(),
                     'productBranch' => $productBranch ?? null,

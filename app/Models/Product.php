@@ -14,6 +14,7 @@ class Product extends Model
         'description',
         'abbreviation',
         'type',
+        'product_type_id',
         'category_id',
         'base_unit_id',
         'kardex',
@@ -34,6 +35,11 @@ class Product extends Model
     public function category()
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function productType()
+    {
+        return $this->belongsTo(ProductType::class);
     }
 
     public function baseUnit()

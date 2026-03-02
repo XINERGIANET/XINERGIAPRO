@@ -347,7 +347,7 @@ class PurchaseController extends Controller
                     ->where('product_branch.branch_id', '=', $branchId);
             })
             ->leftJoin('units', 'units.id', '=', 'products.base_unit_id')
-            ->where('products.type', 'PRODUCT')
+            ->where('products.classification', 'GOOD')
             ->orderBy('products.description')
             ->get([
                 'products.id',

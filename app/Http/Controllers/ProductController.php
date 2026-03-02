@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Operation;
 use App\Models\Product;
 use App\Models\ProductBranch;
+use App\Models\ProductType;
 use App\Models\TaxRate;
 use App\Models\Unit;
 use Illuminate\Http\Request;
@@ -52,8 +53,10 @@ class ProductController extends Controller
             $perPage = 10;
         }
 
+        ProductType::ensureDefaultsForBranch((int) $branchId);
+
         $products = Product::query()
-            ->with(['category', 'baseUnit', 'productBranches.branch', 'productBranches.taxRate'])
+            ->with(['category', 'baseUnit', 'productType', 'productBranches.branch', 'productBranches.taxRate'])
             ->when($search, function ($query) use ($search) {
                 $query->where('description', 'ILIKE', "%{$search}%")
                     ->orWhere('code', 'ILIKE', "%{$search}%")
@@ -65,6 +68,11 @@ class ProductController extends Controller
 
         $categories = Category::query()->orderBy('description')->get();
         $units = Unit::query()->orderBy('description')->get();
+        $productTypes = ProductType::query()
+            ->where('branch_id', $branchId)
+            ->where('status', true)
+            ->orderBy('name')
+            ->get();
         $taxRates = TaxRate::query()->where('status', true)->orderBy('order_num')->get();
         $currentBranch = Branch::find(session('branch_id'));
         $nextProductCode = $this->nextBranchProductCode((int) $branchId);
@@ -73,6 +81,7 @@ class ProductController extends Controller
             'products' => $products,
             'categories' => $categories,
             'units' => $units,
+            'productTypes' => $productTypes,
             'taxRates' => $taxRates,
             'currentBranch' => $currentBranch,
             'nextProductCode' => $nextProductCode,
@@ -152,6 +161,12 @@ class ProductController extends Controller
         $units = Unit::query()->orderBy('description')->get();
         $taxRates = TaxRate::query()->where('status', true)->orderBy('order_num')->get();
         $branchId = $request->session()->get('branch_id');
+        ProductType::ensureDefaultsForBranch((int) $branchId);
+        $productTypes = ProductType::query()
+            ->where('branch_id', $branchId)
+            ->where('status', true)
+            ->orderBy('name')
+            ->get();
         $productBranch = $product->productBranches()
             ->where('branch_id', $branchId)
             ->first();
@@ -161,6 +176,7 @@ class ProductController extends Controller
             'productBranch' => $productBranch,
             'categories' => $categories,
             'units' => $units,
+            'productTypes' => $productTypes,
             'taxRates' => $taxRates,
             'suppliers' => collect(), 
             'viewId' => $request->input('view_id'),
@@ -240,32 +256,45 @@ class ProductController extends Controller
 
     private function validateProduct(Request $request): array
     {
+        $branchId = (int) $request->session()->get('branch_id');
+        $selectedProductType = ProductType::query()
+            ->where('id', (int) $request->input('product_type_id'))
+            ->where('branch_id', $branchId)
+            ->where('status', true)
+            ->first();
+        $isSupplyType = $selectedProductType
+            && in_array(strtoupper((string) $selectedProductType->behavior), ['SUPPLY', 'SUMINISTRO'], true);
+        $detailNumericRules = $isSupplyType
+            ? ['nullable', 'numeric', 'min:0']
+            : ['required', 'numeric', 'min:0'];
+
         $validated = $request->validate([
             // Datos del Producto
             'code' => ['required', 'string', 'max:50'],
             'description' => ['required', 'string', 'max:255'],
             'abbreviation' => ['required', 'string', 'max:255'],
-            'type' => ['required', 'string', 'in:PRODUCT,INGREDENT'],
+            'product_type_id' => ['required', 'integer', 'exists:product_types,id'],
             'category_id' => ['required', 'integer', 'exists:categories,id'],
             'base_unit_id' => ['required', 'integer', 'exists:units,id'],
             'kardex' => ['required', 'string', 'in:S,N'],
-            'status' => ['required', 'string', 'in:A,I'],
+            'status' => ['nullable', 'string', 'in:A,I'],
             'image' => ['nullable', 'sometimes', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
-            'complement' => ['required', 'string', 'in:NO,HAS,IS'],
+            'complement' => ['nullable', 'string', 'in:NO,HAS,IS'],
             'complement_mode' => ['nullable', 'string', 'in:,ALL,QUANTITY'],
-            'classification' => ['required', 'string', 'in:GOOD,SERVICE'],
+            'classification' => ['nullable', 'string', 'in:GOOD,SERVICE'],
             'features' => ['nullable', 'string'],
-            'recipe' => ['required', 'boolean'],
+            'recipe' => ['nullable', 'boolean'],
 
             // Datos de ProductBranch (Detalle por Sede)
-            'price' => ['required', 'numeric', 'min:0'],
-            'stock' => ['required', 'numeric', 'min:0'],
-            'stock_minimum' => ['required', 'numeric', 'min:0'],
-            'stock_maximum' => ['required', 'numeric', 'min:0'],
-            'minimum_sell' => ['required', 'numeric', 'min:0'],
-            'minimum_purchase' => ['required', 'numeric', 'min:0'],
+            'price' => $detailNumericRules,
+            'purchase_price' => $detailNumericRules,
+            'stock' => $detailNumericRules,
+            'stock_minimum' => $detailNumericRules,
+            'stock_maximum' => $detailNumericRules,
+            'minimum_sell' => $detailNumericRules,
+            'minimum_purchase' => $detailNumericRules,
             'tax_rate_id' => ['nullable', 'integer', 'exists:tax_rates,id'],
-            'unit_sale' => ['nullable', 'string', 'max:50'],
+            'unit_sale' => ['nullable', 'string', 'in:S,N'],
             'expiration_date' => ['nullable', 'date'],
             'favorite' => ['required', 'string', 'in:S,N'],
             'duration_minutes' => ['nullable', 'integer', 'min:0'],
@@ -276,25 +305,54 @@ class ProductController extends Controller
         if (isset($validated['image']) && empty($validated['image'])) {
             unset($validated['image']);
         }
+
+        $productType = $selectedProductType;
+
+        if (!$productType) {
+            throw ValidationException::withMessages([
+                'product_type_id' => 'El tipo de producto no pertenece a la sucursal actual.',
+            ]);
+        }
+
+        if (in_array(strtoupper((string) $productType->behavior), ['SUPPLY', 'SUMINISTRO'], true)) {
+            $validated['price'] = 0;
+            $validated['purchase_price'] = 0;
+            $validated['stock'] = 0;
+            $validated['stock_minimum'] = 0;
+            $validated['stock_maximum'] = 0;
+            $validated['minimum_sell'] = 0;
+            $validated['minimum_purchase'] = 0;
+            $validated['unit_sale'] = 'N';
+            $validated['expiration_date'] = null;
+        }
+
+        $validated['status'] = $validated['status'] ?? 'A';
+        $validated['complement'] = 'NO';
+        $validated['complement_mode'] = '';
+        $validated['classification'] = 'GOOD';
+        $validated['unit_sale'] = $validated['unit_sale'] ?? 'N';
         
         return $validated;
     }
 
     private function prepareProductData(array $validated): array
     {
+        $productType = ProductType::query()->findOrFail((int) $validated['product_type_id']);
+
         return [
             'code' => $validated['code'],
             'description' => $validated['description'],
             'abbreviation' => $validated['abbreviation'],
-            'type' => $validated['type'],
+            'type' => $productType->behavior,
+            'product_type_id' => $productType->id,
             'category_id' => $validated['category_id'],
             'base_unit_id' => $validated['base_unit_id'],
             'kardex' => $validated['kardex'],
-            'complement' => $validated['complement'],
-            'complement_mode' => $validated['complement_mode'],
-            'classification' => $validated['classification'],
-            'features' => $validated['features'],
-            'recipe' => (bool) $validated['recipe'],
+            'complement' => 'NO',
+            'complement_mode' => '',
+            'classification' => 'GOOD',
+            'features' => $validated['features'] ?? null,
+            'recipe' => (bool) ($validated['recipe'] ?? false),
         ];
     }
 
@@ -302,18 +360,19 @@ class ProductController extends Controller
     {
         return [
             'status' => $validated['status'],
-            'expiration_date' => $validated['expiration_date'],
+            'expiration_date' => $validated['expiration_date'] ?? null,
             'stock_minimum' => $validated['stock_minimum'],
             'stock_maximum' => $validated['stock_maximum'],
             'minimum_sell' => $validated['minimum_sell'],
             'minimum_purchase' => $validated['minimum_purchase'],
             'favorite' => $validated['favorite'],
-            'tax_rate_id' => $validated['tax_rate_id'],
-            'unit_sale' => $validated['unit_sale'],
-            'duration_minutes' => $validated['duration_minutes'],
-            'supplier_id' => $validated['supplier_id'],
+            'tax_rate_id' => $validated['tax_rate_id'] ?? null,
+            'unit_sale' => $validated['unit_sale'] ?? 'N',
+            'duration_minutes' => $validated['duration_minutes'] ?? null,
+            'supplier_id' => $validated['supplier_id'] ?? null,
             'stock' => $validated['stock'],
             'price' => $validated['price'],
+            'purchase_price' => $validated['purchase_price'],
         ];
     }
 

@@ -16,6 +16,7 @@ use App\Http\Controllers\MovementTypeController;
 use App\Http\Controllers\DocumentTypeController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductTypeController;
 use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\ParameterCategoriesController;
 use App\Http\Controllers\ParameterController;
@@ -186,6 +187,10 @@ Route::middleware('auth')->group(function () {
     Route::resource('/admin/herramientas/productos', ProductController::class)
         ->names('admin.products')
         ->parameters(['productos' => 'product'])
+        ->only(['index', 'store', 'edit', 'update', 'destroy']);
+    Route::resource('/herramientas/tipos-producto', ProductTypeController::class)
+        ->names('product-types')
+        ->parameters(['tipos-producto' => 'productType'])
         ->only(['index', 'store', 'edit', 'update', 'destroy']);
 
     Route::get('/admin/herramientas/productos/{product}/product-branches/create', [ProductBranchController::class, 'create'])

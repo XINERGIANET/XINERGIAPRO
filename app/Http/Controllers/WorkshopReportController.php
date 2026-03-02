@@ -171,7 +171,7 @@ class WorkshopReportController extends Controller
             ->get();
 
         $kardexProducts = Product::query()
-            ->where('type', 'PRODUCT')
+            ->where('classification', 'GOOD')
             ->orderBy('description')
             ->get(['id', 'description']);
 

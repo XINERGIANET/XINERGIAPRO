@@ -1,22 +1,47 @@
 <div x-data="{
-        // Variable que controla si se muestran los campos (True si NO es ingrediente)
-        showComplements: '{{ old('type', $product->type ?? 'PRODUCT') }}'.trim() !== 'INGREDENT',
-        complementValue: '{{ old('complement', $product->complement ?? 'NO') }}',
-        complementMode: '{{ old('complement_mode', $product->complement_mode ?? '') }}',
-        classificationValue: '{{ old('classification', $product->classification ?? 'GOOD') }}',
-        complements: @json(old('complements', [])),
+        productTypes: {{ Illuminate\Support\Js::from(collect($productTypes ?? [])->map(fn($type) => ['id' => $type->id, 'name' => $type->name, 'behavior' => $type->behavior])->values()) }},
+        selectedProductTypeId: {{ Illuminate\Support\Js::from((string) old('product_type_id', $product->product_type_id ?? '')) }},
+        showBranchDetail: true,
 
-        addComplement() { this.complements.push({ product: '', qty: 1 }); },
-        removeComplement(i) { this.complements.splice(i, 1); },
+        init() {
+            this.syncProductTypeBehavior(this.selectedProductTypeId);
+        },
+        selectedProductTypeLabel() {
+            const selected = this.productTypes.find(type => String(type.id) === String(this.selectedProductTypeId));
+            return selected?.name || 'Tipo seleccionado';
+        },
+        applySupplyBranchDefaults() {
+            const defaults = {
+                price: '0',
+                purchase_price: '0',
+                stock: '0',
+                stock_minimum: '0',
+                stock_maximum: '0',
+                minimum_sell: '0',
+                minimum_purchase: '0',
+                unit_sale: 'N',
+                expiration_date: ''
+            };
 
-        handleTypeChange(e) {
-            const isIngredient = e.target.value.trim() === 'INGREDENT';
-            this.showComplements = !isIngredient;
-            if (isIngredient) {
-                this.complementValue = 'NO';
-                this.complementMode = '';
-                this.classificationValue = 'GOOD';
+            Object.entries(defaults).forEach(([name, value]) => {
+                const field = this.$root.getElementsByName(name)[0];
+                if (!field) return;
+                field.value = value;
+                field.dispatchEvent(new Event('input', { bubbles: true }));
+                field.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+        },
+        syncProductTypeBehavior(productTypeId) {
+            const selected = this.productTypes.find(type => String(type.id) === String(productTypeId));
+            const isSupply = ['SUPPLY', 'SUMINISTRO'].includes(String(selected?.behavior || '').toUpperCase());
+            this.showBranchDetail = !isSupply;
+            if (isSupply) {
+                this.applySupplyBranchDefaults();
             }
+        },
+        handleTypeChange(e) {
+            this.selectedProductTypeId = e.target.value;
+            this.syncProductTypeBehavior(e.target.value);
         }
      }">
 
@@ -63,15 +88,45 @@
 
             <div>
                 <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Tipo</label>
-                <select
-                    name="type"
-                    required
-                    @change="handleTypeChange($event)"
-                    class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                >
-                    <option value="PRODUCT" @selected(old('type', $product->type ?? 'PRODUCT') === 'PRODUCT')>Producto final</option>
-                    <option value="INGREDENT" @selected(old('type', $product->type ?? 'PRODUCT') === 'INGREDENT')>Ingrediente</option>
-                </select>
+                @if (!empty($lockProductType))
+                    <input type="hidden" name="product_type_id" x-model="selectedProductTypeId" />
+                    <select
+                        id="product-type-select"
+                        x-model="selectedProductTypeId"
+                        @change="handleTypeChange($event)"
+                        class="hidden"
+                        tabindex="-1"
+                        aria-hidden="true"
+                    >
+                        @foreach (($productTypes ?? collect()) as $productType)
+                            <option value="{{ $productType->id }}">
+                                {{ $productType->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <select
+                        x-bind:value="selectedProductTypeLabel()"
+                        disabled
+                        class="dark:bg-dark-900 h-11 w-full cursor-not-allowed rounded-lg border border-gray-200 bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 opacity-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white/90"
+                    >
+                        <option x-text="selectedProductTypeLabel()"></option>
+                    </select>
+                @else
+                    <select
+                        id="product-type-select"
+                        name="product_type_id"
+                        required
+                        @change="handleTypeChange($event)"
+                        class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                    >
+                        <option value="">Seleccione tipo</option>
+                        @foreach (($productTypes ?? collect()) as $productType)
+                            <option value="{{ $productType->id }}" @selected(old('product_type_id', $product->product_type_id ?? '') == $productType->id)>
+                                {{ $productType->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                @endif
             </div>
 
             <div>
@@ -107,35 +162,6 @@
             </div>
 
             <div>
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Estado</label>
-                <select
-                    name="status"
-                    required
-                    class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                >
-                    <option value="A" @selected(old('status', $product->status ?? 'A') === 'A')>Activo</option>
-                    <option value="I" @selected(old('status', $product->status ?? 'A') === 'I')>Inactivo</option>
-                </select>
-            </div>
-        </div>
-    </div>
-
-    <!-- CONFIGURACIÓN DEL PRODUCTO -->
-    <div class="mb-8 p-6 bg-gray-50 dark:bg-gray-800/30 rounded-lg border border-gray-200 dark:border-gray-700">
-        <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">Configuración</h3>
-        <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            <div>
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Receta</label>
-                <select
-                    name="recipe"
-                    class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                >
-                    <option value="0" @selected(old('recipe', $product?->recipe ?? 0) == 0)>No</option>
-                    <option value="1" @selected(old('recipe', $product?->recipe ?? 0) == 1)>Sí</option>
-                </select>
-            </div>
-
-            <div>
                 <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Kardex</label>
                 <select
                     name="kardex"
@@ -143,7 +169,7 @@
                     class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                 >
                     <option value="N" @selected(old('kardex', $product->kardex ?? 'N') === 'N')>No</option>
-                    <option value="S" @selected(old('kardex', $product->kardex ?? 'N') === 'S')>Sí</option>
+                    <option value="S" @selected(old('kardex', $product->kardex ?? 'N') === 'S')>SÃ­</option>
                 </select>
             </div>
 
@@ -155,35 +181,51 @@
                     class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                 >
                     <option value="N" @selected(old('favorite', $productBranch->favorite ?? 'N') === 'N')>No</option>
-                    <option value="S" @selected(old('favorite', $productBranch->favorite ?? 'N') === 'S')>Sí</option>
+                    <option value="S" @selected(old('favorite', $productBranch->favorite ?? 'N') === 'S')>SÃ­</option>
                 </select>
-            </div>
-
-            <div>
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Duración (minutos)</label>
-                <input
-                    type="number"
-                    name="duration_minutes"
-                    value="{{ old('duration_minutes', $productBranch->duration_minutes ?? '') }}"
-                    class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
-                    placeholder="Ej: 30"
-                />
             </div>
         </div>
     </div>
+    @if (!empty($product))
+        <div class="mb-8 max-w-sm">
+            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Estado</label>
+            <select
+                name="status"
+                required
+                class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+            >
+                <option value="A" @selected(old('status', $product->status ?? 'A') === 'A')>Activo</option>
+                <option value="I" @selected(old('status', $product->status ?? 'A') === 'I')>Inactivo</option>
+            </select>
+        </div>
+    @endif
 
     <!-- INFORMACIÓN DE PRECIOS Y STOCK (DETALLE POR SEDE) -->
-    <div class="mb-8 p-6 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+    <div x-show="showBranchDetail" x-transition class="mb-8 p-6 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+        <fieldset x-bind:disabled="!showBranchDetail">
         <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">💰 Información Detalle por Sede</h3>
         <p class="mb-4 text-xs text-gray-600 dark:text-gray-400">Estos campos se configuran por cada sucursal</p>
         <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Precio</label>
+                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Precio venta</label>
                 <input
                     type="number"
                     name="price"
                     step="0.01"
                     value="{{ old('price', $productBranch->price ?? '') }}"
+                    required
+                    class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                    placeholder="0.00"
+                />
+            </div>
+
+            <div>
+                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Precio compra</label>
+                <input
+                    type="number"
+                    name="purchase_price"
+                    step="0.01"
+                    value="{{ old('purchase_price', $productBranch->purchase_price ?? '') }}"
                     required
                     class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                     placeholder="0.00"
@@ -256,14 +298,19 @@
             </div>
 
             <div>
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Unidad de venta</label>
-                <input
-                    type="text"
-                    name="unit_sale"
-                    value="{{ old('unit_sale', $productBranch->unit_sale ?? '') }}"
-                    class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
-                    placeholder="Ej: Unidad, Kg, Lt"
-                />
+                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Venta unitaria</label>
+                <div class="flex h-11 items-center gap-3 rounded-lg border border-gray-300 bg-white px-4 dark:border-gray-700 dark:bg-gray-900">
+                    <input type="hidden" name="unit_sale" value="N" />
+                    <input
+                        id="unit_sale"
+                        type="checkbox"
+                        name="unit_sale"
+                        value="S"
+                        @checked(old('unit_sale', $productBranch->unit_sale ?? 'N') === 'S')
+                        class="h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                    />
+                    <label for="unit_sale" class="text-sm text-gray-700 dark:text-gray-300">Permitir venta unitaria</label>
+                </div>
             </div>
 
             <div>
@@ -275,13 +322,6 @@
                     class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                 />
             </div>
-        </div>
-    </div>
-
-    <!-- CONFIGURACIÓN AVANZADA -->
-    <div class="mb-8 p-6 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-        <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">⚙️ Configuración Avanzada</h3>
-        <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             <div>
                 <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Tasa impositiva</label>
                 <select
@@ -316,8 +356,12 @@
                 </select>
             </div>
         </div>
+        </fieldset>
     </div>
 
+  
+
+    @if (false)
     <!-- COMPLEMENTOS -->
     <div x-show="showComplements" x-transition class="mb-8 p-6 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
         <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">🎁 Complementos</h3>
@@ -367,19 +411,24 @@
         </div>
     </div>
 
+    @endif
     <!-- MULTIMEDIA E INFORMACIÓN ADICIONAL -->
     <div class="mb-8 p-6 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
         <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">📸 Multimedia e Información Adicional</h3>
+        @php
+            $existingImagePreview = isset($product) && $product->image ? asset('storage/' . $product->image) : '';
+            $existingImageName = isset($product) && $product->image ? basename($product->image) : '';
+        @endphp
         <div class="grid gap-5 lg:grid-cols-2" x-data="{ 
-                imagePreview: '{{ isset($product) && $product->image ? asset('storage/' . $product->image) : '' }}',
-                fileName: '{{ isset($product) && $product->image ? basename($product->image) : '' }}',
+                imagePreview: {{ Illuminate\Support\Js::from($existingImagePreview) }},
+                fileName: {{ Illuminate\Support\Js::from($existingImageName) }},
                 defaultPlaceholder: 'https://placehold.co/100x100?text=Sin+Imagen',
                 
                 showPreview(event) {
                     const file = event.target.files[0];
                     if (!file) {
-                        this.imagePreview = '{{ isset($product) && $product->image ? asset('storage/' . $product->image) : '' }}';
-                        this.fileName = '{{ isset($product) && $product->image ? basename($product->image) : '' }}';
+                        this.imagePreview = {{ Illuminate\Support\Js::from($existingImagePreview) }};
+                        this.fileName = {{ Illuminate\Support\Js::from($existingImageName) }};
                         return;
                     }
 

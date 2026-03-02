@@ -28,13 +28,13 @@ class WarehouseMovementController extends Controller
             abort(403, 'No se ha seleccionado una sucursal');
         }
 
-        // Cargar productos igual que OrderController - todos los productos de tipo PRODUCT
-        $products = Product::where('type', 'PRODUCT')
+        // Cargar productos fisicos de la sucursal
+        $products = Product::where('classification', 'GOOD')
             ->with(['category', 'baseUnit'])
             ->orderBy('description')
             ->get();
 
-        // Si no hay productos con type PRODUCT, cargar todos los productos sin filtro
+        // Si no hay productos fisicos, cargar todos los productos sin filtro
         if ($products->isEmpty()) {
             $products = Product::with(['category', 'baseUnit'])
                 ->orderBy('description')
@@ -82,7 +82,7 @@ class WarehouseMovementController extends Controller
             abort(403, 'No se ha seleccionado una sucursal');
         }
 
-        $products = Product::where('type', 'PRODUCT')
+        $products = Product::where('classification', 'GOOD')
             ->with(['category', 'baseUnit'])
             ->orderBy('description')
             ->get();

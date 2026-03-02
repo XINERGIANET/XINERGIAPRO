@@ -42,7 +42,7 @@ class StoreWorkshopLineRequest extends FormRequest
             }
 
             $product = Product::query()->find($productId);
-            if (!$product || strtoupper((string) $product->type) !== 'PRODUCT') {
+            if (!$product || strtoupper((string) $product->classification) !== 'GOOD') {
                 $validator->errors()->add('product_id', 'El item seleccionado no es un repuesto valido.');
                 return;
             }
