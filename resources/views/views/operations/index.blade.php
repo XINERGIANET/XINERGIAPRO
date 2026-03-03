@@ -105,26 +105,38 @@
             title="Botones de: {{ $view->name }}"
             desc="Gestiona las operaciones (botones) que pertenecen a esta vista."
         >
-            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                
-                {{-- BUSCADOR --}}
-                <form method="GET" action="{{ route('admin.views.operations.index', $view) }}" class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-center mb-6">
+                {{-- BUSCADOR Y SELECTOR --}}
+                <form method="GET" action="{{ route('admin.views.operations.index', $view) }}" class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center min-w-0">
                     @if ($viewId)
                         <input type="hidden" name="view_id" value="{{ $viewId }}">
                     @endif
-                    <div class="relative flex-1">
-                        <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                            {!! $SearchIcon !!}
-                        </span>
-                        <input
-                            type="text"
-                            name="search"
-                            value="{{ request('search') }}"
-                            placeholder="Buscar por nombre o acción..."
-                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-10 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
-                        />
+                    <div class="w-auto flex-none">
+                        <select
+                            name="per_page"
+                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                            onchange="this.form.submit()"
+                        >
+                            @foreach ([10, 20, 50, 100] as $size)
+                                <option value="{{ $size }}" @selected(($perPage ?? 10) == $size)>{{ $size }} / pagina</option>
+                            @endforeach
+                        </select>
                     </div>
-                    <div class="flex flex-wrap gap-2">
+                    <div class="flex-1 min-w-0">
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                                <i class="ri-search-line"></i>
+                            </span>
+                            <input
+                                type="text"
+                                name="search"
+                                value="{{ request('search') }}"
+                                placeholder="Buscar por nombre o acción..."
+                                class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                            />
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 flex-none">
                         <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 px-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #244BB3; border-color: #244BB3;">
                             <i class="ri-search-line text-gray-100"></i>
                             <span class="font-medium text-gray-100">Buscar</span>
@@ -137,7 +149,7 @@
                 </form>
 
                 {{-- BOTONES DE ACCIÓN --}}
-                <div class="flex flex-wrap items-center gap-2">
+                <div class="flex items-center gap-3 border-t border-gray-100 pt-4 lg:border-0 lg:pt-0 flex-none lg:ml-0">
                     @foreach ($topOperations as $operation)
                         @php
                             $topTextColor = $resolveTextColor($operation);
@@ -154,31 +166,34 @@
                                 size="md"
                                 variant="primary"
                                 type="button"
+                                class="w-full sm:w-auto h-11 px-6 shadow-sm"
                                 style="{{ $topStyle }}"
                                 @click="$dispatch('open-create-modal')"
                             >
-                                <i class="{{ $operation->icon }}"></i>
+                                <i class="{{ $operation->icon }} text-lg"></i>
                                 <span>{{ $operation->name }}</span>
                             </x-ui.button>
                         @else
                             <x-ui.link-button
                                 size="md"
                                 variant="primary"
+                                class="w-full sm:w-auto h-11 px-6 shadow-sm"
                                 style="{{ $topStyle }}"
                                 href="{{ $topActionUrl }}"
                             >
-                                <i class="{{ $operation->icon }}"></i>
+                                <i class="{{ $operation->icon }} text-lg"></i>
                                 <span>{{ $operation->name }}</span>
                             </x-ui.link-button>
                         @endif
                     @endforeach
-                </div>
-            </div>
-
-            <div class="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div class="flex items-center gap-2 text-sm text-gray-500">
-                    <span>Total</span>
-                    <x-ui.badge size="sm" variant="light" color="info">{{ $operations->total() }}</x-ui.badge>
+                    @if ($topOperations->isEmpty())
+                        <x-ui.button size="md" variant="primary" type="button"
+                            class="w-full sm:w-auto h-11 px-6 shadow-sm"
+                            style="background-color: #00A389; color: #FFFFFF;" @click="$dispatch('open-create-modal')">
+                            <i class="ri-add-line text-lg"></i>
+                            <span>Nuevo Operacion</span>
+                        </x-ui.button>
+                    @endif
                 </div>
             </div>
 
@@ -187,57 +202,57 @@
                     <table class="w-full min-w-[880px]">
                         <thead>
                             <tr class="border-b border-gray-100 dark:border-gray-800 text-white">
-                                <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6 first:rounded-tl-xl sticky-left-header"><p class="font-medium text-white text-theme-xs dark:text-white">ID</p></th>
-                                <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6"><p class="font-medium text-white text-theme-xs dark:text-white">Icono</p></th>
-                                <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6"><p class="font-medium text-white text-theme-xs dark:text-white">Nombre</p></th>
-                                <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6"><p class="font-medium text-white text-theme-xs dark:text-white">Tipo</p></th>
-                                <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6"><p class="font-medium text-white text-theme-xs dark:text-white">Acción</p></th>
-                                <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6"><p class="font-medium text-white text-theme-xs dark:text-white">Estado</p></th>
-                                <th style="background-color: #334155;" class="px-5 py-3 text-right sm:px-6 last:rounded-tr-xl text-white"><p class="font-medium text-white text-theme-xs dark:text-white">Acciones</p></th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-4 text-center sm:px-6 first:rounded-tl-xl sticky-left-header transition-colors"><p class="font-bold text-white text-theme-xs uppercase">ID</p></th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-4 text-center sm:px-6"><p class="font-bold text-white text-theme-xs uppercase">Icono</p></th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-4 text-center sm:px-6"><p class="font-bold text-white text-theme-xs uppercase">Nombre</p></th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-4 text-center sm:px-6"><p class="font-bold text-white text-theme-xs uppercase">Tipo</p></th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-4 text-center sm:px-6"><p class="font-bold text-white text-theme-xs uppercase">Acción</p></th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-4 text-center sm:px-6"><p class="font-bold text-white text-theme-xs uppercase">Estado</p></th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-4 text-center sm:px-6 last:rounded-tr-xl transition-colors"><p class="font-bold text-white text-theme-xs uppercase">Acciones</p></th>
                             </tr>
                         </thead>
                         <tbody>
                             @forelse ($operations as $operation)
                                 <tr class="border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5">
                                     
-                                    <td class="px-5 py-4 sm:px-6 sticky-left">
+                                    <td class="px-5 py-4 sm:px-6 sticky-left text-center">
                                         <span class="font-bold text-gray-700 dark:text-gray-200">#{{ $operation->id }}</span>
                                     </td>
 
                                     <td class="px-5 py-4 sm:px-6">
-                                        <div class="flex h-10 w-10 items-center justify-center rounded bg-gray-50 border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+                                        <div class="flex h-10 w-10 items-center justify-center rounded bg-gray-50 border border-gray-200 dark:bg-gray-800 dark:border-gray-700 mx-auto">
                                             <i class="{{ $operation->icon }} text-lg" style="color: {{ $operation->color }};"></i>
                                         </div>
                                     </td>
                                     
-                                    <td class="px-5 py-4 sm:px-6">
+                                    <td class="px-5 py-4 sm:px-6 text-center">
                                         <p class="font-medium text-gray-800 text-theme-sm dark:text-white/90">{{ $operation->name }}</p>
-                                        <div class="flex items-center gap-1 mt-1">
+                                        <div class="flex items-center justify-center gap-1 mt-1">
                                             <span class="w-2 h-2 rounded-full" style="background-color: {{ $operation->color }}"></span>
                                             <span class="text-xs text-gray-400">{{ $operation->color }}</span>
                                         </div>
                                     </td>
 
-                                    <td class="px-5 py-4 sm:px-6">
+                                    <td class="px-5 py-4 sm:px-6 text-center">
                                         <x-ui.badge variant="light" color="{{ $operation->type === 'T' ? 'info' : 'success' }}">
                                             {{ $operation->type === 'T' ? 'Tabla' : 'Registro' }}
                                         </x-ui.badge>
                                     </td>
 
-                                    <td class="px-5 py-4 sm:px-6">
+                                    <td class="px-5 py-4 sm:px-6 text-center">
                                         <code class="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700">
                                             {{ $operation->action }}
                                         </code>
                                     </td>
 
-                                    <td class="px-5 py-4 sm:px-6">
+                                    <td class="px-5 py-4 sm:px-6 text-center">
                                         <x-ui.badge variant="light" color="{{ $operation->status ? 'success' : 'error' }}">
                                             {{ $operation->status ? 'Activo' : 'Inactivo' }}
                                         </x-ui.badge>
                                     </td>
 
                                     <td class="px-5 py-4 sm:px-6">
-                                        <div class="flex items-center justify-end gap-2">
+                                        <div class="flex items-center justify-center gap-2">
                                             @foreach ($rowOperations as $operationRow)
                                                 @php
                                                     $action = $operationRow->action ?? '';
@@ -295,8 +310,18 @@
                 
             </div>
 
-            <div class="mt-4">
-                {{ $operations->links() }}
+            <div class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div class="text-sm text-gray-500 dark:text-gray-400">
+                    Mostrando
+                    <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $operations->firstItem() ?? 0 }}</span>
+                    -
+                    <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $operations->lastItem() ?? 0 }}</span>
+                    de
+                    <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $operations->total() }}</span>
+                </div>
+                <div class="flex-none pagination-simple">
+                    {{ $operations->links('vendor.pagination.forced') }}
+                </div>
             </div>
         </x-common.component-card>
 

@@ -326,8 +326,8 @@
                     de
                     <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $areas->total() }}</span>
                 </div>
-                <div>
-                    {{ $areas->links() }}
+                <div class="flex-none pagination-simple">
+                    {{ $areas->links('vendor.pagination.forced') }}
                 </div>
             </div>
         </x-common.component-card>

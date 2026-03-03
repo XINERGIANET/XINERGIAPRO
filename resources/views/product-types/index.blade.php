@@ -124,23 +124,23 @@
                 <table class="w-full min-w-[900px]">
                     <thead>
                         <tr class="text-white">
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6 first:rounded-tl-xl"><p class="font-semibold text-white text-theme-xs uppercase">Nombre</p></th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6"><p class="font-semibold text-white text-theme-xs uppercase">Comportamiento</p></th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6"><p class="font-semibold text-white text-theme-xs uppercase">Estado</p></th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-right sm:px-6 last:rounded-tr-xl"><p class="font-semibold text-white text-theme-xs uppercase">Acciones</p></th>
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6 first:rounded-tl-xl w-1/3"><p class="font-semibold text-white text-theme-xs uppercase">Nombre</p></th>
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6"><p class="font-semibold text-white text-theme-xs uppercase">Comportamiento</p></th>
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6"><p class="font-semibold text-white text-theme-xs uppercase">Estado</p></th>
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6 last:rounded-tr-xl"><p class="font-semibold text-white text-theme-xs uppercase">Acciones</p></th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse ($productTypes as $productType)
                             <tr class="group/row border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5 relative hover:z-[60]">
-                                <td class="px-5 py-4 sm:px-6">
-                                    <div class="flex items-start gap-3">
+                                <td class="px-5 py-4 text-left sm:px-6 w-1/3">
+                                    <div class="flex items-center justify-start gap-3">
                                         @if ($productType->icon)
-                                            <span class="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                                            <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200">
                                                 <i class="{{ $productType->icon }}"></i>
                                             </span>
                                         @endif
-                                        <div>
+                                        <div class="text-left">
                                             <p class="font-medium text-gray-800 text-theme-sm dark:text-white/90">{{ $productType->name }}</p>
                                             @if ($productType->description)
                                                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ $productType->description }}</p>
@@ -148,18 +148,18 @@
                                         </div>
                                     </div>
                                 </td>
-                                <td class="px-5 py-4 sm:px-6">
+                                <td class="px-5 py-4 text-center sm:px-6">
                                     <x-ui.badge variant="light" color="{{ $productType->behavior === 'SUPPLY' ? 'warning' : 'success' }}">
                                         {{ $productType->behavior === 'SUPPLY' ? 'Suministro' : 'Vendible' }}
                                     </x-ui.badge>
                                 </td>
-                                <td class="px-5 py-4 sm:px-6">
+                                <td class="px-5 py-4 text-center sm:px-6">
                                     <x-ui.badge variant="light" color="{{ $productType->status ? 'success' : 'error' }}">
                                         {{ $productType->status ? 'Activo' : 'Inactivo' }}
                                     </x-ui.badge>
                                 </td>
-                                <td class="px-5 py-4 sm:px-6">
-                                    <div class="flex items-center justify-end gap-2">
+                                <td class="px-5 py-4 text-center sm:px-6">
+                                    <div class="flex items-center justify-center gap-2">
                                         @if ($rowOperations->isNotEmpty())
                                             @foreach ($rowOperations as $operation)
                                                 @php
@@ -228,13 +228,18 @@
                 </table>
             </div>
 
-            <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div class="text-sm text-gray-500">
-                    Mostrando <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $productTypes->firstItem() ?? 0 }}</span>
-                    - <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $productTypes->lastItem() ?? 0 }}</span>
-                    de <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $productTypes->total() }}</span>
+            <div class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div class="text-sm text-gray-500 dark:text-gray-400">
+                    Mostrando
+                    <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $productTypes->firstItem() ?? 0 }}</span>
+                    -
+                    <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $productTypes->lastItem() ?? 0 }}</span>
+                    de
+                    <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $productTypes->total() }}</span>
                 </div>
-                <div>{{ $productTypes->links() }}</div>
+                <div class="flex-none pagination-simple">
+                    {{ $productTypes->links('vendor.pagination.forced') }}
+                </div>
             </div>
         </x-common.component-card>
 

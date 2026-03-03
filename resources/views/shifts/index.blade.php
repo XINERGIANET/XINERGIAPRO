@@ -156,7 +156,7 @@
                             <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 font-medium text-theme-xs first:rounded-tl-xl sticky-left-header">Nombre / Abr.</th>
                             <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 font-medium text-theme-xs">Sucursal</th>
                             <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 font-medium text-theme-xs">Horario</th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 font-medium text-theme-xs text-right last:rounded-tr-xl">Acciones</th>
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 font-medium text-theme-xs text-center last:rounded-tr-xl">Acciones</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -183,7 +183,7 @@
                                     </div>
                                 </td>
                                 <td class="px-5 py-4">
-                                    <div class="flex items-center justify-end gap-2">
+                                    <div class="flex items-center justify-center gap-2">
                                         @if ($rowOperations->isNotEmpty())
                                             @foreach ($rowOperations as $operation)
                                                 @php
@@ -321,8 +321,8 @@
                     de
                     <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $shifts->total() }}</span>
                 </div>
-                <div>
-                    {{ $shifts->links() }}
+                <div class="flex-none pagination-simple">
+                    {{ $shifts->links('vendor.pagination.forced') }}
                 </div>
             </div>
         </x-common.component-card>

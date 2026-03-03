@@ -251,12 +251,17 @@
         </div>
     @endif
     {{-- PAGINACIÓN INFERIOR --}}
-    <div class="mt-6 flex flex-col items-center justify-center gap-4 sm:flex-row sm:justify-between border-t border-gray-100 pt-6 dark:border-gray-800">
-        <p class="text-sm text-gray-500 dark:text-gray-400">
-            Mostrando <span class="font-medium text-gray-700 dark:text-gray-200">{{ $paymentGateways->firstItem() ?? 0 }}</span> a <span class="font-medium text-gray-700 dark:text-gray-200">{{ $paymentGateways->lastItem() ?? 0 }}</span> de <span class="font-medium text-gray-700 dark:text-gray-200">{{ $paymentGateways->total() }}</span> registros
-        </p>
-        <div class="flex justify-center">
-            {{ $paymentGateways->links() }}
+    <div class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div class="text-sm text-gray-500 dark:text-gray-400">
+            Mostrando
+            <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $paymentGateways->firstItem() ?? 0 }}</span>
+            -
+            <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $paymentGateways->lastItem() ?? 0 }}</span>
+            de
+            <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $paymentGateways->total() }}</span>
+        </div>
+        <div class="flex-none pagination-simple">
+            {{ $paymentGateways->links('vendor.pagination.forced') }}
         </div>
     </div>
 </x-common.component-card>

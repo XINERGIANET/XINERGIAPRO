@@ -232,8 +232,18 @@
                 </table>
             </div>
 
-            <div class="mt-4">
-                {{ $roles->links() }}
+            <div class="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div class="text-sm text-gray-500 dark:text-gray-400">
+                    Mostrando
+                    <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $roles->firstItem() ?? 0 }}</span>
+                    -
+                    <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $roles->lastItem() ?? 0 }}</span>
+                    de
+                    <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $roles->total() }}</span>
+                </div>
+                <div class="flex-none pagination-simple">
+                    {{ $roles->links('vendor.pagination.forced') }}
+                </div>
             </div>
         </x-common.component-card>
 

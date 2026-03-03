@@ -183,15 +183,15 @@
                                 <td class="px-5 py-4 sm:px-6 text-center">
                                     <p class="font-medium text-gray-800 text-theme-sm dark:text-white/90">{{ $module->name }}</p>
                                 </td>
-                                <td class="px-5 py-4 sm:px-6 text-center">
-                                    <div class="flex items-center justify-center gap-3">
-                                        <div class="flex h-8 w-8 items-center justify-center rounded bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300 mx-auto">
-                                            <span class="w-5 h-5 fill-current">{!! MenuHelper::getIconSvg($module->icon) !!}</span>
+                                <td class="px-5 py-4 sm:px-10">
+                                    <div class="flex items-center justify-start gap-3">
+                                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-50 text-gray-500 border border-gray-100 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700 mx-0 shrink-0">
+                                            <span class="w-6 h-6">{!! MenuHelper::getIconSvg($module->icon) !!}</span>
                                         </div>
-                                        <span class="text-xs text-gray-500">{{ $module->icon }}</span>
+                                        <span class="text-xs font-medium text-gray-400 truncate">{{ $module->icon }}</span>
                                     </div>
                                 </td>
-                                <td class="px-5 py-4 sm:px-6 text-center">
+                                <td class="px-5 py-4 sm:px-6 text-center text-center">
                                     <x-ui.badge variant="light" color="{{ $module->status ? 'success' : 'error' }}" class="mx-auto">
                                         {{ $module->status ? 'Activo' : 'Inactivo' }}
                                     </x-ui.badge>
@@ -254,20 +254,23 @@
                             </tr>
                         @endforelse
                     </tbody>
-                    @if ($modules->count() > 0)
-@endif
                 </table>
         </div>
 
         {{-- PAGINACIÓN INFERIOR --}}
-        <div class="mt-6 flex flex-col items-center justify-center gap-4 sm:flex-row sm:justify-between border-t border-gray-100 pt-6 dark:border-gray-800">
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-                Mostrando <span class="font-medium text-gray-700 dark:text-gray-200">{{ $modules->firstItem() ?? 0 }}</span> a <span class="font-medium text-gray-700 dark:text-gray-200">{{ $modules->lastItem() ?? 0 }}</span> de <span class="font-medium text-gray-700 dark:text-gray-200">{{ $modules->total() }}</span> registros
-            </p>
-            <div class="flex justify-center">
-                {{ $modules->links() }}
+            <div class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div class="text-sm text-gray-500 dark:text-gray-400">
+                    Mostrando
+                    <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $modules->firstItem() ?? 0 }}</span>
+                    -
+                    <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $modules->lastItem() ?? 0 }}</span>
+                    de
+                    <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $modules->total() }}</span>
+                </div>
+                <div class="flex-none pagination-simple">
+                    {{ $modules->links('vendor.pagination.forced') }}
+                </div>
             </div>
-        </div>
     </x-common.component-card>
 
 

@@ -283,7 +283,7 @@
                 <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $views->total() }}</span>
             </div>
             <div class="flex-none pagination-simple">
-                {{ $views->links() }}
+                    {{ $views->links('vendor.pagination.forced') }}
             </div>
         </div>
     </x-common.component-card>

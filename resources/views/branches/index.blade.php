@@ -347,8 +347,8 @@
                     de
                     <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $branches->total() }}</span>
                 </div>
-                <div>
-                    {{ $branches->links() }}
+                <div class="flex-none pagination-simple">
+                    {{ $branches->links('vendor.pagination.forced') }}
                 </div>
             </div>
         </x-common.component-card>
