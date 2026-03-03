@@ -178,22 +178,22 @@
                     <thead>
                         <tr class="text-white">
                             <th style="background-color: #334155; color: #FFFFFF;" class="w-12 px-4 py-4 text-center first:rounded-tl-xl"></th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="hidden md:table-cell px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="hidden md:table-cell px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Código</p>
                             </th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Descripción</p>
                             </th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="hidden sm:table-cell px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="hidden sm:table-cell px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Categoría</p>
                             </th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="hidden lg:table-cell px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="hidden lg:table-cell px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Unidad base</p>
                             </th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="hidden xl:table-cell px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="hidden xl:table-cell px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Tipo</p>
                             </th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-right sm:px-6 last:rounded-tr-xl">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6 last:rounded-tr-xl">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Acciones</p>
                             </th>
                         </tr>
@@ -210,27 +210,27 @@
                                         <i class="ri-subtract-line" x-show="openRow === {{ $product->id }}"></i>
                                     </button>
                                 </td>
-                                <td class="hidden md:table-cell px-5 py-4 sm:px-6">
+                                <td class="hidden md:table-cell px-5 py-4 text-center sm:px-6">
                                     <p class="font-medium text-gray-800 text-theme-sm dark:text-white/90">
                                         {{ $product->code }}</p>
                                 </td>
-                                <td class="px-5 py-4 sm:px-6">
+                                <td class="px-5 py-4 text-center sm:px-6">
                                     <p class="text-gray-500 text-theme-sm dark:text-gray-400">{{ $product->description }}
                                     </p>
                                 </td>
-                                <td class="hidden sm:table-cell px-5 py-4 sm:px-6">
+                                <td class="hidden sm:table-cell px-5 py-4 text-center sm:px-6">
                                     <p class="text-gray-500 text-theme-sm dark:text-gray-400">
                                         {{ $product->category?->description ?? '-' }}</p>
                                 </td>
-                                <td class="hidden lg:table-cell px-5 py-4 sm:px-6">
+                                <td class="hidden lg:table-cell px-5 py-4 text-center sm:px-6">
                                     <p class="text-gray-500 text-theme-sm dark:text-gray-400">
                                         {{ $product->baseUnit?->description ?? '-' }}</p>
                                 </td>
-                                <td class="hidden xl:table-cell px-5 py-4 sm:px-6">
+                                <td class="hidden xl:table-cell px-5 py-4 text-center sm:px-6">
                                     <p class="text-gray-500 text-theme-sm dark:text-gray-400">{{ $product->productType?->name ?? '-' }}</p>
                                 </td>
-                                <td class="px-5 py-4 sm:px-6">
-                                    <div class="flex items-center justify-end gap-2">
+                                <td class="px-5 py-4 text-center sm:px-6">
+                                    <div class="flex items-center justify-center gap-2">
 
                                         {{-- <div class="relative group">
                                             <x-ui.button size="icon" type="button"
@@ -361,8 +361,8 @@
                 </table>
             </div>
 
-            <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div class="text-sm text-gray-500">
+            <div class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div class="text-sm text-gray-500 dark:text-gray-400">
                     Mostrando
                     <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $products->firstItem() ?? 0 }}</span>
                     -
@@ -370,8 +370,8 @@
                     de
                     <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $products->total() }}</span>
                 </div>
-                <div>
-                    {{ $products->links() }}
+                <div class="flex-none pagination-simple">
+                    {{ $products->links('vendor.pagination.forced') }}
                 </div>
             </div>
         </x-common.component-card>

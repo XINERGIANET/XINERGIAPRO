@@ -336,8 +336,8 @@
                     de
                     <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $tables->total() }}</span>
                 </div>
-                <div>
-                    {{ $tables->links() }}
+                <div class="flex-none pagination-simple">
+                    {{ $tables->links('vendor.pagination.forced') }}
                 </div>
             </div>
         </x-common.component-card>

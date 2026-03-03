@@ -361,7 +361,7 @@
                 <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $warehouseMovements->total() }}</span>
             </div>
             <div class="flex-none pagination-simple">
-                {{ $warehouseMovements->links() }}
+                {{ $warehouseMovements->links('vendor.pagination.forced') }}
             </div>
         </div>
     </div>

@@ -261,8 +261,8 @@
                     de
                     <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $profiles->total() }}</span>
                 </div>
-                <div>
-                    {{ $profiles->links() }}
+                <div class="flex-none pagination-simple">
+                    {{ $profiles->links('vendor.pagination.forced') }}
                 </div>
             </div>
         </x-common.component-card>

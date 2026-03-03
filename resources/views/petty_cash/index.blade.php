@@ -334,7 +334,7 @@
                                 <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6">
                                     <p class="font-semibold text-white text-theme-xs uppercase">Metodos de pago</p>
                                 </th>
-                                <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-right sm:px-6 last:rounded-tr-xl">
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6 last:rounded-tr-xl">
                                     <p class="font-semibold text-white text-theme-xs uppercase">Operaciones</p>
                                 </th>
                             </tr>
@@ -396,8 +396,8 @@
                                             {{ $paymentSummary ?: '-' }}
                                         </p>
                                     </td>
-                                    <td class="px-5 py-4 sm:px-6 align-middle">
-                                        <div class="flex items-center justify-end gap-2">
+                                    <td class="px-5 py-4 sm:px-6">
+                                        <div class="flex items-center justify-center gap-2">
                                             @if ($rowOperations->isNotEmpty())
                                                 @foreach ($rowOperations as $operation)
                                                     @php
@@ -523,8 +523,8 @@
                     de
                     <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $movements->total() }}</span>
                 </div>
-                <div>
-                    {{ $movements->links() }}
+                <div class="flex-none pagination-simple">
+                    {{ $movements->links('vendor.pagination.forced') }}
                 </div>
             </div>
 
