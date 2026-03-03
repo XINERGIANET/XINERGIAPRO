@@ -12,41 +12,80 @@
             <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first() }}</div>
         @endif
 
-        <div class="mb-4 flex flex-wrap items-center gap-2">
-            <x-ui.button size="md" variant="primary" type="button" style="background-color:#00A389;color:#fff" @click="$dispatch('open-vehicle-modal')">
-                <i class="ri-add-line"></i><span>Nuevo vehiculo</span>
-            </x-ui.button>
-            <button type="button" class="h-10 rounded-lg bg-[#244BB3] px-3 text-sm font-medium text-white">Operacion: Ver</button>
-        </div>
+        {{-- Barra de Herramientas Premium (Estilo solicitado) --}}
+        <form method="GET" action="{{ route('workshop.vehicles.index') }}" class="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-white/[0.02]">
+            {{-- Selector de Registros --}}
+            <div class="flex items-center gap-2">
+                <select name="per_page" class="h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="this.form.submit()">
+                    <option value="10" @selected(($per_page ?? 10) == 10)>10 / pág</option>
+                    <option value="25" @selected(($per_page ?? 10) == 25)>25 / pág</option>
+                    <option value="50" @selected(($per_page ?? 10) == 50)>50 / pág</option>
+                    <option value="100" @selected(($per_page ?? 10) == 100)>100 / pág</option>
+                </select>
+            </div>
 
-        <form method="GET" class="mb-4 flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.02]">
-            <input name="search" value="{{ $search }}" class="h-11 min-w-[280px] flex-1 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Buscar por placa, marca, modelo, VIN">
-            <button class="h-11 rounded-lg bg-[#244BB3] px-4 text-sm font-medium text-white">Buscar</button>
-            <a href="{{ route('workshop.vehicles.index') }}" class="h-11 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 inline-flex items-center">Limpiar</a>
+            {{-- Buscador Principal --}}
+            <div class="relative flex-1 min-w-[300px]">
+                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                    <i class="ri-search-line text-lg text-gray-400"></i>
+                </div>
+                <input 
+                    name="search" 
+                    value="{{ $search ?? '' }}" 
+                    class="h-11 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-4 text-sm shadow-sm transition-all focus:border-blue-500 focus:ring-blue-500 placeholder:text-gray-400" 
+                    placeholder="Buscar por placa, marca, modelo, VIN..."
+                >
+            </div>
+
+            {{-- Acciones del Formulario --}}
+            <div class="flex items-center gap-2">
+                <button type="submit" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#244BB3] px-6 text-sm font-bold text-white shadow-lg shadow-blue-100 transition-all hover:brightness-110 active:scale-95">
+                    <i class="ri-search-line"></i>
+                    <span>Buscar</span>
+                </button>
+                <a href="{{ route('workshop.vehicles.index') }}" class="inline-flex h-11 items-center justify-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-bold text-gray-700 shadow-sm transition-all hover:bg-gray-50 active:scale-95">
+                    Limpiar
+                </a>
+            </div>
+
+            {{-- Botón Nuevo (Al final a la derecha) --}}
+            <div class="ml-auto">
+                <x-ui.button 
+                    size="md" 
+                    variant="primary" 
+                    type="button" 
+                    class="!h-11 rounded-2xl px-6 font-bold shadow-lg transition-all hover:scale-[1.02]" 
+                    style="background-color:#00A389;color:#fff" 
+                    @click="$dispatch('open-vehicle-modal')"
+                >
+                    <i class="ri-add-line text-lg"></i>
+                    <span>Nuevo vehiculo</span>
+                </x-ui.button>
+            </div>
         </form>
 
         <div class="overflow-x-auto overflow-y-hidden mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
             <table class="w-full min-w-[900px]">
                 <thead>
                     <tr>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">ID</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Cliente</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Vehiculo</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Placa</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">KM</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Acciones</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">ID</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Cliente</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Vehiculo</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Placa</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">KM</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($vehicles as $vehicle)
                         <tr class="relative hover:z-[60] border-t border-gray-100 dark:border-gray-800">
-                            <td class="px-4 py-3 text-sm">{{ $vehicle->id }}</td>
-                            <td class="px-4 py-3 text-sm">{{ $vehicle->client?->first_name }} {{ $vehicle->client?->last_name }}</td>
-                            <td class="px-4 py-3 text-sm">{{ $vehicle->brand }} {{ $vehicle->model }} ({{ ucfirst($vehicle->vehicleType?->name ?? $vehicle->type) }})</td>
-                            <td class="px-4 py-3 text-sm">{{ $vehicle->plate }}</td>
-                            <td class="px-4 py-3 text-sm">{{ $vehicle->current_mileage }}</td>
+                            <td class="px-4 py-3 text-sm text-center">{{ $vehicle->id }}</td>
+                            <td class="px-4 py-3 text-sm text-center uppercase">{{ $vehicle->client?->first_name }} {{ $vehicle->client?->last_name }}</td>
+                            <td class="px-4 py-3 text-sm text-center uppercase">{{ $vehicle->brand }} {{ $vehicle->model }} ({{ ucfirst($vehicle->vehicleType?->name ?? $vehicle->type) }})</td>
+                            <td class="px-4 py-3 text-sm text-center font-bold">{{ $vehicle->plate }}</td>
+                            <td class="px-4 py-3 text-sm text-center">{{ number_format($vehicle->current_mileage) }}</td>
                             <td class="px-4 py-3 text-sm">
-                                <div class="flex items-center justify-end gap-2">
+                                <div class="flex items-center justify-center gap-2">
                                     <div class="relative group">
                                         <x-ui.button
                                             size="icon"
@@ -97,13 +136,40 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="px-4 py-4 text-sm text-gray-500">Sin vehiculos registrados.</td></tr>
+                        <tr><td colspan="6" class="px-4 py-4 text-sm text-gray-500 text-center">Sin vehiculos registrados.</td></tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
 
-        <div class="mt-4">{{ $vehicles->links() }}</div>
+        {{-- Pie de Tabla Premium (Estilo solicitado) --}}
+        <div class="mt-4 flex flex-col items-center justify-between gap-4 p-4 md:flex-row">
+            <div class="text-[14px] font-semibold text-gray-600">
+                Mostrando {{ $vehicles->firstItem() ?? 0 }} - {{ $vehicles->lastItem() ?? 0 }} de {{ $vehicles->total() }}
+            </div>
+            <div class="pagination-premium">
+                {{ $vehicles->links() }}
+            </div>
+        </div>
+
+        <style>
+            .pagination-premium nav > div:first-child { display: none !important; }
+            .pagination-premium nav span.relative.z-0.inline-flex { gap: 8px !important; display: flex !important; }
+            .pagination-premium nav span.relative.z-0.inline-flex a,
+            .pagination-premium nav span.relative.z-0.inline-flex > span > span,
+            .pagination-premium nav span.relative.z-0.inline-flex > span > a,
+            .pagination-premium nav span.relative.z-0.inline-flex [aria-disabled="true"] span {
+                border-radius: 12px !important; border: 1px solid #E5E7EB !important; color: #9CA3AF !important;
+                background-color: white !important; width: 40px !important; height: 40px !important;
+                display: flex !important; align-items: center !important; justify-content: center !important;
+                padding: 0 !important; font-weight: 600 !important; transition: all 0.2s; cursor: pointer;
+            }
+            .pagination-premium nav span.relative.z-0.inline-flex span[aria-current="page"] span {
+                background-color: #F0F7FF !important; color: #244BB3 !important; border: 1.5px solid #244BB3 !important; border-radius: 12px !important;
+            }
+            .pagination-premium nav span.relative.z-0.inline-flex [aria-disabled="true"] span { opacity: 0.5; cursor: default; background-color: #F9FAFB !important; }
+            .pagination-premium nav span.relative.z-0.inline-flex a:hover { background-color: #F9FAFB !important; border-color: #D1D5DB !important; color: #374151 !important; }
+        </style>
     </x-common.component-card>
 
     <x-ui.modal x-data="{ open: false }" x-on:open-vehicle-modal.window="open = true" :isOpen="false" :showCloseButton="false" class="max-w-6xl">

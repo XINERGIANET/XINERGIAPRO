@@ -81,12 +81,25 @@
 
     <x-common.component-card title="Gestión de Módulos" desc="Administra los elementos principales del menú lateral.">
         
-        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <form method="GET" class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+        {{-- BARRA DE BÚSQUEDA Y ACCIONES --}}
+        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between mb-6">
+            <form method="GET" class="flex flex-1 flex-wrap gap-2 sm:flex-nowrap sm:items-center min-w-0">
                 @if ($viewId)
                     <input type="hidden" name="view_id" value="{{ $viewId }}">
                 @endif
-                <div class="relative flex-1">
+                
+                {{-- Selector de página a la IZQUIERDA --}}
+                <div class="flex-none">
+                    <select name="per_page"
+                        class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 rounded-lg border border-gray-300 bg-transparent px-3 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        onchange="this.form.submit()">
+                        @foreach ([10, 20, 50, 100] as $size)
+                            <option value="{{ $size }}" @selected(request('per_page', 10) == $size)>{{ $size }} / página</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="relative flex-1 min-w-0">
                     <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                         {!! $SearchIcon !!}
                     </span>
@@ -98,72 +111,67 @@
                         class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-10 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                     />
                 </div>
-                <div class="flex flex-wrap gap-2">
-                    <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 px-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #244BB3; border-color: #244BB3;">
+                <div class="flex items-center gap-2 flex-none">
+                    <x-ui.button size="md" variant="primary" type="submit" class="h-11 px-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #244BB3; border-color: #244BB3;">
                         <i class="ri-search-line text-gray-100"></i>
                         <span class="font-medium text-gray-100">Buscar</span>
                     </x-ui.button>
-                    <x-ui.link-button size="md" variant="outline" href="{{ route('admin.modules.index', $viewId ? ['view_id' => $viewId] : []) }}" class="flex-1 sm:flex-none h-11 px-4 border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200">
+                    <x-ui.link-button size="md" variant="outline" href="{{ route('admin.modules.index', $viewId ? ['view_id' => $viewId] : []) }}" class="h-11 px-4 border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200">
                         <i class="ri-refresh-line"></i>
                         <span class="font-medium">Limpiar</span>
                     </x-ui.link-button>
+
+                    @foreach ($topOperations as $operation)
+                        @php
+                            $topTextColor = $resolveTextColor($operation);
+                            $topColor = $operation->color ?: '#3B82F6';
+                            $topStyle = "background-color: {$topColor}; color: {$topTextColor};";
+                            $topActionUrl = $resolveActionUrl($operation->action ?? '', null, $operation);
+                            $isCreate = str_contains($operation->action ?? '', 'modules.create');
+                        @endphp
+                        @if ($isCreate)
+                            <x-ui.button
+                                size="md"
+                                variant="primary"
+                                type="button"
+                                class="h-11 px-6 shadow-sm whitespace-nowrap"
+                                style="{{ $topStyle }}"
+                                @click="$dispatch('open-module-modal')"
+                            >
+                                <i class="{{ $operation->icon }} text-lg"></i>
+                                <span>{{ $operation->name }}</span>
+                            </x-ui.button>
+                        @else
+                            <x-ui.link-button
+                                size="md"
+                                variant="primary"
+                                class="h-11 px-6 shadow-sm whitespace-nowrap"
+                                style="{{ $topStyle }}"
+                                href="{{ $topActionUrl }}"
+                            >
+                                <i class="{{ $operation->icon }} text-lg"></i>
+                                <span>{{ $operation->name }}</span>
+                            </x-ui.link-button>
+                        @endif
+                    @endforeach
                 </div>
             </form>
-            
-            <div class="flex flex-wrap items-center gap-2">
-                @foreach ($topOperations as $operation)
-                    @php
-                        $topTextColor = $resolveTextColor($operation);
-                        $topColor = $operation->color ?: '#3B82F6';
-                        $topStyle = "background-color: {$topColor}; color: {$topTextColor};";
-                        $topActionUrl = $resolveActionUrl($operation->action ?? '', null, $operation);
-                        $isCreate = str_contains($operation->action ?? '', 'modules.create');
-                    @endphp
-                    @if ($isCreate)
-                        <x-ui.button
-                            size="md"
-                            variant="primary"
-                            type="button"
-                            style="{{ $topStyle }}"
-                            @click="$dispatch('open-module-modal')"
-                        >
-                            <i class="{{ $operation->icon }}"></i>
-                            <span>{{ $operation->name }}</span>
-                        </x-ui.button>
-                    @else
-                        <x-ui.link-button
-                            size="md"
-                            variant="primary"
-                            style="{{ $topStyle }}"
-                            href="{{ $topActionUrl }}"
-                        >
-                            <i class="{{ $operation->icon }}"></i>
-                            <span>{{ $operation->name }}</span>
-                        </x-ui.link-button>
-                    @endif
-                @endforeach
-            </div>
         </div>
 
-        <div class="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div class="flex items-center gap-2 text-sm text-gray-500">
-                <span>Total</span>
-                <x-ui.badge size="sm" variant="light" color="info">{{ $modules->total() }}</x-ui.badge>
-            </div>
-        </div>
+
 
         {{-- TABLA --}}
         <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
                 <table class="w-full min-w-[880px]">
                     <thead>
                         <tr class="text-white">
-                            <th style="background-color: #334155;" class="px-3 py-3 text-left sm:px-6 first:rounded-tl-xl sticky-left-header">
+                            <th style="background-color: #334155;" class="px-3 py-3 text-center sm:px-6 first:rounded-tl-xl sticky-left-header">
                                 <p class="font-semibold text-gray-100 text-theme-xs truncate">Orden</p>
                             </th>
-                            <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6"><p class="font-semibold text-gray-100 text-theme-xs uppercase">Nombre</p></th>
-                            <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6"><p class="font-semibold text-gray-100 text-theme-xs uppercase">Icono</p></th>
-                            <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6"><p class="font-semibold text-gray-100 text-theme-xs uppercase">Estado</p></th>
-                            <th style="background-color: #334155;" class="px-5 py-3 text-right sm:px-6 last:rounded-tr-xl"><p class="font-semibold text-gray-100 text-theme-xs uppercase">Acciones</p></th>
+                            <th style="background-color: #334155;" class="px-5 py-3 text-center sm:px-6"><p class="font-semibold text-gray-100 text-theme-xs uppercase">Nombre</p></th>
+                            <th style="background-color: #334155;" class="px-5 py-3 text-center sm:px-6"><p class="font-semibold text-gray-100 text-theme-xs uppercase">Icono</p></th>
+                            <th style="background-color: #334155;" class="px-5 py-3 text-center sm:px-6"><p class="font-semibold text-gray-100 text-theme-xs uppercase">Estado</p></th>
+                            <th style="background-color: #334155;" class="px-5 py-3 text-center sm:px-6 last:rounded-tr-xl"><p class="font-semibold text-gray-100 text-theme-xs uppercase">Acciones</p></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -172,24 +180,24 @@
                                 <td class="px-3 py-4 sm:px-6 sticky-left text-center">
                                     <span class="font-bold text-gray-700 dark:text-gray-200 text-xs text-center block">#{{ $module->order_num }}</span>
                                 </td>
-                                <td class="px-5 py-4 sm:px-6">
+                                <td class="px-5 py-4 sm:px-6 text-center">
                                     <p class="font-medium text-gray-800 text-theme-sm dark:text-white/90">{{ $module->name }}</p>
                                 </td>
-                                <td class="px-5 py-4 sm:px-6">
-                                    <div class="flex items-center gap-3">
-                                        <div class="flex h-8 w-8 items-center justify-center rounded bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                                <td class="px-5 py-4 sm:px-6 text-center">
+                                    <div class="flex items-center justify-center gap-3">
+                                        <div class="flex h-8 w-8 items-center justify-center rounded bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300 mx-auto">
                                             <span class="w-5 h-5 fill-current">{!! MenuHelper::getIconSvg($module->icon) !!}</span>
                                         </div>
                                         <span class="text-xs text-gray-500">{{ $module->icon }}</span>
                                     </div>
                                 </td>
-                                <td class="px-5 py-4 sm:px-6">
-                                    <x-ui.badge variant="light" color="{{ $module->status ? 'success' : 'error' }}">
+                                <td class="px-5 py-4 sm:px-6 text-center">
+                                    <x-ui.badge variant="light" color="{{ $module->status ? 'success' : 'error' }}" class="mx-auto">
                                         {{ $module->status ? 'Activo' : 'Inactivo' }}
                                     </x-ui.badge>
                                 </td>
-                                <td class="px-5 py-4 sm:px-6">
-                                    <div class="flex items-center justify-end gap-2">
+                                <td class="px-5 py-4 sm:px-6 text-center">
+                                    <div class="flex items-center justify-center gap-2">
                                         @foreach ($rowOperations as $operation)
                                             @php
                                                 $action = $operation->action ?? '';
@@ -251,50 +259,69 @@
                 </table>
         </div>
 
-        <div class="mt-4">
-            {{ $modules->links() }}
+        {{-- PAGINACIÓN INFERIOR --}}
+        <div class="mt-6 flex flex-col items-center justify-center gap-4 sm:flex-row sm:justify-between border-t border-gray-100 pt-6 dark:border-gray-800">
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+                Mostrando <span class="font-medium text-gray-700 dark:text-gray-200">{{ $modules->firstItem() ?? 0 }}</span> a <span class="font-medium text-gray-700 dark:text-gray-200">{{ $modules->lastItem() ?? 0 }}</span> de <span class="font-medium text-gray-700 dark:text-gray-200">{{ $modules->total() }}</span> registros
+            </p>
+            <div class="flex justify-center">
+                {{ $modules->links() }}
+            </div>
         </div>
     </x-common.component-card>
 
 
     <x-ui.modal x-data="{ open: false }" @open-module-modal.window="open = true" @close-module-modal.window="open = false" :isOpen="false" class="max-w-3xl">
-        <div class="p-6 sm:p-8">
-            <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <p class="text-xs uppercase tracking-[0.3em] text-gray-400">Administracion</p>
-                    <h3 class="mt-2 text-lg font-semibold text-gray-800 dark:text-white/90">Registrar modulo</h3>
-                    <p class="mt-1 text-sm text-gray-500">Ingresa la informacion principal del modulo.</p>
-                </div>
-                <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-500 dark:bg-brand-500/10">
-                    <i class="ri-building-line"></i>
+        <div class="overflow-hidden rounded-3xl bg-white dark:bg-gray-900 shadow-2xl">
+            {{-- Header del Modal --}}
+            <div class="relative p-6 sm:p-8 border-b border-gray-100 dark:border-gray-800">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex items-center gap-5">
+                        <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600 text-white shadow-lg shadow-brand-500/20">
+                            <i class="ri-apps-2-fill text-3xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-500">Configuración</p>
+                            <h3 class="mt-0.5 text-xl font-bold text-gray-900 dark:text-white">Gestión de Módulo</h3>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Define los parámetros del elemento para el menú principal.</p>
+                        </div>
+                    </div>
+                    <button type="button" @click="open = false" 
+                        class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-50 text-gray-400 transition-all hover:bg-red-50 hover:text-red-500 dark:bg-gray-800 dark:hover:bg-red-900/30">
+                        <i class="ri-close-line text-2xl"></i>
+                    </button>
                 </div>
             </div>
 
-            @if ($errors->any())
-                <div class="mb-5">
-                    <x-ui.alert variant="error" title="Revisa los campos" message="Hay errores en el formulario, corrige los datos e intenta nuevamente." />
-                </div>
-            @endif
-
-            <form method="POST" action="{{ route('admin.modules.store') }}" class="space-y-6">
-                @csrf
-                @if ($viewId)
-                    <input type="hidden" name="view_id" value="{{ $viewId }}">
+            <div class="p-6 sm:p-8">
+                @if ($errors->any())
+                    <div class="mb-6">
+                        <x-ui.alert variant="error" title="Atención" message="Por favor corrige los errores indicados en el formulario." />
+                    </div>
                 @endif
 
-                @include('modules._form', ['module' => null])
+                <form method="POST" action="{{ route('admin.modules.store') }}" class="space-y-8">
+                    @csrf
+                    @if ($viewId)
+                        <input type="hidden" name="view_id" value="{{ $viewId }}">
+                    @endif
 
-                <div class="flex flex-wrap gap-3">
-                    <x-ui.button type="submit" size="md" variant="primary">
-                        <i class="ri-save-line"></i>
-                        <span>Guardar</span>
-                    </x-ui.button>
-                    <x-ui.button type="button" size="md" variant="outline" @click="open = false">
-                        <i class="ri-close-line"></i>
-                        <span>Cancelar</span>
-                    </x-ui.button>
-                </div>
-            </form>
+                    @include('modules._form', ['module' => null])
+
+                    <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+                        <x-ui.button type="button" size="lg" variant="outline" @click="open = false" 
+                            class="rounded-xl border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 shadow-sm transition-all duration-200">
+                            <i class="ri-close-line"></i>
+                            <span>Cancelar</span>
+                        </x-ui.button>
+                        <x-ui.button type="submit" size="lg" variant="primary" 
+                            class="rounded-xl bg-brand-600 hover:bg-brand-700 shadow-lg shadow-brand-600/20 active:scale-95 transition-all duration-200 px-8">
+                            <i class="ri-save-3-line"></i>
+                            <span>Guardar Módulo</span>
+                        </x-ui.button>
+                    </div>
+                </form>
+            </div>
         </div>
     </x-ui.modal>
     

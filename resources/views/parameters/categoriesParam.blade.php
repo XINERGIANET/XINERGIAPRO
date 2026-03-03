@@ -73,21 +73,32 @@
                 @if ($viewId)
                     <input type="hidden" name="view_id" value="{{ $viewId }}">
                 @endif
+                {{-- Selector de página a la IZQUIERDA --}}
+                <div class="flex-none">
+                    <select
+                        name="per_page"
+                        onchange="this.form.submit()"
+                        class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 rounded-lg border border-gray-300 bg-transparent px-3 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                    >
+                        @foreach ($allowedPerPage as $size)
+                            <option value="{{ $size }}" @selected($perPage == $size)>{{ $size }} / página</option>
+                        @endforeach
+                    </select>
+                </div>
                 <div class="relative flex-1">
                     <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"><i class="ri-search-line"></i>
-
                     </span>
                     <input type="text" name="search" value="{{ $search }}" placeholder="Buscar por descripcion"
                         class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-12 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <x-ui.button size="sm" variant="primary" type="submit">
-                        <i class="ri-search-line"></i>
-                        <span>Buscar</span>
+                    <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 px-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #244BB3; border-color: #244BB3;">
+                        <i class="ri-search-line text-gray-100"></i>
+                        <span class="font-medium text-gray-100">Buscar</span>
                     </x-ui.button>
-                    <x-ui.link-button size="sm" variant="outline" href="{{ $viewId ? route('admin.parameters.categories.index', ['view_id' => $viewId]) : route('admin.parameters.categories.index') }}">
-                        <i class="ri-close-line"></i>
-                        <span>Limpiar</span>
+                    <x-ui.link-button size="md" variant="outline" href="{{ $viewId ? route('admin.parameters.categories.index', ['view_id' => $viewId]) : route('admin.parameters.categories.index') }}" class="flex-1 sm:flex-none h-11 px-4 border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200">
+                        <i class="ri-refresh-line"></i>
+                        <span class="font-medium">Limpiar</span>
                     </x-ui.link-button>
                     @if ($topOperations->isNotEmpty())
                         @foreach ($topOperations as $operationRow)
@@ -123,10 +134,10 @@
                     <table class="w-full min-w-[880px]">
                         <thead class="text-left text-theme-xs dark:text-gray-400">
                             <tr class="border-b border-gray-100 dark:border-gray-800">
-                                <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">ID</th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6 first:rounded-tl-xl">ID</th>
                                 <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">Descripcion</th>
                                 <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">Fecha de creacion</th>
-                                <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">Acciones</th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6 last:rounded-tr-xl">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -248,34 +259,13 @@
                 </div>
             </div>
         @endif
-        <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="text-sm text-gray-500">
-                Mostrando
-                <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $parameterCategories->firstItem() ?? 0 }}</span>
-                -
-                <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $parameterCategories->lastItem() ?? 0 }}</span>
-                de
-                <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $parameterCategories->total() }}</span>
-            </div>
-            <div>
+        {{-- PAGINACIÓN INFERIOR --}}
+        <div class="mt-6 flex flex-col items-center justify-center gap-4 sm:flex-row sm:justify-between border-t border-gray-100 pt-6 dark:border-gray-800">
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+                Mostrando <span class="font-medium text-gray-700 dark:text-gray-200">{{ $parameterCategories->firstItem() ?? 0 }}</span> a <span class="font-medium text-gray-700 dark:text-gray-200">{{ $parameterCategories->lastItem() ?? 0 }}</span> de <span class="font-medium text-gray-700 dark:text-gray-200">{{ $parameterCategories->total() }}</span> registros
+            </p>
+            <div class="flex justify-center">
                 {{ $parameterCategories->links() }}
-            </div>
-            <div>
-                <form method="GET" action="{{ route('admin.parameters.categories.index') }}">
-                    @if ($viewId)
-                        <input type="hidden" name="view_id" value="{{ $viewId }}">
-                    @endif
-                    <input type="hidden" name="search" value="{{ $search }}">
-                    <select
-                        name="per_page"
-                        onchange="this.form.submit()"
-                        class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
-                    >
-                        @foreach ($allowedPerPage as $size)
-                            <option value="{{ $size }}" @selected($perPage == $size)>{{ $size }} / pagina</option>
-                        @endforeach
-                    </select>
-                </form>
             </div>
         </div>
     </x-common.component-card>

@@ -75,12 +75,13 @@
                 @if ($viewId)
                     <input type="hidden" name="view_id" value="{{ $viewId }}">
                 @endif
-                <div class="w-29">
+                {{-- Selector de página a la IZQUIERDA --}}
+                <div class="flex-none">
                     <select name="per_page"
-                        class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 rounded-lg border border-gray-300 bg-transparent px-3 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                         onchange="this.form.submit()">
-                        @foreach ($allowedPerPage as $size)
-                            <option value="{{ $size }}" @selected($perPage == $size)>{{ $size }} / pagina
+                        @foreach ($allowedPerPage ?? [10, 20, 50, 100] as $size)
+                            <option value="{{ $size }}" @selected($perPage == $size)>{{ $size }} / página
                             </option>
                         @endforeach
                     </select>
@@ -141,12 +142,12 @@
                     <thead class="text-left text-theme-xs dark:text-gray-400">
                         <tr class="border-b border-gray-100 dark:border-gray-800">
                             <th style="background-color: #334155; color: #FFFFFF;"
-                                class="px-5 py-3 text-center sm:px-6 sticky-left-header">ID</th>
+                                class="px-5 py-3 text-center sm:px-6 sticky-left-header first:rounded-tl-xl">ID</th>
                             <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">
                                 Descripcion</th>
                             <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">
                                 Tipo</th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6 last:rounded-tr-xl">
                                 Acciones</th>
                         </tr>
                     </thead>
@@ -234,34 +235,13 @@
             </div>
         @endif
 
-        <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="text-sm text-gray-500">
-                Mostrando
-                <span
-                    class="font-semibold text-gray-700 dark:text-gray-200">{{ $paymentConcepts->firstItem() ?? 0 }}</span>
-                -
-                <span
-                    class="font-semibold text-gray-700 dark:text-gray-200">{{ $paymentConcepts->lastItem() ?? 0 }}</span>
-                de
-                <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $paymentConcepts->total() }}</span>
-            </div>
-            <div>
+        {{-- PAGINACIÓN INFERIOR --}}
+        <div class="mt-6 flex flex-col items-center justify-center gap-4 sm:flex-row sm:justify-between border-t border-gray-100 pt-6 dark:border-gray-800">
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+                Mostrando <span class="font-medium text-gray-700 dark:text-gray-200">{{ $paymentConcepts->firstItem() ?? 0 }}</span> a <span class="font-medium text-gray-700 dark:text-gray-200">{{ $paymentConcepts->lastItem() ?? 0 }}</span> de <span class="font-medium text-gray-700 dark:text-gray-200">{{ $paymentConcepts->total() }}</span> registros
+            </p>
+            <div class="flex justify-center">
                 {{ $paymentConcepts->links() }}
-            </div>
-            <div>
-                <form method="GET" action="{{ route('admin.payment_concepts.index') }}">
-                    @if ($viewId)
-                        <input type="hidden" name="view_id" value="{{ $viewId }}">
-                    @endif
-                    <input type="hidden" name="search" value="{{ $search ?? '' }}">
-                    <select name="per_page" onchange="this.form.submit()"
-                        class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30">
-                        @foreach ($allowedPerPage as $size)
-                            <option value="{{ $size }}" @selected($perPage == $size)>{{ $size }} / pagina
-                            </option>
-                        @endforeach
-                    </select>
-                </form>
             </div>
         </div>
     </x-common.component-card>

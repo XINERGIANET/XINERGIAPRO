@@ -29,6 +29,7 @@ class WorkshopSalesRegisterController extends Controller
         if (!in_array($tab, ['natural', 'corporativo'], true)) {
             $tab = 'natural';
         }
+        $perPage = (int) $request->input('per_page', 10);
 
         $sales = SalesMovement::query()
             ->with(['movement', 'movement.person'])
@@ -42,14 +43,14 @@ class WorkshopSalesRegisterController extends Controller
                 }
             })
             ->orderByDesc('id')
-            ->paginate(20)
+            ->paginate($perPage)
             ->withQueryString();
 
         $total = (float) $sales->getCollection()->sum('total');
         $subtotal = (float) $sales->getCollection()->sum('subtotal');
         $tax = (float) $sales->getCollection()->sum('tax');
 
-        return view('workshop.sales-register.index', compact('sales', 'month', 'tab', 'total', 'subtotal', 'tax', 'branch'));
+        return view('workshop.sales-register.index', compact('sales', 'month', 'tab', 'total', 'subtotal', 'tax', 'branch', 'perPage'));
     }
 }
 

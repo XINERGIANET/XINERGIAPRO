@@ -31,6 +31,7 @@ class WorkshopVehicleController extends Controller
         $companyId = (int) ($branch?->company_id ?? 0);
 
         $search = trim((string) $request->input('search', ''));
+        $perPage = (int) $request->input('per_page', 10);
 
         $vehicles = Vehicle::query()
             ->with(['client', 'branch', 'vehicleType'])
@@ -45,7 +46,7 @@ class WorkshopVehicleController extends Controller
                 });
             })
             ->orderByDesc('id')
-            ->paginate(15)
+            ->paginate($perPage)
             ->withQueryString();
 
         $clients = Person::query()
@@ -78,7 +79,13 @@ class WorkshopVehicleController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        return view('workshop.vehicles.index', compact('vehicles', 'clients', 'search', 'vehicleTypes'));
+        return view('workshop.vehicles.index', [
+            'vehicles' => $vehicles,
+            'clients' => $clients,
+            'search' => $search,
+            'vehicleTypes' => $vehicleTypes,
+            'per_page' => $perPage,
+        ]);
     }
 
     public function store(StoreVehicleRequest $request): RedirectResponse

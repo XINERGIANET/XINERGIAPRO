@@ -50,6 +50,7 @@ class WorkshopOrderController extends Controller
         $branch = $branchId > 0 ? \App\Models\Branch::query()->find($branchId) : null;
         $companyId = (int) ($branch?->company_id ?? 0);
         $search = trim((string) $request->input('search', ''));
+        $perPage = (int) $request->input('per_page', 10);
 
         $orders = WorkshopMovement::query()
             ->with(['movement', 'vehicle', 'client'])
@@ -65,10 +66,10 @@ class WorkshopOrderController extends Controller
                 });
             })
             ->orderByDesc('id')
-            ->paginate(15)
+            ->paginate($perPage)
             ->withQueryString();
 
-        return view('workshop.orders.index', compact('orders', 'search'));
+        return view('workshop.orders.index', compact('orders', 'search', 'perPage'));
     }
 
     public function create()

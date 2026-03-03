@@ -5,6 +5,45 @@
     <x-common.page-breadcrumb pageTitle="Servicios Taller" />
 
     <x-common.component-card title="Catalogo de servicios" desc="Gestiona servicios preventivos y correctivos del taller.">
+        {{-- Barra de Herramientas Premium (Estilo solicitado) --}}
+        <form method="GET" action="{{ route('workshop.services.index') }}" class="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-white/[0.02]">
+            {{-- Selector de Registros --}}
+            <div class="flex items-center gap-2">
+                <select name="per_page" class="h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="this.form.submit()">
+                    <option value="10" @selected(($perPage ?? 10) == 10)>10 / pág</option>
+                    <option value="25" @selected(($perPage ?? 10) == 25)>25 / pág</option>
+                    <option value="50" @selected(($perPage ?? 10) == 50)>50 / pág</option>
+                    <option value="100" @selected(($perPage ?? 10) == 100)>100 / pág</option>
+                </select>
+            </div>
+
+            {{-- Buscador Central --}}
+            <div class="relative flex-1 min-w-[200px]">
+                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                    <i class="ri-search-line text-gray-400"></i>
+                </div>
+                <input type="text" name="search" value="{{ $search }}" class="h-11 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-4 text-sm font-medium text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Buscar servicio...">
+            </div>
+
+            {{-- Acciones del Formulario --}}
+            <div class="flex items-center gap-2">
+                <button type="submit" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#244BB3] px-6 text-sm font-bold text-white shadow-lg shadow-blue-100 transition-all hover:brightness-110 active:scale-95">
+                    <i class="ri-search-line"></i>
+                    <span>Buscar</span>
+                </button>
+                <a href="{{ route('workshop.services.index') }}" class="inline-flex h-11 items-center justify-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-bold text-gray-700 shadow-sm transition-all hover:bg-gray-50 active:scale-95">
+                    Limpiar
+                </a>
+            </div>
+
+            {{-- Botones de Acción (Al final a la derecha) --}}
+            <div class="ml-auto flex gap-2">
+                <x-ui.button size="md" variant="primary" type="button" class="!h-11 rounded-2xl px-6 font-bold shadow-lg transition-all hover:scale-[1.02]" style="background-color:#00A389;color:#fff" @click="$dispatch('open-service-modal')">
+                    <i class="ri-add-line"></i><span>Nuevo servicio</span>
+                </x-ui.button>
+            </div>
+        </form>
+
         @if (session('status'))
             <div class="mb-4 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-700">{{ session('status') }}</div>
         @endif
@@ -12,41 +51,32 @@
             <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first() }}</div>
         @endif
 
-        <div class="mb-4 flex flex-wrap items-center gap-2">
-            <x-ui.button size="md" variant="primary" type="button" style="background-color:#00A389;color:#fff" @click="$dispatch('open-service-modal')">
-                <i class="ri-add-line"></i><span>Nuevo servicio</span>
-            </x-ui.button>
-            <button type="button" class="h-10 rounded-lg bg-[#244BB3] px-3 text-sm font-medium text-white">Operacion: Ver</button>
-        </div>
-
-        <form method="GET" class="mb-4 flex flex-wrap gap-2 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.02]">
-            <input name="search" value="{{ $search }}" class="h-11 min-w-[280px] flex-1 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Buscar servicio">
-            <button class="h-11 rounded-lg bg-[#244BB3] px-4 text-sm font-medium text-white">Buscar</button>
-            <a href="{{ route('workshop.services.index') }}" class="h-11 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 inline-flex items-center">Limpiar</a>
-        </form>
-
         <div class="overflow-x-auto overflow-y-hidden mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
             <table class="w-full min-w-[900px]">
                 <thead>
                     <tr>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">Nombre</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Tipo</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Precio base</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Minutos</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Activo</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Acciones</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">Nombre</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Tipo</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Precio base</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Minutos</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Activo</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($services as $service)
                         <tr class="relative hover:z-[60] border-t border-gray-100 dark:border-gray-800">
-                            <td class="px-4 py-3 text-sm">{{ $service->name }}</td>
-                            <td class="px-4 py-3 text-sm">{{ $service->type }}</td>
-                            <td class="px-4 py-3 text-sm">{{ number_format((float)$service->base_price, 2) }}</td>
-                            <td class="px-4 py-3 text-sm">{{ $service->estimated_minutes }}</td>
-                            <td class="px-4 py-3 text-sm">{{ $service->active ? 'SI' : 'NO' }}</td>
+                            <td class="px-4 py-3 text-sm text-center font-medium">{{ $service->name }}</td>
+                            <td class="px-4 py-3 text-sm text-center uppercase">{{ $service->type }}</td>
+                            <td class="px-4 py-3 text-sm text-center font-bold text-emerald-600">{{ number_format((float)$service->base_price, 2) }}</td>
+                            <td class="px-4 py-3 text-sm text-center">{{ $service->estimated_minutes }} min</td>
+                            <td class="px-4 py-3 text-sm text-center">
+                                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium {{ $service->active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
+                                    {{ $service->active ? 'SI' : 'NO' }}
+                                </span>
+                            </td>
                             <td class="px-4 py-3 text-sm">
-                                <div class="flex items-center justify-end gap-2">
+                                <div class="flex items-center justify-center gap-2">
                                     <div class="relative group">
                                         <x-ui.button
                                             size="icon"
@@ -97,13 +127,40 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="px-4 py-4 text-sm text-gray-500">Sin servicios registrados.</td></tr>
+                        <tr><td colspan="6" class="px-4 py-4 text-sm text-gray-500 text-center">Sin servicios registrados.</td></tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
 
-        <div class="mt-4">{{ $services->links() }}</div>
+        {{-- Pie de Tabla Premium (Estilo solicitado) --}}
+        <div class="mt-4 flex flex-col items-center justify-between gap-4 p-4 md:flex-row">
+            <div class="text-[14px] font-semibold text-gray-600">
+                Mostrando {{ $services->firstItem() ?? 0 }} - {{ $services->lastItem() ?? 0 }} de {{ $services->total() }}
+            </div>
+            <div class="pagination-premium">
+                {{ $services->links() }}
+            </div>
+        </div>
+
+        <style>
+            .pagination-premium nav > div:first-child { display: none !important; }
+            .pagination-premium nav span.relative.z-0.inline-flex { gap: 8px !important; display: flex !important; }
+            .pagination-premium nav span.relative.z-0.inline-flex a,
+            .pagination-premium nav span.relative.z-0.inline-flex > span > span,
+            .pagination-premium nav span.relative.z-0.inline-flex > span > a,
+            .pagination-premium nav span.relative.z-0.inline-flex [aria-disabled="true"] span {
+                border-radius: 12px !important; border: 1px solid #E5E7EB !important; color: #9CA3AF !important;
+                background-color: white !important; width: 40px !important; height: 40px !important;
+                display: flex !important; align-items: center !important; justify-content: center !important;
+                padding: 0 !important; font-weight: 600 !important; transition: all 0.2s; cursor: pointer;
+            }
+            .pagination-premium nav span.relative.z-0.inline-flex span[aria-current="page"] span {
+                background-color: #F0F7FF !important; color: #244BB3 !important; border: 1.5px solid #244BB3 !important; border-radius: 12px !important;
+            }
+            .pagination-premium nav span.relative.z-0.inline-flex [aria-disabled="true"] span { opacity: 0.5; cursor: default; background-color: #F9FAFB !important; }
+            .pagination-premium nav span.relative.z-0.inline-flex a:hover { background-color: #F9FAFB !important; border-color: #D1D5DB !important; color: #374151 !important; }
+        </style>
     </x-common.component-card>
 
     <x-ui.modal x-data="{ open: false }" x-on:open-service-modal.window="open = true" :isOpen="false" :showCloseButton="false" class="max-w-3xl">

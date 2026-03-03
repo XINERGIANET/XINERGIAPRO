@@ -5,23 +5,52 @@
     <x-common.page-breadcrumb pageTitle="Ordenes Taller" />
 
     <x-common.component-card title="Ordenes de servicio" desc="Consulta y gestiona ordenes del taller.">
-        <div class="mb-4 flex flex-wrap items-center gap-2">
-            <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.orders.create') }}" style="background-color:#00A389;color:#fff">
-                <i class="ri-add-line"></i><span>Nueva OS</span>
-            </x-ui.link-button>
-            <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.reports.index') }}" style="background-color:#1d4ed8;color:#fff">
-                <i class="ri-bar-chart-2-line"></i><span>Reportes</span>
-            </x-ui.link-button>
-        </div>
+        {{-- Barra de Herramientas Premium (Estilo solicitado) --}}
+        <form method="GET" action="{{ route('workshop.orders.index') }}" class="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-white/[0.02]">
+            {{-- Selector de Registros --}}
+            <div class="flex items-center gap-2">
+                <select name="per_page" class="h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="this.form.submit()">
+                    <option value="10" @selected(($perPage ?? 10) == 10)>10 / pág</option>
+                    <option value="25" @selected(($perPage ?? 10) == 25)>25 / pág</option>
+                    <option value="50" @selected(($perPage ?? 10) == 50)>50 / pág</option>
+                    <option value="100" @selected(($perPage ?? 10) == 100)>100 / pág</option>
+                </select>
+            </div>
 
-        <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <form method="GET" class="flex flex-1 gap-2">
-                <input name="search" value="{{ $search }}" class="h-11 flex-1 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Buscar OS / placa / cliente">
-                <button class="h-11 rounded-lg bg-[#244BB3] px-4 text-sm font-medium text-white">Buscar</button>
-                <a href="{{ route('workshop.orders.index') }}" class="h-11 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 inline-flex items-center">Limpiar</a>
-            </form>
-            <a href="{{ route('workshop.orders.create') }}" class="h-11 rounded-lg bg-emerald-700 px-4 text-sm font-medium text-white inline-flex items-center">Nueva OS</a>
-        </div>
+            {{-- Buscador Principal --}}
+            <div class="relative flex-1 min-w-[300px]">
+                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                    <i class="ri-search-line text-lg text-gray-400"></i>
+                </div>
+                <input 
+                    name="search" 
+                    value="{{ $search }}" 
+                    class="h-11 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-4 text-sm shadow-sm transition-all focus:border-blue-500 focus:ring-blue-500 placeholder:text-gray-400" 
+                    placeholder="Buscar OS, placa o cliente..."
+                >
+            </div>
+
+            {{-- Acciones del Formulario --}}
+            <div class="flex items-center gap-2">
+                <button type="submit" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#244BB3] px-6 text-sm font-bold text-white shadow-lg shadow-blue-100 transition-all hover:brightness-110 active:scale-95">
+                    <i class="ri-search-line"></i>
+                    <span>Buscar</span>
+                </button>
+                <a href="{{ route('workshop.orders.index') }}" class="inline-flex h-11 items-center justify-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-bold text-gray-700 shadow-sm transition-all hover:bg-gray-50 active:scale-95">
+                    Limpiar
+                </a>
+            </div>
+
+            {{-- Botón Nuevo (Al final a la derecha) --}}
+            <div class="ml-auto flex gap-2">
+                <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.reports.index') }}" class="!h-11 rounded-2xl px-6 font-bold shadow-lg transition-all hover:scale-[1.02]" style="background-color:#1d4ed8;color:#fff">
+                    <i class="ri-bar-chart-2-line"></i><span>Reportes</span>
+                </x-ui.link-button>
+                <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.orders.create') }}" class="!h-11 rounded-2xl px-6 font-bold shadow-lg transition-all hover:scale-[1.02]" style="background-color:#00A389;color:#fff">
+                    <i class="ri-add-line"></i><span>Nueva OS</span>
+                </x-ui.link-button>
+            </div>
+        </form>
 
         @if (session('status'))
             <div class="mb-4 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-700">{{ session('status') }}</div>
@@ -31,28 +60,37 @@
             <table class="w-full min-w-[1100px]">
                 <thead>
                     <tr>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">OS</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Ingreso</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Cliente</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Vehiculo</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Estado</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Total</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Pagado</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Acciones</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">OS</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Ingreso</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Cliente</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Vehiculo</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Estado</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Total</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Pagado</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($orders as $order)
                         <tr class="relative hover:z-[60] border-t border-gray-100 dark:border-gray-800">
-                            <td class="px-4 py-3 text-sm">{{ $order->movement?->number }}</td>
-                            <td class="px-4 py-3 text-sm">{{ $order->intake_date?->format('Y-m-d H:i') }}</td>
-                            <td class="px-4 py-3 text-sm">{{ $order->client?->first_name }} {{ $order->client?->last_name }}</td>
-                            <td class="px-4 py-3 text-sm">{{ $order->vehicle?->brand }} {{ $order->vehicle?->model }} {{ $order->vehicle?->plate }}</td>
-                            <td class="px-4 py-3 text-sm">{{ $order->status }}</td>
-                            <td class="px-4 py-3 text-sm">{{ number_format((float) $order->total, 2) }}</td>
-                            <td class="px-4 py-3 text-sm">{{ number_format((float) $order->paid_total, 2) }}</td>
+                            <td class="px-4 py-3 text-sm text-center font-medium">{{ $order->movement?->number }}</td>
+                            <td class="px-4 py-3 text-sm text-center">{{ $order->intake_date?->format('Y-m-d H:i') }}</td>
+                            <td class="px-4 py-3 text-sm text-center">{{ $order->client?->full_name }}</td>
+                            <td class="px-4 py-3 text-sm text-center">{{ $order->vehicle?->brand }} {{ $order->vehicle?->model }} ({{ $order->vehicle?->plate }})</td>
+                            <td class="px-4 py-3 text-sm text-center">
+                                <span class="px-2 py-1 rounded-lg text-xs font-bold uppercase {{ match($order->status) {
+                                    'open' => 'bg-blue-100 text-blue-700',
+                                    'finished' => 'bg-green-100 text-green-700',
+                                    'cancelled' => 'bg-red-100 text-red-700',
+                                    default => 'bg-gray-100 text-gray-700'
+                                } }}">
+                                    {{ $order->status }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3 text-sm text-center font-bold">{{ number_format((float) $order->total, 2) }}</td>
+                            <td class="px-4 py-3 text-sm text-center font-bold text-emerald-600">{{ number_format((float) $order->paid_total, 2) }}</td>
                             <td class="px-4 py-3 text-sm">
-                                <div class="flex items-center justify-end gap-2">
+                                <div class="flex items-center justify-center gap-2">
                                     <div class="relative group">
                                         <x-ui.link-button
                                             size="icon"
@@ -119,13 +157,40 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="8" class="px-4 py-4 text-sm text-gray-500">Sin ordenes para el filtro.</td></tr>
+                        <tr><td colspan="8" class="px-4 py-4 text-sm text-gray-500 text-center">Sin ordenes para el filtro.</td></tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
 
-        <div class="mt-4">{{ $orders->links() }}</div>
+        {{-- Pie de Tabla Premium (Estilo solicitado) --}}
+        <div class="mt-4 flex flex-col items-center justify-between gap-4 p-4 md:flex-row">
+            <div class="text-[14px] font-semibold text-gray-600">
+                Mostrando {{ $orders->firstItem() ?? 0 }} - {{ $orders->lastItem() ?? 0 }} de {{ $orders->total() }}
+            </div>
+            <div class="pagination-premium">
+                {{ $orders->links() }}
+            </div>
+        </div>
+
+        <style>
+            .pagination-premium nav > div:first-child { display: none !important; }
+            .pagination-premium nav span.relative.z-0.inline-flex { gap: 8px !important; display: flex !important; }
+            .pagination-premium nav span.relative.z-0.inline-flex a,
+            .pagination-premium nav span.relative.z-0.inline-flex > span > span,
+            .pagination-premium nav span.relative.z-0.inline-flex > span > a,
+            .pagination-premium nav span.relative.z-0.inline-flex [aria-disabled="true"] span {
+                border-radius: 12px !important; border: 1px solid #E5E7EB !important; color: #9CA3AF !important;
+                background-color: white !important; width: 40px !important; height: 40px !important;
+                display: flex !important; align-items: center !important; justify-content: center !important;
+                padding: 0 !important; font-weight: 600 !important; transition: all 0.2s; cursor: pointer;
+            }
+            .pagination-premium nav span.relative.z-0.inline-flex span[aria-current="page"] span {
+                background-color: #F0F7FF !important; color: #244BB3 !important; border: 1.5px solid #244BB3 !important; border-radius: 12px !important;
+            }
+            .pagination-premium nav span.relative.z-0.inline-flex [aria-disabled="true"] span { opacity: 0.5; cursor: default; background-color: #F9FAFB !important; }
+            .pagination-premium nav span.relative.z-0.inline-flex a:hover { background-color: #F9FAFB !important; border-color: #D1D5DB !important; color: #374151 !important; }
+        </style>
     </x-common.component-card>
 </div>
 @endsection

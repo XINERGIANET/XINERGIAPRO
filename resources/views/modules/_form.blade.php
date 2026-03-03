@@ -1,70 +1,98 @@
-<div class="grid gap-5">
-    <div>
-        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Nombre del Módulo</label>
-        <div class="relative">
-            <span class="absolute top-1/2 left-0 -translate-y-1/2 border-r border-gray-200 px-3.5 py-3 text-gray-500 dark:border-gray-800 dark:text-gray-400">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 7V17C4 18.1046 4.89543 19 6 19H18C19.1046 19 20 18.1046 20 17V7M4 7L12 12L20 7M4 7L12 2L20 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+@php
+    use Illuminate\Support\HtmlString;
+@endphp
+
+<div class="grid gap-6">
+    {{-- Nombre del Módulo --}}
+    <div class="space-y-2">
+        <label class="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
+            <i class="ri-box-3-line text-lg text-brand-500"></i>
+            Nombre del Módulo
+        </label>
+        <div class="relative group">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 group-focus-within:text-brand-500 transition-colors duration-200">
+                <i class="ri-edit-box-line text-xl"></i>
             </span>
             <input
                 type="text"
                 name="name"
                 required
-                placeholder="Ej: Ventas"
+                placeholder="Ej: Gestión de Ventas, Inventario..."
                 value="{{ old('name', $module->name ?? '') }}"
-                class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-[62px] text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                class="block w-full h-12 pl-12 pr-4 text-sm text-gray-800 bg-white border border-gray-200 rounded-2xl shadow-sm focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 transition-all duration-200 dark:bg-gray-900 dark:border-gray-700 dark:text-white dark:placeholder-white/20"
             />
         </div>
+        @error('name')
+            <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+        @enderror
     </div>
 
-    <div>
-        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-            Icono <span class="text-xs text-gray-400 font-normal">(Nombre de la clase)</span>
+    {{-- Icono --}}
+    <div class="space-y-2">
+        <label class="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
+            <i class="ri-palette-line text-lg text-brand-500"></i>
+            Icono del Menú
+            <span class="text-[10px] font-normal px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-500 rounded-full uppercase tracking-wider">RemixIcon Class</span>
         </label>
-        <div class="relative">
-            <span class="absolute top-1/2 left-0 -translate-y-1/2 border-r border-gray-200 px-3.5 py-3 text-gray-500 dark:border-gray-800 dark:text-gray-400">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 12L11 15L16 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="relative group">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 group-focus-within:text-brand-500 transition-colors duration-200">
+                <i class="ri-compass-3-line text-xl"></i>
             </span>
             <input
                 type="text"
                 name="icon"
                 required
-                placeholder="Ej: dashboard"
+                placeholder="Ej: ri-dashboard-3-line, ri-settings-4-fill..."
                 value="{{ old('icon', $module->icon ?? '') }}"
-                class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-[62px] text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                class="block w-full h-12 pl-12 pr-4 text-sm text-gray-800 bg-white border border-gray-200 rounded-2xl shadow-sm focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 transition-all duration-200 dark:bg-gray-900 dark:border-gray-700 dark:text-white dark:placeholder-white/20"
             />
         </div>
+        @error('icon')
+            <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+        @enderror
     </div>
 
-    <div class="grid grid-cols-2 gap-5">
-        <div>
-            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Orden</label>
-            <div class="relative">
-                <span class="absolute top-1/2 left-0 -translate-y-1/2 border-r border-gray-200 px-3.5 py-3 text-gray-500 dark:border-gray-800 dark:text-gray-400">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 3H14V21H10V3Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 8H20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16H20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {{-- Orden --}}
+        <div class="space-y-2">
+            <label class="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                <i class="ri-list-ordered text-lg text-brand-500"></i>
+                Orden de Visualización
+            </label>
+            <div class="relative group">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 group-focus-within:text-brand-500 transition-colors duration-200">
+                    <i class="ri-sort-number-asc text-xl"></i>
                 </span>
                 <input
                     type="number"
                     name="order_num"
                     required
-                    value="{{ old('order_num', $module->order_num ?? '') }}"
-                    class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-[62px] text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                    value="{{ old('order_num', $module->order_num ?? '0') }}"
+                    class="block w-full h-12 pl-12 pr-4 text-sm text-gray-800 bg-white border border-gray-200 rounded-2xl shadow-sm focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 transition-all duration-200 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                 />
             </div>
         </div>
 
-        <div>
-            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Estado</label>
-            <div class="relative">
-                <span class="absolute top-1/2 left-0 -translate-y-1/2 border-r border-gray-200 px-3.5 py-3 text-gray-500 dark:border-gray-800 dark:text-gray-400">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 8V12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 16H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        {{-- Estado --}}
+        <div class="space-y-2">
+            <label class="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                <i class="ri-checkbox-circle-line text-lg text-brand-500"></i>
+                Estado del Módulo
+            </label>
+            <div class="relative group">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 group-focus-within:text-brand-500 transition-colors duration-200 pointer-events-none">
+                    <i class="ri-toggle-line text-xl"></i>
                 </span>
                 <select
                     name="status"
-                    class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-[62px] text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                    class="block w-full h-12 pl-12 pr-10 text-sm text-gray-800 bg-white border border-gray-200 rounded-2xl shadow-sm focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 transition-all duration-200 appearance-none dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                 >
                     <option value="1" {{ old('status', $module->status ?? 1) == 1 ? 'selected' : '' }}>Activo</option>
                     <option value="0" {{ old('status', $module->status ?? 1) == 0 ? 'selected' : '' }}>Inactivo</option>
                 </select>
+                <span class="absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400 pointer-events-none">
+                    <i class="ri-arrow-down-s-line text-xl"></i>
+                </span>
             </div>
         </div>
     </div>

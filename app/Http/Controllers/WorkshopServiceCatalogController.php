@@ -26,6 +26,7 @@ class WorkshopServiceCatalogController extends Controller
         $branch = $branchId > 0 ? \App\Models\Branch::query()->find($branchId) : null;
         $companyId = (int) ($branch?->company_id ?? 0);
         $search = trim((string) $request->input('search', ''));
+        $perPage = (int) $request->input('per_page', 10);
 
         $services = WorkshopService::query()
             ->when($companyId > 0, fn ($query) => $query->where(function ($inner) use ($companyId) {
@@ -36,10 +37,10 @@ class WorkshopServiceCatalogController extends Controller
             }))
             ->when($search !== '', fn ($query) => $query->where('name', 'ILIKE', "%{$search}%"))
             ->orderBy('name')
-            ->paginate(15)
+            ->paginate($perPage)
             ->withQueryString();
 
-        return view('workshop.services.index', compact('services', 'search'));
+        return view('workshop.services.index', compact('services', 'search', 'perPage'));
     }
 
     public function store(Request $request): RedirectResponse

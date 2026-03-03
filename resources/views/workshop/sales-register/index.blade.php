@@ -5,63 +5,95 @@
     <x-common.page-breadcrumb pageTitle="Ventas Taller" />
 
     <x-common.component-card title="Registro de ventas" desc="Ventas de taller por tipo de cliente.">
-        <div class="mb-4 flex flex-wrap items-center gap-2">
-            <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.reports.export.sales', ['month' => $month, 'customer_type' => $tab]) }}" style="background-color:#166534;color:#fff">
-                <i class="ri-file-excel-2-line"></i><span>Exportar Excel</span>
-            </x-ui.link-button>
-            <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.reports.index') }}" style="background-color:#1d4ed8;color:#fff">
-                <i class="ri-bar-chart-2-line"></i><span>Reportes</span>
-            </x-ui.link-button>
-        </div>
+        {{-- Barra de Herramientas Premium (Estilo solicitado) --}}
+        <form method="GET" action="{{ route('workshop.sales-register.index') }}" class="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-white/[0.02]">
+            {{-- Selector de Registros --}}
+            <div class="flex items-center gap-2">
+                <select name="per_page" class="h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="this.form.submit()">
+                    <option value="10" @selected(($perPage ?? 10) == 10)>10 / pág</option>
+                    <option value="25" @selected(($perPage ?? 10) == 25)>25 / pág</option>
+                    <option value="50" @selected(($perPage ?? 10) == 50)>50 / pág</option>
+                    <option value="100" @selected(($perPage ?? 10) == 100)>100 / pág</option>
+                </select>
+            </div>
 
-        <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <h2 class="text-lg font-semibold text-gray-800 dark:text-white/90">Sucursal: {{ $branch->legal_name }}</h2>
-            <a class="h-11 rounded-lg bg-emerald-700 px-4 text-sm font-medium text-white inline-flex items-center"
-               href="{{ route('workshop.reports.export.sales', ['month' => $month, 'customer_type' => $tab]) }}">Exportar Excel</a>
-        </div>
+            {{-- Filtros Secundarios --}}
+            <div class="flex flex-wrap items-center gap-2">
+                <input type="month" name="month" value="{{ $month }}" class="h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                
+                <select name="tab" class="h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="natural" @selected($tab === 'natural')>Natural</option>
+                    <option value="corporativo" @selected($tab === 'corporativo')>Corporativo</option>
+                </select>
+            </div>
 
-        <form method="GET" class="mb-4 grid grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-white p-4 md:grid-cols-4 dark:border-gray-800 dark:bg-white/[0.02]">
-            <input type="month" name="month" value="{{ $month }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
-            <select name="tab" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
-                <option value="natural" @selected($tab === 'natural')>Natural</option>
-                <option value="corporativo" @selected($tab === 'corporativo')>Corporativo</option>
-            </select>
-            <button class="h-11 rounded-lg bg-[#244BB3] px-4 text-sm font-medium text-white">Filtrar</button>
-            <a href="{{ route('workshop.sales-register.index') }}" class="h-11 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 inline-flex items-center justify-center">Limpiar</a>
+            {{-- Acciones del Formulario --}}
+            <div class="flex items-center gap-2">
+                <button type="submit" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#244BB3] px-6 text-sm font-bold text-white shadow-lg shadow-blue-100 transition-all hover:brightness-110 active:scale-95">
+                    <i class="ri-search-line"></i>
+                    <span>Filtrar</span>
+                </button>
+                <a href="{{ route('workshop.sales-register.index') }}" class="inline-flex h-11 items-center justify-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-bold text-gray-700 shadow-sm transition-all hover:bg-gray-50 active:scale-95">
+                    Limpiar
+                </a>
+            </div>
+
+            {{-- Botones de Acción (Al final a la derecha) --}}
+            <div class="ml-auto flex gap-2">
+                <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.reports.export.sales', ['month' => $month, 'customer_type' => $tab]) }}" class="!h-11 rounded-2xl px-6 font-bold shadow-lg transition-all hover:scale-[1.02]" style="background-color:#166534;color:#fff">
+                    <i class="ri-file-excel-2-line"></i><span>Exportar</span>
+                </x-ui.link-button>
+                <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.reports.index') }}" class="!h-11 rounded-2xl px-6 font-bold shadow-lg transition-all hover:scale-[1.02]" style="background-color:#1d4ed8;color:#fff">
+                    <i class="ri-bar-chart-2-line"></i><span>Reportes</span>
+                </x-ui.link-button>
+            </div>
         </form>
 
-        <div class="mb-4 grid grid-cols-1 gap-2 md:grid-cols-3">
-            <div class="rounded-xl border border-gray-200 p-3 text-sm dark:border-gray-800"><strong>Subtotal:</strong> {{ number_format($subtotal, 2) }}</div>
-            <div class="rounded-xl border border-gray-200 p-3 text-sm dark:border-gray-800"><strong>IGV:</strong> {{ number_format($tax, 2) }}</div>
-            <div class="rounded-xl border border-gray-200 p-3 text-sm dark:border-gray-800"><strong>Total:</strong> {{ number_format($total, 2) }}</div>
+        <div class="mb-4 flex items-center justify-between">
+            <h2 class="text-lg font-bold text-slate-700 dark:text-white/90">Sucursal: {{ $branch->legal_name }}</h2>
+        </div>
+
+        <div class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div class="rounded-2xl border border-gray-100 bg-slate-50 p-4 shadow-sm dark:border-gray-800 dark:bg-white/[0.02]">
+                <div class="text-xs font-bold uppercase tracking-wider text-slate-500">Subtotal</div>
+                <div class="mt-1 text-xl font-bold text-slate-700">{{ number_format($subtotal, 2) }}</div>
+            </div>
+            <div class="rounded-2xl border border-gray-100 bg-slate-50 p-4 shadow-sm dark:border-gray-800 dark:bg-white/[0.02]">
+                <div class="text-xs font-bold uppercase tracking-wider text-slate-500">IGV</div>
+                <div class="mt-1 text-xl font-bold text-slate-700">{{ number_format($tax, 2) }}</div>
+            </div>
+            <div class="rounded-2xl border border-gray-100 bg-blue-50 p-4 shadow-sm dark:border-gray-800 dark:bg-blue-500/[0.05]">
+                <div class="text-xs font-bold uppercase tracking-wider text-blue-600">Total</div>
+                <div class="mt-1 text-2xl font-black text-blue-700">{{ number_format($total, 2) }}</div>
+            </div>
         </div>
 
         <div class="overflow-x-auto overflow-y-hidden mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
             <table class="w-full min-w-[1000px]">
                 <thead>
                     <tr>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">Fecha</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Documento</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Cliente</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Tipo</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Subtotal</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">IGV</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white">Total</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Acciones</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">Fecha</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Documento</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Cliente</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Tipo</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Subtotal</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">IGV</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Total</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($sales as $sale)
                         <tr class="relative hover:z-[60] border-t border-gray-100 dark:border-gray-800">
-                            <td class="px-4 py-3 text-sm">{{ optional($sale->movement?->moved_at)->format('Y-m-d H:i') }}</td>
-                            <td class="px-4 py-3 text-sm">{{ $sale->movement?->number }}</td>
-                            <td class="px-4 py-3 text-sm">{{ $sale->movement?->person_name }}</td>
-                            <td class="px-4 py-3 text-sm">{{ $sale->movement?->person?->person_type }}</td>
-                            <td class="px-4 py-3 text-sm">{{ number_format((float)$sale->subtotal, 2) }}</td>
-                            <td class="px-4 py-3 text-sm">{{ number_format((float)$sale->tax, 2) }}</td>
-                            <td class="px-4 py-3 text-sm">{{ number_format((float)$sale->total, 2) }}</td>
+                            <td class="px-4 py-3 text-sm text-center font-medium">{{ optional($sale->movement?->moved_at)->format('Y-m-d H:i') }}</td>
+                            <td class="px-4 py-3 text-sm text-center">{{ $sale->movement?->number }}</td>
+                            <td class="px-4 py-3 text-sm text-center">{{ $sale->movement?->person_name }}</td>
+                            <td class="px-4 py-3 text-sm text-center uppercase">{{ $sale->movement?->person?->person_type }}</td>
+                            <td class="px-4 py-3 text-sm text-center font-bold">{{ number_format((float)$sale->subtotal, 2) }}</td>
+                            <td class="px-4 py-3 text-sm text-center font-bold text-emerald-600">{{ number_format((float)$sale->tax, 2) }}</td>
+                            <td class="px-4 py-3 text-sm text-center font-bold text-emerald-600">{{ number_format((float)$sale->total, 2) }}</td>
                             <td class="px-4 py-3 text-sm">
-                                <div class="flex items-center justify-end gap-2">
+                                <div class="flex items-center justify-center gap-2">
                                     @if($sale->movement_id)
                                         <div class="relative group">
                                             <x-ui.link-button
@@ -137,13 +169,40 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="8" class="px-4 py-4 text-sm text-gray-500">Sin ventas para el filtro.</td></tr>
+                        <tr><td colspan="8" class="px-4 py-4 text-sm text-gray-500 text-center">Sin ventas para el filtro.</td></tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
 
-        <div class="mt-4">{{ $sales->links() }}</div>
+        {{-- Pie de Tabla Premium (Estilo solicitado) --}}
+        <div class="mt-4 flex flex-col items-center justify-between gap-4 p-4 md:flex-row">
+            <div class="text-[14px] font-semibold text-gray-600">
+                Mostrando {{ $sales->firstItem() ?? 0 }} - {{ $sales->lastItem() ?? 0 }} de {{ $sales->total() }}
+            </div>
+            <div class="pagination-premium">
+                {{ $sales->links() }}
+            </div>
+        </div>
+
+        <style>
+            .pagination-premium nav > div:first-child { display: none !important; }
+            .pagination-premium nav span.relative.z-0.inline-flex { gap: 8px !important; display: flex !important; }
+            .pagination-premium nav span.relative.z-0.inline-flex a,
+            .pagination-premium nav span.relative.z-0.inline-flex > span > span,
+            .pagination-premium nav span.relative.z-0.inline-flex > span > a,
+            .pagination-premium nav span.relative.z-0.inline-flex [aria-disabled="true"] span {
+                border-radius: 12px !important; border: 1px solid #E5E7EB !important; color: #9CA3AF !important;
+                background-color: white !important; width: 40px !important; height: 40px !important;
+                display: flex !important; align-items: center !important; justify-content: center !important;
+                padding: 0 !important; font-weight: 600 !important; transition: all 0.2s; cursor: pointer;
+            }
+            .pagination-premium nav span.relative.z-0.inline-flex span[aria-current="page"] span {
+                background-color: #F0F7FF !important; color: #244BB3 !important; border: 1.5px solid #244BB3 !important; border-radius: 12px !important;
+            }
+            .pagination-premium nav span.relative.z-0.inline-flex [aria-disabled="true"] span { opacity: 0.5; cursor: default; background-color: #F9FAFB !important; }
+            .pagination-premium nav span.relative.z-0.inline-flex a:hover { background-color: #F9FAFB !important; border-color: #D1D5DB !important; color: #374151 !important; }
+        </style>
     </x-common.component-card>
 </div>
 @endsection

@@ -93,13 +93,13 @@
             title="Opciones: {{ $module->name }}"
             desc="Gestiona los sub-menús asociados a este módulo."
         >
-            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                
-                <form method="GET" action="{{ route('admin.modules.menu_options.index', $module) }}" class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+            {{-- BARRA DE BÚSQUEDA Y ACCIONES --}}
+            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between mb-6">
+                <form method="GET" action="{{ route('admin.modules.menu_options.index', $module) }}" class="flex flex-1 flex-wrap gap-2 sm:flex-nowrap sm:items-center min-w-0">
                     @if ($viewId)
                         <input type="hidden" name="view_id" value="{{ $viewId }}">
                     @endif
-                    <div class="relative flex-1">
+                    <div class="relative flex-1 min-w-0">
                         <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                            <i class="ri-search-line"></i>
                         </span>
@@ -111,24 +111,20 @@
                             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-10 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                         />
                     </div>
-                    <div class="flex flex-wrap gap-2">
-                        <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 px-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #244BB3; border-color: #244BB3;">
+                    <div class="flex items-center gap-2 flex-none">
+                        <x-ui.button size="md" variant="primary" type="submit" class="h-11 px-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #244BB3; border-color: #244BB3;">
                             <i class="ri-search-line text-gray-100"></i>
                             <span class="font-medium text-gray-100">Buscar</span>
                         </x-ui.button>
-                        <x-ui.link-button size="md" variant="outline" href="{{ route('admin.modules.menu_options.index', $viewId ? [$module, 'view_id' => $viewId] : $module) }}" class="flex-1 sm:flex-none h-11 px-4 border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200">
+                        <x-ui.link-button size="md" variant="outline" href="{{ route('admin.modules.menu_options.index', $viewId ? [$module, 'view_id' => $viewId] : $module) }}" class="h-11 px-4 border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200">
                             <i class="ri-refresh-line"></i>
                             <span class="font-medium">Limpiar</span>
                         </x-ui.link-button>
-                    </div>
-                </form>
 
-                <div class="flex gap-2">
-                    <x-ui.link-button size="md" variant="outline" href="{{ route('admin.modules.index', $viewId ? ['view_id' => $viewId] : []) }}">
-                        <i class="ri-arrow-left-line"></i> Volver
-                    </x-ui.link-button>
+                        <x-ui.link-button size="md" variant="outline" href="{{ route('admin.modules.index', $viewId ? ['view_id' => $viewId] : []) }}" class="h-11 border-gray-200">
+                            <i class="ri-arrow-left-line"></i> Volver
+                        </x-ui.link-button>
 
-                    @if ($topOperations->isNotEmpty())
                         @foreach ($topOperations as $operation)
                             @php
                                 $topColor = $operation->color ?: '#12f00e';
@@ -147,23 +143,22 @@
                                     size="md"
                                     variant="primary"
                                     type="button"
+                                    class="h-11 px-6 shadow-sm whitespace-nowrap"
                                     style="{{ $topStyle }}"
                                     @click="$dispatch('open-create-modal')"
                                 >
-                                    <i class="{{ $operation->icon }}"></i>
+                                    <i class="{{ $operation->icon }} text-lg"></i>
                                     <span>{{ $operation->name }}</span>
                                 </x-ui.button>
                             @else
-                                <x-ui.link-button size="md" variant="primary" style="{{ $topStyle }}" href="{{ $topActionUrl }}">
-                                    <i class="{{ $operation->icon }}"></i>
+                                <x-ui.link-button size="md" variant="primary" class="h-11 px-6 shadow-sm whitespace-nowrap" style="{{ $topStyle }}" href="{{ $topActionUrl }}">
+                                    <i class="{{ $operation->icon }} text-lg"></i>
                                     <span>{{ $operation->name }}</span>
                                 </x-ui.link-button>
                             @endif
                         @endforeach
-                 
-                     
-                    @endif
-                </div>
+                    </div>
+                </form>
             </div>
 
             {{-- TOTALIZADOR --}}
@@ -179,47 +174,47 @@
                     <table class="w-full min-w-max">
                         <thead>
                             <tr class="text-white">
-                                <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6 first:rounded-tl-xl sticky-left-header"><p class="font-semibold text-gray-100 text-theme-xs uppercase">Orden (ID)</p></th>
-                                <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6"><p class="font-semibold text-gray-100 text-theme-xs uppercase">Icono</p></th>
-                                <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6"><p class="font-semibold text-gray-100 text-theme-xs uppercase">Nombre</p></th>
-                                <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6"><p class="font-semibold text-gray-100 text-theme-xs uppercase">Ruta / Acción</p></th>
-                                <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6"><p class="font-semibold text-gray-100 text-theme-xs uppercase">Estado</p></th>
-                                <th style="background-color: #334155;" class="px-5 py-3 text-right sm:px-6 last:rounded-tr-xl"><p class="font-semibold text-gray-100 text-theme-xs uppercase">Acciones</p></th>
+                                <th style="background-color: #334155;" class="px-5 py-3 text-center sm:px-6 first:rounded-tl-xl sticky-left-header"><p class="font-semibold text-gray-100 text-theme-xs uppercase">Orden (ID)</p></th>
+                                <th style="background-color: #334155;" class="px-5 py-3 text-center sm:px-6"><p class="font-semibold text-gray-100 text-theme-xs uppercase">Icono</p></th>
+                                <th style="background-color: #334155;" class="px-5 py-3 text-center sm:px-6"><p class="font-semibold text-gray-100 text-theme-xs uppercase">Nombre</p></th>
+                                <th style="background-color: #334155;" class="px-5 py-3 text-center sm:px-6"><p class="font-semibold text-gray-100 text-theme-xs uppercase">Ruta / Acción</p></th>
+                                <th style="background-color: #334155;" class="px-5 py-3 text-center sm:px-6"><p class="font-semibold text-gray-100 text-theme-xs uppercase">Estado</p></th>
+                                <th style="background-color: #334155;" class="px-5 py-3 text-center sm:px-6 last:rounded-tr-xl"><p class="font-semibold text-gray-100 text-theme-xs uppercase">Acciones</p></th>
                             </tr>
                         </thead>
                         <tbody>
                             @forelse ($menuOptions as $option)
                                 <tr class="group/row border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5 relative hover:z-[60]">
-                                    <td class="px-5 py-4 sm:px-6">
-                                        <span class="font-bold text-gray-700 dark:text-gray-200">#{{ $option->id }}</span>
-                                    </td>
-                                    <td class="px-5 py-4 sm:px-6">
-                                        <div class="flex h-8 w-8 items-center justify-center rounded bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                                            @if(class_exists('App\Helpers\MenuHelper'))
-                                                <span class="w-5 h-5 fill-current">{!! MenuHelper::getIconSvg($option->icon) !!}</span>
-                                            @else
-                                                <i class="{{ $option->icon }}"></i>
-                                            @endif
-                                        </div>
-                                    </td>
-                                    <td class="px-5 py-4 sm:px-6">
-                                        <p class="font-medium text-gray-800 text-theme-sm dark:text-white/90">{{ $option->name }}</p>
-                                        @if($option->quick_access)
-                                            <span class="mt-1 inline-block text-[10px] text-brand-500 bg-brand-50 px-1 rounded border border-brand-100">Acceso Rápido</span>
+                                <td class="px-5 py-4 sm:px-6 text-center">
+                                    <span class="font-bold text-gray-700 dark:text-gray-200">#{{ $option->id }}</span>
+                                </td>
+                                <td class="px-5 py-4 sm:px-6 text-center">
+                                    <div class="flex h-8 w-8 items-center justify-center rounded bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300 mx-auto">
+                                        @if(class_exists('App\Helpers\MenuHelper'))
+                                            <span class="w-5 h-5 fill-current">{!! MenuHelper::getIconSvg($option->icon) !!}</span>
+                                        @else
+                                            <i class="{{ $option->icon }}"></i>
                                         @endif
-                                    </td>
-                                    <td class="px-5 py-4 sm:px-6">
-                                        <code class="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-gray-600 dark:text-gray-400">
-                                            {{ $option->action }}
-                                        </code>
-                                    </td>
-                                    <td class="px-5 py-4 sm:px-6">
-                                        <x-ui.badge variant="light" color="{{ $option->status ? 'success' : 'error' }}">
-                                            {{ $option->status ? 'Activo' : 'Inactivo' }}
-                                        </x-ui.badge>
-                                    </td>
-                                    <td class="px-5 py-4 sm:px-6">
-                                        <div class="flex items-center justify-end gap-2">
+                                    </div>
+                                </td>
+                                <td class="px-5 py-4 sm:px-6 text-center">
+                                    <p class="font-medium text-gray-800 text-theme-sm dark:text-white/90">{{ $option->name }}</p>
+                                    @if($option->quick_access)
+                                        <span class="mt-1 inline-block text-[10px] text-brand-500 bg-brand-50 px-1 rounded border border-brand-100">Acceso Rápido</span>
+                                    @endif
+                                </td>
+                                <td class="px-5 py-4 sm:px-6 text-center">
+                                    <code class="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-gray-600 dark:text-gray-400">
+                                        {{ $option->action }}
+                                    </code>
+                                </td>
+                                <td class="px-5 py-4 sm:px-6 text-center">
+                                    <x-ui.badge variant="light" color="{{ $option->status ? 'success' : 'error' }}" class="mx-auto">
+                                        {{ $option->status ? 'Activo' : 'Inactivo' }}
+                                    </x-ui.badge>
+                                </td>
+                                <td class="px-5 py-4 sm:px-6 text-center">
+                                    <div class="flex items-center justify-center gap-2">
                                             @if ($rowOperations->isNotEmpty())
                                                 @foreach ($rowOperations as $operation)
                                                     @php

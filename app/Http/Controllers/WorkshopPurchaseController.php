@@ -30,6 +30,7 @@ class WorkshopPurchaseController extends Controller
         $supplierId = (int) $request->input('supplier_id', 0);
         $documentKind = strtoupper(trim((string) $request->input('document_kind', '')));
         $scopeBranchId = (int) $request->input('branch_id', $branchId);
+        $perPage = (int) $request->input('per_page', 10);
 
         $isAdmin = ((int) (auth()->user()?->profile_id ?? 0) === 1) || str_contains(strtoupper((string) (auth()->user()?->profile?->name ?? '')), 'ADMIN');
         if (!$isAdmin) {
@@ -54,7 +55,7 @@ class WorkshopPurchaseController extends Controller
             ->when($documentKind !== '', fn ($query) => $query->where('document_kind', $documentKind))
             ->orderByDesc('issued_at')
             ->orderByDesc('id')
-            ->paginate(20)
+            ->paginate($perPage)
             ->withQueryString();
 
         $suppliers = Person::query()
@@ -77,7 +78,8 @@ class WorkshopPurchaseController extends Controller
             'supplierId',
             'documentKind',
             'scopeBranchId',
-            'isAdmin'
+            'isAdmin',
+            'perPage'
         ));
     }
 }

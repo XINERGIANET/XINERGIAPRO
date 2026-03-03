@@ -44,6 +44,8 @@ class WorkshopClientController extends Controller
         $type = (string) $request->input('type', '');
         $roleId = (int) $request->input('role_id', 0);
 
+        $perPage = (int) $request->input('per_page', 10);
+        
         $clients = Person::query()
             ->where('branch_id', $branchId)
             ->when($type !== '', function ($query) use ($type) {
@@ -70,7 +72,7 @@ class WorkshopClientController extends Controller
                 });
             })
             ->orderByDesc('id')
-            ->paginate(15)
+            ->paginate($perPage)
             ->withQueryString();
 
         $roles = Role::query()->orderBy('name')->get(['id', 'name']);
@@ -81,6 +83,7 @@ class WorkshopClientController extends Controller
             'search' => $search,
             'type' => $type,
             'roleId' => $roleId,
+            'per_page' => $perPage,
             'roles' => $roles,
             'profiles' => $profiles,
             'selectedRoleIds' => old('roles', []),

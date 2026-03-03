@@ -70,63 +70,78 @@
         <x-common.page-breadcrumb pageTitle="Perfiles" />
 
         <x-common.component-card title="Listado de perfiles" desc="Gestiona los perfiles registrados en el sistema.">
-            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <form method="GET" class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+            {{-- BARRA DE BÚSQUEDA Y ACCIONES --}}
+            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between mb-6">
+                <form method="GET" class="flex flex-1 flex-wrap gap-2 sm:flex-nowrap sm:items-center min-w-0">
                     @if ($viewId)
                         <input type="hidden" name="view_id" value="{{ $viewId }}">
                     @endif
-                    <div class="w-29">
-                        <select name="per_page"
+                    <div class="w-full sm:w-auto flex-none">
+                         <select name="per_page"
                             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                             onchange="this.form.submit()">
                             @foreach ([10, 20, 50, 100] as $size)
-                                <option value="{{ $size }}" @selected($perPage == $size)>{{ $size }} / pagina</option>
+                                <option value="{{ $size }}" @selected($perPage == $size)>{{ $size }} / página</option>
                             @endforeach
                         </select>
                     </div>
-                    <div class="relative flex-1">
-                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                            <i class="ri-search-line"></i>
+                    <div class="relative flex-1 min-w-0">
+                        <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                             <i class="ri-search-line"></i>
                         </span>
-                        <input type="text" name="search" value="{{ $search }}"
-                            placeholder="Buscar por nombre"
-                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-12 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
+                        <input
+                            type="text"
+                            name="search"
+                            value="{{ $search }}"
+                            placeholder=" Buscar perfil..."
+                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-10 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                        />
                     </div>
-                    <div class="flex flex-wrap gap-2">
-                        <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 px-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #244BB3; border-color: #244BB3;">
+                    <div class="flex items-center gap-2 flex-none">
+                        <x-ui.button size="md" variant="primary" type="submit" class="h-11 px-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #244BB3; border-color: #244BB3;">
                             <i class="ri-search-line text-gray-100"></i>
                             <span class="font-medium text-gray-100">Buscar</span>
                         </x-ui.button>
-                        <x-ui.link-button size="md" variant="outline" href="{{ route('admin.profiles.index', $viewId ? ['view_id' => $viewId] : []) }}" class="flex-1 sm:flex-none h-11 px-4 border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200">
+                        <x-ui.link-button size="md" variant="outline" href="{{ route('admin.profiles.index', $viewId ? ['view_id' => $viewId] : []) }}" class="h-11 px-4 border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200">
                             <i class="ri-refresh-line"></i>
                             <span class="font-medium">Limpiar</span>
                         </x-ui.link-button>
+
+                        @foreach ($topOperations as $operation)
+                            @php
+                                $topTextColor = $resolveTextColor($operation);
+                                $topColor = $operation->color ?: '#3B82F6';
+                                $topStyle = "background-color: {$topColor}; color: {$topTextColor};";
+                                $topActionUrl = $resolveActionUrl($operation->action ?? '', null, $operation);
+                                $isCreate = str_contains($operation->action ?? '', 'profiles.create');
+                            @endphp
+                            @if ($isCreate)
+                                <x-ui.button
+                                    size="md"
+                                    variant="primary"
+                                    type="button"
+                                    class="h-11 px-6 shadow-sm whitespace-nowrap"
+                                    style="{{ $topStyle }}"
+                                    @click="$dispatch('open-profile-modal')"
+                                >
+                                    <i class="{{ $operation->icon }} text-lg"></i>
+                                    <span>{{ $operation->name }}</span>
+                                </x-ui.button>
+                            @else
+                                <x-ui.link-button
+                                    size="md"
+                                    variant="primary"
+                                    class="h-11 px-6 shadow-sm whitespace-nowrap"
+                                    style="{{ $topStyle }}"
+                                    href="{{ $topActionUrl }}"
+                                >
+                                    <i class="{{ $operation->icon }} text-lg"></i>
+                                    <span>{{ $operation->name }}</span>
+                                </x-ui.link-button>
+                            @endif
+                        @endforeach
                     </div>
                 </form>
-                <div class="flex flex-wrap items-center gap-2">
-                    @foreach ($topOperations as $operation)
-                        @php
-                            $topTextColor = $resolveTextColor($operation);
-                            $topColor = $operation->color ?: '#3B82F6';
-                            $topStyle = "background-color: {$topColor}; color: {$topTextColor};";
-                            $topActionUrl = $resolveActionUrl($operation->action ?? '', null, $operation);
-                            $isCreate = str_contains($operation->action ?? '', 'profiles.create');
-                        @endphp
-                        @if ($isCreate)
-                            <x-ui.button size="md" variant="primary" type="button"
-                                style="{{ $topStyle }}" @click="$dispatch('open-profile-modal')">
-                                <i class="{{ $operation->icon }}"></i>
-                                <span>{{ $operation->name }}</span>
-                            </x-ui.button>
-                        @else
-                            <x-ui.link-button size="md" variant="primary"
-                                style="{{ $topStyle }}" href="{{ $topActionUrl }}">
-                                <i class="{{ $operation->icon }}"></i>
-                                <span>{{ $operation->name }}</span>
-                            </x-ui.link-button>
-                        @endif
-                    @endforeach
-                </div>
             </div>
 
             <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
