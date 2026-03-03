@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
+use App\Models\Card;
 use App\Models\CashRegister;
+use App\Models\DigitalWallet;
 use App\Models\DocumentType;
 use App\Models\Location;
 use App\Models\PaymentMethod;
+use App\Models\PaymentGateways;
 use App\Models\Person;
 use App\Models\ProductBranch;
 use App\Models\Vehicle;
@@ -22,6 +25,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class WorkshopMaintenanceBoardController extends Controller
 {
@@ -706,12 +710,69 @@ class WorkshopMaintenanceBoardController extends Controller
             ];
         })->values();
 
+        $paymentMethodOptions = collect($formData['paymentMethods'] ?? collect())
+            ->map(function ($method) {
+                return [
+                    'id' => (int) $method->id,
+                    'description' => (string) ($method->description ?? ''),
+                    'kind' => $this->inferPaymentMethodKind((string) ($method->description ?? '')),
+                ];
+            })
+            ->values();
+
+        $cardOptions = Card::query()
+            ->where('status', true)
+            ->orderBy('order_num')
+            ->get(['id', 'description', 'type', 'icon'])
+            ->map(fn ($card) => [
+                'id' => (int) $card->id,
+                'description' => (string) ($card->description ?? ''),
+                'type' => (string) ($card->type ?? ''),
+                'icon' => (string) ($card->icon ?? ''),
+            ])
+            ->values();
+
+        $digitalWalletOptions = DigitalWallet::query()
+            ->where('status', true)
+            ->orderBy('order_num')
+            ->get(['id', 'description'])
+            ->map(fn ($wallet) => [
+                'id' => (int) $wallet->id,
+                'description' => (string) ($wallet->description ?? ''),
+            ])
+            ->values();
+
+        $paymentGatewayOptionsByMethod = collect(
+            DB::table('payment_gateway_payment_method as pgpm')
+                ->join('payment_gateways as pg', 'pg.id', '=', 'pgpm.payment_gateway_id')
+                ->whereNull('pgpm.deleted_at')
+                ->whereNull('pg.deleted_at')
+                ->where('pg.status', true)
+                ->orderBy('pg.order_num')
+                ->orderBy('pg.description')
+                ->get([
+                    'pgpm.payment_method_id',
+                    'pg.id',
+                    'pg.description',
+                ])
+        )
+            ->groupBy('payment_method_id')
+            ->map(fn ($rows) => collect($rows)->map(fn ($row) => [
+                'id' => (int) $row->id,
+                'description' => (string) ($row->description ?? ''),
+            ])->values())
+            ->all();
+
         return view('workshop.maintenance-board.checkout', array_merge($formData, [
             'order' => $order,
             'pendingLines' => $pendingLines,
             'totalOs' => (float) $order->total,
             'paidOs' => (float) $order->paid_total,
             'pendingOs' => max(0, (float) $order->total - (float) $order->paid_total),
+            'paymentMethodOptions' => $paymentMethodOptions,
+            'cardOptions' => $cardOptions,
+            'digitalWalletOptions' => $digitalWalletOptions,
+            'paymentGatewayOptionsByMethod' => $paymentGatewayOptionsByMethod,
         ]));
     }
 
@@ -738,6 +799,70 @@ class WorkshopMaintenanceBoardController extends Controller
             'product_lines.*.qty' => ['required_with:product_lines', 'numeric', 'gt:0'],
             'product_lines.*.unit_price' => ['required_with:product_lines', 'numeric', 'gte:0'],
         ]);
+
+        $methodIds = collect($validated['payment_methods'] ?? [])
+            ->pluck('payment_method_id')
+            ->filter()
+            ->map(fn ($value) => (int) $value)
+            ->unique()
+            ->values();
+
+        $methodsIndex = PaymentMethod::query()
+            ->whereIn('id', $methodIds->all())
+            ->get(['id', 'description'])
+            ->keyBy('id');
+
+        $gatewayMethodMap = collect(
+            DB::table('payment_gateway_payment_method')
+                ->whereNull('deleted_at')
+                ->whereIn('payment_method_id', $methodIds->all())
+                ->get(['payment_method_id', 'payment_gateway_id'])
+        )
+            ->groupBy('payment_method_id')
+            ->map(fn ($rows) => collect($rows)->pluck('payment_gateway_id')->map(fn ($value) => (int) $value)->all());
+
+        foreach ($validated['payment_methods'] as $index => $payment) {
+            $method = $methodsIndex->get((int) ($payment['payment_method_id'] ?? 0));
+            $kind = $this->inferPaymentMethodKind((string) ($method?->description ?? ''));
+
+            if ($kind === 'card') {
+                if (empty($payment['card_id'])) {
+                    throw ValidationException::withMessages([
+                        "payment_methods.{$index}.card_id" => 'Debe seleccionar la tarjeta.',
+                    ]);
+                }
+
+                if (!empty($payment['payment_gateway_id'])) {
+                    $allowedGateways = $gatewayMethodMap->get((int) $payment['payment_method_id'], []);
+                    if (!in_array((int) $payment['payment_gateway_id'], $allowedGateways, true)) {
+                        throw ValidationException::withMessages([
+                            "payment_methods.{$index}.payment_gateway_id" => 'La pasarela no corresponde al método de pago seleccionado.',
+                        ]);
+                    }
+                }
+
+                $validated['payment_methods'][$index]['digital_wallet_id'] = null;
+                $validated['payment_methods'][$index]['bank_id'] = null;
+            } elseif ($kind === 'wallet') {
+                if (empty($payment['digital_wallet_id'])) {
+                    throw ValidationException::withMessages([
+                        "payment_methods.{$index}.digital_wallet_id" => 'Debe seleccionar la billetera digital.',
+                    ]);
+                }
+
+                $validated['payment_methods'][$index]['card_id'] = null;
+                $validated['payment_methods'][$index]['payment_gateway_id'] = null;
+                $validated['payment_methods'][$index]['bank_id'] = null;
+            } else {
+                $validated['payment_methods'][$index]['card_id'] = null;
+                $validated['payment_methods'][$index]['payment_gateway_id'] = null;
+                $validated['payment_methods'][$index]['digital_wallet_id'] = null;
+            }
+
+            $validated['payment_methods'][$index]['reference'] = isset($payment['reference'])
+                ? trim((string) $payment['reference'])
+                : null;
+        }
 
         $user = auth()->user();
         $branchId = (int) session('branch_id');
@@ -857,6 +982,32 @@ class WorkshopMaintenanceBoardController extends Controller
         $branch = Branch::query()->findOrFail($branchId);
 
         return [$branchId, (int) $branch->company_id];
+    }
+
+    private function inferPaymentMethodKind(string $description): string
+    {
+        $normalized = mb_strtolower(trim($description), 'UTF-8');
+
+        if (
+            str_contains($normalized, 'tarjeta')
+            || str_contains($normalized, 'card')
+            || str_contains($normalized, 'credito')
+            || str_contains($normalized, 'débito')
+            || str_contains($normalized, 'debito')
+        ) {
+            return 'card';
+        }
+
+        if (
+            str_contains($normalized, 'billetera')
+            || str_contains($normalized, 'wallet')
+            || str_contains($normalized, 'yape')
+            || str_contains($normalized, 'plin')
+        ) {
+            return 'wallet';
+        }
+
+        return 'other';
     }
 
     private function uploadDamagePhotos(Request $request, array $damages, int $branchId): array

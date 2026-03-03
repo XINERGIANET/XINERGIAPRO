@@ -6,10 +6,18 @@
         pendingLines: @js($pendingLines->values()->all()),
         productsCatalog: @js(($products ?? collect())->values()->all()),
         productLines: @js(array_values(old('product_lines', []))),
+        paymentMethodOptions: @js(($paymentMethodOptions ?? collect())->values()->all()),
+        cardOptions: @js(($cardOptions ?? collect())->values()->all()),
+        digitalWalletOptions: @js(($digitalWalletOptions ?? collect())->values()->all()),
+        paymentGatewayOptionsByMethod: @js($paymentGatewayOptionsByMethod ?? []),
+        paymentRows: @js(array_values(old('payment_methods', []))),
         pendingOs: Number(@json($pendingOs)),
         init() {
             if (!Array.isArray(this.productLines)) this.productLines = [];
-            if (this.productLines.length === 0) this.syncAmount();
+            if (!Array.isArray(this.paymentRows)) this.paymentRows = [];
+            this.paymentRows = this.paymentRows.map((row) => this.normalizePaymentRow(row));
+            if (this.paymentRows.length === 0) this.addPaymentRow(true);
+            this.syncAmount();
         },
         lineSubtotal(line) {
             return Number(line.qty || 0) * Number(line.unit_price || 0);
@@ -42,9 +50,69 @@
             if (product) line.unit_price = Number(product.price || 0);
             this.syncAmount();
         },
+        inferMethodKind(methodId) {
+            const method = this.paymentMethodOptions.find((item) => String(item.id) === String(methodId));
+            return method?.kind || 'other';
+        },
+        normalizePaymentRow(row) {
+            const methodId = String(row.payment_method_id ?? '');
+            return {
+                payment_method_id: methodId,
+                amount: row.amount === 0 ? '0.00' : String(row.amount ?? ''),
+                reference: String(row.reference ?? ''),
+                card_id: row.card_id ? String(row.card_id) : '',
+                digital_wallet_id: row.digital_wallet_id ? String(row.digital_wallet_id) : '',
+                payment_gateway_id: row.payment_gateway_id ? String(row.payment_gateway_id) : '',
+                kind: this.inferMethodKind(methodId),
+            };
+        },
+        defaultPaymentRow(useRemaining = false) {
+            const first = this.paymentMethodOptions[0] || null;
+            const methodId = first ? String(first.id) : '';
+            const remaining = Math.max(this.remainingAmount(), 0);
+            const amount = useRemaining ? remaining : 0;
+            return {
+                payment_method_id: methodId,
+                amount: amount > 0 ? amount.toFixed(2) : '',
+                reference: '',
+                card_id: '',
+                digital_wallet_id: '',
+                payment_gateway_id: '',
+                kind: this.inferMethodKind(methodId),
+            };
+        },
+        addPaymentRow(useRemaining = false) {
+            this.paymentRows.push(this.defaultPaymentRow(useRemaining));
+            this.syncAmount();
+        },
+        removePaymentRow(index) {
+            if (this.paymentRows.length === 1) {
+                this.paymentRows[0].amount = this.chargeTotal().toFixed(2);
+                return;
+            }
+            this.paymentRows.splice(index, 1);
+            this.syncAmount();
+        },
+        onPaymentMethodChange(index) {
+            const row = this.paymentRows[index];
+            row.kind = this.inferMethodKind(row.payment_method_id);
+            row.card_id = '';
+            row.digital_wallet_id = '';
+            row.payment_gateway_id = '';
+        },
+        availableGateways(methodId) {
+            return this.paymentGatewayOptionsByMethod[String(methodId)] || [];
+        },
+        paymentTotal() {
+            return this.paymentRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+        },
+        remainingAmount() {
+            return this.chargeTotal() - this.paymentTotal();
+        },
         syncAmount() {
-            const amountInput = this.$refs.amountInput;
-            if (amountInput) amountInput.value = this.chargeTotal().toFixed(2);
+            if (this.paymentRows.length === 1) {
+                this.paymentRows[0].amount = this.chargeTotal().toFixed(2);
+            }
         }
     }"
 >
@@ -192,33 +260,164 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <div>
-                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Metodo de pago</label>
-                    <select name="payment_methods[0][payment_method_id]" required class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
-                        @foreach(($paymentMethods ?? collect()) as $method)
-                            <option value="{{ $method->id }}" @selected(old('payment_methods.0.payment_method_id', optional(($paymentMethods ?? collect())->first())->id) == $method->id)>
-                                {{ $method->description }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Monto</label>
-                    <input
-                        x-ref="amountInput"
-                        type="number"
-                        step="0.01"
-                        min="0.01"
-                        name="payment_methods[0][amount]"
-                        value="{{ old('payment_methods.0.amount', number_format($pendingOs, 2, '.', '')) }}"
-                        required
-                        class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+            <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div class="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <p class="text-sm font-semibold text-slate-800">Desglose de cobro</p>
+                        <p class="text-xs text-slate-500">Puedes combinar uno o varios métodos de pago en la misma entrega.</p>
+                    </div>
+                    <button
+                        type="button"
+                        @click="addPaymentRow(true)"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
                     >
+                        <i class="ri-add-line text-base normal-case"></i>
+                        Agregar método
+                    </button>
                 </div>
-                <div>
-                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Referencia (opcional)</label>
-                    <input type="text" name="payment_methods[0][reference]" value="{{ old('payment_methods.0.reference') }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Operacion / voucher">
+
+                <div class="space-y-3 p-3">
+                    <template x-for="(row, index) in paymentRows" :key="`payment-row-${index}`">
+                        <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                            <div class="mb-3 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold text-white" x-text="index + 1"></div>
+                                    <div>
+                                        <p class="text-sm font-semibold text-slate-800">Método de pago</p>
+                                        <p class="text-xs text-slate-500" x-text="row.kind === 'card' ? 'Requiere tarjeta y puede usar pasarela.' : (row.kind === 'wallet' ? 'Requiere seleccionar la billetera digital.' : 'No requiere detalles adicionales.')"></p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    @click="removePaymentRow(index)"
+                                    class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-rose-200 bg-white text-rose-500 transition hover:bg-rose-50"
+                                    :disabled="paymentRows.length === 1"
+                                    :class="{ 'cursor-not-allowed opacity-50': paymentRows.length === 1 }"
+                                    title="Quitar método"
+                                >
+                                    <i class="ri-delete-bin-line text-lg"></i>
+                                </button>
+                            </div>
+
+                            <div
+                                class="grid items-end gap-3"
+                                :style="row.kind === 'card'
+                                    ? 'grid-template-columns:minmax(230px,2.5fr) minmax(140px,1.2fr) minmax(180px,1.5fr) minmax(180px,1.5fr) minmax(240px,2fr);'
+                                    : 'grid-template-columns:minmax(260px,2.8fr) minmax(150px,1.3fr) minmax(220px,1.8fr) minmax(260px,2.1fr);'"
+                            >
+                                <div class="min-w-0">
+                                    <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Método</label>
+                                    <select
+                                        x-model="row.payment_method_id"
+                                        @change="onPaymentMethodChange(index)"
+                                        :name="`payment_methods[${index}][payment_method_id]`"
+                                        required
+                                        class="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition focus:border-slate-500"
+                                    >
+                                        <template x-for="method in paymentMethodOptions" :key="`method-${method.id}`">
+                                            <option :value="String(method.id)" x-text="method.description"></option>
+                                        </template>
+                                    </select>
+                                </div>
+
+                                <div class="min-w-0">
+                                    <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Monto</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0.01"
+                                        x-model="row.amount"
+                                        :name="`payment_methods[${index}][amount]`"
+                                        required
+                                        class="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-slate-500"
+                                    >
+                                </div>
+
+                                <div class="min-w-0" x-show="row.kind === 'card'">
+                                    <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Tarjeta</label>
+                                    <select
+                                        x-model="row.card_id"
+                                        :name="`payment_methods[${index}][card_id]`"
+                                        x-bind:required="row.kind === 'card'"
+                                        x-bind:disabled="row.kind !== 'card'"
+                                        class="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
+                                    >
+                                        <option value="">Seleccionar tarjeta</option>
+                                        <template x-for="card in cardOptions" :key="`card-${card.id}`">
+                                            <option :value="String(card.id)" x-text="card.type ? `${card.description} (${card.type})` : card.description"></option>
+                                        </template>
+                                    </select>
+                                </div>
+
+                                <div class="min-w-0" x-show="row.kind === 'wallet'">
+                                    <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Billetera digital</label>
+                                    <select
+                                        x-model="row.digital_wallet_id"
+                                        :name="`payment_methods[${index}][digital_wallet_id]`"
+                                        x-bind:required="row.kind === 'wallet'"
+                                        x-bind:disabled="row.kind !== 'wallet'"
+                                        class="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
+                                    >
+                                        <option value="">Seleccionar billetera</option>
+                                        <template x-for="wallet in digitalWalletOptions" :key="`wallet-${wallet.id}`">
+                                            <option :value="String(wallet.id)" x-text="wallet.description"></option>
+                                        </template>
+                                    </select>
+                                </div>
+
+                                <div class="min-w-0" x-show="row.kind !== 'card' && row.kind !== 'wallet'">
+                                    <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Detalle</label>
+                                    <div class="flex h-10 items-center rounded-xl border border-dashed border-slate-300 bg-white px-3 text-sm text-slate-400">
+                                        Sin selección adicional
+                                    </div>
+                                </div>
+
+                                <div class="min-w-0" x-show="row.kind === 'card'">
+                                    <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Pasarela</label>
+                                    <select
+                                        x-model="row.payment_gateway_id"
+                                        :name="`payment_methods[${index}][payment_gateway_id]`"
+                                        x-bind:disabled="row.kind !== 'card'"
+                                        class="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
+                                    >
+                                        <option value="">Sin pasarela</option>
+                                        <template x-for="gateway in availableGateways(row.payment_method_id)" :key="`gateway-${row.payment_method_id}-${gateway.id}`">
+                                            <option :value="String(gateway.id)" x-text="gateway.description"></option>
+                                        </template>
+                                    </select>
+                                </div>
+
+                                <div class="min-w-0">
+                                    <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Referencia</label>
+                                    <input
+                                        type="text"
+                                        x-model="row.reference"
+                                        :name="`payment_methods[${index}][reference]`"
+                                        class="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
+                                        placeholder="Operación, voucher, celular o nota"
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="grid gap-3 border-t border-slate-200 bg-slate-50 px-3 py-3 md:grid-cols-3">
+                    <div class="rounded-xl border border-slate-200 bg-white px-4 py-2.5">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Total cobro</p>
+                        <p class="mt-1 text-lg font-bold text-slate-800" x-text="`S/ ${paymentTotal().toFixed(2)}`"></p>
+                    </div>
+                    <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700">Objetivo</p>
+                        <p class="mt-1 text-lg font-bold text-emerald-700" x-text="`S/ ${chargeTotal().toFixed(2)}`"></p>
+                    </div>
+                    <div
+                        class="rounded-xl border px-4 py-2.5"
+                        :class="Math.abs(remainingAmount()) < 0.009 ? 'border-sky-200 bg-sky-50' : (remainingAmount() > 0 ? 'border-amber-200 bg-amber-50' : 'border-rose-200 bg-rose-50')"
+                    >
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.12em]" :class="Math.abs(remainingAmount()) < 0.009 ? 'text-sky-700' : (remainingAmount() > 0 ? 'text-amber-700' : 'text-rose-700')">Diferencia</p>
+                        <p class="mt-1 text-lg font-bold" :class="Math.abs(remainingAmount()) < 0.009 ? 'text-sky-700' : (remainingAmount() > 0 ? 'text-amber-700' : 'text-rose-700')" x-text="`S/ ${remainingAmount().toFixed(2)}`"></p>
+                    </div>
                 </div>
             </div>
 
