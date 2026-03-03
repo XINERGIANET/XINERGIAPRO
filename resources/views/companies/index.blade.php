@@ -172,7 +172,11 @@
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                             @forelse ($companies as $company)
-                                <tr class="group/row transition hover:bg-gray-50/80 dark:hover:bg-white/5 relative hover:z-[60]">
+                                <tr
+                                    class="group/row hover:bg-gray-50/80 dark:hover:bg-white/5 relative hover:z-[60]"
+                                    onmouseenter="this.querySelector('.sticky-left')?.style.setProperty('background-color', '#f9fafbcc', 'important')"
+                                    onmouseleave="this.querySelector('.sticky-left')?.style.setProperty('background-color', '#ffffff', 'important')"
+                                >
                                     <td class="px-3 py-4 whitespace-nowrap sticky-left w-32 max-w-[128px] sm:w-auto sm:max-w-none">
                                         <div class="flex items-center gap-2">
                                             <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-500 dark:bg-brand-500/10 shrink-0">

@@ -13,6 +13,7 @@ use App\Models\PurchaseMovement;
 use App\Models\PurchaseMovementDetail;
 use App\Models\TaxRate;
 use App\Models\Unit;
+use App\Services\KardexSyncService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -152,6 +153,8 @@ class PurchaseController extends Controller
                     $this->incrementBranchStock($branchId, $product->id, $quantity);
                 }
             }
+
+            app(KardexSyncService::class)->syncMovement($movement);
         });
 
         return redirect()
@@ -263,6 +266,8 @@ class PurchaseController extends Controller
                     $this->incrementBranchStock($branchId, $product->id, $quantity);
                 }
             }
+
+            app(KardexSyncService::class)->syncMovement($purchase);
         });
 
         return redirect()
@@ -286,6 +291,7 @@ class PurchaseController extends Controller
                 }
             }
 
+            app(KardexSyncService::class)->deleteMovement($purchase->id);
             PurchaseMovementDetail::query()->where('purchase_movement_id', $purchaseModel->id)->delete();
             $purchaseModel->delete();
             $purchase->delete();

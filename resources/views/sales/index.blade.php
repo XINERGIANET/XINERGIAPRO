@@ -158,8 +158,12 @@
                     </thead>
                     <tbody>
                         @forelse ($sales as $sale)
-                            <tr class="group/row border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5 relative hover:z-[60]">
-                                <td class="px-4 py-4 sm:px-6 sticky-left">
+                            <tr
+                                class="group/row border-b border-gray-100 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5 relative hover:z-[60]"
+                                onmouseenter="this.querySelector('.sticky-left')?.style.setProperty('background-color', '#f9fafb', 'important')"
+                                onmouseleave="this.querySelector('.sticky-left')?.style.setProperty('background-color', '#ffffff', 'important')"
+                            >
+                                <td class="px-4 py-4 sm:px-6 sticky-left group-hover/row:bg-gray-50 dark:group-hover/row:bg-white/5">
                                     <div class="flex items-center gap-2">
                                         <button type="button"
                                             @click="openRow === {{ $sale->id }} ? openRow = null : openRow = {{ $sale->id }}"
@@ -276,9 +280,12 @@
                                             <div class="relative group">
                                                     <x-ui.link-button
                                                         size="icon"
-                                                        variant="outline"
+                                                        variant="primary"
                                                         href="{{ route('admin.sales.print.pdf', array_merge([$sale], $viewId ? ['view_id' => $viewId] : [])) }}"
-                                                        className="rounded-xl border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                                                        className="rounded-xl border-0 shadow-none"
+                                                        style="background-color: #ef4444; color: #ffffff;"
+                                                        onmouseover="this.style.backgroundColor='#dc2626'"
+                                                        onmouseout="this.style.backgroundColor='#ef4444'"
                                                         aria-label="Imprimir PDF" target="_blank"
                                                     >
                                                         <i class="ri-file-pdf-2-line"></i>
@@ -291,9 +298,12 @@
                                             <div class="relative group">
                                                     <x-ui.link-button
                                                         size="icon"
-                                                        variant="outline"
+                                                        variant="primary"
                                                         href="{{ route('admin.sales.print.ticket', array_merge([$sale], $viewId ? ['view_id' => $viewId] : [])) }}"
-                                                        className="rounded-xl border border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                                                        className="rounded-xl border-0 shadow-none"
+                                                        style="background-color: #8b5cf6; color: #ffffff;"
+                                                        onmouseover="this.style.backgroundColor='#7c3aed'"
+                                                        onmouseout="this.style.backgroundColor='#8b5cf6'"
                                                         aria-label="Imprimir Ticket" target="_blank"
                                                     >
                                                         <i class="ri-printer-line"></i>
@@ -373,9 +383,12 @@
                                             <div class="relative group">
                                                 <x-ui.link-button
                                                     size="icon"
-                                                    variant="outline"
+                                                    variant="primary"
                                                     href="{{ route('admin.sales.print.pdf', array_merge([$sale], $viewId ? ['view_id' => $viewId] : [])) }}"
-                                                    className="rounded-xl border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                                                    className="rounded-xl border-0 shadow-none"
+                                                    style="background-color: #ef4444; color: #ffffff;"
+                                                    onmouseover="this.style.backgroundColor='#dc2626'"
+                                                    onmouseout="this.style.backgroundColor='#ef4444'"
                                                     aria-label="Imprimir PDF"
                                                 >
                                                     <i class="ri-file-pdf-2-line"></i>
@@ -388,9 +401,12 @@
                                             <div class="relative group">
                                                 <x-ui.link-button
                                                     size="icon"
-                                                    variant="outline"
+                                                    variant="primary"
                                                     href="{{ route('admin.sales.print.ticket', array_merge([$sale], $viewId ? ['view_id' => $viewId] : [])) }}"
-                                                    className="rounded-xl border border-slate-300 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                                                    className="rounded-xl border-0 shadow-none"
+                                                    style="background-color: #8b5cf6; color: #ffffff;"
+                                                    onmouseover="this.style.backgroundColor='#7c3aed'"
+                                                    onmouseout="this.style.backgroundColor='#8b5cf6'"
                                                     aria-label="Imprimir Ticket"
                                                 >
                                                     <i class="ri-printer-line"></i>

@@ -7,6 +7,7 @@ use App\Models\Card;
 use App\Models\CashMovements;
 use App\Models\CashRegister;
 use App\Models\DocumentType;
+use App\Models\DigitalWallet;
 use App\Models\Movement;
 use App\Models\MovementType;
 use App\Models\PaymentConcept;
@@ -21,6 +22,7 @@ use App\Models\Shift;
 use App\Models\TaxRate;
 use App\Models\Unit;
 use App\Models\Operation;
+use App\Services\KardexSyncService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -132,9 +134,59 @@ class SalesController extends Controller
             })
             ->values();
 
+        $people = Person::query()
+            ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name', 'document_number']);
+
+        $defaultClientId = Person::query()
+            ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
+            ->whereRaw('UPPER(first_name) = ?', ['CLIENTES'])
+            ->whereRaw('UPPER(last_name) = ?', ['VARIOS'])
+            ->value('id');
+
+        $documentTypes = DocumentType::query()
+            ->where('movement_type_id', 2)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $paymentMethods = PaymentMethod::query()
+            ->where('status', true)
+            ->orderBy('order_num')
+            ->get(['id', 'description', 'order_num']);
+
+        $paymentGateways = PaymentGateways::query()
+            ->where('status', true)
+            ->orderBy('order_num')
+            ->get(['id', 'description', 'order_num']);
+
+        $cards = Card::query()
+            ->where('status', true)
+            ->orderBy('order_num')
+            ->get(['id', 'description', 'type', 'icon', 'order_num']);
+
+        $digitalWallets = DigitalWallet::query()
+            ->where('status', true)
+            ->orderBy('order_num')
+            ->get(['id', 'description', 'order_num']);
+
+        $cashRegisters = CashRegister::query()
+            ->orderByRaw("CASE WHEN status = 'A' THEN 0 ELSE 1 END")
+            ->orderBy('number')
+            ->get(['id', 'number', 'status']);
+
         return view('sales.create', [
             'products' => $products,
             'productBranches' => $productBranches,
+            'people' => $people,
+            'defaultClientId' => $defaultClientId,
+            'documentTypes' => $documentTypes,
+            'paymentMethods' => $paymentMethods,
+            'paymentGateways' => $paymentGateways,
+            'cards' => $cards,
+            'digitalWallets' => $digitalWallets,
+            'cashRegisters' => $cashRegisters,
             // Compatibilidad con implementaciones previas en la vista
             'productsBranches' => $productBranches,
         ]);
@@ -162,6 +214,11 @@ class SalesController extends Controller
             ->where('status', true)
             ->orderBy('order_num')
             ->get(['id', 'description', 'type', 'icon', 'order_num']);
+
+        $digitalWallets = DigitalWallet::query()
+            ->where('status', true)
+            ->orderBy('order_num')
+            ->get(['id', 'description', 'order_num']);
         
         $cashRegisters = CashRegister::query()
             ->orderByRaw("CASE WHEN status = 'A' THEN 0 ELSE 1 END")
@@ -257,6 +314,7 @@ class SalesController extends Controller
             'paymentMethods' => $paymentMethods,
             'paymentGateways' => $paymentGateways,
             'cards' => $cards,
+            'digitalWallets' => $digitalWallets,
             'cashRegisters' => $cashRegisters,
             'people' => $people,
             'defaultClientId' => $defaultClientId,
@@ -286,6 +344,7 @@ class SalesController extends Controller
                 'payment_methods.*.amount' => 'required|numeric|min:0.01',
                 'payment_methods.*.payment_gateway_id' => 'nullable|integer|exists:payment_gateways,id',
                 'payment_methods.*.card_id' => 'nullable|integer|exists:cards,id',
+                'payment_methods.*.digital_wallet_id' => 'nullable|integer|exists:digital_wallets,id',
                 'notes' => 'nullable|string',
                 'movement_id' => 'nullable|integer|exists:movements,id', // ID del borrador a completar
             ]);
@@ -572,6 +631,8 @@ class SalesController extends Controller
                 ]);
             }
             
+            app(KardexSyncService::class)->syncMovement($movement);
+
             // Crear/actualizar movimiento de caja separado del movimiento de venta
             $cashEntryMovement = $this->resolveCashEntryMovementBySaleMovement($movement->id);
          
@@ -657,8 +718,18 @@ class SalesController extends Controller
             // Crear CashMovementDetail para cada método de pago
             foreach ($request->payment_methods as $paymentMethodData) {
                 $paymentMethod = PaymentMethod::findOrFail($paymentMethodData['payment_method_id']);
+                $paymentMethodDescription = mb_strtolower((string) ($paymentMethod->description ?? ''));
                 $paymentGateway = null;
                 $card = null;
+                $digitalWallet = null;
+
+                if ((str_contains($paymentMethodDescription, 'billetera') || str_contains($paymentMethodDescription, 'wallet')) && empty($paymentMethodData['digital_wallet_id'])) {
+                    throw new \Exception('Debe seleccionar la billetera digital del metodo de pago.');
+                }
+
+                if ((str_contains($paymentMethodDescription, 'tarjeta') || str_contains($paymentMethodDescription, 'card')) && empty($paymentMethodData['card_id'])) {
+                    throw new \Exception('Debe seleccionar el detalle de tarjeta del metodo de pago.');
+                }
                 
                 if ($paymentMethodData['payment_gateway_id']) {
                     $paymentGateway = PaymentGateways::find($paymentMethodData['payment_gateway_id']);
@@ -666,6 +737,10 @@ class SalesController extends Controller
                 
                 if ($paymentMethodData['card_id']) {
                     $card = Card::find($paymentMethodData['card_id']);
+                }
+
+                if (!empty($paymentMethodData['digital_wallet_id'])) {
+                    $digitalWallet = DigitalWallet::find($paymentMethodData['digital_wallet_id']);
                 }
                 
                 DB::table('cash_movement_details')->insert([
@@ -679,8 +754,8 @@ class SalesController extends Controller
                     'card' => $card?->description ?? '',
                     'bank_id' => null,
                     'bank' => '',
-                    'digital_wallet_id' => null,
-                    'digital_wallet' => '',
+                    'digital_wallet_id' => $digitalWallet?->id,
+                    'digital_wallet' => $digitalWallet?->description ?? '',
                     'payment_gateway_id' => $paymentGateway?->id,
                     'payment_gateway' => $paymentGateway?->description ?? '',
                     'amount' => $paymentMethodData['amount'],
@@ -1012,6 +1087,7 @@ class SalesController extends Controller
 
     public function destroy(Movement $sale)
     {
+        app(KardexSyncService::class)->deleteMovement($sale->id);
         $sale->delete();
 
         return redirect()

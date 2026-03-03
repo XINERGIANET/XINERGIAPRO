@@ -13,6 +13,7 @@ use App\Models\Person;
 use App\Models\WarehouseMovement;
 use App\Models\WarehouseMovementDetail;
 use App\Models\WorkshopPurchaseRecord;
+use App\Services\KardexSyncService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -288,6 +289,7 @@ class WarehouseMovementController extends Controller
                 $productBranch->update(['stock' => $newStock]);
             }
 
+            app(KardexSyncService::class)->syncMovement($movement);
             DB::commit();
 
             return response()->json([
@@ -487,6 +489,7 @@ class WarehouseMovementController extends Controller
                 $destiny->update(['stock' => (float) $destiny->stock + $qty]);
             }
 
+            app(KardexSyncService::class)->syncMovement($movement);
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -773,6 +776,8 @@ class WarehouseMovementController extends Controller
                 'issued_at' => $issuedAt,
             ]);
 
+            app(KardexSyncService::class)->syncMovement($outMovement);
+            app(KardexSyncService::class)->syncMovement($inMovement);
             DB::commit();
 
             return response()->json([
