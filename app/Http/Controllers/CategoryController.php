@@ -46,10 +46,15 @@ class CategoryController extends Controller
             $perPage = 10;
         }
 
+        Category::syncExistingToAllBranches();
+
         $categories = Category::query()
+            ->forBranch((int) $branchId)
             ->when($search, function ($query) use ($search) {
-                $query->where('description', 'ILIKE', "%{$search}%")
-                    ->orWhere('abbreviation', 'ILIKE', "%{$search}%");
+                $query->where(function ($inner) use ($search) {
+                    $inner->where('description', 'ILIKE', "%{$search}%")
+                        ->orWhere('abbreviation', 'ILIKE', "%{$search}%");
+                });
             })
             ->orderByDesc('id')
             ->paginate($perPage)
@@ -76,8 +81,19 @@ class CategoryController extends Controller
             $path = $request->file('image')->store('category', 'public');
             $data['image'] = $path;
         }
-        
-        Category::create($data);
+
+        $category = Category::create($data);
+        $branchId = (int) $request->session()->get('branch_id');
+        if ($branchId) {
+            $category->branches()->syncWithoutDetaching([
+                $branchId => [
+                    'menu_type' => 'GENERAL',
+                    'status' => 'E',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ],
+            ]);
+        }
         $viewId = $request->input('view_id');
 
         return redirect()

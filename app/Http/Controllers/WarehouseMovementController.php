@@ -546,6 +546,7 @@ class WarehouseMovementController extends Controller
         }
 
         $warehouseMovements = WarehouseMovement::query()
+            ->where('branch_id', $branchId)
             ->with(['movement.movementType', 'movement.documentType', 'branch'])
             ->when($search, function ($query) use ($search) {
                 $query->whereHas('movement', function ($q) use ($search) {

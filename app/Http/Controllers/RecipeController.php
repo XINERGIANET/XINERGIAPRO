@@ -19,6 +19,7 @@ class RecipeController extends Controller
         $categoryId = $request->input('category');
         $status = $request->input('status');
         $perPage = (int) $request->input('per_page', 12);
+        $branchId = (int) $request->session()->get('branch_id');
         
         $recipes = Recipe::query()
             ->with(['category', 'yieldUnit', 'ingredients.product', 'ingredients.unit'])
@@ -37,7 +38,11 @@ class RecipeController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
-        $categories = Category::orderBy('description')->get();
+        Category::syncExistingToAllBranches();
+        $categories = Category::query()
+            ->forBranch($branchId)
+            ->orderBy('description')
+            ->get();
 
         return view('recipe_book.index', [
             'recipes' => $recipes,
@@ -51,7 +56,12 @@ class RecipeController extends Controller
 
     public function create()
     {
-        $categories = Category::orderBy('description')->get();
+        $branchId = (int) session('branch_id');
+        Category::syncExistingToAllBranches();
+        $categories = Category::query()
+            ->forBranch($branchId)
+            ->orderBy('description')
+            ->get();
         $units = Unit::orderBy('description')->get();
         $products = Product::where('status', 'A')->orderBy('description')->get();
 
@@ -104,7 +114,12 @@ class RecipeController extends Controller
 
     public function edit(Recipe $recipe)
     {
-        $categories = Category::orderBy('description')->get();
+        $branchId = (int) session('branch_id');
+        Category::syncExistingToAllBranches();
+        $categories = Category::query()
+            ->forBranch($branchId)
+            ->orderBy('description')
+            ->get();
         $units = Unit::orderBy('description')->get();
         $products = Product::where('status', 'A')->orderBy('description')->get();
 

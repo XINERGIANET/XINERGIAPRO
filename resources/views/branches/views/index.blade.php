@@ -394,8 +394,10 @@
                     @if ($requestIcon)
                         <input type="hidden" name="icon" value="{{ $requestIcon }}">
                     @endif
-
-                     <div class="table-responsive lg:!overflow-visible mt-4 min-h-0 flex-1 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+                    <div
+                        class="table-responsive mt-4 min-h-0 flex-1 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]"
+                        style="max-height: 52vh; overflow-y: scroll !important; overflow-x: auto !important; min-height: 0;"
+                    >
                         <table class="w-full min-w-[700px]">
                             <thead>
                                 <tr class="text-white">
@@ -456,7 +458,7 @@
                         </table>
                     </div>
 
-                    <div class="flex flex-wrap gap-3">
+                    <div class="sticky bottom-0 flex flex-wrap gap-3 bg-[#F4F6FA] pt-2">
                         <x-ui.button type="submit" size="md" variant="primary">
                             <i class="ri-save-line"></i>
                             <span>Guardar cambios</span>

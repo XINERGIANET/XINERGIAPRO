@@ -42,7 +42,7 @@ class WorkshopClientController extends Controller
 
         $search = trim((string) $request->input('search', ''));
         $type = (string) $request->input('type', '');
-        $roleId = (int) $request->input('role_id', 0);
+        $roleId = (int) $request->input('role_id', 3);
 
         $perPage = (int) $request->input('per_page', 10);
         

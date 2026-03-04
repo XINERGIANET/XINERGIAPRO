@@ -2,15 +2,24 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Card;
+use App\Models\Branch;
+use App\Models\CashMovements;
+use App\Models\CashRegister;
 use App\Models\DocumentType;
+use App\Models\DigitalWallet;
 use App\Models\Movement;
 use App\Models\MovementType;
 use App\Models\Operation;
+use App\Models\PaymentConcept;
+use App\Models\PaymentGateways;
+use App\Models\PaymentMethod;
 use App\Models\Person;
 use App\Models\Product;
 use App\Models\ProductBranch;
 use App\Models\PurchaseMovement;
 use App\Models\PurchaseMovementDetail;
+use App\Models\Shift;
 use App\Models\TaxRate;
 use App\Models\Unit;
 use App\Services\KardexSyncService;
@@ -68,6 +77,86 @@ class PurchaseController extends Controller
     public function create(Request $request)
     {
         return view('purchases.create', $this->getFormData($request));
+    }
+
+    public function storeProviderQuick(Request $request)
+    {
+        $branchId = (int) session('branch_id');
+        $branch = Branch::query()->with('location.parent.parent')->findOrFail($branchId);
+        $companyId = (int) ($branch->company_id ?? 0);
+
+        $validated = $request->validate([
+            'person_type' => ['required', 'in:DNI,RUC,CARNET DE EXTRANGERIA,PASAPORTE'],
+            'document_number' => ['required', 'string', 'max:50'],
+            'first_name' => ['required', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'genero' => ['nullable', 'string', 'max:30'],
+            'fecha_nacimiento' => ['nullable', 'date'],
+        ]);
+
+        $branchDistrictId = (int) ($branch->location_id ?? 0);
+        if ($branchDistrictId <= 0) {
+            return response()->json([
+                'message' => 'La sucursal no tiene distrito configurado.',
+            ], 422);
+        }
+
+        $existingPerson = Person::query()
+            ->join('branches', 'branches.id', '=', 'people.branch_id')
+            ->select('people.*')
+            ->where('branches.company_id', $companyId)
+            ->where('people.document_number', (string) $validated['document_number'])
+            ->whereNull('people.deleted_at')
+            ->first();
+
+        if ($existingPerson) {
+            $existingPerson->roles()->syncWithoutDetaching([
+                4 => ['branch_id' => $branchId],
+            ]);
+
+            return response()->json([
+                'id' => (int) $existingPerson->id,
+                'person_type' => (string) $existingPerson->person_type,
+                'document_number' => (string) $existingPerson->document_number,
+                'first_name' => (string) $existingPerson->first_name,
+                'last_name' => (string) ($existingPerson->last_name ?? ''),
+                'name' => trim(((string) $existingPerson->first_name) . ' ' . ((string) $existingPerson->last_name)),
+                'label' => trim(((string) $existingPerson->first_name) . ' ' . ((string) $existingPerson->last_name)),
+                'document' => (string) ($existingPerson->document_number ?? ''),
+            ]);
+        }
+
+        $validated['phone'] = (string) ($validated['phone'] ?? '');
+        $validated['email'] = (string) ($validated['email'] ?? '');
+        $validated['address'] = trim((string) ($validated['address'] ?? '')) ?: '-';
+        $validated['location_id'] = $branchDistrictId;
+
+        $person = DB::transaction(function () use ($validated, $branchId) {
+            $person = Person::query()->create(array_merge(
+                $validated,
+                ['branch_id' => $branchId]
+            ));
+
+            $person->roles()->syncWithoutDetaching([
+                4 => ['branch_id' => $branchId],
+            ]);
+
+            return $person;
+        });
+
+        return response()->json([
+            'id' => (int) $person->id,
+            'person_type' => (string) $person->person_type,
+            'document_number' => (string) $person->document_number,
+            'first_name' => (string) $person->first_name,
+            'last_name' => (string) ($person->last_name ?? ''),
+            'name' => trim(((string) $person->first_name) . ' ' . ((string) $person->last_name)),
+            'label' => trim(((string) $person->first_name) . ' ' . ((string) $person->last_name)),
+            'document' => (string) ($person->document_number ?? ''),
+        ]);
     }
 
     public function store(Request $request)
@@ -155,6 +244,20 @@ class PurchaseController extends Controller
             }
 
             app(KardexSyncService::class)->syncMovement($movement);
+
+            if (
+                ($validated['payment_type'] ?? 'CONTADO') === 'CONTADO'
+                && ($validated['affects_cash'] ?? 'N') === 'S'
+            ) {
+                $this->registerPurchaseCashOutflow(
+                    movement: $movement,
+                    person: $person,
+                    validated: $validated,
+                    total: (float) $totals['total'],
+                    branchId: $branchId,
+                    user: $user
+                );
+            }
         });
 
         return redirect()
@@ -319,6 +422,13 @@ class PurchaseController extends Controller
             'exchange_rate' => ['required', 'numeric', 'min:0.001'],
             'tax_rate_percent' => ['required', 'numeric', 'min:0', 'max:100'],
             'comment' => ['nullable', 'string'],
+            'cash_register_id' => ['nullable', 'integer', 'exists:cash_registers,id'],
+            'payment_methods' => ['nullable', 'array'],
+            'payment_methods.*.payment_method_id' => ['nullable', 'integer', 'exists:payment_methods,id'],
+            'payment_methods.*.amount' => ['nullable', 'numeric', 'min:0.01'],
+            'payment_methods.*.payment_gateway_id' => ['nullable', 'integer', 'exists:payment_gateways,id'],
+            'payment_methods.*.card_id' => ['nullable', 'integer', 'exists:cards,id'],
+            'payment_methods.*.digital_wallet_id' => ['nullable', 'integer', 'exists:digital_wallets,id'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'items.*.unit_id' => ['required', 'integer', 'exists:units,id'],
@@ -340,10 +450,41 @@ class PurchaseController extends Controller
             ->orderBy('last_name')
             ->get(['id', 'first_name', 'last_name', 'document_number']);
 
+        $branch = Branch::query()->with('location.parent.parent')->find($branchId);
+        $district = $branch?->location;
+        $province = $district?->parent;
+        $department = $province?->parent;
+
         $documentTypes = DocumentType::query()
             ->where('movement_type_id', $movementType->id)
             ->orderBy('name')
             ->get(['id', 'name']);
+
+        $cashRegisters = CashRegister::query()
+            ->where('branch_id', $branchId)
+            ->orderByRaw("CASE WHEN status = 'A' THEN 0 ELSE 1 END")
+            ->orderBy('number')
+            ->get(['id', 'number', 'status']);
+
+        $paymentMethods = PaymentMethod::query()
+            ->where('status', true)
+            ->orderBy('order_num')
+            ->get(['id', 'description', 'order_num']);
+
+        $paymentGateways = PaymentGateways::query()
+            ->where('status', true)
+            ->orderBy('order_num')
+            ->get(['id', 'description', 'order_num']);
+
+        $cards = Card::query()
+            ->where('status', true)
+            ->orderBy('order_num')
+            ->get(['id', 'description', 'type', 'icon', 'order_num']);
+
+        $digitalWallets = DigitalWallet::query()
+            ->where('status', true)
+            ->orderBy('order_num')
+            ->get(['id', 'description', 'order_num']);
 
         $units = Unit::query()->orderBy('description')->get(['id', 'description']);
 
@@ -353,15 +494,20 @@ class PurchaseController extends Controller
                     ->where('product_branch.branch_id', '=', $branchId);
             })
             ->leftJoin('units', 'units.id', '=', 'products.base_unit_id')
+            ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
             ->where('products.classification', 'GOOD')
             ->orderBy('products.description')
             ->get([
                 'products.id',
                 'products.code',
                 'products.description',
+                'products.image',
                 'products.base_unit_id as unit_sale',
-                'product_branch.price',
+                'product_branch.purchase_price',
+                'product_branch.avg_cost',
+                'product_branch.stock',
                 'units.description as unit_name',
+                'categories.description as category_name',
             ]);
 
         $defaultTaxRate = (float) (TaxRate::query()->where('status', true)->orderBy('order_num')->value('tax_rate') ?? 18);
@@ -369,14 +515,64 @@ class PurchaseController extends Controller
             ? $this->generatePurchaseNumber((int) $documentTypes->first()->id, $branchId)
             : '00000001';
 
+        $purchaseCreateConfig = [
+            'products' => $products->map(fn ($p) => [
+                'id' => (int) $p->id,
+                'code' => (string) ($p->code ?? ''),
+                'name' => (string) ($p->description ?? ''),
+                'img' => ($p->image && !empty($p->image))
+                    ? asset('storage/' . ltrim((string) $p->image, '/'))
+                    : null,
+                'category' => (string) ($p->category_name ?? 'Sin categoria'),
+                'stock' => (float) ($p->stock ?? 0),
+                'unit_id' => (int) ($p->unit_sale ?? 0),
+                'unit_name' => (string) ($p->unit_name ?? ''),
+                'cost' => (float) ($p->purchase_price ?? $p->avg_cost ?? 0),
+            ])->values(),
+            'units' => $units,
+            'providers' => $people->map(fn ($person) => [
+                'id' => (int) $person->id,
+                'label' => trim(($person->first_name ?? '') . ' ' . ($person->last_name ?? '')),
+                'document' => (string) ($person->document_number ?? ''),
+            ])->values(),
+            'documentTypes' => $documentTypes->values(),
+            'cashRegisters' => $cashRegisters->values(),
+            'paymentMethods' => $paymentMethods->values(),
+            'paymentGateways' => $paymentGateways->values(),
+            'cards' => $cards->values(),
+            'digitalWallets' => $digitalWallets->values(),
+            'initialProviderId' => (int) old('person_id', 0),
+            'initialItems' => old('items', []),
+            'initialPaymentType' => (string) old('payment_type', 'CONTADO'),
+            'initialDocumentTypeId' => (int) old('document_type_id', $documentTypes->first()->id ?? 0),
+            'initialCashRegisterId' => (int) old('cash_register_id', ($cashRegisters->firstWhere('status', 'A')->id ?? $cashRegisters->first()->id ?? 0)),
+            'initialRows' => old('payment_methods', []),
+            'initialTaxRate' => (float) old('tax_rate_percent', $defaultTaxRate),
+            'initialIncludesTax' => (string) old('includes_tax', 'S'),
+            'initialCurrency' => (string) old('currency', 'PEN'),
+            'initialExchangeRate' => (float) old('exchange_rate', 3.5),
+            'initialMovedAt' => (string) old('moved_at', now()->format('Y-m-d H:i')),
+            'purchaseNumberPreview' => (string) $purchaseNumberPreview,
+            'quickProviderStoreUrl' => route('admin.purchases.providers.store'),
+            'branchDepartmentName' => (string) ($department->name ?? ''),
+            'branchProvinceName' => (string) ($province->name ?? ''),
+            'branchDistrictName' => (string) ($district->name ?? ''),
+        ];
+
         return [
             'viewId' => $request->input('view_id'),
             'people' => $people,
             'documentTypes' => $documentTypes,
+            'cashRegisters' => $cashRegisters,
+            'paymentMethods' => $paymentMethods,
+            'paymentGateways' => $paymentGateways,
+            'cards' => $cards,
+            'digitalWallets' => $digitalWallets,
             'units' => $units,
             'products' => $products,
             'defaultTaxRate' => $defaultTaxRate,
             'purchaseNumberPreview' => $purchaseNumberPreview,
+            'purchaseCreateConfig' => $purchaseCreateConfig,
         ];
     }
 
@@ -510,6 +706,223 @@ class PurchaseController extends Controller
         }
 
         $pb->update(['stock' => $newStock]);
+    }
+
+    private function registerPurchaseCashOutflow(
+        Movement $movement,
+        Person $person,
+        array $validated,
+        float $total,
+        int $branchId,
+        $user
+    ): void {
+        $paymentRows = collect($validated['payment_methods'] ?? [])
+            ->filter(fn ($row) => !empty($row['payment_method_id']) && (float) ($row['amount'] ?? 0) > 0)
+            ->values();
+
+        if ($paymentRows->isEmpty()) {
+            throw new \RuntimeException('Debe registrar al menos un metodo de pago para afectar caja.');
+        }
+
+        $paidAmount = (float) $paymentRows->sum(fn ($row) => (float) ($row['amount'] ?? 0));
+        if (abs($paidAmount - $total) > 0.01) {
+            throw new \RuntimeException('La suma de los metodos de pago debe coincidir con el total de la compra.');
+        }
+
+        $cashRegisterId = (int) ($validated['cash_register_id'] ?? 0);
+        if ($cashRegisterId <= 0) {
+            throw new \RuntimeException('Debe seleccionar una caja para registrar el pago de la compra.');
+        }
+
+        $cashRegister = CashRegister::query()
+            ->where('branch_id', $branchId)
+            ->findOrFail($cashRegisterId);
+
+        $paymentConcept = $this->resolvePurchasePaymentConcept();
+        $cashMovementTypeId = $this->resolveCashMovementTypeId();
+        $cashDocumentTypeId = $this->resolveCashExpenseDocumentTypeId($cashMovementTypeId);
+        $shift = Shift::query()->where('branch_id', $branchId)->first() ?? Shift::query()->first();
+
+        if (!$shift) {
+            throw new \RuntimeException('No hay turno disponible para registrar el pago en caja.');
+        }
+
+        $cashOutMovement = Movement::query()->create([
+            'number' => $this->generateCashMovementNumber($branchId, $cashRegisterId, (int) $paymentConcept->id),
+            'moved_at' => $validated['moved_at'],
+            'user_id' => $user?->id,
+            'user_name' => $user?->name ?? 'Sistema',
+            'person_id' => $person->id,
+            'person_name' => trim(($person->first_name ?? '') . ' ' . ($person->last_name ?? '')),
+            'responsible_id' => $user?->id,
+            'responsible_name' => $user?->name ?? 'Sistema',
+            'comment' => 'Pago de compra ' . $movement->number,
+            'status' => '1',
+            'movement_type_id' => $cashMovementTypeId,
+            'document_type_id' => $cashDocumentTypeId,
+            'branch_id' => $branchId,
+            'parent_movement_id' => $movement->id,
+            'shift_id' => $shift->id,
+            'shift_snapshot' => [
+                'name' => $shift->name,
+                'start_time' => $shift->start_time,
+                'end_time' => $shift->end_time,
+            ],
+        ]);
+
+        $cashMovement = CashMovements::query()->create([
+            'payment_concept_id' => $paymentConcept->id,
+            'currency' => $validated['currency'],
+            'exchange_rate' => (float) $validated['exchange_rate'],
+            'total' => $total,
+            'cash_register_id' => $cashRegisterId,
+            'cash_register' => $cashRegister->number ?? 'Caja Principal',
+            'shift_id' => $shift->id,
+            'shift_snapshot' => [
+                'name' => $shift->name,
+                'start_time' => $shift->start_time,
+                'end_time' => $shift->end_time,
+            ],
+            'movement_id' => $cashOutMovement->id,
+            'branch_id' => $branchId,
+        ]);
+
+        foreach ($paymentRows as $paymentMethodData) {
+            $paymentMethod = PaymentMethod::query()->findOrFail((int) $paymentMethodData['payment_method_id']);
+            $paymentMethodDescription = mb_strtolower((string) ($paymentMethod->description ?? ''), 'UTF-8');
+            $paymentGateway = !empty($paymentMethodData['payment_gateway_id'])
+                ? PaymentGateways::query()->find((int) $paymentMethodData['payment_gateway_id'])
+                : null;
+            $card = !empty($paymentMethodData['card_id'])
+                ? Card::query()->find((int) $paymentMethodData['card_id'])
+                : null;
+            $digitalWallet = !empty($paymentMethodData['digital_wallet_id'])
+                ? DigitalWallet::query()->find((int) $paymentMethodData['digital_wallet_id'])
+                : null;
+
+            if ((str_contains($paymentMethodDescription, 'billetera') || str_contains($paymentMethodDescription, 'wallet')) && !$digitalWallet) {
+                throw new \RuntimeException('Debe seleccionar la billetera digital del metodo de pago.');
+            }
+
+            if ((str_contains($paymentMethodDescription, 'tarjeta') || str_contains($paymentMethodDescription, 'card')) && !$card) {
+                throw new \RuntimeException('Debe seleccionar el detalle de tarjeta del metodo de pago.');
+            }
+
+            DB::table('cash_movement_details')->insert([
+                'cash_movement_id' => $cashMovement->id,
+                'type' => 'PAGADO',
+                'paid_at' => $validated['moved_at'],
+                'payment_method_id' => $paymentMethod->id,
+                'payment_method' => $paymentMethod->description ?? '',
+                'number' => $cashOutMovement->number,
+                'card_id' => $card?->id,
+                'card' => $card?->description,
+                'bank_id' => null,
+                'bank' => null,
+                'digital_wallet_id' => $digitalWallet?->id,
+                'digital_wallet' => $digitalWallet?->description,
+                'payment_gateway_id' => $paymentGateway?->id,
+                'payment_gateway' => $paymentGateway?->description,
+                'amount' => (float) ($paymentMethodData['amount'] ?? 0),
+                'comment' => $validated['comment'] ?? ('Pago de compra ' . $movement->number),
+                'status' => 'A',
+                'branch_id' => $branchId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    private function resolveCashMovementTypeId(): int
+    {
+        $movementTypeId = MovementType::query()
+            ->where(function ($query) {
+                $query->where('description', 'ILIKE', '%caja%')
+                    ->orWhere('description', 'ILIKE', '%cash%');
+            })
+            ->orderBy('id')
+            ->value('id');
+
+        if (!$movementTypeId) {
+            $movementTypeId = MovementType::query()->find(4)?->id;
+        }
+
+        if (!$movementTypeId) {
+            $movementTypeId = MovementType::query()->orderBy('id')->value('id');
+        }
+
+        if (!$movementTypeId) {
+            throw new \RuntimeException('No se encontro tipo de movimiento para caja.');
+        }
+
+        return (int) $movementTypeId;
+    }
+
+    private function resolveCashExpenseDocumentTypeId(int $cashMovementTypeId): int
+    {
+        $documentTypeId = DocumentType::query()
+            ->where('movement_type_id', $cashMovementTypeId)
+            ->where('name', 'ILIKE', '%egreso%')
+            ->orderBy('id')
+            ->value('id');
+
+        if (!$documentTypeId) {
+            $documentTypeId = DocumentType::query()
+                ->where('movement_type_id', $cashMovementTypeId)
+                ->orderBy('id')
+                ->value('id');
+        }
+
+        if (!$documentTypeId) {
+            throw new \RuntimeException('No se encontro tipo de documento para salida de caja.');
+        }
+
+        return (int) $documentTypeId;
+    }
+
+    private function resolvePurchasePaymentConcept(): PaymentConcept
+    {
+        $paymentConcept = PaymentConcept::query()
+            ->where('type', 'E')
+            ->where(function ($query) {
+                $query->where('description', 'ILIKE', '%compra%')
+                    ->orWhere('description', 'ILIKE', '%proveedor%');
+            })
+            ->orderBy('id')
+            ->first();
+
+        if (!$paymentConcept) {
+            $paymentConcept = PaymentConcept::query()
+                ->where('type', 'E')
+                ->orderBy('id')
+                ->first();
+        }
+
+        if (!$paymentConcept) {
+            throw new \RuntimeException('No se encontro concepto de pago de egreso para compras.');
+        }
+
+        return $paymentConcept;
+    }
+
+    private function generateCashMovementNumber(int $branchId, int $cashRegisterId, ?int $paymentConceptId = null): string
+    {
+        $lastRecord = Movement::query()
+            ->select('movements.number')
+            ->join('cash_movements', 'cash_movements.movement_id', '=', 'movements.id')
+            ->where('movements.branch_id', $branchId)
+            ->where('cash_movements.cash_register_id', $cashRegisterId)
+            ->when($paymentConceptId !== null, function ($query) use ($paymentConceptId) {
+                $query->where('cash_movements.payment_concept_id', $paymentConceptId);
+            })
+            ->lockForUpdate()
+            ->orderByDesc('movements.number')
+            ->first();
+
+        $lastNumber = $lastRecord?->number;
+        $nextSequence = $lastNumber ? ((int) $lastNumber + 1) : 1;
+
+        return str_pad((string) $nextSequence, 8, '0', STR_PAD_LEFT);
     }
 
     private function assertValidPurchaseMovement(Movement $movement): void

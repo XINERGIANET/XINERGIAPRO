@@ -50,9 +50,12 @@ class ShiftController extends Controller
 
         $shifts = Shift::query()
             ->with('branch')
+            ->where('branch_id', $branchId)
             ->when($search, function ($query, $search) {
-                $query->where('name', 'ILIKE', "%{$search}%")
-                    ->orWhere('abbreviation', 'ILIKE', "%{$search}%");
+                $query->where(function ($inner) use ($search) {
+                    $inner->where('name', 'ILIKE', "%{$search}%")
+                        ->orWhere('abbreviation', 'ILIKE', "%{$search}%");
+                });
             })
             ->orderByDesc('id')
             ->paginate($perPage)

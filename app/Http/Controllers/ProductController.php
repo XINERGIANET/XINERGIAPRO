@@ -11,6 +11,7 @@ use App\Models\ProductType;
 use App\Models\TaxRate;
 use App\Models\Unit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -54,19 +55,37 @@ class ProductController extends Controller
         }
 
         ProductType::ensureDefaultsForBranch((int) $branchId);
+        $this->syncBranchProductsFromOtherBranches((int) $branchId);
 
         $products = Product::query()
-            ->with(['category', 'baseUnit', 'productType', 'productBranches.branch', 'productBranches.taxRate'])
+            ->with([
+                'category',
+                'baseUnit',
+                'productType',
+                'productBranches' => function ($query) use ($branchId) {
+                    $query->where('branch_id', $branchId)
+                        ->with(['branch', 'taxRate']);
+                },
+            ])
+            ->whereHas('productBranches', function ($query) use ($branchId) {
+                $query->where('branch_id', $branchId);
+            })
             ->when($search, function ($query) use ($search) {
-                $query->where('description', 'ILIKE', "%{$search}%")
-                    ->orWhere('code', 'ILIKE', "%{$search}%")
-                    ->orWhere('abbreviation', 'ILIKE', "%{$search}%");
+                $query->where(function ($inner) use ($search) {
+                    $inner->where('description', 'ILIKE', "%{$search}%")
+                        ->orWhere('code', 'ILIKE', "%{$search}%")
+                        ->orWhere('abbreviation', 'ILIKE', "%{$search}%");
+                });
             })
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
 
-        $categories = Category::query()->orderBy('description')->get();
+        Category::syncExistingToAllBranches();
+        $categories = Category::query()
+            ->forBranch((int) $branchId)
+            ->orderBy('description')
+            ->get();
         $units = Unit::query()->orderBy('description')->get();
         $productTypes = ProductType::query()
             ->where('branch_id', $branchId)
@@ -157,10 +176,14 @@ class ProductController extends Controller
 
     public function edit(Request $request, Product $product)
     {
-        $categories = Category::query()->orderBy('description')->get();
+        $branchId = $request->session()->get('branch_id');
+        Category::syncExistingToAllBranches();
+        $categories = Category::query()
+            ->forBranch((int) $branchId)
+            ->orderBy('description')
+            ->get();
         $units = Unit::query()->orderBy('description')->get();
         $taxRates = TaxRate::query()->where('status', true)->orderBy('order_num')->get();
-        $branchId = $request->session()->get('branch_id');
         ProductType::ensureDefaultsForBranch((int) $branchId);
         $productTypes = ProductType::query()
             ->where('branch_id', $branchId)
@@ -408,5 +431,59 @@ class ProductController extends Controller
         }
 
         return '1';
+    }
+
+    private function syncBranchProductsFromOtherBranches(int $branchId): void
+    {
+        if ($branchId <= 0) {
+            return;
+        }
+
+        $hasProductsInBranch = ProductBranch::query()
+            ->where('branch_id', $branchId)
+            ->exists();
+
+        if ($hasProductsInBranch) {
+            return;
+        }
+
+        $templateRows = ProductBranch::query()
+            ->where('branch_id', '!=', $branchId)
+            ->whereNull('deleted_at')
+            ->orderBy('id')
+            ->get()
+            ->unique('product_id');
+
+        if ($templateRows->isEmpty()) {
+            return;
+        }
+
+        DB::transaction(function () use ($branchId, $templateRows) {
+            foreach ($templateRows as $template) {
+                ProductBranch::query()->firstOrCreate(
+                    [
+                        'product_id' => $template->product_id,
+                        'branch_id' => $branchId,
+                    ],
+                    [
+                        'status' => $template->status ?? 'A',
+                        'expiration_date' => $template->expiration_date,
+                        'stock_minimum' => $template->stock_minimum ?? 0,
+                        'stock_maximum' => $template->stock_maximum ?? 0,
+                        'minimum_sell' => $template->minimum_sell ?? 0,
+                        'minimum_purchase' => $template->minimum_purchase ?? 0,
+                        'favorite' => $template->favorite ?? 'N',
+                        'tax_rate_id' => $template->tax_rate_id,
+                        'unit_sale' => $template->unit_sale ?? 'N',
+                        'duration_minutes' => $template->duration_minutes,
+                        'supplier_id' => $template->supplier_id,
+                        'stock' => 0,
+                        'price' => $template->price ?? 0,
+                        'purchase_price' => $template->purchase_price ?? 0,
+                        'avg_cost' => $template->avg_cost ?? 0,
+                    ]
+                );
+            }
+        });
     }
 }
