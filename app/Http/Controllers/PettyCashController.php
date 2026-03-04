@@ -25,7 +25,12 @@ class PettyCashController extends Controller
 
     public function redirectBase(Request $request)
     {
-        $firstBox = CashRegister::where('status', '1')->first();
+        $branchId = (int) $request->session()->get('branch_id');
+        $firstBox = CashRegister::query()
+            ->where('branch_id', $branchId)
+            ->where('status', '1')
+            ->orderBy('number', 'asc')
+            ->first();
         if ($firstBox) {
             $params = ['cash_register_id' => $firstBox->id];
             if ($request->filled('view_id')) {
@@ -33,7 +38,15 @@ class PettyCashController extends Controller
             }
             return redirect()->route('admin.petty-cash.index', $params);
         }
-        abort(404, 'No hay cajas registradas');
+
+        $redirectParams = [];
+        if ($request->filled('view_id')) {
+            $redirectParams['view_id'] = $request->input('view_id');
+        }
+
+        return redirect()
+            ->route('boxes.index', $redirectParams)
+            ->with('error', 'No hay cajas registradas para la sucursal activa.');
     }
 
     public function index(Request $request, $cash_register_id = null)
@@ -72,22 +85,32 @@ class PettyCashController extends Controller
                 ->get();
         }
    // dd($viewId, $branchId, $profileId, $operaciones);
-        $cashRegisters = CashRegister::where('status', '1')->orderBy('number', 'asc')->get();
+        $cashRegisters = CashRegister::query()
+            ->where('branch_id', $branchId)
+            ->where('status', '1')
+            ->orderBy('number', 'asc')
+            ->get();
         $selectedBoxId = $cash_register_id;
+
+        if ($selectedBoxId && !$cashRegisters->contains('id', (int) $selectedBoxId)) {
+            $selectedBoxId = null;
+        }
 
         if (empty($selectedBoxId) && $cashRegisters->isNotEmpty()) {
             $selectedBoxId = $cashRegisters->first()->id;
         }
 
         // --- LÓGICA DE ESTADO DE CAJA (MODIFICADO) ---
-        $lastShiftRelation = CashShiftRelation::where('branch_id', session('branch_id'))
-            ->whereHas('cashMovementStart', function ($query) use ($selectedBoxId) {
-                $query->where('cash_register_id', $selectedBoxId);
+        $hasOpening = CashShiftRelation::query()
+            ->where('branch_id', $branchId)
+            ->where('status', '1')
+            ->whereHas('cashMovementStart', function ($query) use ($branchId) {
+                $query->where('branch_id', $branchId)
+                    ->whereHas('cashRegister', function ($cashRegisterQuery) use ($branchId) {
+                        $cashRegisterQuery->where('branch_id', $branchId);
+                    });
             })
-            ->latest('id')
-            ->first();
-
-        $hasOpening = $lastShiftRelation && $lastShiftRelation->status == '1';
+            ->exists();
 
         $documentTypes = DocumentType::where('movement_type_id', 4)->get();
 
@@ -263,8 +286,8 @@ class PettyCashController extends Controller
                     'user_name'          => session('user_name'),
                     'person_id'          => session('person_id'),
                     'person_name'        => session('person_fullname'),
-                    'responsible_id'     => session('person_id'),
-                    'responsible_name'   => session('person_fullname'),
+                    'responsible_id'     => session('user_id'),
+                    'responsible_name'   => session('user_name') ?? session('person_fullname'),
                     'comment'            => $validated['comment'],
                     'status'             => '1',
                     'movement_type_id'   => $typeId,

@@ -73,6 +73,7 @@ class SalesController extends Controller
         $sales = Movement::query()
             ->with(['branch', 'person', 'movementType', 'documentType', 'salesMovement'])
             ->where('movement_type_id', 2) //2 es venta
+            ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
             ->when($search, function ($query) use ($search) {
                 $query->where(function ($inner) use ($search) {
                     $inner->where('number', 'ILIKE', "%{$search}%")

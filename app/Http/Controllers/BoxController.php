@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\CashRegister;
 use App\Models\Operation;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class BoxController extends Controller
 {
@@ -45,6 +47,7 @@ class BoxController extends Controller
         }
 
         $cash = CashRegister::query()
+            ->where('branch_id', $branchId)
             ->when($search, function ($query, $search) {
                 $query->where(function ($inner) use ($search) {
                     $inner->where('number', 'ILIKE', "%{$search}%")
@@ -66,8 +69,16 @@ class BoxController extends Controller
 
     public function store(Request $request)
     {
+        $branchId = (int) $request->session()->get('branch_id');
         $validated = $request->validate([
-            'number' => 'required|string|max:20|unique:cash_registers,number',
+            'number' => [
+                'required',
+                'string',
+                'max:20',
+                Rule::unique('cash_registers', 'number')->where(function ($query) use ($branchId) {
+                    return $query->where('branch_id', $branchId);
+                }),
+            ],
             'series' => 'required|string|max:10',
             'status' => 'required|boolean',
         ], [
@@ -81,6 +92,7 @@ class BoxController extends Controller
                 'number'    => $validated['number'],
                 'series'    => $validated['series'],
                 'status'    => $validated['status'],
+                'branch_id' => $branchId,
             ]);
             $viewId = $request->input('view_id');
             
@@ -97,7 +109,10 @@ class BoxController extends Controller
 
     public function edit(Request $request, CashRegister $box)
     {
-        $cash = CashRegister::paginate(10); 
+        $branchId = (int) $request->session()->get('branch_id');
+        $cash = CashRegister::query()
+            ->where('branch_id', $branchId)
+            ->paginate(10); 
         
         return view('boxes.edit', [
             'title' => 'Cajas',
@@ -109,8 +124,18 @@ class BoxController extends Controller
 
     public function update(Request $request, CashRegister $box)
     {
+        $branchId = (int) $request->session()->get('branch_id');
         $validated = $request->validate([
-            'number' => 'required|string|max:20|unique:cash_registers,number,' . $box->id,
+            'number' => [
+                'required',
+                'string',
+                'max:20',
+                Rule::unique('cash_registers', 'number')
+                    ->ignore($box->id)
+                    ->where(function ($query) use ($branchId) {
+                        return $query->where('branch_id', $branchId);
+                    }),
+            ],
             'series' => 'required|string|max:10',
             'status' => 'required|boolean',
         ]);
@@ -127,7 +152,7 @@ class BoxController extends Controller
                 ->with('success', 'Caja actualizada correctamente');
 
         } catch (\Exception $e) {
-            \Log::error('Error al actualizar la caja: ' . $e->getMessage());
+            Log::error('Error al actualizar la caja: ' . $e->getMessage());
             $viewId = $request->input('view_id');
             return redirect()->route('boxes.index', $viewId ? ['view_id' => $viewId] : [])
                 ->withErrors(['error' => 'Error al actualizar: ' . $e->getMessage()])

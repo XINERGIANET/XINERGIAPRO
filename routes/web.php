@@ -134,6 +134,8 @@ Route::middleware('auth')->group(function () {
         ->names('admin.purchases')
         ->parameters(['compras' => 'purchase'])
         ->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
+    Route::post('/admin/compras/proveedores', [PurchaseController::class, 'storeProviderQuick'])
+        ->name('admin.purchases.providers.store');
     Route::get('/admin/ventas/{sale}/imprimir/pdf', [SalesController::class, 'printPdf'])->name('admin.sales.print.pdf');
     Route::get('/admin/ventas/{sale}/imprimir/ticket', [SalesController::class, 'printTicket'])->name('admin.sales.print.ticket');
 

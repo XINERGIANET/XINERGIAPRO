@@ -231,7 +231,11 @@ class OrderController extends Controller
                     'tax_rate' => $taxRatePct,
                 ];
             });
-        $categories = Category::orderBy('description')->get();
+        Category::syncExistingToAllBranches();
+        $categories = Category::query()
+            ->forBranch((int) $branchId)
+            ->orderBy('description')
+            ->get();
         $units = Unit::orderBy('description')->get();
         
         return view('orders.create', [

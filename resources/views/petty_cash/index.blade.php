@@ -206,6 +206,7 @@
                 {{-- BOTONERA --}}
                 <div class="flex flex-wrap gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
                     @if ($topOperations->isNotEmpty())
+                        @php $renderedTopOperation = false; @endphp
                         @foreach ($topOperations as $operation)
                             @php
                                 $topTextColor = $resolveTextColor($operation);
@@ -232,6 +233,10 @@
                                 $modalDocId = ($isExpenseOp || $isCloseOp) ? $egresoDocId : $ingresoDocId;
                                 $modalConcept = $isOpenOp ? 'Apertura de caja' : ($isCloseOp ? 'Cierre de caja' : '');
                             @endphp
+                            @if ((!$hasOpening && !$isOpenOp) || ($hasOpening && $isOpenOp))
+                                @continue
+                            @endif
+                            @php $renderedTopOperation = true; @endphp
                             @if ($isPettyCashModalOp)
                                 <x-ui.button size="md" variant="primary" type="button" style="{{ $topStyle }}"
                                     @click="$dispatch('open-movement-modal', { concept: '{{ $modalConcept }}', docId: '{{ $modalDocId }}' })">
@@ -245,6 +250,30 @@
                                 </x-ui.link-button>
                             @endif
                         @endforeach
+                        @if (!$renderedTopOperation)
+                            @if (!$hasOpening)
+                                <x-ui.button size="md" variant="primary" style="background-color: #3B82F6; color: #FFFFFF;"
+                                    @click="$dispatch('open-movement-modal', { concept: 'Apertura de caja', docId: '{{ $ingresoDocId }}' })">
+                                    <i class="ri-key-2-line"></i><span>Aperturar Caja</span>
+                                </x-ui.button>
+                            @else
+                                <x-ui.button size="md" variant="primary" style="background-color: #00A389; color: #FFFFFF;"
+                                    @click="$dispatch('open-movement-modal', { concept: '', docId: '{{ $ingresoDocId }}' })">
+                                    <i class="ri-add-line"></i><span>Ingreso</span>
+                                </x-ui.button>
+
+                                <x-ui.button size="md" variant="primary"
+                                    style="background-color: #EF4444; color: #FFFFFF; border: none;"
+                                    @click="$dispatch('open-movement-modal', { concept: '', docId: '{{ $egresoDocId }}' })">
+                                    <i class="ri-subtract-line mr-1"></i><span>Egreso</span>
+                                </x-ui.button>
+
+                                <x-ui.button size="md" style="background-color: #FACC15; color: #111827;"
+                                    @click="$dispatch('open-movement-modal', { concept: 'Cierre de caja', docId: '{{ $egresoDocId }}' })">
+                                    <i class="ri-lock-2-line"></i> Cerrar
+                                </x-ui.button>
+                            @endif
+                        @endif
                     @else
                         @if (!$hasOpening)
                             <x-ui.button size="md" variant="primary" style="background-color: #3B82F6; color: #FFFFFF;"
