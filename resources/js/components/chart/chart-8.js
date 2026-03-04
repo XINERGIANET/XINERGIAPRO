@@ -2,6 +2,7 @@
 export function initChartEight() {
     const chartEightEl = document.querySelector('#chartEight');
     if (chartEightEl) {
+        chartEightEl.innerHTML = '';
         const chartEightOptions = {
             series: [
                 {

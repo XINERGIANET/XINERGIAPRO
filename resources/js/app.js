@@ -436,6 +436,12 @@ const bootAlpine = () => {
 };
 
 document.addEventListener('turbo:before-cache', () => {
+    // Clear all chart and calendar containers before taking a snapshot
+    // This is the definitive fix for duplication bugs when using the 'back' button with Turbo
+    document.querySelectorAll('[id^="chart"], #calendar, [id*="calendar"]').forEach((el) => {
+        el.innerHTML = '';
+    });
+
     if (window.Alpine && alpineBooted) {
         Alpine.destroyTree(document.body);
     }

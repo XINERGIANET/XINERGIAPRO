@@ -2,6 +2,7 @@
 export function initChartThirteen() {
     const chartThirteenEl = document.querySelector("#chartThirteen");
     if (chartThirteenEl) {
+        chartThirteenEl.innerHTML = '';
         const data = [
             [1746153600000, 30.95],
             [1746240000000, 31.34],

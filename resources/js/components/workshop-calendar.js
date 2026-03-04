@@ -8,6 +8,7 @@ export function initWorkshopCalendar() {
     const calendarEl = document.getElementById('workshop-calendar');
 
     if (calendarEl) {
+        calendarEl.innerHTML = '';
         const eventsUrl = calendarEl.dataset.eventsUrl;
 
         const calendar = new Calendar(calendarEl, {

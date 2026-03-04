@@ -133,34 +133,20 @@
             </table>
         </div>
 
-        {{-- Pie de Tabla Premium (Estilo solicitado) --}}
-        <div class="mt-4 flex flex-col items-center justify-between gap-4 p-4 md:flex-row">
-            <div class="text-[14px] font-semibold text-gray-600">
-                Mostrando {{ $services->firstItem() ?? 0 }} - {{ $services->lastItem() ?? 0 }} de {{ $services->total() }}
+        {{-- PAGINACIÓN INFERIOR --}}
+        <div class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="text-sm text-gray-500 dark:text-gray-400">
+                Mostrando
+                <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $services->firstItem() ?? 0 }}</span>
+                -
+                <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $services->lastItem() ?? 0 }}</span>
+                de
+                <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $services->total() }}</span>
             </div>
-            <div class="pagination-premium">
-                {{ $services->links() }}
+            <div class="flex-none pagination-simple">
+                {{ $services->links('vendor.pagination.forced') }}
             </div>
         </div>
-
-        <style>
-            .pagination-premium nav > div:first-child { display: none !important; }
-            .pagination-premium nav span.relative.z-0.inline-flex { gap: 8px !important; display: flex !important; }
-            .pagination-premium nav span.relative.z-0.inline-flex a,
-            .pagination-premium nav span.relative.z-0.inline-flex > span > span,
-            .pagination-premium nav span.relative.z-0.inline-flex > span > a,
-            .pagination-premium nav span.relative.z-0.inline-flex [aria-disabled="true"] span {
-                border-radius: 12px !important; border: 1px solid #E5E7EB !important; color: #9CA3AF !important;
-                background-color: white !important; width: 40px !important; height: 40px !important;
-                display: flex !important; align-items: center !important; justify-content: center !important;
-                padding: 0 !important; font-weight: 600 !important; transition: all 0.2s; cursor: pointer;
-            }
-            .pagination-premium nav span.relative.z-0.inline-flex span[aria-current="page"] span {
-                background-color: #F0F7FF !important; color: #244BB3 !important; border: 1.5px solid #244BB3 !important; border-radius: 12px !important;
-            }
-            .pagination-premium nav span.relative.z-0.inline-flex [aria-disabled="true"] span { opacity: 0.5; cursor: default; background-color: #F9FAFB !important; }
-            .pagination-premium nav span.relative.z-0.inline-flex a:hover { background-color: #F9FAFB !important; border-color: #D1D5DB !important; color: #374151 !important; }
-        </style>
     </x-common.component-card>
 
     <x-ui.modal x-data="{ open: false }" x-on:open-service-modal.window="open = true" :isOpen="false" :showCloseButton="false" class="max-w-3xl">

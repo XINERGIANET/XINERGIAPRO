@@ -1,15 +1,15 @@
 <header
     style="height: 55px; background: linear-gradient(105deg, #0f172a 0%, #1e293b 46%, #b45309 100%) !important;"
-    class="sticky top-0 flex w-full z-99999 dark:border-gray-800 dark:bg-gray-900"
+    class="sticky top-0 flex w-full z-40 dark:border-gray-800 dark:bg-gray-900 min-w-0"
     x-data="{
         isApplicationMenuOpen: false,
         toggleApplicationMenu() {
             this.isApplicationMenuOpen = !this.isApplicationMenuOpen;
         }
     }">
-    <div class="flex flex-col items-center justify-between grow xl:flex-row xl:px-6">
+    <div class="flex flex-col items-center justify-between grow xl:flex-row xl:px-6 min-w-0">
         <div
-            class="flex items-center justify-between w-full gap-2 px-3 py-3 dark:border-gray-800 sm:gap-4 xl:justify-normal xl:border-b-0 xl:px-0 lg:py-4">
+            class="flex items-center justify-between w-full xl:w-auto gap-2 px-3 py-3 dark:border-gray-800 sm:gap-4 xl:justify-normal xl:border-b-0 xl:px-0 lg:py-4 min-w-0">
 
             <!-- Desktop Sidebar Toggle Button -->
             <button
@@ -69,7 +69,7 @@
 
             <!-- Application Menu Toggle -->
             <button @click="toggleApplicationMenu()"
-                class="flex items-center justify-center w-10 h-10 text-white rounded-lg z-99999 hover:bg-white/10 hover:text-white transition-all xl:hidden">
+                class="flex items-center justify-center w-10 h-10 text-white rounded-lg z-40 hover:bg-white/10 hover:text-white transition-all xl:hidden">
                 <!-- Dots Icon -->
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                     <path fill-rule="evenodd" clip-rule="evenodd"
@@ -82,8 +82,7 @@
 
         <!-- Application Menu (mobile) and Right Side Actions (desktop) -->
         <div :class="isApplicationMenuOpen ? 'flex' : 'hidden'"
-            
-            class="items-center justify-between w-full gap-4 px-5 py-4 xl:flex shadow-theme-md xl:justify-end xl:px-0 xl:shadow-none border-t border-white/5 xl:border-0">
+            class="items-center justify-between w-full xl:w-auto gap-4 px-5 py-4 xl:flex shadow-theme-md xl:justify-end xl:px-0 xl:shadow-none border-t border-white/5 xl:border-0 min-w-0">
             <div class="flex items-center gap-2 2xsm:gap-3">
                 @if (!empty($quickOptions) && $quickOptions->count())
                     <div class="hidden xl:flex items-center gap-2">
@@ -102,10 +101,18 @@
                     </div>
                 @endif
 
-
-
-                <!-- Notification Dropdown -->
-                <x-header.notification-dropdown class="text-white hover:text-white" />
+                <!-- Back Button -->
+                <div class="relative">
+                    <button
+                        onclick="window.history.back()"
+                        class="relative flex items-center justify-center text-white transition-all bg-white/10 border border-white/10 rounded-full hover:text-white h-11 w-11 hover:bg-white/20"
+                        aria-label="Regresar"
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M15 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
 
             <!-- User Dropdown -->

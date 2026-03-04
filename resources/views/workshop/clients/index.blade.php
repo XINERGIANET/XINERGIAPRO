@@ -170,64 +170,20 @@
             </table>
         </div>
 
-        {{-- Pie de Tabla Premium (Estilo solicitado) --}}
-        <div class="mt-4 flex flex-col items-center justify-between gap-4 p-4 md:flex-row">
-            <div class="text-[14px] font-semibold text-gray-600">
-                Mostrando {{ $clients->firstItem() ?? 0 }} - {{ $clients->lastItem() ?? 0 }} de {{ $clients->total() }}
+        {{-- PAGINACIÓN INFERIOR --}}
+        <div class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="text-sm text-gray-500 dark:text-gray-400">
+                Mostrando
+                <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $clients->firstItem() ?? 0 }}</span>
+                -
+                <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $clients->lastItem() ?? 0 }}</span>
+                de
+                <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $clients->total() }}</span>
             </div>
-            <div class="pagination-premium">
-                {{ $clients->links() }}
+            <div class="flex-none pagination-simple">
+                {{ $clients->links('vendor.pagination.forced') }}
             </div>
         </div>
-
-        <style>
-            /* Eliminar el texto "Showing..." duplicado de Laravel */
-            .pagination-premium nav > div:first-child {
-                display: none !important;
-            }
-            /* Contenedor de flechas y números */
-            .pagination-premium nav span.relative.z-0.inline-flex {
-                gap: 8px !important; display: flex !important;
-            }
-            /* Botones normales (números y flechas) */
-            .pagination-premium nav span.relative.z-0.inline-flex a,
-            .pagination-premium nav span.relative.z-0.inline-flex > span > span,
-            .pagination-premium nav span.relative.z-0.inline-flex > span > a,
-            .pagination-premium nav span.relative.z-0.inline-flex [aria-disabled="true"] span {
-                border-radius: 12px !important;
-                border: 1px solid #E5E7EB !important;
-                color: #9CA3AF !important;
-                background-color: white !important;
-                width: 40px !important;
-                height: 40px !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                padding: 0 !important;
-                font-weight: 600 !important;
-                transition: all 0.2s;
-                cursor: pointer;
-            }
-            /* Botón activo */
-            .pagination-premium nav span.relative.z-0.inline-flex span[aria-current="page"] span {
-                background-color: #F0F7FF !important;
-                color: #244BB3 !important;
-                border: 1.5px solid #244BB3 !important;
-                border-radius: 12px !important;
-            }
-            /* Botones deshabilitados */
-            .pagination-premium nav span.relative.z-0.inline-flex [aria-disabled="true"] span {
-                opacity: 0.5;
-                cursor: default;
-                background-color: #F9FAFB !important;
-            }
-            /* Hover efectos */
-            .pagination-premium nav span.relative.z-0.inline-flex a:hover {
-                background-color: #F9FAFB !important;
-                border-color: #D1D5DB !important;
-                color: #374151 !important;
-            }
-        </style>
     </x-common.component-card>
 
     <x-ui.modal x-data="{ open: false }" x-on:open-client-modal.window="open = true" :isOpen="false" :showCloseButton="false" class="max-w-6xl">

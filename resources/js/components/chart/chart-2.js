@@ -3,6 +3,8 @@ export const initChartTwo = () => {
     const chartElement = document.querySelector('#chartTwo');
 
     if (chartElement) {
+        if (chartElement.querySelector('.apexcharts-canvas')) return;
+        chartElement.innerHTML = '';
         const occupancyRate = window.dashboardData?.occupancyData?.rate || 0;
         const chartTwoOptions = {
             series: [occupancyRate],

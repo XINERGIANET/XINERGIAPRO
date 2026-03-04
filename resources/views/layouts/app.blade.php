@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full overflow-x-hidden">
 
 <head>
     <meta charset="utf-8">
@@ -7,6 +7,7 @@
 <meta name="turbo-cache-control" content="{{ session('status') || session('error') ? 'no-cache' : 'no-preview' }}">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
+    @yield('meta')
     <title>{{ $title ?? 'Dashboard' }} | Xinergia PRO</title>
 
     <!-- Scripts -->
@@ -182,7 +183,7 @@ body.swal2-shown
 body.swal2-shown #sidebar { z-index: 1 !important; }
 </style></head>
 
-<body class="min-h-screen flex flex-col"
+<body class="min-h-screen flex flex-col overflow-x-hidden"
     x-data="{ 'loaded': true}"
     x-init="
     const checkMobile = () => {
@@ -208,11 +209,11 @@ body.swal2-shown #sidebar { z-index: 1 !important; }
     {{-- preloader end --}}
     <x-common.loading-overlay/>
 
-    <div class="flex-1 flex flex-col xl:flex-row min-h-screen">
+    <div class="min-h-screen">
         @include('layouts.backdrop')
         @include('layouts.sidebar')
 
-        <div class="flex-1 flex flex-col min-w-0 min-h-full transition-all duration-300 ease-in-out"
+        <div class="min-w-0 min-h-screen transition-all duration-300 ease-in-out overflow-x-hidden flex flex-col"
             :class="{
                 'xl:ml-[290px]': $store.sidebar.isExpanded || $store.sidebar.isHovered,
                 'xl:ml-[90px]': !$store.sidebar.isExpanded && !$store.sidebar.isHovered,
@@ -222,7 +223,7 @@ body.swal2-shown #sidebar { z-index: 1 !important; }
             @include('layouts.app-header')
             <!-- app header end -->
             
-            <main class="flex-1 p-4 mx-auto w-full max-w-(--breakpoint-2xl) md:p-6 flex flex-col min-w-0">
+            <main class="flex-1 p-4 md:p-6 flex flex-col min-w-0 w-full">
                 <div class="flex-1">
                     @yield('content')
                 </div>

@@ -3,6 +3,7 @@
 export function initChartSix() {
     const chartSixEl = document.querySelector('#chartSix');
     if (chartSixEl) {
+        chartSixEl.innerHTML = '';
         const chartSixOptions = {
             series: [
                 {

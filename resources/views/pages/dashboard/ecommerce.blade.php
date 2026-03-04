@@ -1,4 +1,7 @@
 @extends('layouts.app')
+@section('meta')
+    <meta name="turbo-cache-control" content="no-cache">
+@endsection
 <script>
     window.dashboardData = @json($dashboardData);
 </script>

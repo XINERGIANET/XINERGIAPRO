@@ -88,6 +88,17 @@ class="fixed flex flex-col mt-0 top-0 px-5 left-0 dark:bg-gray-900 dark:border-g
     @mouseenter="if (!$store.sidebar.isExpanded) $store.sidebar.setHovered(true)"
     @mouseleave="$store.sidebar.setHovered(false)">
 
+    <!-- Close Button (Mobile only) -->
+    <button
+        @click="$store.sidebar.setMobileOpen(false)"
+        class="absolute top-5 right-5 p-2 text-gray-500 hover:text-gray-800 xl:hidden transition-colors z-[100000]"
+        aria-label="Cerrar menú"
+    >
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+    </button>
+
     <div class="pt-8 pb-8 flex px-2"
         :class="(!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen) ?
         'xl:justify-center' :

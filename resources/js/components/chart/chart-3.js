@@ -3,6 +3,8 @@ export const initChartThree = () => {
     const chartElement = document.querySelector('#chartThree');
 
     if (chartElement) {
+        if (chartElement.querySelector('.apexcharts-canvas')) return;
+        chartElement.innerHTML = '';
         const salesData = window.dashboardData?.monthlySales || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
         const subtotalData = window.dashboardData?.monthlySubtotal || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 

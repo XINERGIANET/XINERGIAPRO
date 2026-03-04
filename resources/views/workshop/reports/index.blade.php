@@ -173,7 +173,20 @@
             </table>
         </div>
 
-        <div class="mt-4">{{ $orders->links() }}</div>
+        {{-- PAGINACIÓN INFERIOR --}}
+        <div class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="text-sm text-gray-500 dark:text-gray-400">
+                Mostrando
+                <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $orders->firstItem() ?? 0 }}</span>
+                -
+                <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $orders->lastItem() ?? 0 }}</span>
+                de
+                <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $orders->total() }}</span>
+            </div>
+            <div class="flex-none pagination-simple">
+                {{ $orders->links('vendor.pagination.forced') }}
+            </div>
+        </div>
     </x-common.component-card>
 </div>
 @endsection

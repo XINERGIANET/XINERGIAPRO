@@ -3,6 +3,8 @@ export const initChartBalance = () => {
     const chartElement = document.querySelector('#chartBalance');
 
     if (chartElement) {
+        if (chartElement.querySelector('.apexcharts-canvas')) return;
+        chartElement.innerHTML = '';
         const income = window.dashboardData?.financialData?.income || 0;
         const expense = window.dashboardData?.financialData?.expense || 0;
 
