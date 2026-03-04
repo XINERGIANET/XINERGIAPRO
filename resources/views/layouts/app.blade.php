@@ -159,22 +159,23 @@
 
         .swal2-popup.swal2-toast {
             position: fixed !important;
-            left: 300px !important;
-            bottom: 20px !important;
-            width: 480px !important;
-            min-width: 480px !important;
-            max-width: 480px !important;
+            left: 310px !important;
+            bottom: 30px !important;
+            width: fit-content !important;
+            min-width: 320px !important;
+            max-width: 500px !important;
             display: flex !important;
             flex-direction: row !important;
             align-items: center !important;
-            padding: 1rem 1.75rem !important;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1) !important;
-            border-radius: 12px !important;
-            border: 1px solid rgba(0,0,0,0.05) !important;
+            padding: 1.15rem 1.85rem !important;
+            box-shadow: 0 15px 45px rgba(0, 0, 0, 0.08) !important;
+            border-radius: 14px !important;
+            border: 1px solid rgba(0,0,0,0.08) !important;
             background: #ffffff !important;
             transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
             visibility: visible !important;
             opacity: 1 !important;
+            overflow: hidden !important; /* Prevent scrollbars */
         }
 
         body[data-sidebar-expanded="false"] .swal2-popup.swal2-toast {
@@ -196,21 +197,30 @@
         }
 
         .swal2-popup.swal2-toast .swal2-icon {
-            margin: 0 20px 0 0 !important;
-            min-width: 32px !important;
-            height: 32px !important;
+            margin: 0 16px 0 0 !important;
+            min-width: 28px !important;
+            height: 28px !important;
             flex-shrink: 0 !important;
+            border-width: 2px !important;
         }
 
         .swal2-popup.swal2-toast .swal2-title {
             margin: 0 !important;
             padding: 0 !important;
-            color: #111827 !important;
-            font-size: 1.1rem !important;
+            color: #1f2937 !important;
+            font-size: 1rem !important;
             font-weight: 600 !important;
-            white-space: nowrap !important;
+            white-space: normal !important;
             overflow: visible !important;
             display: block !important;
+            line-height: 1.4 !important;
+            text-align: left !important;
+        }
+
+        .swal2-popup.swal2-toast .swal2-timer-progress-bar {
+            background: #10B880 !important; /* Elegant green for progress */
+            height: 3px !important;
+            opacity: 0.6 !important;
         }
 
         .swal2-container.swal2-backdrop-show .swal-backdrop-blur {
