@@ -77,9 +77,6 @@
     @vite($viteEntries)
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@4.5.0/fonts/remixicon.css">
 
-    <!-- Alpine.js -->
-    {{-- <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script> --}}
-
     <!-- Theme Store -->
     <script>
         document.addEventListener('alpine:init', () => {
@@ -90,7 +87,6 @@
                 },
                 theme: 'light',
                 toggle() {
-                    // Dark mode disabled
                 },
                 updateTheme() {
                     const html = document.documentElement;
@@ -101,41 +97,35 @@
             });
 
             Alpine.store('sidebar', {
-                // Initialize based on screen size and localStorage
                 isExpanded: (window.innerWidth >= 1280) ? (localStorage.getItem('sidebarExpanded') !== 'false') : false,
                 isMobileOpen: false,
                 isHovered: false,
 
                 toggleExpanded() {
                     this.isExpanded = !this.isExpanded;
-                    // Save preference on desktop
                     if (window.innerWidth >= 1280) {
                         localStorage.setItem('sidebarExpanded', this.isExpanded);
                     }
-                    // When toggling desktop sidebar, ensure mobile menu is closed
                     this.isMobileOpen = false;
+                    document.body.setAttribute('data-sidebar-expanded', this.isExpanded);
                 },
-
                 toggleMobileOpen() {
                     this.isMobileOpen = !this.isMobileOpen;
-                    // Don't modify isExpanded when toggling mobile menu
                 },
-
                 setMobileOpen(val) {
                     this.isMobileOpen = val;
                 },
-
                 setHovered(val) {
-                    // Only allow hover effects on desktop when sidebar is collapsed
                     if (window.innerWidth >= 1280 && !this.isExpanded) {
                         this.isHovered = val;
+                        document.body.setAttribute('data-sidebar-hovered', val);
                     }
                 }
             });
+            document.body.setAttribute('data-sidebar-expanded', Alpine.store('sidebar').isExpanded);
         });
     </script>
 
-    <!-- Force light mode immediately to prevent flash -->
     <script>
         (function() {
             const root = document.documentElement;
@@ -154,34 +144,82 @@
         })();
     </script>
     
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<style>
-.swal-on-top { z-index: 2147483647 !important; }
-.swal2-container { z-index: 2147483647 !important; position: fixed !important; inset: 0 !important; pointer-events: none; }
-.swal2-popup { pointer-events: all; }
-</style>
-<style>
-.swal2-container.swal2-bottom-start { padding-left: 18rem !important; }
-@media (max-width: 1280px) {
-  .swal2-container.swal2-bottom-start { padding-left: 1rem !important; }
-}
-</style>
-<style>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <style>
+        .swal2-container { 
+            z-index: 9999999 !important; 
+        }
+        
+        .swal2-container.swal2-bottom-start {
+            display: block !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
 
-.swal2-container { position: fixed !important; inset: 0 !important; }
-</style>
-<style>
-body.swal2-shown > .swal2-container { z-index: 999999 !important; }
-body.swal2-shown .swal2-container { z-index: 999999 !important; }
-</style>
-<style>
-body.swal2-shown .sidebar,
-body.swal2-shown [class*='sidebar'] { z-index: 10 !important; }
-</style><style>
-body.swal2-shown .swal2-container { z-index: 1000000 !important; position: fixed !important; inset: 0 !important; }
-body.swal2-shown 
-body.swal2-shown #sidebar { z-index: 1 !important; }
-</style></head>
+        .swal2-popup.swal2-toast {
+            position: fixed !important;
+            left: 300px !important;
+            bottom: 20px !important;
+            width: 480px !important;
+            min-width: 480px !important;
+            max-width: 480px !important;
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            padding: 1rem 1.75rem !important;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1) !important;
+            border-radius: 12px !important;
+            border: 1px solid rgba(0,0,0,0.05) !important;
+            background: #ffffff !important;
+            transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
+
+        body[data-sidebar-expanded="false"] .swal2-popup.swal2-toast {
+            left: 100px !important;
+        }
+        
+        body[data-sidebar-hovered="true"] .swal2-popup.swal2-toast {
+            left: 300px !important;
+        }
+
+        @media (max-width: 1280px) {
+            .swal2-popup.swal2-toast {
+                left: 1rem !important;
+                width: calc(100vw - 2rem) !important;
+                min-width: auto !important;
+                max-width: none !important;
+                bottom: 1rem !important;
+            }
+        }
+
+        .swal2-popup.swal2-toast .swal2-icon {
+            margin: 0 20px 0 0 !important;
+            min-width: 32px !important;
+            height: 32px !important;
+            flex-shrink: 0 !important;
+        }
+
+        .swal2-popup.swal2-toast .swal2-title {
+            margin: 0 !important;
+            padding: 0 !important;
+            color: #111827 !important;
+            font-size: 1.1rem !important;
+            font-weight: 600 !important;
+            white-space: nowrap !important;
+            overflow: visible !important;
+            display: block !important;
+        }
+
+        .swal2-container.swal2-backdrop-show .swal-backdrop-blur {
+            background-color: rgba(156, 163, 175, 0.4) !important;
+            backdrop-filter: blur(8px) !important;
+            -webkit-backdrop-filter: blur(8px) !important;
+        }
+    </style>
+</head>
 
 <body class="min-h-screen flex flex-col overflow-x-hidden"
     x-data="{ 'loaded': true}"
@@ -192,10 +230,10 @@ body.swal2-shown #sidebar { z-index: 1 !important; }
             $store.sidebar.isExpanded = false;
         } else {
             $store.sidebar.isMobileOpen = false;
-            // Respect stored preference on desktop
             const saved = localStorage.getItem('sidebarExpanded');
             $store.sidebar.isExpanded = (saved !== 'false');
         }
+        document.body.setAttribute('data-sidebar-expanded', $store.sidebar.isExpanded);
     };
     if (window.__sidebarResizeHandler) {
         window.removeEventListener('resize', window.__sidebarResizeHandler);
@@ -204,9 +242,7 @@ body.swal2-shown #sidebar { z-index: 1 !important; }
     window.addEventListener('resize', window.__sidebarResizeHandler);
     checkMobile();">
 
-    {{-- preloader --}}
     <x-common.preloader/>
-    {{-- preloader end --}}
     <x-common.loading-overlay/>
 
     <div class="min-h-screen">
@@ -219,9 +255,7 @@ body.swal2-shown #sidebar { z-index: 1 !important; }
                 'xl:ml-[90px]': !$store.sidebar.isExpanded && !$store.sidebar.isHovered,
                 'ml-0': $store.sidebar.isMobileOpen
             }">
-            <!-- app header start -->
             @include('layouts.app-header')
-            <!-- app header end -->
             
             <main class="flex-1 p-4 md:p-6 flex flex-col min-w-0 w-full">
                 <div class="flex-1">
@@ -240,114 +274,78 @@ body.swal2-shown #sidebar { z-index: 1 !important; }
                 </div>
             </footer>
         </div>
-
     </div>
 
-</body>
-
+{{-- Script de Notificaciones --}}
 @if (session('status'))
 <script>
-(function() {
-    const showStatusToast = () => {
-        const message = @json(session('status'));
-        const key = 'toast:status';
-        if (window.sessionStorage && sessionStorage.getItem(key) === message) {
-            return;
-        }
-        if (window.Swal) {
+    (function() {
+        if (window.Swal && !document.documentElement.hasAttribute('data-turbo-preview')) {
             Swal.fire({
                 toast: true,
-                position: 'bottom-end',
+                position: 'bottom-start',
                 icon: 'success',
-                title: message,
+                title: @json(session('status')),
                 showConfirmButton: false,
-                timer: 3500,
+                timer: 4500,
                 timerProgressBar: true
             });
         }
-        if (window.sessionStorage) {
-            sessionStorage.setItem(key, message);
-        }
-    };
-    document.addEventListener('DOMContentLoaded', showStatusToast, { once: true });
-    document.addEventListener('turbo:load', showStatusToast);
-})();
+    })();
 </script>
 @endif
 
 @if (session('error'))
 <script>
-(function() {
-    const showErrorToast = () => {
-        const message = @json(session('error'));
-        const key = 'toast:error';
-        if (window.sessionStorage && sessionStorage.getItem(key) === message) {
-            return;
-        }
-        if (window.Swal) {
+    (function() {
+        if (window.Swal && !document.documentElement.hasAttribute('data-turbo-preview')) {
             Swal.fire({
                 toast: true,
-                position: 'bottom-end',
+                position: 'bottom-start',
                 icon: 'error',
-                title: message,
+                title: @json(session('error')),
                 showConfirmButton: false,
-                timer: 4000,
+                timer: 5000,
                 timerProgressBar: true
             });
         }
-        if (window.sessionStorage) {
-            sessionStorage.setItem(key, message);
-        }
-    };
-    document.addEventListener('DOMContentLoaded', showErrorToast, { once: true });
-    document.addEventListener('turbo:load', showErrorToast);
-})();
+    })();
 </script>
 @endif
+
 <script>
+    document.addEventListener('turbo:before-visit', () => {
+        if (window.Swal && Swal.getPopup()) Swal.close();
+    });
+    document.addEventListener('turbo:before-cache', () => {
+        if (window.Swal && Swal.getPopup()) Swal.close();
+    });
+
     if (!window.__globalSwalDeleteHandler) {
         document.addEventListener('submit', (event) => {
             const form = event.target.closest('.js-swal-delete');
-            if (!form) return;
-            if (form.dataset.swalBound === 'true') return;
+            if (!form || form.dataset.swalBound === 'true') return;
             event.preventDefault();
-            if (!window.Swal) {
-                form.submit();
-                return;
-            }
-            const title = form.dataset.swalTitle || '¿Eliminar registro?';
-            const text = form.dataset.swalText || 'Esta acción no se puede deshacer.';
-            const icon = form.dataset.swalIcon || 'warning';
-            const confirmText = form.dataset.swalConfirm || 'Sí, eliminar';
-            const cancelText = form.dataset.swalCancel || 'Cancelar';
-            const confirmColor = form.dataset.swalConfirmColor || '#ef4444';
-            const cancelColor = form.dataset.swalCancelColor || '#6b7280';
-
+            if (!window.Swal) { form.submit(); return; }
+            
             const isDark = document.documentElement.classList.contains('dark');
             Swal.fire({
-                title,
-                text,
-                icon,
+                title: form.dataset.swalTitle || '¿Eliminar registro?',
+                text: form.dataset.swalText || 'Esta acción no se puede deshacer.',
+                icon: form.dataset.swalIcon || 'warning',
                 showCancelButton: true,
-                confirmButtonText: confirmText,
-                cancelButtonText: cancelText,
-                confirmButtonColor: confirmColor,
-                cancelButtonColor: cancelColor,
+                confirmButtonText: form.dataset.swalConfirm || 'Sí, eliminar',
+                cancelButtonText: form.dataset.swalCancel || 'Cancelar',
+                confirmButtonColor: form.dataset.swalConfirmColor || '#ef4444',
+                cancelButtonColor: form.dataset.swalCancelColor || '#6b7280',
                 reverseButtons: true,
                 allowOutsideClick: false,
                 background: isDark ? '#111827' : '#ffffff',
                 color: isDark ? '#e5e7eb' : '#111827',
-                customClass: {
-                    backdrop: 'swal-backdrop-blur',
-                },
-                didOpen: (popup) => {
-                    popup.classList.toggle('swal-dark', isDark);
-                },
+                customClass: { backdrop: 'swal-backdrop-blur' }
             }).then((result) => {
                 if (result.isConfirmed) {
-                    if (window.showLoadingModal) {
-                        window.showLoadingModal();
-                    }
+                    if (window.showLoadingModal) window.showLoadingModal();
                     form.dataset.swalBound = 'true';
                     form.submit();
                 }
@@ -356,21 +354,6 @@ body.swal2-shown #sidebar { z-index: 1 !important; }
         window.__globalSwalDeleteHandler = true;
     }
 </script>
-<style>
-    .swal2-container.swal2-backdrop-show .swal-backdrop-blur {
-        background-color: rgba(156, 163, 175, 0.5) !important;
-        opacity: 1 !important;
-        backdrop-filter: blur(32px) !important;
-        -webkit-backdrop-filter: blur(32px) !important;
-    }
-</style>
     @stack('scripts')
-
+</body> 
 </html>
-
-
-
-
-
-
-
