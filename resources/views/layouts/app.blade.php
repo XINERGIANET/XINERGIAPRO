@@ -159,8 +159,8 @@
 
         .swal2-popup.swal2-toast {
             position: fixed !important;
-            left: 310px !important;
-            bottom: 30px !important;
+            left: 24px !important;
+            bottom: 24px !important;
             width: fit-content !important;
             min-width: 320px !important;
             max-width: 500px !important;
@@ -178,13 +178,7 @@
             overflow: hidden !important; /* Prevent scrollbars */
         }
 
-        body[data-sidebar-expanded="false"] .swal2-popup.swal2-toast {
-            left: 100px !important;
-        }
-        
-        body[data-sidebar-hovered="true"] .swal2-popup.swal2-toast {
-            left: 300px !important;
-        }
+        /* Removed rules that pushed toast away from sidebar */
 
         @media (max-width: 1280px) {
             .swal2-popup.swal2-toast {
