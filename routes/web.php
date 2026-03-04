@@ -32,6 +32,8 @@ use App\Http\Controllers\TaxRateController;
 use App\Http\Controllers\PettyCashController;
 use App\Http\Controllers\BoxController;
 use App\Http\Controllers\KardexController;
+use App\Http\Controllers\CashShiftRelationController;
+use App\Http\Controllers\SystemConfigController;
 use App\Http\Controllers\RecipeBookController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\WarehouseMovementController;
@@ -207,6 +209,8 @@ Route::middleware('auth')->group(function () {
     //Kardex
     Route::get('/herramientas/kardex', [KardexController::class, 'index'])
         ->name('kardex.index');
+    Route::get('/herramientas/kardex/pdf', [KardexController::class, 'pdf'])
+        ->name('kardex.pdf');
     // dashboard pages
     Route::get('/', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
@@ -352,6 +356,12 @@ Route::middleware('auth')->group(function () {
         ->names('shifts')
         ->parameters(['turnos' => 'shifts']);
 
+    // Configuracion de sistema (parametros por sucursal)
+    Route::get('/configuracion/sistema', [SystemConfigController::class, 'index'])
+        ->name('admin.system-config.index');
+    Route::post('/configuracion/sistema', [SystemConfigController::class, 'update'])
+        ->name('admin.system-config.update');
+
     //Caja chica
     Route::get('/caja/caja-chica', [PettyCashController::class, 'redirectBase'])
         ->name('admin.petty-cash.base');
@@ -368,6 +378,10 @@ Route::middleware('auth')->group(function () {
     Route::resource('/caja/cajas', BoxController::class)
         ->names('boxes')
         ->parameters(['cajas' => 'box']);
+
+    //Relación caja-turno
+    Route::get('/caja/relacion-turnos-caja', [CashShiftRelationController::class, 'index'])
+        ->name('admin.cash-shift-relations.index');
 
     //tasa de impuesto
     Route::resource('/admin/herramientas/tasas-impuesto', TaxRateController::class)

@@ -103,7 +103,7 @@ class MenuOptionController extends Controller
                         'profile_id' => $profileId,
                         'menu_option_id' => $menuOption->id,
                         'branch_id' => $branchId,
-                        'status' => false,
+                        'status' => true,
                         'created_at' => $now,
                         'updated_at' => $now,
                     ];

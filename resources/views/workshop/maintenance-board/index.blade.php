@@ -33,6 +33,7 @@
                 <select
                     id="status"
                     name="status"
+                    onchange="this.form.submit()"
                     class="h-10 min-w-[220px] rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 focus:border-orange-400 focus:outline-none"
                 >
                     <option value="all" @selected(($selectedStatus ?? 'in_progress') === 'all')>Todos</option>
@@ -170,7 +171,7 @@
                                 Venta y cobro
                             </a>
                         @endif
-                        <a href="{{ route('workshop.orders.show', $card) }}" class="rounded-xl bg-slate-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800">Ver detalle</a>
+                        <a href="{{ route('workshop.pdf.order', $card) }}" target="_blank" rel="noopener" class="rounded-xl bg-slate-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800">I. inicial</a>
                     </div>
                 </div>
             @empty

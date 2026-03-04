@@ -7,8 +7,10 @@ use App\Models\WorkshopMovementDetail;
 use App\Models\Product;
 use App\Support\WorkshopAuthorization;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\Request;
+use Symfony\Component\Process\Process;
 
 class WorkshopReportController extends Controller
 {
@@ -200,7 +202,25 @@ class WorkshopReportController extends Controller
         $this->assertOrderScope($order);
         $order->load(['movement', 'vehicle', 'client', 'details.product', 'checklists.items', 'damages', 'intakeInventory']);
 
-        return view('workshop.pdf.order', compact('order'));
+        $html = view('workshop.pdf.order', compact('order'))->render();
+        $pdfBinary = $this->renderPdfWithWkhtmltopdf($html, 'A4', [
+            '--orientation', 'Portrait',
+            '--margin-top', '8',
+            '--margin-right', '8',
+            '--margin-bottom', '8',
+            '--margin-left', '8',
+        ]);
+
+        if ($pdfBinary === null) {
+            return view('workshop.pdf.order', compact('order'));
+        }
+
+        $number = $order->movement?->number ?? ('os-' . $order->id);
+
+        return response($pdfBinary, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="orden-servicio-' . $number . '.pdf"',
+        ]);
     }
 
     public function activationPdf(WorkshopMovement $order)
@@ -271,6 +291,93 @@ class WorkshopReportController extends Controller
         if ($branch && (int) $order->company_id !== (int) $branch->company_id) {
             abort(404);
         }
+    }
+
+    private function renderPdfWithWkhtmltopdf(string $html, ?string $pageSize = 'A4', array $extraArgs = []): ?string
+    {
+        $binary = $this->resolveWkhtmltopdfBinary();
+        if (!$binary) {
+            return null;
+        }
+
+        $tmpDir = storage_path('app/tmp');
+        if (!is_dir($tmpDir)) {
+            @mkdir($tmpDir, 0775, true);
+        }
+
+        $htmlFile = tempnam($tmpDir, 'workshop_os_html_');
+        $pdfFile = tempnam($tmpDir, 'workshop_os_pdf_');
+
+        if ($htmlFile === false || $pdfFile === false) {
+            return null;
+        }
+
+        $htmlPath = $htmlFile . '.html';
+        $pdfPath = $pdfFile . '.pdf';
+        @rename($htmlFile, $htmlPath);
+        @rename($pdfFile, $pdfPath);
+        file_put_contents($htmlPath, $html);
+
+        $args = array_merge([
+            $binary,
+            '--enable-local-file-access',
+            '--disable-javascript',
+            '--load-error-handling', 'ignore',
+            '--load-media-error-handling', 'ignore',
+            '--encoding', 'utf-8',
+            '--margin-top', '10',
+            '--margin-right', '10',
+            '--margin-bottom', '10',
+            '--margin-left', '10',
+        ], $extraArgs);
+
+        if (!empty($pageSize)) {
+            $args[] = '--page-size';
+            $args[] = $pageSize;
+        }
+
+        $args[] = $htmlPath;
+        $args[] = $pdfPath;
+        $process = new Process($args);
+
+        try {
+            $process->setTimeout(120);
+            $process->run();
+            if (!file_exists($pdfPath) || filesize($pdfPath) <= 0) {
+                Log::warning('wkhtmltopdf fallo al generar PDF de orden de servicio', [
+                    'error' => $process->getErrorOutput(),
+                    'output' => $process->getOutput(),
+                ]);
+                return null;
+            }
+
+            $content = file_get_contents($pdfPath);
+            return $content === false ? null : $content;
+        } catch (\Throwable $e) {
+            Log::warning('Error ejecutando wkhtmltopdf en OS: ' . $e->getMessage());
+            return null;
+        } finally {
+            @unlink($htmlPath);
+            @unlink($pdfPath);
+        }
+    }
+
+    private function resolveWkhtmltopdfBinary(): ?string
+    {
+        $candidates = array_filter([
+            env('WKHTMLTOPDF_BINARY'),
+            base_path('wkhtmltopdf/bin/wkhtmltopdf.exe'),
+            'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe',
+            'C:\Snappy\wkhtmltopdf.exe',
+        ]);
+
+        foreach ($candidates as $candidate) {
+            if (is_string($candidate) && file_exists($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 }
 

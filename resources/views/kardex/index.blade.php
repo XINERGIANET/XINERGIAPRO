@@ -10,7 +10,7 @@
             @if ($viewId)
                 <input type="hidden" name="view_id" value="{{ $viewId }}">
             @endif
-            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Descripción</label>
                     <input
@@ -46,45 +46,48 @@
                     </select>
                 </div>
                 <div>
-                    <x-form.date-picker
-                        name="date_from"
-                        label="Desde"
-                        placeholder="dd/mm/yyyy"
-                        :defaultDate="$dateFrom"
-                        dateFormat="Y-m-d"
-                    />
-                </div>
-                <div>
-                    <x-form.date-picker
-                        name="date_to"
-                        label="Hasta"
-                        placeholder="dd/mm/yyyy"
-                        :defaultDate="$dateTo"
-                        dateFormat="Y-m-d"
-                    />
-                </div>
-                <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Tipo</label>
-                    <select name="document_type_id"
+                    <select name="product_type_id"
                         class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
-                        <option value="all" @selected($documentTypeId == 'all')>Todos</option>
-                        @foreach ($typeOptions as $typeOption)
-                            <option value="{{ $typeOption->id }}" @selected((string) $documentTypeId === (string) $typeOption->id)>
-                                {{ $typeOption->name }}
+                        <option value="all" @selected($productTypeId == 'all')>Todos</option>
+                        @foreach ($productTypes as $productType)
+                            <option value="{{ $productType->id }}" @selected((string) $productTypeId === (string) $productType->id)>
+                                {{ $productType->name }}
                             </option>
                         @endforeach
                     </select>
                 </div>
             </div>
 
-            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <div>
                     <x-form.date-picker
+                        id="kardex-date-from"
+                        name="date_from"
+                        label="Fecha inicio"
+                        :defaultDate="$dateFrom"
+                        dateFormat="Y-m-d H:i"
+                        :enableTime="true"
+                        :time24hr="true"
+                        :altInput="true"
+                        altFormat="d/m/Y H:i"
+                        locale="es"
+                        placeholder="dd/mm/yyyy hh:mm"
+                    />
+                </div>
+                <div>
+                    <x-form.date-picker
+                        id="kardex-date-to"
                         name="date_to"
-                        label="Hasta"
-                        placeholder="dd/mm/yyyy"
+                        label="Fecha fin"
                         :defaultDate="$dateTo"
-                        dateFormat="Y-m-d"
+                        dateFormat="Y-m-d H:i"
+                        :enableTime="true"
+                        :time24hr="true"
+                        :altInput="true"
+                        altFormat="d/m/Y H:i"
+                        locale="es"
+                        placeholder="dd/mm/yyyy hh:mm"
                     />
                 </div>
                 <div>
@@ -97,12 +100,16 @@
                         <option value="A" @selected($situation === 'A')>Anulado</option>
                     </select>
                 </div>
-                <div class="flex items-end gap-2 sm:col-span-2 xl:col-span-3 flex-wrap">
+                <div class="flex flex-wrap items-end justify-end gap-2">
                     <x-ui.button type="submit" size="md" variant="primary" class="h-11 px-6" style="background-color: #334155; border-color: #334155;">
                         <i class="ri-search-line"></i>
-                        <span>Consultar</span>
                     </x-ui.button>
-                    <button type="button" id="kardex-pdf-button" class="inline-flex h-11 items-center gap-2 rounded-lg bg-red-500 px-6 text-sm font-semibold text-white shadow-theme-xs hover:bg-red-600">
+                    <button
+                        type="submit"
+                        formaction="{{ route('kardex.pdf') }}"
+                        formtarget="_blank"
+                        class="inline-flex h-11 items-center gap-2 rounded-lg bg-red-500 px-6 text-sm font-semibold text-white shadow-theme-xs hover:bg-red-600"
+                    >
                         <i class="ri-file-pdf-line"></i>
                         <span>PDF</span>
                     </button>
@@ -110,40 +117,19 @@
                         <i class="ri-file-excel-line"></i>
                         <span>Excel</span>
                     </button>
-                    <a href="#kardex-summary" class="inline-flex h-11 items-center gap-2 rounded-lg bg-fuchsia-600 px-6 text-sm font-semibold text-white shadow-theme-xs hover:bg-fuchsia-700">
+                    {{-- <a href="#kardex-summary" class="inline-flex h-11 items-center gap-2 rounded-lg px-6 text-sm font-semibold text-white shadow-theme-xs hover:opacity-95" style="background-color: #9333ea;">
                         <i class="ri-printer-line"></i>
-                        <span>Resumen</span>
-                    </a>
-                    <x-ui.link-button href="{{ route('kardex.index', $viewId ? ['view_id' => $viewId] : []) }}" size="md" variant="outline" class="h-11 px-6">
-                        <i class="ri-refresh-line"></i>
-                        <span>Limpiar</span>
-                    </x-ui.link-button>
+                       
+                    </a> --}}
                 </div>
             </div>
         </form>
 
-        <div id="kardex-summary" class="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <div class="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03]">
-                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Registros</p>
-                <p class="mt-2 text-2xl font-black text-gray-900 dark:text-white">{{ number_format($summary['records']) }}</p>
-            </div>
-            <div class="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03]">
-                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Entradas</p>
-                <p class="mt-2 text-2xl font-black text-emerald-600">{{ number_format($summary['entries'], 0) }}</p>
-            </div>
-            <div class="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03]">
-                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Salidas</p>
-                <p class="mt-2 text-2xl font-black text-rose-600">{{ number_format($summary['exits'], 0) }}</p>
-            </div>
-            <div class="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-theme-xs dark:border-gray-800 dark:bg-white/[0.03]">
-                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Valorizado</p>
-                <p class="mt-2 text-2xl font-black text-amber-600">S/ {{ number_format($summary['valuation'], 2) }}</p>
-            </div>
-        </div>
+   
 
 
         {{-- Tabla de movimientos --}}
-        <div class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] overflow-x-auto">
+        <div id="kardex-summary" class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] overflow-x-auto">
             <table id="kardex-table" class="w-full min-w-[1500px]">
                     <thead>
                         <tr class="text-white text-center" style="background-color: #334155;">
@@ -274,14 +260,7 @@
 <script>
     (function () {
         const rows = @json($movements);
-        const pdfButton = document.getElementById('kardex-pdf-button');
         const excelButton = document.getElementById('kardex-excel-button');
-
-        if (pdfButton) {
-            pdfButton.addEventListener('click', function () {
-                window.print();
-            });
-        }
 
         if (excelButton) {
             excelButton.addEventListener('click', function () {
@@ -302,7 +281,7 @@
                         row.date || '',
                         row.origin || '-',
                         row.situation === 'A' ? 'Anulado' : (row.situation === 'I' ? 'Inactivo' : 'Activado'),
-                    ].map((value) => `"${String(value).replaceAll('"', '""')}"`);
+                    ].map((value) => `"${String(value).replace(/"/g, '""')}"`);
 
                     csvRows.push(values.join(','));
                 });
@@ -311,7 +290,7 @@
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = 'kardex.csv';
+                link.download = `kardex_${new Date().toISOString().slice(0, 10)}.csv`;
                 document.body.appendChild(link);
                 link.click();
                 link.remove();

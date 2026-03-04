@@ -1,0 +1,80 @@
+@extends('layouts.app')
+
+@php
+    $activeTab = old('active_tab', optional($categories->first())->id);
+@endphp
+
+@section('content')
+    <x-common.page-breadcrumb pageTitle="Configuracion | Mi sucursal" />
+
+    <x-common.component-card title="Configuracion de sistema" desc="Parametros por sucursal.">
+        <form method="POST" action="{{ route('admin.system-config.update', $viewId ? ['view_id' => $viewId] : []) }}" x-data="{ activeTab: '{{ (string) $activeTab }}' }">
+            @csrf
+            @if ($viewId)
+                <input type="hidden" name="view_id" value="{{ $viewId }}">
+            @endif
+            <input type="hidden" name="active_tab" :value="activeTab">
+
+            <div class="mb-6 overflow-x-auto border-b border-gray-200">
+                <div class="flex min-w-max items-center gap-1">
+                    @foreach ($categories as $category)
+                        <button
+                            type="button"
+                            @click="activeTab = '{{ $category->id }}'"
+                            class="h-11 whitespace-nowrap rounded-t-lg px-5 text-sm font-semibold transition"
+                            :class="activeTab === '{{ $category->id }}'
+                                ? 'border-b-2 border-orange-500 bg-orange-50 text-orange-600'
+                                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'"
+                        >
+                            {{ strtoupper($category->description) }}
+                        </button>
+                    @endforeach
+                </div>
+            </div>
+
+            @foreach ($categories as $category)
+                <section x-show="activeTab === '{{ $category->id }}'" x-cloak>
+                    <div class="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                        @foreach ($category->parameters as $parameter)
+                            @php
+                                $currentValue = old("values.{$parameter->id}", $parameter->branch_value ?? $parameter->value);
+                                $normalized = strtolower(trim((string) $currentValue));
+                                $isBoolean = in_array($normalized, ['si', 'no', 'yes', 'no', 'true', 'false', '1', '0'], true);
+                                $type = is_numeric($currentValue) ? 'number' : 'text';
+                            @endphp
+                            <div class="rounded-xl border border-gray-200 bg-white p-4">
+                                <label class="mb-2 block text-sm font-semibold text-gray-700">{{ $parameter->description }}</label>
+
+                                @if ($isBoolean)
+                                    <select
+                                        name="values[{{ $parameter->id }}]"
+                                        class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-700 focus:border-orange-400 focus:outline-none"
+                                    >
+                                        <option value="Si" @selected(in_array($normalized, ['si', 'yes', 'true', '1'], true))>Si</option>
+                                        <option value="No" @selected(in_array($normalized, ['no', 'false', '0'], true))>No</option>
+                                    </select>
+                                @else
+                                    <input
+                                        type="{{ $type }}"
+                                        step="any"
+                                        name="values[{{ $parameter->id }}]"
+                                        value="{{ $currentValue }}"
+                                        class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-700 focus:border-orange-400 focus:outline-none"
+                                    />
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                </section>
+            @endforeach
+
+            <div class="mt-6 flex justify-end">
+                <x-ui.button type="submit" size="md" variant="primary" class="h-11 px-6" style="background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff;">
+                    <i class="ri-save-line"></i>
+                    <span>Guardar configuracion</span>
+                </x-ui.button>
+            </div>
+        </form>
+    </x-common.component-card>
+@endsection
+

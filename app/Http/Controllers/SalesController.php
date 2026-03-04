@@ -27,6 +27,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Carbon\Carbon;
 use Symfony\Component\Process\Process;
 
@@ -95,7 +96,12 @@ class SalesController extends Controller
 
     public function create()
     {
-        $branchId = session('branch_id');
+        $user = auth()->user();
+        $branchId = (int) (session('branch_id') ?? $user?->branch_id ?? $user?->person?->branch_id);
+
+        if (!$branchId) {
+            abort(403, 'No se pudo determinar la sucursal del usuario logueado.');
+        }
 
         $products = Product::query()
             ->where('type', 'SELLABLE')
@@ -173,6 +179,7 @@ class SalesController extends Controller
             ->get(['id', 'description', 'order_num']);
 
         $cashRegisters = CashRegister::query()
+            ->where('branch_id', $branchId)
             ->orderByRaw("CASE WHEN status = 'A' THEN 0 ELSE 1 END")
             ->orderBy('number')
             ->get(['id', 'number', 'status']);
@@ -196,6 +203,12 @@ class SalesController extends Controller
     // POS: vista de cobro
     public function charge(Request $request)
     {
+        $user = $request->user();
+        $branchId = (int) (session('branch_id') ?? $user?->branch_id ?? $user?->person?->branch_id);
+        if (!$branchId) {
+            abort(403, 'No se pudo determinar la sucursal del usuario logueado.');
+        }
+
         $documentTypes = DocumentType::query()
             ->orderBy('name')
             ->where('movement_type_id', 2)
@@ -222,11 +235,11 @@ class SalesController extends Controller
             ->get(['id', 'description', 'order_num']);
         
         $cashRegisters = CashRegister::query()
+            ->where('branch_id', $branchId)
             ->orderByRaw("CASE WHEN status = 'A' THEN 0 ELSE 1 END")
             ->orderBy('number')
             ->get(['id', 'number', 'status']);
 
-        $branchId = session('branch_id');
         $people = Person::query()
             ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
             ->orderBy('first_name')
@@ -328,6 +341,15 @@ class SalesController extends Controller
     // POS: procesar venta
     public function processSale(Request $request)
     {
+        $user = $request->user();
+        $branchId = (int) (session('branch_id') ?? $user?->branch_id ?? $user?->person?->branch_id);
+        if (!$branchId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se pudo determinar la sucursal del usuario logueado.',
+            ], 422);
+        }
+
         try {
             $validated = $request->validate([
                 'items' => 'required|array|min:1',
@@ -338,7 +360,11 @@ class SalesController extends Controller
                 // Compatibilidad: algunos flujos pueden enviar `comment` en lugar de `note`
                 'items.*.comment' => 'nullable|string|max:65535',
                 'document_type_id' => 'required|integer|exists:document_types,id',
-                'cash_register_id' => 'required|integer|exists:cash_registers,id',
+                'cash_register_id' => [
+                    'required',
+                    'integer',
+                    Rule::exists('cash_registers', 'id')->where(fn ($query) => $query->where('branch_id', $branchId)),
+                ],
                 'person_id' => 'nullable|integer|exists:people,id',
                 'payment_methods' => 'required|array|min:1',
                 'payment_methods.*.payment_method_id' => 'required|integer|exists:payment_methods,id',
@@ -360,8 +386,6 @@ class SalesController extends Controller
         try {
             DB::beginTransaction();
 
-            $user = $request->user();
-            $branchId = session('branch_id');
             $branch = Branch::findOrFail($branchId);
             
             // Obtener turno de la sucursal
@@ -433,9 +457,12 @@ class SalesController extends Controller
             $total = $calculated['total'];
 
             // Caja seleccionada desde el formulario de cobro
-            $cashRegister = CashRegister::find($validated['cash_register_id']);
+            $cashRegister = CashRegister::query()
+                ->where('id', $validated['cash_register_id'])
+                ->where('branch_id', $branchId)
+                ->first();
             if (!$cashRegister) {
-                throw new \Exception('No hay caja registradora disponible');
+                throw new \Exception('La caja seleccionada no pertenece a la sucursal del usuario logueado.');
             }
 
             // Validar que la suma de los métodos de pago sea igual al total
@@ -502,8 +529,8 @@ class SalesController extends Controller
                     'person_name' => $selectedPerson
                         ? trim(($selectedPerson->first_name ?? '') . ' ' . ($selectedPerson->last_name ?? ''))
                         : 'Publico General',
-                    'responsible_id' => $user?->person->id,
-                    'responsible_name' => $user?->person->first_name . ' ' . $user?->person->last_name ?? '-',
+                    'responsible_id' => $user?->id,
+                    'responsible_name' => trim((string) ($user?->name ?? 'Sistema')),
                     'comment' => $request->notes ?? '',
                     'status' => 'A', // Siempre Activo (pago completo)
                     'movement_type_id' => $movementType->id,
@@ -652,8 +679,8 @@ class SalesController extends Controller
                     'person_name' => $selectedPerson
                         ? trim(($selectedPerson->first_name ?? '') . ' ' . ($selectedPerson->last_name ?? ''))
                         : 'Publico General',
-                    'responsible_id' => $user?->person->id,
-                    'responsible_name' => $user?->person->first_name . ' ' . $user?->person->last_name ?? '-',
+                    'responsible_id' => $user?->id,
+                    'responsible_name' => trim((string) ($user?->name ?? 'Sistema')),
                     'comment' => 'Cobro de venta ' . $movement->number,
                     'status' => '1',
                     'movement_type_id' => 4,

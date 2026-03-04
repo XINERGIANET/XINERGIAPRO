@@ -70,6 +70,26 @@
         this.mileageIn = selected.km ? String(selected.km) : '';
         this.vehicleSearch = selected.display_label || selected.label || '';
     },
+    resolveDefaultClientId() {
+        const matchClientesVarios = this.clientsList.find((client) => {
+            const fullName = `${client.first_name || ''} ${client.last_name || ''}`.trim().toLowerCase();
+            return fullName.includes('clientes') && fullName.includes('varios');
+        });
+        if (matchClientesVarios?.id) {
+            return String(matchClientesVarios.id);
+        }
+        const firstClient = this.clientsList[0];
+        return firstClient?.id ? String(firstClient.id) : '';
+    },
+    ensureQuickVehicleClient() {
+        const fallbackClientId = this.resolveDefaultClientId();
+        if (!String(this.selectedClientId || '').trim()) {
+            this.selectedClientId = fallbackClientId;
+        }
+        if (!String(this.quickVehicle.client_person_id || '').trim()) {
+            this.quickVehicle.client_person_id = this.selectedClientId || fallbackClientId;
+        }
+    },
     get filteredVehicles() {
         const q = String(this.vehicleSearch || '').trim().toLowerCase();
         if (!q) return this.vehicles.slice(0, 30);
@@ -144,8 +164,9 @@
         this.quickClient.location_id = '';
     },
     resetQuickVehicle() {
+        const fallbackClientId = this.resolveDefaultClientId();
         this.quickVehicle = {
-            client_person_id: this.selectedClientId || '',
+            client_person_id: this.selectedClientId || fallbackClientId || '',
             vehicle_type_id: @js(optional($vehicleTypes->firstWhere('name', 'moto lineal'))->id ?? optional($vehicleTypes->first())->id ?? ''),
             brand: '',
             model: '',
@@ -164,10 +185,12 @@
         this.creatingVehicle = !this.creatingVehicle;
         if (this.creatingVehicle) {
             this.resetQuickVehicle();
+            this.ensureQuickVehicleClient();
         }
     },
     async saveQuickVehicle() {
         this.quickVehicleError = '';
+        this.ensureQuickVehicleClient();
         this.creatingVehicleLoading = true;
         try {
             const response = await fetch(@js(route('workshop.maintenance-board.vehicles.store')), {
@@ -364,7 +387,7 @@
             url: URL.createObjectURL(file),
         }));
     }
-}" x-init="$nextTick(() => { if (selectedVehicleId) { syncVehicle() } initSignaturePad(); syncServiceLinesFromSelection(); })">
+}" x-init="$nextTick(() => { if (selectedVehicleId) { syncVehicle() } ensureQuickVehicleClient(); initSignaturePad(); syncServiceLinesFromSelection(); })">
     <x-common.page-breadcrumb
         pageTitle="Nuevo Ingreso a Mantenimiento"
         :crumbs="[
