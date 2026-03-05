@@ -1264,5 +1264,33 @@ class BranchController extends Controller
                 'updated_at' => now(),
             ]);
         }
+           $generalClient = Person::query()->firstOrCreate(
+            [
+                'branch_id' => $branch->id,
+                'document_number' => '0',
+                'person_type' => 'DNI',
+            ],
+            [
+                'first_name' => 'CLIENTES VARIOS',
+                'last_name' => '',
+                'phone' => '-',
+                'email' => 'clientes.varios.' . $branch->id . '@xinergia.local',
+                'address' => $branch->address ?: '-',
+                'location_id' => $branch->location_id,
+            ]
+        );
+
+    
+            DB::table('role_person')->updateOrInsert(
+                [
+                    'role_id' => 3,
+                    'person_id' => $generalClient->id,
+                    'branch_id' => $branch->id,
+                ],
+                [
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
     }
 }

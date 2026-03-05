@@ -3,495 +3,472 @@
 @section('title', 'Entrada de Productos')
 
 @section('content')
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div class="flex items-center gap-2">
-            <span class="text-gray-500 dark:text-gray-400"><i class="ri-archive-line"></i></span>
-            <h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">
-                Entrada de Productos a almacén
-            </h2>
-        </div>
-        <nav>
-            <ol class="flex items-center gap-1.5">
-                <li>
-                    <a class="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400" href="{{ url('/') }}">
-                        Home
-                        <svg class="stroke-current" width="17" height="16" viewBox="0 0 17 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M6.0765 12.667L10.2432 8.50033L6.0765 4.33366" stroke="" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"></path>
-                        </svg>
-                    </a>
-                </li>
-                <li>
-                    <a class="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400" href="{{ route('warehouse_movements.index', request('view_id') ? ['view_id' => request('view_id')] : []) }}">
-                        Movimientos de Almacén
-                        <svg class="stroke-current" width="17" height="16" viewBox="0 0 17 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M6.0765 12.667L10.2432 8.50033L6.0765 4.33366" stroke="" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"></path>
-                        </svg>
-                    </a>
-                </li>
-                <li class="text-sm text-gray-800 dark:text-white/90">
-                    Entrada de Productos
-                </li>
-            </ol>
-        </nav>
-    </div>
+    @php
+        $viewId = request('view_id');
+        $warehouseIndexUrl = route('warehouse_movements.index', $viewId ? ['view_id' => $viewId] : []);
+        $branchId = session('branch_id');
 
-    <div class="flex items-start w-full bg-slate-100 fade-in min-h-screen" style="--brand:#3B82F6;">
-        
-        {{-- SECCIÓN IZQUIERDA: LISTA DE PRODUCTOS --}}
-        <main class="flex-1 flex flex-col min-w-0">
-            
-            {{-- Header --}}
-            <header class="h-20 px-6 flex items-center justify-between bg-white border-b border-gray-200 shadow-sm z-10">
-                <div class="flex items-center gap-4">
-                    <button onclick="goBack()" class="h-10 w-10 rounded-lg bg-gray-50 border border-gray-200 text-gray-500 hover:text-blue-600 hover:border-blue-600 transition-colors flex items-center justify-center">
-                        <i class="fas fa-arrow-left"></i>
-                    </button>
-                    <div>
-                        <h2 class="text-xl font-bold text-slate-800">
-                            Entrada de Productos
-                        </h2>
-                        <p class="text-xs text-gray-500 mt-0.5">Agregar productos al inventario</p>
+        $productsMapped = $products->map(function ($product) use ($productBranches) {
+            $productBranch = $productBranches->get($product->id);
+            $imageUrl = null;
+
+            if ($product->image && !empty(trim($product->image))) {
+                $imagePath = trim($product->image);
+                if (strpos($imagePath, '\\') === false && strpos($imagePath, 'C:') === false && strpos($imagePath, 'Temp') === false && strpos($imagePath, 'Windows') === false) {
+                    if (str_starts_with($imagePath, 'http://') || str_starts_with($imagePath, 'https://')) {
+                        $imageUrl = $imagePath;
+                    } elseif (str_starts_with($imagePath, 'storage/')) {
+                        $imageUrl = asset($imagePath);
+                    } elseif (str_starts_with($imagePath, '/storage/')) {
+                        $imageUrl = asset(ltrim($imagePath, '/'));
+                    } else {
+                        $imageUrl = asset('storage/' . $imagePath);
+                    }
+                }
+            }
+
+            return [
+                'id' => $product->id,
+                'code' => $product->code ?? '',
+                'name' => $product->description ?? 'Sin nombre',
+                'img' => $imageUrl,
+                'category' => $product->category ? $product->category->description : 'General',
+                'unit' => $product->baseUnit ? $product->baseUnit->description : 'Unidad',
+                'stock' => (float) ($productBranch->stock ?? 0),
+            ];
+        })->values();
+    @endphp
+
+    <div id="warehouse-entry-view">
+        <x-common.page-breadcrumb pageTitle="Entrada de productos" />
+
+        <x-common.component-card
+            title="Almacén | Entrada"
+            desc="Registra entradas con el mismo flujo visual del POS."
+        >
+            <div class="flex items-start gap-6" style="display:flex;align-items:flex-start;gap:1.5rem;">
+                <section class="min-w-0 space-y-5" style="flex:0 0 60%;max-width:60%;width:60%;">
+                    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                            <div class="relative flex-1">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                                    <i class="ri-search-line text-lg"></i>
+                                </span>
+                                <input
+                                    id="product-search"
+                                    type="text"
+                                    placeholder="Buscar por nombre, código o categoría"
+                                    class="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-12 pr-4 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                                >
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <a href="{{ $warehouseIndexUrl }}" class="inline-flex h-12 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                                    <i class="ri-arrow-left-line"></i>
+                                    <span>Volver</span>
+                                </a>
+                                <button type="button" id="clear-entry-button" class="inline-flex h-12 items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-5 text-sm font-semibold text-rose-700 hover:bg-rose-100">
+                                    <i class="ri-delete-bin-6-line"></i>
+                                    <span>Limpiar</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div class="w-64 hidden md:block relative">
-                    <input type="text" id="search-products" placeholder="Buscar productos..." 
-                        class="w-full pl-9 pr-4 py-2 bg-gray-100 border-transparent focus:bg-white focus:border-blue-500 focus:ring-0 rounded-lg text-sm transition-all">
-                    <i class="fas fa-search absolute left-3 top-2.5 text-gray-400 text-xs"></i>
-                </div>
-            </header>
 
-            {{-- Grid de Productos --}}
-            <div class="p-6 bg-[#F3F4F6]">
-                <h3 class="font-bold text-slate-700 mb-4 text-base" id="category-title">Categoría: General</h3>
-                <div id="products-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; width: 100%;">
-                    {{-- JS llenará esto --}}
-                </div>
-            </div>
-        </main>
-
-        {{-- SECCIÓN DERECHA: CARRITO DE ENTRADA --}}
-        <aside class="w-[400px] bg-white border-l border-gray-300 flex flex-col shadow-2xl z-20 shrink-0 sticky top-0 h-screen">
-            
-            {{-- Header Carrito --}}
-            <div class="h-16 px-6 border-b border-gray-200 bg-white flex justify-between items-center shrink-0">
-                <h3 class="text-xl font-bold text-slate-800">Productos a Ingresar</h3>
-                <span class="px-3 py-1 bg-green-50 text-green-700 rounded-full text-xs font-bold border border-green-100">Entrada</span>
-            </div>
-
-            {{-- Lista Items --}}
-            <div id="cart-container" class="flex-1 overflow-y-auto p-5 space-y-3 bg-white"></div>
-
-            {{-- Footer --}}
-            <div class="p-6 bg-slate-100 border-t border-gray-300 shadow-[0_-5px_25px_rgba(0,0,0,0.05)] shrink-0 z-30">
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Proveedor</label>
-                    <select id="supplier-person-id" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm">
-                        <option value="">Seleccionar proveedor</option>
-                        @foreach($suppliers as $supplier)
-                            <option value="{{ $supplier->id }}">
-                                {{ trim(($supplier->first_name ?? '').' '.($supplier->last_name ?? '')) ?: 'Persona #'.$supplier->id }}
-                                @if(!empty($supplier->document_number))
-                                    ({{ $supplier->document_number }})
-                                @endif
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Comentario (opcional)</label>
-                    <textarea id="movement-comment" rows="2" 
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                        placeholder="Ej: Compra de proveedor, Transferencia de otra sucursal..."></textarea>
-                </div>
-                <div class="mb-4 grid grid-cols-2 gap-2">
-                    <select id="purchase-document-kind" class="rounded border px-2 py-2 text-sm">
-                        <option value="FACTURA">FACTURA</option>
-                        <option value="BOLETA">BOLETA</option>
-                        <option value="RECIBO">RECIBO</option>
-                    </select>
-                    <input id="purchase-series" class="rounded border px-2 py-2 text-sm" placeholder="Serie">
-                    <input id="purchase-number" class="rounded border px-2 py-2 text-sm" placeholder="Número doc" required>
-                    <input id="purchase-currency" class="rounded border px-2 py-2 text-sm" value="PEN" placeholder="Moneda">
-                    <input id="purchase-igv-rate" type="number" min="0" max="100" step="0.0001" class="rounded border px-2 py-2 text-sm" value="18" placeholder="IGV %">
-                    <input id="purchase-issued-at" type="date" class="rounded border px-2 py-2 text-sm" value="{{ now()->toDateString() }}">
-                </div>
-                <div class="space-y-3 mb-5 text-sm">
-                    <div class="flex justify-between text-gray-500 font-medium">
-                        <span>Total de productos</span>
-                        <span class="text-slate-700" id="total-products">0</span>
+                    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                            <div>
+                                <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Catálogo</p>
+                                <h3 class="mt-1 text-lg font-bold text-slate-900">Productos</h3>
+                            </div>
+                            <div id="category-filters" class="flex flex-wrap gap-2"></div>
+                        </div>
+                        <div id="products-grid" class="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"></div>
                     </div>
-                    <div class="flex justify-between text-gray-500 font-medium">
-                        <span>Total de unidades</span>
-                        <span class="text-slate-700" id="total-quantity">0</span>
+                </section>
+
+                <aside class="min-w-0" style="flex:0 0 40%;max-width:40%;width:40%;">
+                    <div class="sticky top-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+                        <div class="border-b border-slate-800 bg-slate-900 px-4 py-3 text-white" style="background-color:#334155;">
+                            <div class="flex items-center justify-between gap-3">
+                                <div>
+                                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-300">Entrada</p>
+                                    <h3 class="mt-0.5 text-xl font-bold">Resumen</h3>
+                                </div>
+                                <span class="rounded-full px-3 py-1 text-xs font-bold text-white" style="background:linear-gradient(90deg,#ff7a00,#ff4d00);">
+                                    En curso
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="max-h-[42vh] overflow-y-auto p-4" id="entry-cart-container"></div>
+
+                        <div class="border-t border-slate-200 bg-slate-50 p-5 space-y-4">
+                            <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                <div class="grid grid-cols-1 gap-3">
+                                    <div class="sm:col-span-2">
+                                        <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Motivo de entrada</label>
+                                        <select id="movement-reason" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
+                                            <option value="AJUSTE DE ENTRADA">Ajuste de entrada</option>
+                                            <option value="DEVOLUCION INTERNA">Devolucion interna</option>
+                                            <option value="REGULARIZACION DE STOCK">Regularizacion de stock</option>
+                                            <option value="TRASLADO INTERNO">Traslado interno</option>
+                                            <option value="OTRO">Otro</option>
+                                        </select>
+                                    </div>
+
+                                    {{--
+                                    <div>
+                                        <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Tipo doc</label>
+                                        <select id="purchase-document-kind" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
+                                            <option value="FACTURA">FACTURA</option>
+                                            <option value="BOLETA">BOLETA</option>
+                                            <option value="RECIBO">RECIBO</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Moneda</label>
+                                        <input id="purchase-currency" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700" value="PEN">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Serie</label>
+                                        <input id="purchase-series" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700" placeholder="001">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Número</label>
+                                        <input id="purchase-number" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700" placeholder="00000001">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">IGV %</label>
+                                        <input id="purchase-igv-rate" type="number" min="0" max="100" step="0.0001" value="18" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold" style="color:#f97316;">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Fecha</label>
+                                        <input id="purchase-issued-at" type="date" value="{{ now()->toDateString() }}" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
+                                    </div>
+                                    --}}
+                                </div>
+                            </div>
+
+                            <div class="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
+                                <div class="flex justify-between text-sm text-slate-500"><span>Items</span><span id="entry-total-products" class="font-semibold text-slate-700">0</span></div>
+                                <div class="flex justify-between text-sm text-slate-500"><span>Cantidad</span><span id="entry-total-quantity" class="font-semibold text-slate-700">0</span></div>
+                            </div>
+
+                            <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                <label class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Comentario</label>
+                                <textarea id="movement-comment" rows="2" placeholder="Detalle adicional de la entrada" class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"></textarea>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <a href="{{ $warehouseIndexUrl }}" class="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                                    <i class="ri-close-line"></i><span>Cancelar</span>
+                                </a>
+                                <button type="button" id="save-entry-button" class="inline-flex h-12 items-center justify-center gap-2 rounded-2xl text-sm font-semibold text-white shadow-theme-xs" style="background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff;box-shadow:0 12px 24px rgba(249,115,22,.24);">
+                                    <i class="ri-save-line"></i><span>Guardar entrada</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <button onclick="goBack()" class="py-3.5 rounded-xl border border-gray-300 bg-white text-gray-700 font-bold hover:bg-gray-50 shadow-sm transition-all">
-                        Cancelar
-                    </button>
-                    <button onclick="saveEntry()" class="py-3.5 rounded-xl bg-blue-600 text-white font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition-all flex justify-center items-center gap-2">
-                        <span>Guardar</span> <i class="fas fa-check-circle"></i>
-                    </button>
-                </div>
+                </aside>
             </div>
-        </aside>
+        </x-common.component-card>
     </div>
 
     <script>
-        @php
-            $branchId = session('branch_id');
-            // Usar la variable $products y $productBranches que vienen del controlador
-            $productsMapped = $products->map(function($product) use ($branchId, $productBranches) {
-                // Buscar productBranch usando el keyBy que hicimos en el controlador
-                $productBranch = $productBranches->get($product->id);
-                
-                // Manejar la URL de la imagen correctamente
-                $imageUrl = null;
-                if ($product->image && !empty($product->image)) {
-                    $imagePath = trim($product->image);
-                    
-                    // Si la imagen contiene rutas de Windows o rutas absolutas, ignorarla
-                    if (strpos($imagePath, '\\') !== false || 
-                        strpos($imagePath, 'C:') !== false ||
-                        strpos($imagePath, 'Temp') !== false ||
-                        strpos($imagePath, 'Windows') !== false) {
-                        // URL inválida, usar null para que el JS use placeholder
-                        $imageUrl = null;
-                    } elseif (strpos($imagePath, 'http://') === 0 || strpos($imagePath, 'https://') === 0) {
-                        // Ya es una URL completa válida
-                        // Verificar que no contenga rutas de Windows incluso en URLs
-                        if (strpos($imagePath, '\\') === false && strpos($imagePath, 'C:') === false) {
-                            $imageUrl = $imagePath;
-                        } else {
-                            $imageUrl = null;
-                        }
-                    } elseif (strpos($imagePath, 'storage/') === 0) {
-                        // Ruta relativa que empieza con storage/
-                        $imageUrl = asset($imagePath);
-                    } elseif (strpos($imagePath, '/storage/') === 0) {
-                        // Ruta relativa que empieza con /storage/
-                        $imageUrl = asset(ltrim($imagePath, '/'));
-                    } elseif (strpos($imagePath, 'product/') === 0) {
-                        // Ruta relativa que empieza con product/
-                        $imageUrl = asset('storage/' . $imagePath);
+        (function () {
+            const products = Array.isArray(@json($productsMapped)) ? @json($productsMapped) : [];
+            const branchId = Number(@json($branchId ?? 0)) || 0;
+            const viewId = @json($viewId);
+
+            const state = { selectedCategory: 'GENERAL', search: '', cart: [] };
+            const categoryFilters = document.getElementById('category-filters');
+            const productsGrid = document.getElementById('products-grid');
+            const cartContainer = document.getElementById('entry-cart-container');
+            const searchInput = document.getElementById('product-search');
+
+            function getImageUrl(raw) {
+                if (raw && String(raw).trim() !== '') return raw;
+                return 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIj48cmVjdCBmaWxsPSIjZTdlOWViIiB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM5Y2EzYWYiPlNpbiBpbWFnZW48L3RleHQ+PC9zdmc+';
+            }
+
+            function categories() {
+                const base = ['GENERAL'];
+                products.forEach((product) => {
+                    const name = String(product.category || 'GENERAL').trim().toUpperCase();
+                    if (name && !base.includes(name)) base.push(name);
+                });
+                return base;
+            }
+
+            function filteredProducts() {
+                const term = state.search.trim().toLowerCase();
+                return products.filter((product) => {
+                    const category = String(product.category || 'GENERAL').trim().toUpperCase();
+                    const categoryOk = state.selectedCategory === 'GENERAL' || category === state.selectedCategory;
+                    const searchOk = term === ''
+                        || String(product.name || '').toLowerCase().includes(term)
+                        || String(product.code || '').toLowerCase().includes(term)
+                        || String(product.category || '').toLowerCase().includes(term);
+                    return categoryOk && searchOk;
+                });
+            }
+
+            function renderCategoryFilters() {
+                if (!categoryFilters) return;
+                categoryFilters.innerHTML = '';
+                categories().forEach((category) => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'inline-flex h-12 items-center justify-center rounded-2xl border px-5 text-sm font-bold transition-all duration-200';
+                    const active = state.selectedCategory === category;
+                    if (active) {
+                        button.classList.add('border-transparent', 'text-white', 'shadow-theme-xs');
+                        button.style.background = 'linear-gradient(90deg,#ff7a00,#ff4d00)';
+                        button.style.boxShadow = '0 12px 24px rgba(249,115,22,.24)';
                     } else {
-                        // Asumir que es una ruta relativa dentro de storage/product
-                        // Construir la ruta de storage correctamente
-                        $imageUrl = asset('storage/' . $imagePath);
+                        button.classList.add('border-slate-200', 'bg-white', 'text-slate-900', 'hover:border-orange-200', 'hover:text-orange-600');
                     }
-                }
-                    
-                return [
-                    'id' => $product->id,
-                    'code' => $product->code ?? '',
-                    'name' => $product->description ?? 'Sin nombre',
-                    'img' => $imageUrl,
-                    'category' => $product->category ? $product->category->description : 'Sin categoría',
-                    'unit' => $product->baseUnit ? $product->baseUnit->description : 'Unidad',
-                    'currentStock' => $productBranch ? (int) ($productBranch->stock ?? 0) : 0,
-                    'price' => $productBranch ? (float) ($productBranch->price ?? 0) : 0,
-                ];
-            })->filter(function($product) {
-                // Filtrar productos sin nombre
-                return !empty($product['name']);
-            })->values();
-        @endphp
-
-        const productsData = @json($productsMapped);
-        const branchId = @json($branchId);
-
-        let selectedProducts = [];
-        let filteredProducts = productsData;
-
-        function getImageUrl(imgUrl) {
-            if (imgUrl && imgUrl.trim() !== '') {
-                return imgUrl;
-            }
-            // SVG placeholder simple codificado
-            return 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIj48cmVjdCBmaWxsPSIjZTdlOWViIiB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM5Y2EzYWYiPlNpbiBpbWFnZW48L3RleHQ+PC9zdmc+';
-        }
-
-        function renderProducts() {
-            const grid = document.getElementById('products-grid');
-            if (!grid) {
-                setTimeout(renderProducts, 100);
-                return;
-            }
-
-            if (filteredProducts.length === 0) {
-                grid.innerHTML = '<div class="col-span-full text-center py-8 text-gray-500">No se encontraron productos</div>';
-                return;
-            }
-
-            try {
-                const html = filteredProducts.map((prod, index) => {
-                    try {
-                        const imageUrl = getImageUrl(prod.img);
-                        
-                        // Escapar caracteres especiales para evitar problemas en el HTML
-                        const safeName = String(prod.name || 'Sin nombre').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                        const safeCode = String(prod.code || 'N/A').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                        const safeUnit = String(prod.unit || 'Unidad').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                        
-                        return `
-                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all cursor-pointer overflow-hidden"
-                            onclick="addProduct(${prod.id})">
-                            <div class="aspect-square bg-gray-100 flex items-center justify-center overflow-hidden">
-                                <img src="${imageUrl}" alt="${safeName}" 
-                                    class="w-full h-full object-cover" 
-                                    loading="lazy"
-                                    onerror="this.onerror=null; this.src='https://via.placeholder.com/200x200?text=Sin+Imagen';">
-                            </div>
-                            <div class="p-3">
-                                <h4 class="font-semibold text-sm text-gray-800 line-clamp-2 mb-1">${safeName}</h4>
-                                <p class="text-xs text-gray-500 mb-2">Código: ${safeCode}</p>
-                                <div class="flex items-center justify-between">
-                                    <span class="text-xs text-gray-600">
-                                        <i class="ri-stack-line"></i> Stock: <strong>${prod.currentStock || 0}</strong>
-                                    </span>
-                                    <span class="text-xs font-medium text-green-600">
-                                        ${safeUnit}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    } catch (prodError) {
-                        return `
-                        <div class="bg-white rounded-lg shadow-sm border border-red-200 hover:shadow-md transition-all cursor-pointer overflow-hidden"
-                            onclick="addProduct(${prod.id})">
-                            <div class="aspect-square bg-gray-100 flex items-center justify-center">
-                                <span class="text-gray-400 text-xs">Sin imagen</span>
-                            </div>
-                            <div class="p-3">
-                                <h4 class="font-semibold text-sm text-gray-800 line-clamp-2 mb-1">${prod.name || 'Sin nombre'}</h4>
-                                <p class="text-xs text-gray-500 mb-2">Código: ${prod.code || 'N/A'}</p>
-                                <div class="flex items-center justify-between">
-                                    <span class="text-xs text-gray-600">
-                                        <i class="ri-stack-line"></i> Stock: <strong>${prod.currentStock || 0}</strong>
-                                    </span>
-                                    <span class="text-xs font-medium text-green-600">
-                                        ${prod.unit || 'Unidad'}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    }
-                }).join('');
-
-                grid.innerHTML = html;
-
-            } catch (error) {
-                grid.innerHTML = '<div class="col-span-full text-center py-8 text-red-500">Error al cargar productos: ' + error.message + '</div>';
-            }
-        }
-
-        function addProduct(productId) {
-            const product = productsData.find(p => p.id === productId);
-            if (!product) return;
-
-            const existing = selectedProducts.find(p => p.id === productId);
-            if (existing) {
-                existing.quantity += 1;
-            } else {
-                selectedProducts.push({
-                    id: product.id,
-                    code: product.code,
-                    name: product.name,
-                    unit: product.unit,
-                    currentStock: product.currentStock,
-                    quantity: 1,
-                    unitCost: Number(product.price || 0),
-                    comment: ''
+                    button.textContent = category;
+                    button.addEventListener('click', () => {
+                        state.selectedCategory = category;
+                        renderCategoryFilters();
+                        renderProducts();
+                    });
+                    categoryFilters.appendChild(button);
                 });
             }
 
-            renderCart();
-        }
-
-        function removeProduct(productId) {
-            selectedProducts = selectedProducts.filter(p => p.id !== productId);
-            renderCart();
-        }
-
-        function updateQuantity(productId, delta) {
-            const product = selectedProducts.find(p => p.id === productId);
-            if (product) {
-                product.quantity = Math.max(1, product.quantity + delta);
-                renderCart();
-            }
-        }
-
-        function renderCart() {
-            const container = document.getElementById('cart-container');
-            if (!container) return;
-
-            if (selectedProducts.length === 0) {
-                container.innerHTML = `
-                    <div class="text-center py-12 text-gray-400">
-                        <i class="ri-shopping-cart-line text-4xl mb-3"></i>
-                        <p class="text-sm">No hay productos seleccionados</p>
-                        <p class="text-xs mt-1">Haz clic en un producto para agregarlo</p>
-                    </div>
-                `;
-                document.getElementById('total-products').textContent = '0';
-                document.getElementById('total-quantity').textContent = '0';
-                return;
-            }
-
-            container.innerHTML = selectedProducts.map(prod => `
-                <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-                    <div class="flex items-start justify-between mb-2">
-                        <div class="flex-1">
-                            <h4 class="font-semibold text-sm text-gray-800">${prod.name}</h4>
-                            <p class="text-xs text-gray-500">Código: ${prod.code || 'N/A'} | Stock actual: ${prod.currentStock}</p>
-                        </div>
-                        <button onclick="removeProduct(${prod.id})" 
-                            class="text-red-500 hover:text-red-700 transition-colors ml-2">
-                            <i class="ri-close-line text-lg"></i>
-                        </button>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <div class="flex items-center gap-2 border border-gray-300 rounded-lg">
-                            <button onclick="updateQuantity(${prod.id}, -1)" 
-                                class="px-3 py-1 text-gray-600 hover:bg-gray-100 transition-colors">
-                                <i class="ri-subtract-line"></i>
-                            </button>
-                            <span class="px-3 py-1 font-semibold text-gray-800 min-w-[3rem] text-center">${prod.quantity}</span>
-                            <button onclick="updateQuantity(${prod.id}, 1)" 
-                                class="px-3 py-1 text-gray-600 hover:bg-gray-100 transition-colors">
-                                <i class="ri-add-line"></i>
-                            </button>
-                        </div>
-                        <span class="text-sm text-gray-600">${prod.unit}</span>
-                    </div>
-                    <div class="mt-3">
-                        <label class="block text-xs text-gray-600 mb-1">Costo unitario</label>
-                        <input type="number" min="0" step="0.000001"
-                            value="${Number(prod.unitCost || 0).toFixed(6)}"
-                            onchange="updateUnitCost(${prod.id}, this.value)"
-                            class="w-full px-2 py-1 border border-gray-300 rounded text-sm">
-                    </div>
-                </div>
-            `).join('');
-
-            const totalProducts = selectedProducts.length;
-            const totalQuantity = selectedProducts.reduce((sum, p) => sum + p.quantity, 0);
-            document.getElementById('total-products').textContent = totalProducts;
-            document.getElementById('total-quantity').textContent = totalQuantity;
-        }
-
-        function updateUnitCost(productId, value) {
-            const product = selectedProducts.find(p => p.id === productId);
-            if (!product) return;
-            const numeric = Number(value);
-            product.unitCost = Number.isFinite(numeric) && numeric >= 0 ? numeric : 0;
-        }
-
-        function goBack() {
-            const viewId = new URLSearchParams(window.location.search).get('view_id');
-            const url = viewId 
-                ? `{{ route('warehouse_movements.index') }}?view_id=${viewId}`
-                : `{{ route('warehouse_movements.index') }}`;
-            window.location.href = url;
-        }
-
-        async function saveEntry() {
-            if (selectedProducts.length === 0) {
-                alert('Por favor, selecciona al menos un producto');
-                return;
-            }
-
-            const supplierPersonId = document.getElementById('supplier-person-id').value;
-            if (!supplierPersonId) {
-                alert('Debes seleccionar un proveedor para registrar la recepcion.');
-                return;
-            }
-
-            const comment = document.getElementById('movement-comment').value.trim();
-            
-            const payload = {
-                items: selectedProducts.map(p => ({
-                    product_id: p.id,
-                    quantity: p.quantity,
-                    unit_cost: Number(p.unitCost || 0),
-                    comment: p.comment || ''
-                })),
-                supplier_person_id: Number(supplierPersonId),
-                purchase: {
-                    document_kind: document.getElementById('purchase-document-kind').value,
-                    series: document.getElementById('purchase-series').value || null,
-                    document_number: document.getElementById('purchase-number').value,
-                    currency: document.getElementById('purchase-currency').value || 'PEN',
-                    igv_rate: Number(document.getElementById('purchase-igv-rate').value || 18),
-                    issued_at: document.getElementById('purchase-issued-at').value
-                },
-                comment: comment || 'Entrada de productos al almacén',
-                branch_id: branchId,
-                movement_type: 'ENTRY'
-            };
-
-            try {
-                const response = await fetch('{{ route("warehouse_movements.store") }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    const viewId = new URLSearchParams(window.location.search).get('view_id');
-                    const redirectUrl = viewId
-                        ? `{{ route('warehouse_movements.index') }}?view_id=${viewId}`
-                        : `{{ route('warehouse_movements.index') }}`;
-                    sessionStorage.setItem('flash_success_message', data.message || 'Entrada guardada correctamente');
-                    window.location.href = redirectUrl;
+            function addToCart(productId) {
+                const product = products.find((item) => Number(item.id) === Number(productId));
+                if (!product) return;
+                const existing = state.cart.find((item) => Number(item.id) === Number(product.id));
+                if (existing) {
+                    existing.quantity += 1;
                 } else {
-                    alert(data.message || 'Error al guardar la entrada');
+                    state.cart.push({
+                        id: Number(product.id),
+                        name: String(product.name || ''),
+                        code: String(product.code || ''),
+                        unit: String(product.unit || 'Unidad'),
+                        img: product.img || null,
+                        quantity: 1,
+                    });
                 }
-            } catch (error) {
-                alert('Error al guardar: ' + (error.message || 'Error de conexión'));
-            }
-        }
-
-        // Búsqueda de productos
-        document.getElementById('search-products')?.addEventListener('input', function(e) {
-            const search = e.target.value.toLowerCase();
-            filteredProducts = productsData.filter(p => 
-                p.name.toLowerCase().includes(search) || 
-                (p.code && p.code.toLowerCase().includes(search))
-            );
-            renderProducts();
-        });
-
-        // Inicializar
-        document.addEventListener('DOMContentLoaded', function() {
-            const grid = document.getElementById('products-grid');
-            if (grid) {
-                renderProducts();
-            } else {
-                setTimeout(renderProducts, 500);
-            }
-            renderCart();
-        });
-
-        if (document.readyState !== 'loading') {
-            setTimeout(function() {
-                renderProducts();
                 renderCart();
-            }, 100);
+            }
+
+            function updateQuantity(productId, diff) {
+                const item = state.cart.find((entry) => Number(entry.id) === Number(productId));
+                if (!item) return;
+                item.quantity = Math.max(1, Number(item.quantity || 1) + diff);
+                renderCart();
+            }
+
+            function setQuantity(productId, value) {
+                const item = state.cart.find((entry) => Number(entry.id) === Number(productId));
+                if (!item) return;
+                const parsed = Math.floor(Number(value));
+                item.quantity = Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+                renderCart();
+            }
+
+            function removeItem(productId) {
+                state.cart = state.cart.filter((entry) => Number(entry.id) !== Number(productId));
+                renderCart();
+            }
+
+            function renderProducts() {
+                if (!productsGrid) return;
+                const list = filteredProducts();
+                productsGrid.innerHTML = '';
+
+                if (!list.length) {
+                    productsGrid.innerHTML = '<div class="col-span-full rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center text-sm text-slate-500">No se encontraron productos para el filtro actual.</div>';
+                    return;
+                }
+
+                list.forEach((product) => {
+                    const card = document.createElement('button');
+                    card.type = 'button';
+                    card.className = 'group relative overflow-hidden border bg-white text-center transition-all duration-200 hover:-translate-y-1';
+                    card.style.borderRadius = '28px';
+                    card.style.borderColor = '#dbe3ef';
+                    card.style.borderWidth = '1px';
+                    card.style.borderStyle = 'solid';
+                    card.style.boxShadow = '0 10px 24px rgba(15,23,42,.06)';
+                    card.addEventListener('mouseenter', () => {
+                        card.style.transform = 'translateY(-4px)';
+                        card.style.borderColor = '#fdba74';
+                        card.style.boxShadow = '0 18px 34px rgba(249,115,22,.16)';
+                        const orb = card.querySelector('[data-role=product-orb]');
+                        if (orb) orb.style.transform = 'scale(1.04)';
+                    });
+                    card.addEventListener('mouseleave', () => {
+                        card.style.transform = '';
+                        card.style.borderColor = '#dbe3ef';
+                        card.style.boxShadow = '0 10px 24px rgba(15,23,42,.06)';
+                        const orb = card.querySelector('[data-role=product-orb]');
+                        if (orb) orb.style.transform = '';
+                    });
+                    card.addEventListener('click', () => addToCart(product.id));
+
+                    const stock = Number(product.stock || 0);
+                    const hasImage = !!product.img;
+
+                    card.innerHTML = `
+                        <div class="relative px-3 pt-3">
+                            <div class="absolute right-2 top-[2.9rem] z-20 rounded-full border px-1.5 py-0.5 text-[9px] font-bold leading-none ${stock > 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-orange-200 bg-orange-50 text-orange-700'}" style="box-shadow:0 6px 14px rgba(15,23,42,.08);">
+                                Stock: ${stock.toFixed(0)}
+                            </div>
+                            <div data-role="product-orb" class="mx-auto mt-2 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-gradient-to-b from-orange-400 to-orange-500 transition-transform duration-200" style="box-shadow:0 12px 24px rgba(249,115,22,.18);">
+                                ${hasImage
+                                    ? `<img src="${getImageUrl(product.img)}" alt="${product.name || 'Producto'}" class="h-14 w-14 object-cover" onerror="this.onerror=null; this.src='${getImageUrl(null)}'">`
+                                    : `<i class="ri-shopping-bag-3-line text-3xl text-white"></i>`}
+                            </div>
+                        </div>
+                        <div class="px-3 pb-3 pt-2.5">
+                            <h4 class="line-clamp-2 min-h-[40px] text-[14px] font-bold leading-5 text-slate-900">${product.name || 'Sin nombre'}</h4>
+                        </div>
+                    `;
+
+                    productsGrid.appendChild(card);
+                });
+            }
+
+            function renderCartSummary() {
+                const totalProducts = state.cart.length;
+                const totalQuantity = state.cart.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+
+                document.getElementById('entry-total-products').textContent = String(totalProducts);
+                document.getElementById('entry-total-quantity').textContent = String(totalQuantity);
+            }
+
+            function renderCart() {
+                if (!cartContainer) return;
+                if (!state.cart.length) {
+                    cartContainer.innerHTML = '<div class="flex min-h-[240px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-center"><div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-sm"><i class="ri-inbox-line text-3xl"></i></div><p class="mt-4 text-base font-bold text-slate-800">Sin productos en la entrada</p><p class="mt-1 text-sm text-slate-500">Agrega productos desde el catálogo.</p></div>';
+                    renderCartSummary();
+                    return;
+                }
+
+                cartContainer.innerHTML = '';
+                state.cart.forEach((item) => {
+                    const row = document.createElement('div');
+                    row.className = 'mb-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm';
+                    row.innerHTML = `
+                        <div class="flex items-center gap-3 p-2.5">
+                            <img src="${getImageUrl(item.img)}" alt="${item.name || 'Producto'}" class="h-12 w-12 shrink-0 rounded-xl object-cover bg-slate-100" onerror="this.onerror=null; this.src='${getImageUrl(null)}'">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center justify-between gap-3">
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-center justify-between gap-2">
+                                            <h5 class="truncate text-sm font-bold text-slate-900">${item.name || 'Producto'}</h5>
+                                        </div>
+                                        <div class="mt-1">
+                                            <span class="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 text-xs font-semibold text-slate-600">${item.unit || 'Unidad'}</span>
+                                        </div>
+                                    </div>
+                                    <div class="inline-flex shrink-0 items-center rounded-xl border border-slate-200 bg-slate-50">
+                                        <button type="button" class="flex h-8 w-8 items-center justify-center text-slate-700 hover:text-rose-600" data-role="minus"><i class="ri-subtract-line"></i></button>
+                                        <input type="number" min="1" step="1" value="${Math.max(1, Math.floor(Number(item.quantity) || 1))}" class="h-8 w-12 border-x border-slate-200 bg-white text-center text-sm font-bold text-slate-900 outline-none" data-role="qty">
+                                        <button type="button" class="flex h-8 w-8 items-center justify-center text-slate-700 hover:text-orange-600" data-role="plus"><i class="ri-add-line"></i></button>
+                                    </div>
+                                    <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 hover:bg-rose-50" title="Eliminar" data-role="remove">
+                                        <i class="ri-delete-bin-line"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    row.querySelector('[data-role=minus]')?.addEventListener('click', () => updateQuantity(item.id, -1));
+                    row.querySelector('[data-role=plus]')?.addEventListener('click', () => updateQuantity(item.id, 1));
+                    row.querySelector('[data-role=remove]')?.addEventListener('click', () => removeItem(item.id));
+                    row.querySelector('[data-role=qty]')?.addEventListener('change', (event) => setQuantity(item.id, event.target.value));
+                    cartContainer.appendChild(row);
+                });
+
+                renderCartSummary();
+            }
+
+            async function saveEntry() {
+                if (!state.cart.length) {
+                    alert('Agrega al menos un producto.');
+                    return;
+                }
+
+                const payload = {
+                    items: state.cart.map((item) => ({
+                        product_id: Number(item.id),
+                        quantity: Number(item.quantity || 0),
+                        unit_cost: 0,
+                        comment: '',
+                    })),
+                    reason: (document.getElementById('movement-reason')?.value || 'AJUSTE DE ENTRADA').trim(),
+                    comment: (document.getElementById('movement-comment')?.value || '').trim(),
+                    branch_id: branchId,
+                    movement_type: 'ENTRY',
+                };
+
+                const saveButton = document.getElementById('save-entry-button');
+                if (saveButton) {
+                    saveButton.disabled = true;
+                    saveButton.classList.add('opacity-70', 'cursor-not-allowed');
+                }
+
+                try {
+                    const response = await fetch(@json(route('warehouse_movements.store')), {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': @json(csrf_token()),
+                        },
+                        body: JSON.stringify(payload),
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok || !data.success) throw new Error(data.message || 'No se pudo guardar la entrada.');
+                    sessionStorage.setItem('flash_success_message', data.message || 'Entrada guardada correctamente');
+                    window.location.href = viewId
+                        ? `${@json(route('warehouse_movements.index'))}?view_id=${encodeURIComponent(String(viewId))}`
+                        : @json(route('warehouse_movements.index'));
+                } catch (error) {
+                    alert(error.message || 'No se pudo guardar la entrada.');
+                } finally {
+                    if (saveButton) {
+                        saveButton.disabled = false;
+                        saveButton.classList.remove('opacity-70', 'cursor-not-allowed');
+                    }
+                }
+            }
+
+            searchInput?.addEventListener('input', (event) => {
+                state.search = String(event.target.value || '');
+                renderProducts();
+            });
+            document.getElementById('save-entry-button')?.addEventListener('click', saveEntry);
+            document.getElementById('clear-entry-button')?.addEventListener('click', () => {
+                state.cart = [];
+                renderCart();
+            });
+
+            renderCategoryFilters();
+            renderProducts();
+            renderCart();
+        })();
+    </script>
+
+    <style>
+        #warehouse-entry-view input:focus,
+        #warehouse-entry-view select:focus,
+        #warehouse-entry-view textarea:focus {
+            outline: none !important;
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.16) !important;
+            border-color: #f97316 !important;
         }
 
-        setTimeout(function() {
-            const grid = document.getElementById('products-grid');
-            if (grid && filteredProducts.length > 0) {
-                renderProducts();
-            }
-        }, 1000);
-    </script>
+        #warehouse-entry-view input:focus-visible,
+        #warehouse-entry-view select:focus-visible,
+        #warehouse-entry-view textarea:focus-visible {
+            outline: none !important;
+        }
+    </style>
 @endsection
