@@ -157,6 +157,7 @@ class SalesController extends Controller
             ->where('movement_type_id', 2)
             ->orderBy('name')
             ->get(['id', 'name']);
+        $defaultDocumentTypeId = $this->getBranchDefaultSaleDocumentTypeId($branchId, $documentTypes);
 
         $paymentMethods = PaymentMethod::query()
             ->where('status', true)
@@ -190,6 +191,7 @@ class SalesController extends Controller
             'people' => $people,
             'defaultClientId' => $defaultClientId,
             'documentTypes' => $documentTypes,
+            'defaultDocumentTypeId' => $defaultDocumentTypeId,
             'paymentMethods' => $paymentMethods,
             'paymentGateways' => $paymentGateways,
             'cards' => $cards,
@@ -213,6 +215,7 @@ class SalesController extends Controller
             ->orderBy('name')
             ->where('movement_type_id', 2)
             ->get(['id', 'name']);
+        $defaultDocumentTypeId = $this->getBranchDefaultSaleDocumentTypeId($branchId, $documentTypes);
         
         $paymentMethods = PaymentMethod::query()
             ->where('status', true)
@@ -325,6 +328,7 @@ class SalesController extends Controller
         
         return view('sales.charge', [
             'documentTypes' => $documentTypes,
+            'defaultDocumentTypeId' => $defaultDocumentTypeId,
             'paymentMethods' => $paymentMethods,
             'paymentGateways' => $paymentGateways,
             'cards' => $cards,
@@ -1158,6 +1162,31 @@ class SalesController extends Controller
     {
         $taxRate = TaxRate::where('status', true)->orderBy('order_num')->first();
         return $taxRate ? ((float) $taxRate->tax_rate) / 100 : 0.18;
+    }
+
+    private function getBranchDefaultSaleDocumentTypeId(int $branchId, $documentTypes): ?int
+    {
+        if ($branchId <= 0) {
+            return $documentTypes->first()?->id ? (int) $documentTypes->first()->id : null;
+        }
+
+        $configuredValue = DB::table('branch_parameters as bp')
+            ->join('parameters as p', 'p.id', '=', 'bp.parameter_id')
+            ->where('bp.branch_id', $branchId)
+            ->whereNull('bp.deleted_at')
+            ->whereNull('p.deleted_at')
+            ->whereRaw('LOWER(p.description) = ?', ['tipo venta por defecto'])
+            ->value('bp.value');
+
+        if (is_numeric($configuredValue)) {
+            $configuredId = (int) $configuredValue;
+            $existsInSaleDocs = $documentTypes->contains(fn ($d) => (int) $d->id === $configuredId);
+            if ($existsInSaleDocs) {
+                return $configuredId;
+            }
+        }
+
+        return $documentTypes->first()?->id ? (int) $documentTypes->first()->id : null;
     }
 
     /**

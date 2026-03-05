@@ -58,11 +58,18 @@ class SystemConfigController extends Controller
             ->orderBy('id')
             ->get();
 
+        $saleDocumentTypes = DB::table('document_types')
+            ->where('movement_type_id', 2)
+            ->whereNull('deleted_at')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         return view('system_config.index', [
             'title' => 'Configuracion de sistema',
             'categories' => $categories,
             'operaciones' => $operaciones,
             'viewId' => $viewId,
+            'saleDocumentTypes' => $saleDocumentTypes,
         ]);
     }
 
@@ -120,4 +127,3 @@ class SystemConfigController extends Controller
             ->with('status', 'Configuracion actualizada correctamente.');
     }
 }
-

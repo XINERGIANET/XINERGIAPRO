@@ -40,12 +40,26 @@
                                 $currentValue = old("values.{$parameter->id}", $parameter->branch_value ?? $parameter->value);
                                 $normalized = strtolower(trim((string) $currentValue));
                                 $isBoolean = in_array($normalized, ['si', 'no', 'yes', 'no', 'true', 'false', '1', '0'], true);
+                                $isDefaultSaleDocType = str_contains(strtolower((string) $parameter->description), 'tipo venta por defecto');
                                 $type = is_numeric($currentValue) ? 'number' : 'text';
                             @endphp
                             <div class="rounded-xl border border-gray-200 bg-white p-4">
                                 <label class="mb-2 block text-sm font-semibold text-gray-700">{{ $parameter->description }}</label>
 
-                                @if ($isBoolean)
+                                @if ($isDefaultSaleDocType)
+                                    <select
+                                        name="values[{{ $parameter->id }}]"
+                                        class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-700 focus:border-orange-400 focus:outline-none"
+                                    >
+                                        @forelse (($saleDocumentTypes ?? collect()) as $documentType)
+                                            <option value="{{ $documentType->id }}" @selected((string) $currentValue === (string) $documentType->id)>
+                                                {{ $documentType->name }}
+                                            </option>
+                                        @empty
+                                            <option value="">Sin tipos de documento de venta</option>
+                                        @endforelse
+                                    </select>
+                                @elseif ($isBoolean)
                                     <select
                                         name="values[{{ $parameter->id }}]"
                                         class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-700 focus:border-orange-400 focus:outline-none"
@@ -77,4 +91,3 @@
         </form>
     </x-common.component-card>
 @endsection
-

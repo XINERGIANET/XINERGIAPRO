@@ -91,24 +91,27 @@
                     <label class="mb-2 block text-xs font-semibold text-gray-900 dark:text-white">Tipo de Documento</label>
                     <div class="grid grid-cols-3 gap-1.5">
                         @foreach ($documentTypes as $index => $documentType)
+                            @php
+                                $isDefaultDoc = (int) ($defaultDocumentTypeId ?? 0) === (int) $documentType->id;
+                            @endphp
                             <button type="button"
-                                class="doc-type-btn {{ $index === 0 ? 'doc-active' : '' }} w-full rounded-lg border-2 {{ $index === 0 ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50' }} p-2 text-left transition hover:bg-blue-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600"
+                                class="doc-type-btn {{ $isDefaultDoc ? 'doc-active' : '' }} w-full rounded-lg border-2 {{ $isDefaultDoc ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50' }} p-2 text-left transition hover:bg-blue-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600"
                                 data-doc-type="{{ strtolower($documentType->name) }}" data-doc-id="{{ $documentType->id }}">
                                 <div class="flex items-center gap-2">
                                     <i
-                                        class="fas fa-file-alt text-base {{ $index === 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400' }}"></i>
+                                        class="fas fa-file-alt text-base {{ $isDefaultDoc ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400' }}"></i>
                                     <div class="flex-1">
                                         <div class="text-sm font-semibold text-gray-900 dark:text-white">
                                             {{ $documentType->name }}</div>
                                     </div>
                                     <i
-                                        class="fas fa-check-circle text-sm {{ $index === 0 ? 'text-blue-600 dark:text-blue-400' : 'hidden text-blue-600 dark:text-blue-400' }}"></i>
+                                        class="fas fa-check-circle text-sm {{ $isDefaultDoc ? 'text-blue-600 dark:text-blue-400' : 'hidden text-blue-600 dark:text-blue-400' }}"></i>
                                 </div>
                             </button>
                         @endforeach
                     </div>
                     <input type="hidden" id="document-type-id" name="document_type_id"
-                        value="{{ $documentTypes->first()?->id ?? '' }}">
+                        value="{{ $defaultDocumentTypeId ?? $documentTypes->first()?->id ?? '' }}">
                 </div>
 
                 {{-- Métodos de Pago Múltiples --}}

@@ -128,7 +128,7 @@
                                                 class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
                                             >
                                                 @foreach ($documentTypes ?? [] as $documentType)
-                                                    <option value="{{ $documentType->id }}">{{ $documentType->name }}</option>
+                                                    <option value="{{ $documentType->id }}" @selected((int) ($defaultDocumentTypeId ?? 0) === (int) $documentType->id)>{{ $documentType->name }}</option>
                                                 @endforeach
                                             </select>
                                         </div>
