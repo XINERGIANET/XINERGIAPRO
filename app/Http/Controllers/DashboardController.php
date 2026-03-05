@@ -2,115 +2,113 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Appointment;
+use App\Models\Branch;
+use App\Models\WorkshopMovement;
+use App\Models\WorkshopMovementDetail;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $branchId = (int) $request->session()->get('branch_id');
+        if ($branchId <= 0) {
+            $branchId = (int) (optional($request->user())->person->branch_id ?? 0);
+        }
+        $companyId = (int) Branch::query()->where('id', $branchId)->value('company_id');
         $now = now();
-        $startOfYear = $now->copy()->startOfYear();
-        $endOfYear = $now->copy()->endOfYear();
 
-        // 1. Customers Count
-        $customersCount = \App\Models\Person::count();
+        $baseQuery = WorkshopMovement::query()
+            ->when($companyId > 0, fn ($q) => $q->where('company_id', $companyId))
+            ->when($branchId > 0, fn ($q) => $q->where('branch_id', $branchId));
 
-        // 2. Orders Metrics (Current Month vs Previous Month)
-        $currentMonthOrders = \App\Models\OrderMovement::whereMonth('created_at', $now->month)
-            ->whereYear('created_at', $now->year)
+        $activeStatuses = ['draft', 'diagnosis', 'awaiting_approval', 'approved', 'in_progress'];
+        $closedStatuses = ['finished', 'delivered'];
+        $cancelledStatuses = ['cancelled'];
+
+        $ordersActive = (clone $baseQuery)->whereIn('status', $activeStatuses)->count();
+        $ordersClosedToday = (clone $baseQuery)
+            ->whereIn('status', $closedStatuses)
+            ->where(function ($query) use ($now) {
+                $query->whereDate('finished_at', $now->toDateString())
+                    ->orWhere(function ($inner) use ($now) {
+                        $inner->whereNull('finished_at')
+                            ->whereDate('updated_at', $now->toDateString());
+                    });
+            })
             ->count();
-        
-        $prevMonthOrders = \App\Models\OrderMovement::whereMonth('created_at', $now->copy()->subMonth()->month)
-            ->whereYear('created_at', $now->copy()->subMonth()->year)
+        $ordersPendingApproval = (clone $baseQuery)->where('status', 'awaiting_approval')->count();
+        $vehiclesInWorkshop = (clone $baseQuery)->whereNotIn('status', array_merge($closedStatuses, $cancelledStatuses))->count();
+
+        $todayInvoiced = (clone $baseQuery)
+            ->whereDate('updated_at', $now->toDateString())
+            ->sum('paid_total');
+        $pendingCollection = (clone $baseQuery)->get(['total', 'paid_total'])->sum(function ($row) {
+            return max(0, (float) $row->total - (float) $row->paid_total);
+        });
+
+        $appointmentsToday = Appointment::query()
+            ->when($companyId > 0, fn ($q) => $q->where('company_id', $companyId))
+            ->when($branchId > 0, fn ($q) => $q->where('branch_id', $branchId))
+            ->whereDate('start_at', $now->toDateString())
             ->count();
 
-        $ordersDiff = 0;
-        if ($prevMonthOrders > 0) {
-            $ordersDiff = (($currentMonthOrders - $prevMonthOrders) / $prevMonthOrders) * 100;
-        } elseif ($currentMonthOrders > 0) {
-            $ordersDiff = 100;
-        }
-
-        // 3. Monthly Sales (Current Year)
-        $salesByMonth = \App\Models\SalesMovement::selectRaw('EXTRACT(MONTH FROM created_at) as month, SUM(total) as total')
-            ->whereYear('created_at', $now->year)
-            ->groupBy('month')
-            ->get()
-            ->pluck('total', 'month')
+        $statusBreakdown = (clone $baseQuery)
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status')
             ->toArray();
 
-        $monthlySalesData = [];
-        for ($i = 1; $i <= 12; $i++) {
-            $monthlySalesData[] = (float) ($salesByMonth[$i] ?? 0);
-        }
-
-        // 4. Statistics Trend (Sales and Revenue/Subtotal)
-        $subtotalByMonth = \App\Models\SalesMovement::selectRaw('EXTRACT(MONTH FROM created_at) as month, SUM(subtotal) as subtotal')
-            ->whereYear('created_at', $now->year)
-            ->groupBy('month')
-            ->get()
-            ->pluck('subtotal', 'month')
-            ->toArray();
-
-        $monthlySubtotalData = [];
-        for ($i = 1; $i <= 12; $i++) {
-            $monthlySubtotalData[] = (float) ($subtotalByMonth[$i] ?? 0);
-        }
-
-        // 5. Recent Orders
-        $recentOrders = \App\Models\OrderMovementDetail::with(['product.category', 'orderMovement'])
-            ->latest()
+        $monthStart = $now->copy()->startOfMonth();
+        $topServices = WorkshopMovementDetail::query()
+            ->join('workshop_movements as wm', 'wm.id', '=', 'workshop_movement_details.workshop_movement_id')
+            ->leftJoin('workshop_services as ws', 'ws.id', '=', 'workshop_movement_details.service_id')
+            ->whereIn('workshop_movement_details.line_type', ['SERVICE', 'SERVCE'])
+            ->whereDate('wm.created_at', '>=', $monthStart->toDateString())
+            ->when($companyId > 0, fn ($q) => $q->where('wm.company_id', $companyId))
+            ->when($branchId > 0, fn ($q) => $q->where('wm.branch_id', $branchId))
+            ->groupBy('ws.name', 'workshop_movement_details.description')
+            ->orderByRaw('COUNT(*) DESC')
             ->limit(5)
-            ->get()
-            ->map(function ($detail) {
-                return [
-                    'name' => $detail->description ?: ($detail->product->description ?? 'Producto'),
-                    'variants' => $detail->product ? $detail->product->productBranches()->count() : 0,
-                    'image' => ($detail->product && $detail->product->image) ? asset('storage/' . $detail->product->image) : '/images/product/product-01.jpg',
-                    'category' => $detail->product->category->description ?? 'General',
-                    'price' => 'S/' . number_format($detail->amount, 2),
-                    'status' => $detail->status ?: 'Entregado', // Fallback status
-                ];
-            });
+            ->get([
+                DB::raw("COALESCE(ws.name, workshop_movement_details.description, 'Servicio') as name"),
+                DB::raw('COUNT(*) as qty'),
+                DB::raw('SUM(workshop_movement_details.total) as amount'),
+            ]);
 
-        // 6. Table Occupancy
-        $totalTables = \App\Models\Table::count();
-        $occupiedTables = \App\Models\Table::whereIn('situation', ['OCUPADA', 'ocupada', 'PENDIENTE', 'Pendiente'])->count();
-        $occupancyRate = $totalTables > 0 ? ($occupiedTables / $totalTables) * 100 : 0;
+        $days = collect(range(6, 0))->map(fn ($offset) => $now->copy()->subDays($offset));
+        $incomeByDay = [];
+        foreach ($days as $day) {
+            $incomeByDay[] = [
+                'label' => $day->format('d/m'),
+                'amount' => (float) (clone $baseQuery)
+                    ->whereDate('updated_at', $day->toDateString())
+                    ->sum('paid_total'),
+            ];
+        }
 
-        // 7. Financial Balance (Income vs Expenses)
-        $monthlyIncome = \App\Models\CashMovements::whereMonth('created_at', $now->month)
-            ->whereYear('created_at', $now->year)
-            ->whereHas('paymentConcept', function ($q) {
-                $q->where('type', 'I');
-            })->sum('total');
-
-        $monthlyExpense = \App\Models\CashMovements::whereMonth('created_at', $now->month)
-            ->whereYear('created_at', $now->year)
-            ->whereHas('paymentConcept', function ($q) {
-                $q->where('type', 'E');
-            })->sum('total');
-
-        $netBalance = $monthlyIncome - $monthlyExpense;
+        $recentOrders = (clone $baseQuery)
+            ->with(['movement:id,number,moved_at', 'vehicle:id,brand,model,plate', 'client:id,first_name,last_name,document_number'])
+            ->latest('id')
+            ->limit(6)
+            ->get();
 
         $dashboardData = [
-            'customersCount' => number_format($customersCount),
-            'ordersCount' => number_format($currentMonthOrders),
-            'ordersDiff' => number_format($ordersDiff, 2),
-            'ordersTrend' => $ordersDiff >= 0 ? 'up' : 'down',
-            'monthlySales' => $monthlySalesData,
-            'monthlySubtotal' => $monthlySubtotalData,
+            'branchName' => (string) (Branch::query()->where('id', $branchId)->value('legal_name') ?? 'Sucursal actual'),
+            'ordersActive' => $ordersActive,
+            'ordersClosedToday' => $ordersClosedToday,
+            'ordersPendingApproval' => $ordersPendingApproval,
+            'vehiclesInWorkshop' => $vehiclesInWorkshop,
+            'appointmentsToday' => $appointmentsToday,
+            'todayInvoiced' => (float) $todayInvoiced,
+            'pendingCollection' => (float) $pendingCollection,
+            'statusBreakdown' => $statusBreakdown,
+            'topServices' => $topServices,
+            'incomeByDay' => $incomeByDay,
             'recentOrders' => $recentOrders,
-            'occupancyData' => [
-                'total' => $totalTables,
-                'occupied' => $occupiedTables,
-                'rate' => round($occupancyRate, 2),
-            ],
-            'financialData' => [
-                'income' => (float) $monthlyIncome,
-                'expense' => (float) $monthlyExpense,
-                'balance' => (float) $netBalance,
-            ],
         ];
 
         return view('pages.dashboard.ecommerce', compact('dashboardData'));
