@@ -18,7 +18,7 @@
             </div>
 
             {{-- Buscador Principal --}}
-            <div class="relative flex-1 min-w-[300px]">
+            <div class="relative flex-1 min-w-0 sm:min-w-[300px]">
                 <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
                     <i class="ri-search-line text-lg text-gray-400"></i>
                 </div>
@@ -56,7 +56,7 @@
             <div class="mb-4 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-700">{{ session('status') }}</div>
         @endif
 
-        <div class="overflow-x-auto overflow-y-hidden mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+        <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
             <table class="w-full min-w-[1100px]">
                 <thead>
                     <tr>

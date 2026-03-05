@@ -129,7 +129,7 @@
 
 
         {{-- Tabla de movimientos --}}
-        <div id="kardex-summary" class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] overflow-x-auto">
+        <div id="kardex-summary" class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
             <table id="kardex-table" class="w-full min-w-[1500px]">
                     <thead>
                         <tr class="text-white text-center" style="background-color: #334155;">

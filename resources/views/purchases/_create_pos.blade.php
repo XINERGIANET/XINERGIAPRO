@@ -292,6 +292,15 @@
 <style>
     #purchases-create-view input:focus,#purchases-create-view select:focus,#purchases-create-view textarea:focus{outline:none!important;box-shadow:0 0 0 3px rgba(249,115,22,.16)!important;border-color:#f97316!important}
     #purchases-create-view input:focus-visible,#purchases-create-view select:focus-visible,#purchases-create-view textarea:focus-visible{outline:none!important}
+    @media (max-width:1279px){
+        #purchases-create-view .flex.items-start.gap-6[style*="display:flex"]{flex-direction:column!important;gap:1rem!important}
+        #purchases-create-view .flex.items-start.gap-6[style*="display:flex"]>section,
+        #purchases-create-view .flex.items-start.gap-6[style*="display:flex"]>aside{flex:0 0 100%!important;max-width:100%!important;width:100%!important}
+        #purchases-create-view aside .sticky{position:static!important;top:auto!important}
+    }
+    @media (max-width:767px){
+        #purchases-create-view .grid.grid-cols-2.gap-3.lg\:grid-cols-3.xl\:grid-cols-4.2xl\:grid-cols-5{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:.65rem!important}
+    }
 </style>
 
 @once

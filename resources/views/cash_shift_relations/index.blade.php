@@ -52,7 +52,7 @@
             </div>
         </form>
 
-        <div class="mt-4 overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white">
             <table class="w-full min-w-[1400px]">
                 <thead>
                     <tr class="border-b border-gray-100">

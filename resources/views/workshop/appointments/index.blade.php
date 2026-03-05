@@ -89,7 +89,7 @@
         <div class="grid grid-cols-1 gap-6">
             <!-- Table View -->
             <div x-show="view === 'table'" x-transition x-cloak class="space-y-4">
-                <div class="overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] shadow-sm">
+                <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] shadow-sm">
                     <table class="w-full">
                         <thead>
                             <tr class="bg-brand-500">

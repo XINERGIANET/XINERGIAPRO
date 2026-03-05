@@ -138,9 +138,9 @@
             {{ $pageTitle }}
         </h2>
     </div>
-    <nav>
+    <nav class="max-w-full">
         @if (!empty($crumbList))
-            <ol class="flex items-center gap-1.5">
+            <ol class="flex flex-wrap items-center justify-end gap-1.5">
                 <li>
                     <a
                         class="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400"
@@ -172,7 +172,7 @@
                         $url = $crumb['url'] ?? $crumb['href'] ?? null;
                         $url = $appendViewId($url);
                     @endphp
-                    <li class="text-sm {{ $isLast ? 'text-gray-800 dark:text-white/90' : 'text-gray-500 dark:text-gray-400' }}">
+                    <li class="text-sm break-words {{ $isLast ? 'text-gray-800 dark:text-white/90' : 'text-gray-500 dark:text-gray-400' }}">
                         @if (!$isLast && $url)
                             <a class="inline-flex items-center gap-1.5" href="{{ $url }}">
                                 {{ $label }}
@@ -200,7 +200,7 @@
                 @endforeach
             </ol>
         @else
-            <ol class="flex items-center gap-1.5">
+            <ol class="flex flex-wrap items-center justify-end gap-1.5">
                 <li>
                     <a
                         class="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400"

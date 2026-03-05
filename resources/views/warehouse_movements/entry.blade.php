@@ -470,5 +470,35 @@
         #warehouse-entry-view textarea:focus-visible {
             outline: none !important;
         }
+
+        @media (max-width: 1279px) {
+            #warehouse-entry-view .flex.items-start.gap-6[style*="display:flex"] {
+                flex-direction: column !important;
+                gap: 1rem !important;
+            }
+
+            #warehouse-entry-view .flex.items-start.gap-6[style*="display:flex"] > section,
+            #warehouse-entry-view .flex.items-start.gap-6[style*="display:flex"] > aside {
+                flex: 0 0 100% !important;
+                max-width: 100% !important;
+                width: 100% !important;
+            }
+
+            #warehouse-entry-view aside .sticky {
+                position: static !important;
+                top: auto !important;
+            }
+        }
+
+        @media (max-width: 767px) {
+            #warehouse-entry-view #products-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 0.65rem !important;
+            }
+
+            #warehouse-entry-view #entry-cart-container {
+                max-height: 42vh !important;
+            }
+        }
     </style>
 @endsection

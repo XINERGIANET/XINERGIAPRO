@@ -35,7 +35,7 @@
         </nav>
     </div>
 
-    <div class="flex items-start w-full bg-slate-100 fade-in min-h-screen" style="--brand:#3B82F6;">
+    <div class="wm-output-layout flex items-start w-full bg-slate-100 fade-in min-h-screen" style="--brand:#3B82F6;">
         
         <main class="flex-1 flex flex-col min-w-0">
             <header class="h-20 px-6 flex items-center justify-between bg-white border-b border-gray-200 shadow-sm z-10">
@@ -117,6 +117,25 @@
             </div>
         </aside>
     </div>
+
+    <style>
+        @media (max-width: 1279px) {
+            .wm-output-layout {
+                flex-direction: column !important;
+            }
+
+            .wm-output-layout > main,
+            .wm-output-layout > aside {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+
+            .wm-output-layout > aside {
+                position: static !important;
+                height: auto !important;
+            }
+        }
+    </style>
 
     <script>
         const productsData = @json($productsMapped ?? []);
@@ -372,4 +391,3 @@
         }
     </script>
 @endsection
-

@@ -8,6 +8,55 @@
   display: none !important;
 }
 
+/* Global responsive foundation for operational pages */
+@media (max-width: 1279px) {
+  main {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+
+  .table-responsive {
+    -webkit-overflow-scrolling: touch;
+    overflow-x: auto !important;
+  }
+
+  .table-responsive table {
+    min-width: 980px;
+  }
+
+  .sticky-left,
+  .sticky-left-header {
+    position: static !important;
+    left: auto !important;
+  }
+
+  .modal {
+    padding: 0.75rem !important;
+  }
+
+  .modal > .relative {
+    max-height: calc(100vh - 1.5rem) !important;
+    border-radius: 1rem !important;
+  }
+}
+
+@media (max-width: 767px) {
+  main {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+
+  .table-responsive table {
+    min-width: 860px;
+  }
+
+  .swal2-popup.swal2-toast {
+    left: 0.75rem !important;
+    bottom: 0.75rem !important;
+    width: calc(100vw - 1.5rem) !important;
+  }
+}
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../**/*.blade.php';

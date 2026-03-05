@@ -57,7 +57,7 @@
             </button>
 
             @if ($branchName)
-                <h1 class="ml-2 inline-flex items-center text-lg font-bold text-white tracking-tight">
+                <h1 class="ml-2 inline-flex max-w-[140px] items-center truncate text-lg font-bold text-white tracking-tight sm:max-w-[220px]">
                     {{ $branchName }}
                 </h1>
             @endif

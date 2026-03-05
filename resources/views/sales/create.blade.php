@@ -225,6 +225,55 @@
         #sales-create-view textarea:focus-visible {
             outline: none !important;
         }
+
+        @media (max-width: 1279px) {
+            #sales-create-view .flex.items-start.gap-6[style*="display:flex"] {
+                flex-direction: column !important;
+                gap: 1rem !important;
+            }
+
+            #sales-create-view .flex.items-start.gap-6[style*="display:flex"] > section,
+            #sales-create-view .flex.items-start.gap-6[style*="display:flex"] > aside {
+                flex: 0 0 100% !important;
+                max-width: 100% !important;
+                width: 100% !important;
+            }
+
+            #sales-create-view aside .sticky {
+                position: static !important;
+                top: auto !important;
+            }
+        }
+
+        @media (max-width: 767px) {
+            #sales-create-view #products-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 0.65rem !important;
+            }
+
+            #sales-create-view #cart-container {
+                max-height: 42vh !important;
+            }
+
+            #stock-error-notification,
+            #add-to-cart-notification {
+                right: 0.75rem !important;
+                left: 0.75rem !important;
+                top: auto !important;
+                bottom: 0.75rem !important;
+                transform: translateY(140%) !important;
+            }
+
+            #stock-error-notification .min-w-\[320px\],
+            #add-to-cart-notification .min-w-\[320px\] {
+                min-width: auto !important;
+                width: 100% !important;
+            }
+
+            .notification-show {
+                transform: translateY(0) !important;
+            }
+        }
     </style>
 
     <script>
