@@ -159,7 +159,18 @@
                     @if ($viewId)
                         <input type="hidden" name="view_id" value="{{ $viewId }}">
                     @endif
-                    <div class="w-full flex-1 relative">
+                    <div class="w-full sm:w-24">
+                        <select
+                            name="per_page"
+                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                            onchange="this.form.submit()"
+                        >
+                            @foreach ([10, 20, 50, 100] as $size)
+                                <option value="{{ $size }}" @selected(($perPage ?? 10) == $size)>{{ $size }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="relative flex-1">
                         <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                             {!! $SearchIcon !!}
                         </span>
@@ -302,22 +313,10 @@
             </div>
 
             <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <form method="GET" class="flex items-center gap-2 text-sm text-gray-600">
-                    @if ($viewId)
-                        <input type="hidden" name="view_id" value="{{ $viewId }}">
-                    @endif
-                    @if (request('search'))
-                        <input type="hidden" name="search" value="{{ request('search') }}">
-                    @endif
-                    <input type="hidden" name="cash_register_id" value="{{ $selectedBoxId }}">
-                    <span>Registros por pagina:</span>
-                    <select name="per_page" onchange="this.form.submit()"
-                        class="h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
-                        @foreach ([10, 20, 50, 100] as $size)
-                            <option value="{{ $size }}" @selected(($perPage ?? 10) == $size)>{{ $size }}</option>
-                        @endforeach
-                    </select>
-                </form>
+                <div class="flex items-center gap-2 text-sm text-gray-500">
+                    <span>Total registros</span>
+                    <x-ui.badge size="sm" variant="light" color="info">{{ $movements->total() }}</x-ui.badge>
+                </div>
                 <div class="flex items-center gap-2 text-sm text-gray-500">
                     <span>Efectivo en caja</span>
                     <x-ui.badge size="sm" variant="light" color="success">S/ {{ number_format((float) ($cashEfectivoTotal ?? 0), 2) }}</x-ui.badge>
