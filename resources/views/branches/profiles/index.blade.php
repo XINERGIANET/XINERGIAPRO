@@ -141,14 +141,14 @@
                     @if ($requestIcon)
                         <input type="hidden" name="icon" value="{{ $requestIcon }}">
                     @endif
-                    <div class="w-29">
+                    <div class="w-36 flex-none">
                         <select
                             name="per_page"
-                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                             onchange="this.form.submit()"
                         >
                             @foreach ([10, 20, 50, 100] as $size)
-                                <option value="{{ $size }}" @selected($perPage == $size)>{{ $size }} / pagina</option>
+                                <option value="{{ $size }}" @selected($perPage == $size)>{{ $size }} / página</option>
                             @endforeach
                         </select>
                     </div>
@@ -165,7 +165,7 @@
                         />
                     </div>
                     <div class="flex flex-wrap gap-2">
-                        <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 px-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #244BB3; border-color: #244BB3;">
+                        <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 px-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #334155; border-color: #334155;">
                             <i class="ri-search-line text-gray-100"></i>
                             <span class="font-medium text-gray-100">Buscar</span>
                         </x-ui.button>
@@ -254,9 +254,9 @@
                                             @if ($isDelete)
                                                 <form method="POST" action="{{ $actionUrl }}"
                                                     class="relative group js-swal-delete"
-                                                    data-swal-title="¿Eliminar perfil?"
+                                                    data-swal-title="Â¿Eliminar perfil?"
                                                     data-swal-text="Se eliminara {{ $profile->name }}. Esta accion no se puede deshacer."
-                                                    data-swal-confirm="Sí, eliminar"
+                                                    data-swal-confirm="SÃ­, eliminar"
                                                     data-swal-cancel="Cancelar"
                                                     data-swal-confirm-color="#ef4444"
                                                     data-swal-cancel-color="#6b7280">
@@ -337,3 +337,5 @@
         </x-common.component-card>
     </div>
 @endsection
+
+

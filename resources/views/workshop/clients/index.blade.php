@@ -16,7 +16,7 @@
         <form method="GET" action="{{ route('workshop.clients.index') }}" class="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-white/[0.02]">
             {{-- Selector de Registros --}}
             <div class="flex items-center gap-2">
-                <select name="per_page" class="h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="this.form.submit()">
+                <select name="per_page" class="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="this.form.submit()">
                     <option value="10" @selected(($per_page ?? 10) == 10)>10 / pág</option>
                     <option value="25" @selected(($per_page ?? 10) == 25)>25 / pág</option>
                     <option value="50" @selected(($per_page ?? 10) == 50)>50 / pág</option>
@@ -39,7 +39,7 @@
 
             {{-- Filtros Extra (Opcional, se mantienen para no perder funcionalidad) --}}
             <div class="flex items-center gap-2">
-                <select name="type" class="h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                <select name="type" class="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
                     <option value="">Tipo: Todos</option>
                     <option value="NATURAL" @selected($type === 'NATURAL')>Natural</option>
                     <option value="CORPORATIVO" @selected($type === 'CORPORATIVO')>Corporativo</option>
@@ -48,7 +48,7 @@
 
             {{-- Acciones del Formulario --}}
             <div class="flex items-center gap-2">
-                <button type="submit" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#244BB3] px-6 text-sm font-bold text-white shadow-lg shadow-blue-100 transition-all hover:brightness-110 active:scale-95">
+                <button type="submit" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#334155] px-6 text-sm font-bold text-white shadow-lg shadow-blue-100 transition-all hover:brightness-110 active:scale-95">
                     <i class="ri-search-line"></i>
                     <span>Buscar</span>
                 </button>
@@ -170,7 +170,7 @@
             </table>
         </div>
 
-        {{-- PAGINACIÓN INFERIOR --}}
+        {{-- PAGINACIÃ“N INFERIOR --}}
         <div class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="text-sm text-gray-500 dark:text-gray-400">
                 Mostrando
@@ -240,7 +240,7 @@
                             <button
                                 type="button"
                                 onclick="fetchReniecForClientEdit(this)"
-                                class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-[#244BB3] px-4 text-sm font-medium text-white hover:bg-[#1f3f98] disabled:opacity-60"
+                                class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-[#334155] px-4 text-sm font-medium text-white hover:bg-[#1f3f98] disabled:opacity-60"
                             >
                                 <i class="ri-search-line"></i>
                                 <span class="ml-1">Buscar</span>
@@ -347,3 +347,5 @@ async function fetchReniecForClientEdit(button) {
 }
 </script>
 @endsection
+
+

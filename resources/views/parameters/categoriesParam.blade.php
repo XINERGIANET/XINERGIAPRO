@@ -78,7 +78,7 @@
                     <select
                         name="per_page"
                         onchange="this.form.submit()"
-                        class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 rounded-lg border border-gray-300 bg-transparent px-3 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                     >
                         @foreach ($allowedPerPage as $size)
                             <option value="{{ $size }}" @selected($perPage == $size)>{{ $size }} / página</option>
@@ -92,7 +92,7 @@
                         class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-12 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 px-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #244BB3; border-color: #244BB3;">
+                    <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 px-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #334155; border-color: #334155;">
                         <i class="ri-search-line text-gray-100"></i>
                         <span class="font-medium text-gray-100">Buscar</span>
                     </x-ui.button>
@@ -259,7 +259,7 @@
                 </div>
             </div>
         @endif
-        {{-- PAGINACIÓN INFERIOR --}}
+        {{-- PAGINACIÃ“N INFERIOR --}}
         <div class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="text-sm text-gray-500 dark:text-gray-400">
                 Mostrando
@@ -373,3 +373,5 @@
         </div>
     </x-ui.modal>
 @endsection
+
+

@@ -696,7 +696,7 @@
                             type="button"
                             @click="fetchReniecQuickClient()"
                             :disabled="creatingClientLoading"
-                            class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-[#244BB3] px-4 text-sm font-medium text-white hover:bg-[#1f3f98] disabled:opacity-60"
+                            class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-[#334155] px-4 text-sm font-medium text-white hover:bg-[#1f3f98] disabled:opacity-60"
                         >
                             <i class="ri-search-line"></i>
                             <span class="ml-1">Buscar</span>
@@ -770,3 +770,4 @@
     </x-ui.modal>
 </div>
 @endsection
+
