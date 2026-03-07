@@ -126,32 +126,32 @@
                 </div>
             </div>
 
-            <div x-data="{ openRow: null }" class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-                <table class="w-full min-w-[1100px]">
+            <div x-data="{ openRow: null }" class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+                <table class="w-full">
                     <thead>
                         <tr class="text-white">
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6 first:rounded-tl-xl sticky-left-header">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6 first:rounded-tl-xl sticky-left-header">
                                 <p class="font-semibold text-white text-theme-xs uppercase">ID</p>
                             </th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Comprobante</p>
                             </th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class= "px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class= "px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Subtotal</p>
                             </th>
-                            <th  style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6">
+                            <th  style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">IGV</p>
                             </th>
-                            <th  style="background-color: #334155; color: #FFFFFF;"  class="px-5 py-3 text-left sm:px-6">
+                            <th  style="background-color: #334155; color: #FFFFFF;"  class="px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Total</p>
                             </th>
-                            <th  style="background-color: #334155; color: #FFFFFF;"  class="px-5 py-3 text-left sm:px-6">
+                            <th  style="background-color: #334155; color: #FFFFFF;"  class="px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Persona</p>
                             </th>
-                            <th  style="background-color: #334155; color: #FFFFFF;"  class="px-5 py-3 text-left sm:px-6">
-                                <p class="font-semibold text-white text-theme-xs uppercase">Situación</p>
+                            <th  style="background-color: #334155; color: #FFFFFF;"  class="px-5 py-3 text-center sm:px-6">
+                                <p class="font-semibold text-white text-theme-xs uppercase">Estado</p>
                             </th>
-                            <th  style="background-color: #334155; color: #FFFFFF;"  class="px-5 py-3 text-right sm:px-6 last:rounded-tr-xl">
+                            <th  style="background-color: #334155; color: #FFFFFF;"  class="px-5 py-3 text-center sm:px-6 last:rounded-tr-xl">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Acciones</p>
                             </th>
                         </tr>
@@ -163,8 +163,8 @@
                                 onmouseenter="this.querySelector('.sticky-left')?.style.setProperty('background-color', '#f9fafb', 'important')"
                                 onmouseleave="this.querySelector('.sticky-left')?.style.setProperty('background-color', '#ffffff', 'important')"
                             >
-                                <td class="px-4 py-4 sm:px-6 sticky-left group-hover/row:bg-gray-50 dark:group-hover/row:bg-white/5">
-                                    <div class="flex items-center gap-2">
+                                <td class="px-5 py-3 text-center sticky-left group-hover/row:bg-gray-50 dark:group-hover/row:bg-white/5">
+                                    <div class="flex items-center justify-center gap-2">
                                         <button type="button"
                                             @click="openRow === {{ $sale->id }} ? openRow = null : openRow = {{ $sale->id }}"
                                             class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-white transition hover:bg-brand-600">
@@ -174,8 +174,8 @@
                                         <p class="font-bold text-gray-800 text-theme-sm dark:text-white/90">#{{ $sale->id }}</p>
                                     </div>
                                 </td>
-                                <td class="px-5 py-4 sm:px-6">
-                                    <div>
+                                <td class="px-5 py-4 sm:px-6 text-center">
+                                    <div class="flex flex-col items-center">
                                         <p class="font-bold text-gray-800 text-theme-sm dark:text-white/90">
                                             {{ strtoupper(substr($sale->documentType->name, 0, 1)) }}{{ $sale->salesMovement->series }}-{{ $sale->number }}
                                         </p>
@@ -184,21 +184,21 @@
                                         </p>
                                     </div>
                                 </td>
-                                <td class="px-5 py-4 sm:px-6">
+                                <td class="px-5 py-4 sm:px-6 text-center">
                                     <p class="text-gray-800 text-theme-sm dark:text-white/90">S/ {{ number_format((float) ($sale->salesMovement?->subtotal ?? 0), 2) }}</p>
                                 </td>
-                                <td class="px-5 py-4 sm:px-6">
+                                <td class="px-5 py-4 sm:px-6 text-center">
                                     <p class="text-gray-800 text-theme-sm dark:text-white/90">S/ {{ number_format((float) ($sale->salesMovement?->tax ?? 0), 2) }}</p>
                                 </td>
-                                <td class="px-5 py-4 sm:px-6">
+                                <td class="px-5 py-4 sm:px-6 text-center">
                                     <p class="font-bold text-brand-600 text-theme-sm dark:text-brand-400">S/ {{ number_format((float) ($sale->salesMovement?->total ?? 0), 2) }}</p>
                                 </td>
-                                <td class="px-5 py-4 sm:px-6">
-                                    <p class="text-gray-800 text-theme-sm dark:text-white/90 truncate max-w-[150px]" title="{{ $sale->person_name ?? 'PÃºblico General' }}">
+                                <td class="px-5 py-4 sm:px-6 text-center">
+                                    <p class="text-gray-800 text-theme-sm dark:text-white/90 truncate max-w-[150px] mx-auto" title="{{ $sale->person_name ?? 'PÃºblico General' }}">
                                         {{ $sale->person_name ?? 'PÃºblico General' }}
                                     </p>
                                 </td>
-                                <td class="px-5 py-4 sm:px-6">
+                                <td class="px-5 py-4 sm:px-6 text-center">
                                     @php
                                         $status = $sale->status ?? 'A';
                                         $badgeColor = 'success';
@@ -211,12 +211,14 @@
                                             $badgeText = 'Inactivo';
                                         }
                                     @endphp
-                                    <x-ui.badge variant="light" color="{{ $badgeColor }}">
-                                        {{ $badgeText }}
+                                    <div class="flex justify-center">
+                                        <x-ui.badge variant="light" color="{{ $badgeColor }}">
+                                            {{ $badgeText }}
                                         </x-ui.badge>
+                                    </div>
                                 </td>
-                                <td class="px-5 py-4 sm:px-6">
-                                    <div class="flex items-center justify-end gap-2">
+                                <td class="px-5 py-4 sm:px-6 text-center">
+                                    <div class="flex items-center justify-center gap-2">
                                         @if ($rowOperations->isNotEmpty())
                                             @foreach ($rowOperations as $operation)
                                                 @php
@@ -506,8 +508,8 @@
                     de
                     <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $sales->total() }}</span>
                 </div>
-                <div>
-                    {{ $sales->links() }}
+                <div class="flex-none pagination-simple">
+                    {{ $sales->links('vendor.pagination.forced') }}
                 </div>
             </div>
         </x-common.component-card>
