@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('content')
 <div x-data="{}">
@@ -9,19 +9,19 @@
         <form method="GET" action="{{ route('workshop.purchases.index') }}" class="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-white/[0.02]">
             {{-- Selector de Registros --}}
             <div class="flex items-center gap-2">
-                <select name="per_page" class="h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="this.form.submit()">
-                    <option value="10" @selected(($perPage ?? 10) == 10)>10 / pág</option>
-                    <option value="25" @selected(($perPage ?? 10) == 25)>25 / pág</option>
-                    <option value="50" @selected(($perPage ?? 10) == 50)>50 / pág</option>
-                    <option value="100" @selected(($perPage ?? 10) == 100)>100 / pág</option>
+                <select name="per_page" class="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="this.form.submit()">
+                    <option value="10" @selected(($perPage ?? 10) == 10)>10 / pÃ¡g</option>
+                    <option value="25" @selected(($perPage ?? 10) == 25)>25 / pÃ¡g</option>
+                    <option value="50" @selected(($perPage ?? 10) == 50)>50 / pÃ¡g</option>
+                    <option value="100" @selected(($perPage ?? 10) == 100)>100 / pÃ¡g</option>
                 </select>
             </div>
 
             {{-- Filtros Secundarios --}}
             <div class="flex flex-wrap items-center gap-2">
-                <input type="month" name="month" value="{{ $month }}" class="h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                <input type="month" name="month" value="{{ $month }}" class="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
                 
-                <select name="supplier_id" class="h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                <select name="supplier_id" class="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
                     <option value="">Proveedor (Todos)</option>
                     @foreach($suppliers as $supplier)
                         <option value="{{ $supplier->id }}" @selected($supplierId === (int)$supplier->id)>
@@ -30,14 +30,14 @@
                     @endforeach
                 </select>
 
-                <select name="document_kind" class="h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                <select name="document_kind" class="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
                     <option value="">Tipo doc (Todos)</option>
                     @foreach(['FACTURA','BOLETA','RECIBO'] as $kind)
                         <option value="{{ $kind }}" @selected($documentKind === $kind)>{{ $kind }}</option>
                     @endforeach
                 </select>
 
-                <select name="branch_id" class="h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500" @disabled(!$isAdmin)>
+                <select name="branch_id" class="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500" @disabled(!$isAdmin)>
                     @foreach($branches as $branch)
                         <option value="{{ $branch->id }}" @selected($scopeBranchId === (int)$branch->id)>
                             {{ $branch->code }} - {{ $branch->name }}
@@ -57,7 +57,7 @@
                 </a>
             </div>
 
-            {{-- Botones de Acción (Al final a la derecha) --}}
+            {{-- Botones de AcciÃ³n (Al final a la derecha) --}}
             <div class="ml-auto flex gap-2">
                 <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.reports.export.purchases', ['month' => $month, 'supplier_id' => $supplierId ?: null, 'document_kind' => $documentKind ?: null, 'branch_id' => $scopeBranchId]) }}" class="!h-11 rounded-2xl px-6 font-bold shadow-lg transition-all hover:scale-[1.02]" style="background-color:#166534;color:#fff">
                     <i class="ri-file-excel-2-line"></i><span>Exportar</span>
@@ -229,7 +229,7 @@
             </table>
         </div>
 
-        {{-- PAGINACIÓN INFERIOR --}}
+        {{-- PAGINACIÃ“N INFERIOR --}}
         <div class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="text-sm text-gray-500 dark:text-gray-400">
                 Mostrando
@@ -246,3 +246,4 @@
     </x-common.component-card>
 </div>
 @endsection
+

@@ -107,7 +107,7 @@
         listIngresos: {{ Js::from($conceptsIngreso) }},
         listEgresos: {{ Js::from($conceptsEgreso) }},
         currentConcepts: []
-    }" {{-- LÓGICA DEL EVENTO --}}
+    }" {{-- LÃ“GICA DEL EVENTO --}}
         @open-movement-modal.window="
         let conceptText = $event.detail.concept || ''; 
         let receivedId = String($event.detail.docId);
@@ -118,7 +118,7 @@
         formConceptId = ''; 
         formDocId = receivedId;
 
-        // Filtrar listas según si es Ingreso o Egreso
+        // Filtrar listas segÃºn si es Ingreso o Egreso
         if (receivedId === refIngresoId) {
             
             if (conceptText === 'Apertura de caja') {
@@ -159,7 +159,19 @@
                     @if ($viewId)
                         <input type="hidden" name="view_id" value="{{ $viewId }}">
                     @endif
-                    <div class="w-full flex-1 relative">
+                    <div class="w-36 flex-none">
+                        <label class="mb-1.5 block text-xs font-medium text-gray-500 sm:hidden">Por página</label>
+                         <select
+                             name="per_page"
+                             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                             onchange="this.form.submit()"
+                         >
+                             @foreach ([10, 20, 50, 100] as $size)
+                                 <option value="{{ $size }}" @selected(($perPage ?? 10) == $size)>{{ $size }} / página</option>
+                             @endforeach
+                         </select>
+                     </div>
+                    <div class="relative flex-1">
                         <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                             {!! $SearchIcon !!}
                         </span>
@@ -190,7 +202,7 @@
                     </div>
 
                     <div class="flex shrink-0 items-center gap-2">
-                        <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 px-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #244BB3; border-color: #244BB3;">
+                        <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 px-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #334155; border-color: #334155;">
                             <i class="ri-search-line text-gray-100"></i>
                             <span class="font-medium text-gray-100">Buscar</span>
                         </x-ui.button>
@@ -301,23 +313,7 @@
                 </div>
             </div>
 
-            <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <form method="GET" class="flex items-center gap-2 text-sm text-gray-600">
-                    @if ($viewId)
-                        <input type="hidden" name="view_id" value="{{ $viewId }}">
-                    @endif
-                    @if (request('search'))
-                        <input type="hidden" name="search" value="{{ request('search') }}">
-                    @endif
-                    <input type="hidden" name="cash_register_id" value="{{ $selectedBoxId }}">
-                    <span>Registros por pagina:</span>
-                    <select name="per_page" onchange="this.form.submit()"
-                        class="h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
-                        @foreach ([10, 20, 50, 100] as $size)
-                            <option value="{{ $size }}" @selected(($perPage ?? 10) == $size)>{{ $size }}</option>
-                        @endforeach
-                    </select>
-                </form>
+            <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
                 <div class="flex items-center gap-2 text-sm text-gray-500">
                     <span>Efectivo en caja</span>
                     <x-ui.badge size="sm" variant="light" color="success">S/ {{ number_format((float) ($cashEfectivoTotal ?? 0), 2) }}</x-ui.badge>
@@ -602,3 +598,4 @@
 
     </div>
 @endsection
+

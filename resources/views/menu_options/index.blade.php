@@ -81,7 +81,7 @@
             };
         @endphp
         <x-common.page-breadcrumb
-            pageTitle="Opciones de Menú"
+            pageTitle="Opciones de MenÃº"
             :breadcrumbs="[
                 ['name' => 'Módulos', 'href' => route('admin.modules.index')],
                 ['name' => $module->name, 'href' => '#'],
@@ -91,9 +91,9 @@
 
         <x-common.component-card
             title="Opciones: {{ $module->name }}"
-            desc="Gestiona los sub-menús asociados a este módulo."
+            desc="Gestiona los sub-menÃºs asociados a este módulo."
         >
-            {{-- BARRA DE BÚSQUEDA Y ACCIONES --}}
+            {{-- BARRA DE BÃšSQUEDA Y ACCIONES --}}
             <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between mb-6">
                 <form method="GET" action="{{ route('admin.modules.menu_options.index', $module) }}" class="flex flex-1 flex-wrap gap-2 sm:flex-nowrap sm:items-center min-w-0">
                     @if ($viewId)
@@ -112,7 +112,7 @@
                         />
                     </div>
                     <div class="flex items-center gap-2 flex-none">
-                        <x-ui.button size="md" variant="primary" type="submit" class="h-11 px-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #244BB3; border-color: #244BB3;">
+                        <x-ui.button size="md" variant="primary" type="submit" class="h-11 px-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #334155; border-color: #334155;">
                             <i class="ri-search-line text-gray-100"></i>
                             <span class="font-medium text-gray-100">Buscar</span>
                         </x-ui.button>
@@ -333,7 +333,7 @@
                                                 <i class="ri-list-settings-line text-2xl"></i>
                                             </div>
                                             <p class="text-base font-semibold text-gray-700 dark:text-gray-200">No hay opciones registradas</p>
-                                            <p class="text-gray-500">Agrega la primera opción al menú de este módulo.</p>
+                                            <p class="text-gray-500">Agrega la primera opción al menÃº de este módulo.</p>
                                         </div>
                                     </td>
                                 </tr>
@@ -367,7 +367,7 @@
                             <i class="ri-menu-add-line text-2xl"></i>
                         </div>
                         <div>
-                            <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Registrar Opción de Menú</h3>
+                            <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Registrar Opción de MenÃº</h3>
                             <p class="mt-1 text-sm text-gray-500">Módulo actual: <strong>{{ $module->name }}</strong></p>
                         </div>
                     </div>
@@ -427,11 +427,11 @@
                 }
 
                 Swal.fire({
-                    title: '¿Eliminar opción?',
+                    title: 'Â¿Eliminar opción?',
                     text: `Se eliminará "${name}".`,
                     icon: 'warning',
                     showCancelButton: true,
-                    confirmButtonText: 'Sí, eliminar',
+                    confirmButtonText: 'SÃ­, eliminar',
                     cancelButtonText: 'Cancelar',
                     confirmButtonColor: '#ef4444',
                     cancelButtonColor: '#6b7280',
@@ -450,3 +450,4 @@
 </script>
 @endpush
 @endsection
+

@@ -68,14 +68,14 @@
                     @if ($viewId)
                         <input type="hidden" name="view_id" value="{{ $viewId }}">
                     @endif
-                    <div class="w-full sm:w-24">
+                    <div class="w-36 flex-none">
                         <select
                             name="per_page"
-                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                             onchange="this.form.submit()"
                         >
                             @foreach ([10, 20, 50, 100] as $size)
-                                <option value="{{ $size }}" @selected($perPage == $size)>{{ $size }} / pagina</option>
+                                <option value="{{ $size }}" @selected($perPage == $size)>{{ $size }} / página</option>
                             @endforeach
                         </select>
                     </div>
@@ -92,7 +92,7 @@
                         />
                     </div>
                     <div class="flex flex-wrap gap-2">
-                        <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 px-6 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #244BB3; border-color: #244BB3;">
+                        <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 px-6 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #334155; border-color: #334155;">
                             <i class="ri-search-line text-gray-100"></i>
                             <span class="font-medium text-gray-100">Buscar</span>
                         </x-ui.button>
@@ -245,7 +245,7 @@
                                         <div class="grid grid-cols-2 border-b border-gray-200 py-2 dark:border-gray-700"><span class="font-semibold">T. cambio</span><span>{{ number_format((float) ($order->exchange_rate ?? 1), 3) }}</span></div>
                                         <div class="grid grid-cols-2 border-b border-gray-200 py-2 dark:border-gray-700"><span class="font-semibold">Comentario</span><span>{{ $order->movement?->comment ?: '-' }}</span></div>
                                         <div class="grid grid-cols-2 border-b border-gray-200 py-2 dark:border-gray-700"><span class="font-semibold">Repartidor</span><span>{{ $order->movement?->responsible_name ?: '-' }}</span></div>
-                                        <div class="grid grid-cols-2 border-b border-gray-200 py-2 dark:border-gray-700"><span class="font-semibold">Monto de envío</span><span>{{ number_format((float) ($order->delivery_amount ?? 0), 2) }}</span></div>
+                                        <div class="grid grid-cols-2 border-b border-gray-200 py-2 dark:border-gray-700"><span class="font-semibold">Monto de envÃ­o</span><span>{{ number_format((float) ($order->delivery_amount ?? 0), 2) }}</span></div>
                                         <div class="grid grid-cols-2 border-b border-gray-200 py-2 dark:border-gray-700"><span class="font-semibold">Origen</span><span>Pedido</span></div>
                                         <div class="grid grid-cols-2 border-b border-gray-200 py-2 dark:border-gray-700"><span class="font-semibold">Celular</span><span>{{ $order->contact_phone ?: '-' }}</span></div>
                                         <div class="grid grid-cols-2 border-b border-gray-200 py-2 dark:border-gray-700"><span class="font-semibold">Dirección</span><span>{{ $order->delivery_address ?: '-' }}</span></div>
@@ -297,3 +297,5 @@
         </x-common.component-card>
     </div>
 @endsection
+
+

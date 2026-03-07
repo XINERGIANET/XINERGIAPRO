@@ -12,6 +12,17 @@
         $totalStatus = (int) $statusBreakdown->sum();
         $recentOrders = collect($d['recentOrders'] ?? []);
         $topServices = collect($d['topServices'] ?? []);
+
+        $statusLabels = [
+            'DRAFT' => 'BORRADOR',
+            'DIAGNOSIS' => 'DIAGNÓSTICO',
+            'AWAITING_APPROVAL' => 'ESPERANDO APROBACIÓN',
+            'APPROVED' => 'APROBADO',
+            'IN PROGRESS' => 'EN PROGRESO',
+            'FINISHED' => 'FINALIZADO',
+            'DELIVERED' => 'ENTREGADO',
+            'CANCELLED' => 'CANCELADO',
+        ];
     @endphp
 
     <x-common.page-breadcrumb pageTitle="Dashboard Taller" />
@@ -102,12 +113,13 @@
                     @forelse ($statusBreakdown as $status => $qty)
                         @php
                             $pct = $totalStatus > 0 ? round(((int) $qty * 100) / $totalStatus, 1) : 0;
-                            $label = str_replace('_', ' ', strtoupper((string) $status));
+                            $rawLabel = str_replace('_', ' ', strtoupper((string) $status));
+                            $label = $statusLabels[$rawLabel] ?? $rawLabel;
                         @endphp
                         <div>
                             <div class="mb-1 flex items-center justify-between text-sm font-semibold text-slate-700">
                                 <span>{{ $label }}</span>
-                                <span>{{ $qty }} ({{ $pct }}%)</span>
+                                <span>{{ number_format((float) $qty, 0) }} ({{ $pct }}%)</span>
                             </div>
                             <div class="h-2.5 rounded-full bg-slate-100">
                                 <div class="h-2.5 rounded-full" style="width: {{ $pct }}%; background: linear-gradient(90deg,#fb923c,#ea580c);"></div>
@@ -183,7 +195,11 @@
                                 <td class="px-3 py-3 text-sm font-semibold text-slate-700">{{ $client }}</td>
                                 <td class="px-3 py-3 text-sm font-semibold text-slate-700">{{ $vehicle ?: 'Sin vehículo' }}</td>
                                 <td class="px-3 py-3">
-                                    <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{{ strtoupper(str_replace('_', ' ', (string) $row->status)) }}</span>
+                                    @php
+                                        $rawStatus = strtoupper(str_replace('_', ' ', (string) $row->status));
+                                        $displayStatus = $statusLabels[$rawStatus] ?? $rawStatus;
+                                    @endphp
+                                    <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{{ $displayStatus }}</span>
                                 </td>
                                 <td class="px-3 py-3 text-right text-sm font-semibold text-slate-700">S/ {{ number_format((float) $row->total, 2) }}</td>
                                 <td class="px-3 py-3 text-right text-sm font-semibold text-emerald-700">S/ {{ number_format((float) $row->paid_total, 2) }}</td>

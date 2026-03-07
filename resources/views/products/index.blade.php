@@ -112,9 +112,9 @@
                     @if ($viewId)
                         <input type="hidden" name="view_id" value="{{ $viewId }}">
                     @endif
-                    <div class="w-full sm:w-24">
+                    <div class="w-36 flex-none">
                         <select name="per_page"
-                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                             onchange="this.form.submit()">
                             @foreach ([10, 20, 50, 100] as $size)
                                 <option value="{{ $size }}" @selected($perPage == $size)>{{ $size }} /
@@ -131,7 +131,7 @@
                             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-12 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
                     </div>
                     <div class="flex flex-wrap gap-2">
-                        <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 px-6 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #244BB3; border-color: #244BB3;">
+                        <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 px-6 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #334155; border-color: #334155;">
                             <i class="ri-search-line text-gray-100"></i>
                             <span class="font-medium text-gray-100">Buscar</span>
                         </x-ui.button>
@@ -185,7 +185,7 @@
                                 <p class="font-semibold text-white text-theme-xs uppercase">Descripción</p>
                             </th>
                             <th style="background-color: #334155; color: #FFFFFF;" class="hidden sm:table-cell px-5 py-3 text-center sm:px-6">
-                                <p class="font-semibold text-white text-theme-xs uppercase">Categoría</p>
+                                <p class="font-semibold text-white text-theme-xs uppercase">CategorÃ­a</p>
                             </th>
                             <th style="background-color: #334155; color: #FFFFFF;" class="hidden lg:table-cell px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Unidad base</p>
@@ -306,18 +306,18 @@
                                         }
                                     @endphp
                                     @if($productBranch)
-                                        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 text-sm">
-                                            <div>
-                                                <p class="text-xs uppercase tracking-wide text-gray-400">Stock</p>
-                                                <p class="font-medium text-gray-700 dark:text-gray-200">{{ $productBranch->stock }}</p>
+                                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Stock</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ number_format($productBranch->stock, 2) }}</p>
                                             </div>
-                                            <div>
-                                                <p class="text-xs uppercase tracking-wide text-gray-400">Precio</p>
-                                                <p class="font-medium text-gray-700 dark:text-gray-200">${{ number_format($productBranch->price, 2) }}</p>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Precio</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">S/ {{ number_format($productBranch->price, 2) }}</p>
                                             </div>
-                                            <div>
-                                                <p class="text-xs uppercase tracking-wide text-gray-400">Tasa de impuesto</p>
-                                                <p class="font-medium text-gray-700 dark:text-gray-200">
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Tasa de impuesto</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">
                                                     @if($productBranch->tax_rate_id && $productBranch->taxRate)
                                                         {{ number_format($productBranch->taxRate->tax_rate, 2) }}%
                                                     @else
@@ -325,9 +325,9 @@
                                                     @endif
                                                 </p>
                                             </div>
-                                            <div>
-                                                <p class="text-xs uppercase tracking-wide text-gray-400">Sucursal</p>
-                                                <p class="font-medium text-gray-700 dark:text-gray-200">{{ $productBranch->branch?->legal_name ?? '-' }}</p>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Sucursal</p>
+                                                <p class="mt-0.5 truncate text-sm font-medium text-gray-800 dark:text-gray-200" title="{{ $productBranch->branch?->legal_name ?? '-' }}">{{ $productBranch->branch?->legal_name ?? '-' }}</p>
                                             </div>
                                         </div>
                                     @else
@@ -635,3 +635,5 @@
         </x-ui.modal>
     </div>
 @endsection
+
+

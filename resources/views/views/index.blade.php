@@ -77,9 +77,9 @@
     
     <x-common.page-breadcrumb pageTitle="Vistas" />
 
-    <x-common.component-card title="Gestión de Vistas" desc="Administra las vistas del sistema para asociarlas a los menús.">
+    <x-common.component-card title="Gestión de Vistas" desc="Administra las vistas del sistema para asociarlas a los menÃºs.">
         
-        {{-- BARRA DE BÚSQUEDA Y ACCIONES --}}
+        {{-- BARRA DE BÃšSQUEDA Y ACCIONES --}}
         <div class="flex flex-col gap-4 mb-6 xl:flex-row xl:items-center xl:justify-between">
             <form method="GET" class="flex flex-1 flex-wrap gap-2 sm:flex-nowrap sm:items-center min-w-0">
                 @if ($viewId)
@@ -87,7 +87,7 @@
                 @endif
                 <div class="w-full sm:w-auto flex-none">
                      <select name="per_page"
-                        class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                         onchange="this.form.submit()">
                         @foreach ([10, 20, 50, 100] as $size)
                             <option value="{{ $size }}" @selected(request('per_page', 10) == $size)>{{ $size }} / página</option>
@@ -107,7 +107,7 @@
                     />
                 </div>
                 <div class="flex items-center gap-2 flex-none">
-                    <x-ui.button size="md" variant="primary" type="submit" class="h-11 px-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #244BB3; border-color: #244BB3;">
+                    <x-ui.button size="md" variant="primary" type="submit" class="h-11 px-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #334155; border-color: #334155;">
                         <i class="ri-search-line text-gray-100"></i>
                         <span class="font-medium text-gray-100">Buscar</span>
                     </x-ui.button>
@@ -216,7 +216,7 @@
                                                     class="relative group js-swal-delete"
                                                     data-swal-title="Eliminar vista?"
                                                     data-swal-text="Se eliminará {{ $view->name }}. Esta acción no se puede deshacer."
-                                                    data-swal-confirm="Sí, eliminar"
+                                                    data-swal-confirm="SÃ­, eliminar"
                                                     data-swal-cancel="Cancelar"
                                                     data-swal-confirm-color="#ef4444"
                                                     data-swal-cancel-color="#6b7280">
@@ -348,3 +348,4 @@
     
     </div> 
 @endsection
+
