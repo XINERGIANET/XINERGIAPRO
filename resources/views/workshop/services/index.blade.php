@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('content')
 <div x-data="{}">
@@ -10,10 +10,10 @@
             {{-- Selector de Registros --}}
             <div class="flex items-center gap-2">
                 <select name="per_page" class="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="this.form.submit()">
-                    <option value="10" @selected(($perPage ?? 10) == 10)>10 / pÃ¡g</option>
-                    <option value="25" @selected(($perPage ?? 10) == 25)>25 / pÃ¡g</option>
-                    <option value="50" @selected(($perPage ?? 10) == 50)>50 / pÃ¡g</option>
-                    <option value="100" @selected(($perPage ?? 10) == 100)>100 / pÃ¡g</option>
+                    <option value="10" @selected(($perPage ?? 10) == 10)>10 / pág</option>
+                    <option value="25" @selected(($perPage ?? 10) == 25)>25 / pág</option>
+                    <option value="50" @selected(($perPage ?? 10) == 50)>50 / pág</option>
+                    <option value="100" @selected(($perPage ?? 10) == 100)>100 / pág</option>
                 </select>
             </div>
 
@@ -36,7 +36,7 @@
                 </a>
             </div>
 
-            {{-- Botones de AcciÃ³n (Al final a la derecha) --}}
+            {{-- Botones de Acción (Al final a la derecha) --}}
             <div class="ml-auto flex gap-2">
                 <x-ui.button size="md" variant="primary" type="button" class="!h-11 rounded-2xl px-6 font-bold shadow-lg transition-all hover:scale-[1.02]" style="background-color:#00A389;color:#fff" @click="$dispatch('open-service-modal')">
                     <i class="ri-add-line"></i><span>Nuevo servicio</span>
@@ -133,7 +133,7 @@
             </table>
         </div>
 
-        {{-- PAGINACIÃ“N INFERIOR --}}
+        {{-- PAGINACIÓN INFERIOR --}}
         <div class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="text-sm text-gray-500 dark:text-gray-400">
                 Mostrando

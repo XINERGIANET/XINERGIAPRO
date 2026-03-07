@@ -388,11 +388,11 @@
                 }
 
                 Swal.fire({
-                    title: 'Â¿Eliminar operación?',
+                    title: '¿Eliminar operación?',
                     text: `Se eliminará "${name}".`,
                     icon: 'warning',
                     showCancelButton: true,
-                    confirmButtonText: 'SÃ­, eliminar',
+                    confirmButtonText: 'Sí, eliminar',
                     cancelButtonText: 'Cancelar',
                     confirmButtonColor: '#ef4444',
                     cancelButtonColor: '#6b7280',

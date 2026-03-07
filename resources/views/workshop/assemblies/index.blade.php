@@ -361,18 +361,18 @@
                     <p class="mt-1 text-[10px] text-gray-500 italic">* Según marca/tipo.</p>
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">UbicaciÃ³n del armado</label>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Ubicación del armado</label>
                     <select name="workshop_assembly_location_id" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm">
-                        <option value="">Seleccione ubicaciÃ³n...</option>
+                        <option value="">Seleccione ubicación...</option>
                         @foreach($assemblyLocations as $location)
                             <option value="{{ $location->id }}">{{ $location->name }}</option>
                         @endforeach
                     </select>
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">TÃ©cnico responsable</label>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Técnico responsable</label>
                     <select name="responsible_technician_person_id" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm">
-                        <option value="">Seleccione tÃ©cnico...</option>
+                        <option value="">Seleccione técnico...</option>
                         @foreach($technicians as $technician)
                             <option value="{{ $technician->id }}">{{ trim(($technician->first_name ?? '') . ' ' . ($technician->last_name ?? '')) }}</option>
                         @endforeach

@@ -70,7 +70,7 @@
         <x-common.page-breadcrumb pageTitle="Perfiles" />
 
         <x-common.component-card title="Listado de perfiles" desc="Gestiona los perfiles registrados en el sistema.">
-            {{-- BARRA DE BÃšSQUEDA Y ACCIONES --}}
+            {{-- BARRA DE BÚSQUEDA Y ACCIONES --}}
             <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between mb-6">
                 <form method="GET" class="flex flex-1 flex-wrap gap-2 sm:flex-nowrap sm:items-center min-w-0">
                     @if ($viewId)

@@ -13,7 +13,7 @@
         [
             'id' => 1,
             'name' => 'Lomo Saltado Clásico',
-            'description' => 'Trozos de lomo fino salteados al wok con cebolla, tomate y ajÃ­ amarillo.',
+            'description' => 'Trozos de lomo fino salteados al wok con cebolla, tomate y ají amarillo.',
             'category' => 'Plato de Fondo',
             'category_class' => 'badge-plato',
             'time' => '20 min',
@@ -25,11 +25,11 @@
         [
             'id' => 2,
             'name' => 'Ceviche de Pescado',
-            'description' => 'Pesca del dÃ­a marinada en limón sutil, con base de leche de tigre clásica.',
+            'description' => 'Pesca del día marinada en limón sutil, con base de leche de tigre clásica.',
             'category' => 'Entrada',
             'category_class' => 'badge-entrada',
             'time' => '10 min',
-            'method' => 'FrÃ­o',
+            'method' => 'Frío',
             'method_icon' => 'ri-fridge-line',
             'cost' => '12.00',
             'image' => 'https://images.unsplash.com/photo-1535914697087-0b13575608d4?auto=format&fit=crop&w=800&q=80'
@@ -37,7 +37,7 @@
         [
             'id' => 3,
             'name' => 'Causa de Pollo',
-            'description' => 'Masa de papa amarilla prensada con ajÃ­ amarillo, rellena de pollo.',
+            'description' => 'Masa de papa amarilla prensada con ají amarillo, rellena de pollo.',
             'category' => 'Entrada',
             'category_class' => 'badge-entrada',
             'time' => '15 min',
@@ -73,11 +73,11 @@
         [
             'id' => 6,
             'name' => 'Tiradito de Pescado',
-            'description' => 'Finas láminas de pescado fresco con crema de ajÃ­ amarillo y limón.',
+            'description' => 'Finas láminas de pescado fresco con crema de ají amarillo y limón.',
             'category' => 'Entrada',
             'category_class' => 'badge-entrada',
             'time' => '12 min',
-            'method' => 'FrÃ­o',
+            'method' => 'Frío',
             'method_icon' => 'ri-fridge-line',
             'cost' => '14.50',
             'image' => 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=800&q=80'
@@ -89,7 +89,7 @@
             'category' => 'Postre',
             'category_class' => 'badge-postre',
             'time' => '25 min',
-            'method' => 'ReposterÃ­a',
+            'method' => 'Repostería',
             'method_icon' => 'ri-cake-3-line',
             'cost' => '5.80',
             'image' => 'https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=800&q=80'
@@ -97,7 +97,7 @@
         [
             'id' => 8,
             'name' => 'Chicha Morada',
-            'description' => 'Bebida tradicional de maÃ­z morado con frutas y especias aromáticas.',
+            'description' => 'Bebida tradicional de maíz morado con frutas y especias aromáticas.',
             'category' => 'Bebida',
             'category_class' => 'badge-bebida',
             'time' => '45 min',
@@ -313,10 +313,10 @@
 
     <x-common.component-card title="Recetario Maestro" desc="Gestión de fichas técnicas y costos de platillos">
         
-        <!-- Sección de bÃºsqueda y filtros -->
+        <!-- Sección de búsqueda y filtros -->
         <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <form method="GET" action="#" class="flex flex-1 items-end gap-3">
-                <!-- Campo de bÃºsqueda -->
+                <!-- Campo de búsqueda -->
                 <div class="flex-1">
                     <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                         Buscar Platillo
@@ -335,10 +335,10 @@
                     </div>
                 </div>
 
-                <!-- CategorÃ­a -->
+                <!-- Categoría -->
                 <div class="w-48">
                     <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                        CategorÃ­a
+                        Categoría
                     </label>
                     <select 
                         name="category"
@@ -433,7 +433,7 @@
 
         <!-- Paginación (deshabilitada - datos hardcodeados) -->
         <!-- <div class="mt-6">
-            Paginación aquÃ­ cuando se conecte a BD
+            Paginación aquí cuando se conecte a BD
         </div> -->
 
     </x-common.component-card>
@@ -470,7 +470,7 @@
 
                     <div>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                            CategorÃ­a
+                            Categoría
                         </label>
                         <select 
                             name="category"

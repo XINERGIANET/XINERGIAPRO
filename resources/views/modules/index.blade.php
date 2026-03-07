@@ -79,9 +79,9 @@
     
     <x-common.page-breadcrumb pageTitle="Módulos" />
 
-    <x-common.component-card title="Gestión de Módulos" desc="Administra los elementos principales del menÃº lateral.">
+    <x-common.component-card title="Gestión de Módulos" desc="Administra los elementos principales del menú lateral.">
         
-        {{-- BARRA DE BÃšSQUEDA Y ACCIONES --}}
+        {{-- BARRA DE BÚSQUEDA Y ACCIONES --}}
         <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between mb-6">
             <form method="GET" class="flex flex-1 flex-wrap gap-2 sm:flex-nowrap sm:items-center min-w-0">
                 @if ($viewId)
@@ -257,7 +257,7 @@
                 </table>
         </div>
 
-        {{-- PAGINACIÃ“N INFERIOR --}}
+        {{-- PAGINACIÓN INFERIOR --}}
             <div class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div class="text-sm text-gray-500 dark:text-gray-400">
                     Mostrando
@@ -286,7 +286,7 @@
                         <div>
                             <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-500">Configuración</p>
                             <h3 class="mt-0.5 text-xl font-bold text-gray-900 dark:text-white">Gestión de Módulo</h3>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">Define los parámetros del elemento para el menÃº principal.</p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Define los parámetros del elemento para el menú principal.</p>
                         </div>
                     </div>
                     <button type="button" @click="open = false" 
@@ -352,11 +352,11 @@
                 }
 
                 Swal.fire({
-                    title: 'Â¿Eliminar módulo?',
+                    title: '¿Eliminar módulo?',
                     text: `Se eliminará "${name}". Esta acción no se puede deshacer.`,
                     icon: 'warning',
                     showCancelButton: true,
-                    confirmButtonText: 'SÃ­, eliminar',
+                    confirmButtonText: 'Sí, eliminar',
                     cancelButtonText: 'Cancelar',
                     confirmButtonColor: '#ef4444', 
                     cancelButtonColor: '#6b7280', 

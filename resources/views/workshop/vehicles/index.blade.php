@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('content')
 <div x-data="{}">
@@ -17,10 +17,10 @@
             {{-- Selector de Registros --}}
             <div class="flex items-center gap-2">
                 <select name="per_page" class="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="this.form.submit()">
-                    <option value="10" @selected(($per_page ?? 10) == 10)>10 / pÃ¡g</option>
-                    <option value="25" @selected(($per_page ?? 10) == 25)>25 / pÃ¡g</option>
-                    <option value="50" @selected(($per_page ?? 10) == 50)>50 / pÃ¡g</option>
-                    <option value="100" @selected(($per_page ?? 10) == 100)>100 / pÃ¡g</option>
+                    <option value="10" @selected(($per_page ?? 10) == 10)>10 / pág</option>
+                    <option value="25" @selected(($per_page ?? 10) == 25)>25 / pág</option>
+                    <option value="50" @selected(($per_page ?? 10) == 50)>50 / pág</option>
+                    <option value="100" @selected(($per_page ?? 10) == 100)>100 / pág</option>
                 </select>
             </div>
 
@@ -48,7 +48,7 @@
                 </a>
             </div>
 
-            {{-- BotÃ³n Nuevo (Al final a la derecha) --}}
+            {{-- Botón Nuevo (Al final a la derecha) --}}
             <div class="ml-auto">
                 <x-ui.button 
                     size="md" 
@@ -142,7 +142,7 @@
             </table>
         </div>
 
-        {{-- PAGINACIÃ“N INFERIOR --}}
+        {{-- PAGINACIÓN INFERIOR --}}
         <div class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="text-sm text-gray-500 dark:text-gray-400">
                 Mostrando
@@ -197,7 +197,7 @@
                     <input name="model" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Modelo" required>
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">AÃ±o</label>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Año</label>
                     <input name="year" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Anio">
                 </div>
                 <div>
@@ -276,7 +276,7 @@
                         <input name="model" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->model }}" placeholder="Modelo" required>
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">AÃ±o</label>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Año</label>
                         <input name="year" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->year }}" placeholder="Anio">
                     </div>
                     <div>

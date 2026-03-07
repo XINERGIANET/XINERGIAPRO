@@ -241,7 +241,7 @@
                 </table>
             </div>
 
-            {{-- PAGINACIÃ“N INFERIOR --}}
+            {{-- PAGINACIÓN INFERIOR --}}
             <div class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div class="text-sm text-gray-500 dark:text-gray-400">
                     Mostrando

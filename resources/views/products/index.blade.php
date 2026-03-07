@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('content')
     <script>
@@ -179,10 +179,10 @@
                         <tr class="text-white">
                             <th style="background-color: #334155; color: #FFFFFF;" class="w-12 px-4 py-4 text-center first:rounded-tl-xl"></th>
                             <th style="background-color: #334155; color: #FFFFFF;" class="hidden md:table-cell px-5 py-3 text-center sm:px-6">
-                                <p class="font-semibold text-white text-theme-xs uppercase">Código</p>
+                                <p class="font-semibold text-white text-theme-xs uppercase">CÃ³digo</p>
                             </th>
                             <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">
-                                <p class="font-semibold text-white text-theme-xs uppercase">Descripción</p>
+                                <p class="font-semibold text-white text-theme-xs uppercase">DescripciÃ³n</p>
                             </th>
                             <th style="background-color: #334155; color: #FFFFFF;" class="hidden sm:table-cell px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">CategorÃ­a</p>
@@ -296,7 +296,7 @@
                                     </div>
                                 </td>
                             </tr>
-                            <tr x-show="openRow === {{ $product->id }}" x-cloak class="bg-gray-50/60 dark:bg-gray-800/40">
+                            <tr x-show="openRow === {{ $product->id }}" x-cloak class="bg-gray-50/70 dark:bg-gray-800/40 border-b border-gray-100 dark:border-gray-800">
                                 <td colspan="7" class="px-6 py-4">
                                     @php
                                         $branchId = session('branch_id');
@@ -306,21 +306,136 @@
                                         }
                                     @endphp
                                     @if($productBranch)
-                                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                        <div class="grid gap-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                                             <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
-                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Stock</p>
-                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ number_format($productBranch->stock, 2) }}</p>
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Código</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ ->code ?: '-' }}</p>
                                             </div>
                                             <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
-                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Precio</p>
-                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">S/ {{ number_format($productBranch->price, 2) }}</p>
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Descripción</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ ->description ?: '-' }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Abreviatura</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ ->abbreviation ?: '-' }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Categoría</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ ->category?->description ?? '-' }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Unidad base</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ ->baseUnit?->description ?? '-' }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Tipo</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ ->productType?->name ?? '-' }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Kardex</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ ->kardex === 'Y' ? 'Sí' : 'No' }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Receta</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ ->recipe ? 'Sí' : 'No' }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Complemento</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ ->complement === 'Y' ? 'Sí' : 'No' }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Modo complemento</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ ->complement_mode ?: '-' }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Clasificación</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ ->classification ?: '-' }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Estado</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ (->status ?? 'A') === 'A' ? 'Activo' : 'Inactivo' }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Stock actual</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ number_format((float) ->stock, 2) }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Precio venta</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">S/ {{ number_format((float) ->price, 2) }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Precio compra</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">S/ {{ number_format((float) (->purchase_price ?? 0), 2) }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Costo promedio</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">S/ {{ number_format((float) (->avg_cost ?? 0), 2) }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Stock mínimo</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ number_format((float) (->stock_minimum ?? 0), 2) }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Stock máximo</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ number_format((float) (->stock_maximum ?? 0), 2) }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Venta mínima</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ number_format((float) (->minimum_sell ?? 0), 2) }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Compra mínima</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ number_format((float) (->minimum_purchase ?? 0), 2) }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Venta unitaria</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ (->unit_sale ?? 'N') === 'Y' ? 'Sí' : 'No' }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Favorito</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ (->favorite ?? 'N') === 'Y' ? 'Sí' : 'No' }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Fecha vencimiento</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ ->expiration_date ?: '-' }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Duración (min)</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ ->duration_minutes ?: '-' }}</p>
                                             </div>
                                             <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
                                                 <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Tasa de impuesto</p>
                                                 <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">
-                                                    @if($productBranch->tax_rate_id && $productBranch->taxRate)
-                                                        {{ number_format($productBranch->taxRate->tax_rate, 2) }}%
+                                                    @if(->tax_rate_id && ->taxRate)
+                                                        {{ number_format((float) ->taxRate->tax_rate, 2) }}%
                                                     @else
+                                                        <span class="text-gray-400">Sin tasa</span>
+                                                    @endif
+                                                </p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Sucursal</p>
+                                                <p class="mt-0.5 truncate text-sm font-medium text-gray-800 dark:text-gray-200" title="{{ ->branch?->legal_name ?? '-' }}">{{ ->branch?->legal_name ?? '-' }}</p>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3 grid gap-3 lg:grid-cols-3">
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-900/50 lg:col-span-2">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Características</p>
+                                                <p class="mt-1 text-sm font-medium leading-6 text-gray-800 dark:text-gray-200">{{ ->features ?: 'Sin características registradas.' }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Imagen</p>
+                                                @if(->image)
+                                                    <div class="mt-2 flex items-center gap-3">
+                                                        <img src="{{ asset('storage/' . ->image) }}" alt="{{ ->description }}" class="h-16 w-16 rounded-xl border border-gray-200 object-cover dark:border-gray-700">
+                                                        <p class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ ->description ?: 'Producto' }}</p>
+                                                    </div>
+                                                @else
+                                                    <p class="mt-1 text-sm font-medium text-gray-400">Sin imagen registrada.</p>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @else
                                                         <span class="text-gray-400">Sin tasa</span>
                                                     @endif
                                                 </p>
@@ -635,5 +750,4 @@
         </x-ui.modal>
     </div>
 @endsection
-
 

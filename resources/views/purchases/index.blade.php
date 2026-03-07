@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('content')
     <div>
@@ -39,7 +39,7 @@
                             onchange="this.form.submit()"
                         >
                             @foreach ([10, 20, 50, 100] as $size)
-                                <option value="{{ $size }}" @selected($perPage == $size)>{{ $size }} / pÃ¡gina</option>
+                                <option value="{{ $size }}" @selected($perPage == $size)>{{ $size }} / página</option>
                             @endforeach
                         </select>
                     </div>
@@ -51,7 +51,7 @@
                             type="text"
                             name="search"
                             value="{{ $search }}"
-                            placeholder="Buscar por nÃºmero, proveedor o usuario"
+                            placeholder="Buscar por número, proveedor o usuario"
                             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-12 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                         />
                     </div>
@@ -190,7 +190,7 @@
                                               class="relative group js-swal-delete"
                                               data-swal-title="Eliminar compra?"
                                               data-swal-text="Se eliminará la compra {{ $purchase->number }} y se revertirá stock."
-                                              data-swal-confirm="SÃ­, eliminar"
+                                              data-swal-confirm="Sí, eliminar"
                                               data-swal-cancel="Cancelar"
                                               data-swal-confirm-color="#ef4444"
                                               data-swal-cancel-color="#6b7280">
@@ -330,7 +330,4 @@
     </div>
 @endsection
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 2965d545e33ea59fd53fcf71a46441e3f209b52b
