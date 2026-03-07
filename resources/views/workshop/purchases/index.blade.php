@@ -75,32 +75,61 @@
             <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first() }}</div>
         @endif
 
+        <div class="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Documentos del mes</p>
+                <p class="mt-2 text-3xl font-black text-slate-900">{{ (int) ($monthSummary->total_docs ?? 0) }}</p>
+            </div>
+            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+                <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-600">Monto registrado</p>
+                <p class="mt-2 text-3xl font-black text-emerald-700">S/ {{ number_format((float) ($monthSummary->total_amount ?? 0), 2) }}</p>
+            </div>
+            <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+                <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-amber-600">Pendiente de pago</p>
+                <p class="mt-2 text-3xl font-black text-amber-700">S/ {{ number_format((float) ($pendingCreditTotal ?? 0), 2) }}</p>
+            </div>
+        </div>
+
         <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-            <table class="w-full min-w-[1100px]">
+            <table class="w-full min-w-[1260px]">
                 <thead>
                     <tr>
                         <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">Fecha</th>
                         <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Tipo</th>
                         <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Serie-Numero</th>
                         <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Proveedor</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Pago</th>
                         <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Moneda</th>
                         <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Subtotal</th>
                         <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">IGV</th>
                         <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Total</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Pendiente</th>
                         <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($records as $record)
+                        @php
+                            $paymentType = strtoupper((string) ($record->movement?->purchaseMovement?->payment_type ?? 'CONTADO'));
+                            $pendingAmount = $paymentType === 'CREDITO' ? (float) $record->total : 0;
+                        @endphp
                         <tr class="relative hover:z-[60] border-t border-gray-100 dark:border-gray-800">
                             <td class="px-4 py-3 text-sm text-center font-medium">{{ optional($record->issued_at)->format('Y-m-d') }}</td>
                             <td class="px-4 py-3 text-sm text-center">{{ $record->document_kind }}</td>
                             <td class="px-4 py-3 text-sm text-center">{{ ($record->series ? $record->series.'-' : '') . $record->document_number }}</td>
                             <td class="px-4 py-3 text-sm text-center">{{ $record->supplier?->first_name }} {{ $record->supplier?->last_name }}</td>
+                            <td class="px-4 py-3 text-center">
+                                <span class="inline-flex rounded-full px-3 py-1 text-xs font-bold {{ $paymentType === 'CREDITO' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700' }}">
+                                    {{ $paymentType }}
+                                </span>
+                            </td>
                             <td class="px-4 py-3 text-sm text-center">{{ $record->currency }}</td>
                             <td class="px-4 py-3 text-sm text-center font-bold">{{ number_format((float)$record->subtotal, 2) }}</td>
                             <td class="px-4 py-3 text-sm text-center font-bold text-emerald-600">{{ number_format((float)$record->igv, 2) }}</td>
                             <td class="px-4 py-3 text-sm text-center font-bold text-emerald-600">{{ number_format((float)$record->total, 2) }}</td>
+                            <td class="px-4 py-3 text-sm text-center font-bold {{ $pendingAmount > 0 ? 'text-amber-600' : 'text-slate-400' }}">
+                                {{ $pendingAmount > 0 ? 'S/ ' . number_format($pendingAmount, 2) : '-' }}
+                            </td>
                             <td class="px-4 py-3 text-sm">
                                 <div class="flex items-center justify-center gap-2">
                                     @if($record->movement_id)
@@ -194,7 +223,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="9" class="px-4 py-4 text-sm text-gray-500 text-center">Sin compras para el filtro.</td></tr>
+                        <tr><td colspan="11" class="px-4 py-4 text-sm text-gray-500 text-center">Sin compras para el filtro.</td></tr>
                     @endforelse
                 </tbody>
             </table>

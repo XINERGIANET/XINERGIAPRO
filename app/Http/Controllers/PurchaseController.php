@@ -213,22 +213,23 @@ class PurchaseController extends Controller
             ]);
 
             foreach ($validated['items'] as $item) {
-                $product = Product::query()->findOrFail((int) $item['product_id']);
                 $quantity = (float) $item['quantity'];
                 $amount = (float) $item['amount'];
                 $unitId = (int) $item['unit_id'];
+                $productId = !empty($item['product_id']) ? (int) $item['product_id'] : null;
+                $product = $productId ? Product::query()->find($productId) : null;
 
                 PurchaseMovementDetail::query()->create([
                     'detail_type' => $validated['detail_type'],
                     'purchase_movement_id' => $purchase->id,
-                    'code' => (string) ($product->code ?? 'SIN-CODIGO'),
-                    'description' => (string) ($item['description'] ?? $product->description ?? 'Sin descripcion'),
-                    'product_id' => $product->id,
-                    'product_json' => [
+                    'code' => (string) ($product?->code ?? 'GLOSA'),
+                    'description' => (string) ($item['description'] ?? $product?->description ?? 'Sin descripcion'),
+                    'product_id' => $product?->id,
+                    'product_json' => $product ? [
                         'id' => $product->id,
                         'code' => $product->code,
                         'description' => $product->description,
-                    ],
+                    ] : null,
                     'unit_id' => $unitId,
                     'tax_rate_id' => null,
                     'quantity' => $quantity,
@@ -238,7 +239,7 @@ class PurchaseController extends Controller
                     'branch_id' => $branchId,
                 ]);
 
-                if ($validated['affects_kardex'] === 'S') {
+                if ($validated['affects_kardex'] === 'S' && $product) {
                     $this->incrementBranchStock($branchId, $product->id, $quantity);
                 }
             }
@@ -340,22 +341,23 @@ class PurchaseController extends Controller
                 ->delete();
 
             foreach ($validated['items'] as $item) {
-                $product = Product::query()->findOrFail((int) $item['product_id']);
                 $quantity = (float) $item['quantity'];
                 $amount = (float) $item['amount'];
                 $unitId = (int) $item['unit_id'];
+                $productId = !empty($item['product_id']) ? (int) $item['product_id'] : null;
+                $product = $productId ? Product::query()->find($productId) : null;
 
                 PurchaseMovementDetail::query()->create([
                     'detail_type' => $validated['detail_type'],
                     'purchase_movement_id' => $oldPurchase->id,
-                    'code' => (string) ($product->code ?? 'SIN-CODIGO'),
-                    'description' => (string) ($item['description'] ?? $product->description ?? 'Sin descripcion'),
-                    'product_id' => $product->id,
-                    'product_json' => [
+                    'code' => (string) ($product?->code ?? 'GLOSA'),
+                    'description' => (string) ($item['description'] ?? $product?->description ?? 'Sin descripcion'),
+                    'product_id' => $product?->id,
+                    'product_json' => $product ? [
                         'id' => $product->id,
                         'code' => $product->code,
                         'description' => $product->description,
-                    ],
+                    ] : null,
                     'unit_id' => $unitId,
                     'tax_rate_id' => null,
                     'quantity' => $quantity,
@@ -365,7 +367,7 @@ class PurchaseController extends Controller
                     'branch_id' => $branchId,
                 ]);
 
-                if ($validated['affects_kardex'] === 'S') {
+                if ($validated['affects_kardex'] === 'S' && $product) {
                     $this->incrementBranchStock($branchId, $product->id, $quantity);
                 }
             }
@@ -407,7 +409,7 @@ class PurchaseController extends Controller
 
     private function validatePurchase(Request $request): array
     {
-        return $request->validate([
+        $validated = $request->validate([
             'moved_at' => ['required', 'date'],
             'person_id' => ['required', 'integer', 'exists:people,id'],
             'document_type_id' => ['required', 'integer', 'exists:document_types,id'],
@@ -430,13 +432,47 @@ class PurchaseController extends Controller
             'payment_methods.*.card_id' => ['nullable', 'integer', 'exists:cards,id'],
             'payment_methods.*.digital_wallet_id' => ['nullable', 'integer', 'exists:digital_wallets,id'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
-            'items.*.unit_id' => ['required', 'integer', 'exists:units,id'],
-            'items.*.description' => ['nullable', 'string'],
+            'items.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'items.*.unit_id' => ['nullable', 'integer', 'exists:units,id'],
+            'items.*.description' => ['required', 'string'],
             'items.*.quantity' => ['required', 'numeric', 'gt:0'],
             'items.*.amount' => ['required', 'numeric', 'min:0'],
             'items.*.comment' => ['nullable', 'string'],
         ]);
+
+        $defaultUnitId = (int) (Unit::query()->orderBy('id')->value('id') ?? 0);
+
+        foreach ($validated['items'] as $index => $item) {
+            $isGlosa = ($validated['detail_type'] ?? 'DETALLADO') === 'GLOSA';
+            $description = trim((string) ($item['description'] ?? ''));
+            if ($description === '') {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    "items.{$index}.description" => 'La descripcion del item es obligatoria.',
+                ]);
+            }
+
+            if ($isGlosa) {
+                $validated['items'][$index]['product_id'] = !empty($item['product_id']) ? (int) $item['product_id'] : null;
+                $validated['items'][$index]['unit_id'] = !empty($item['unit_id'])
+                    ? (int) $item['unit_id']
+                    : ($defaultUnitId > 0 ? $defaultUnitId : null);
+            } else {
+                if (empty($item['product_id'])) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        "items.{$index}.product_id" => 'Debe seleccionar un producto.',
+                    ]);
+                }
+                if (empty($item['unit_id'])) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        "items.{$index}.unit_id" => 'Debe seleccionar una unidad.',
+                    ]);
+                }
+                $validated['items'][$index]['product_id'] = (int) $item['product_id'];
+                $validated['items'][$index]['unit_id'] = (int) $item['unit_id'];
+            }
+        }
+
+        return $validated;
     }
 
     private function getFormData(Request $request): array
@@ -465,6 +501,7 @@ class PurchaseController extends Controller
             ->orderByRaw("CASE WHEN status = 'A' THEN 0 ELSE 1 END")
             ->orderBy('number')
             ->get(['id', 'number', 'status']);
+        $defaultCashRegisterId = $this->getBranchConfiguredCashRegisterId($branchId, $cashRegisters, 'caja factur');
 
         $paymentMethods = PaymentMethod::query()
             ->where('status', true)
@@ -545,8 +582,9 @@ class PurchaseController extends Controller
             'initialItems' => old('items', []),
             'initialPaymentType' => (string) old('payment_type', 'CONTADO'),
             'initialDocumentTypeId' => (int) old('document_type_id', $documentTypes->first()->id ?? 0),
-            'initialCashRegisterId' => (int) old('cash_register_id', ($cashRegisters->firstWhere('status', 'A')->id ?? $cashRegisters->first()->id ?? 0)),
+            'initialCashRegisterId' => (int) old('cash_register_id', $defaultCashRegisterId ?? 0),
             'initialRows' => old('payment_methods', []),
+            'initialDetailType' => (string) old('detail_type', 'DETALLADO'),
             'initialTaxRate' => (float) old('tax_rate_percent', $defaultTaxRate),
             'initialIncludesTax' => (string) old('includes_tax', 'S'),
             'initialCurrency' => (string) old('currency', 'PEN'),
@@ -595,6 +633,32 @@ class PurchaseController extends Controller
         }
 
         return $movementType;
+    }
+
+    private function getBranchConfiguredCashRegisterId(int $branchId, $cashRegisters, string $needle): ?int
+    {
+        if ($branchId <= 0) {
+            return $cashRegisters->firstWhere('status', 'A')->id ?? $cashRegisters->first()->id ?? null;
+        }
+
+        $configuredValue = DB::table('branch_parameters as bp')
+            ->join('parameters as p', 'p.id', '=', 'bp.parameter_id')
+            ->where('bp.branch_id', $branchId)
+            ->whereNull('bp.deleted_at')
+            ->whereNull('p.deleted_at')
+            ->where('p.description', 'ILIKE', '%' . $needle . '%')
+            ->orderBy('p.id')
+            ->value('bp.value');
+
+        if (is_numeric($configuredValue)) {
+            $configuredId = (int) $configuredValue;
+            $exists = $cashRegisters->contains(fn ($cashRegister) => (int) $cashRegister->id === $configuredId);
+            if ($exists) {
+                return $configuredId;
+            }
+        }
+
+        return $cashRegisters->firstWhere('status', 'A')->id ?? $cashRegisters->first()->id ?? null;
     }
 
     private function resolveOperations($viewId, int $branchId)

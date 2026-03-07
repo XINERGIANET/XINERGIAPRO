@@ -20,6 +20,8 @@
     districts: @js($districts ?? []),
     vehicleTypes: @js($vehicleTypes->map(fn($type) => ['id' => $type->id, 'name' => $type->name])),
     servicesCatalog: @js($services->map(fn($s) => ['id' => $s->id, 'name' => $s->name, 'base_price' => (float) $s->base_price, 'type' => $s->type])),
+    historyBase: @js(route('workshop.clients.history', ['person' => '__PERSON__'])),
+    historyUrl: '',
     selectedVehicleId: @js((string) old('vehicle_id', '')),
     vehicleSearch: '',
     vehicleDropdownOpen: false,
@@ -69,6 +71,12 @@
         this.selectedClientId = selected.client_person_id ? String(selected.client_person_id) : '';
         this.mileageIn = selected.km ? String(selected.km) : '';
         this.vehicleSearch = selected.display_label || selected.label || '';
+        this.syncHistoryUrl();
+    },
+    syncHistoryUrl() {
+        this.historyUrl = this.selectedClientId
+            ? `${this.historyBase.replace('__PERSON__', this.selectedClientId)}?modal=1`
+            : '';
     },
     resolveDefaultClientId() {
         const matchClientesVarios = this.clientsList.find((client) => {
@@ -89,6 +97,7 @@
         if (!String(this.quickVehicle.client_person_id || '').trim()) {
             this.quickVehicle.client_person_id = this.selectedClientId || fallbackClientId;
         }
+        this.syncHistoryUrl();
     },
     get filteredVehicles() {
         const q = String(this.vehicleSearch || '').trim().toLowerCase();
@@ -217,6 +226,7 @@
             this.selectedClientId = payload.client_person_id ? String(payload.client_person_id) : this.selectedClientId;
             this.mileageIn = payload.km ? String(payload.km) : this.mileageIn;
             this.vehicleSearch = this.vehicles[0].display_label || payload.label || '';
+            this.syncHistoryUrl();
             this.creatingVehicle = false;
             this.resetQuickVehicle();
         } catch (error) {
@@ -248,6 +258,7 @@
             this.clientsList.unshift(payload);
             this.selectedClientId = String(payload.id);
             this.quickVehicle.client_person_id = String(payload.id);
+            this.syncHistoryUrl();
             this.quickClient = {
                 person_type: 'DNI',
                 document_number: '',
@@ -387,7 +398,7 @@
             url: URL.createObjectURL(file),
         }));
     }
-}" x-init="$nextTick(() => { if (selectedVehicleId) { syncVehicle() } ensureQuickVehicleClient(); initSignaturePad(); syncServiceLinesFromSelection(); })">
+}" x-init="$nextTick(() => { if (selectedVehicleId) { syncVehicle() } ensureQuickVehicleClient(); syncHistoryUrl(); initSignaturePad(); syncServiceLinesFromSelection(); })">
     <x-common.page-breadcrumb
         pageTitle="Nuevo Ingreso a Mantenimiento"
         :crumbs="[
@@ -511,7 +522,23 @@
                 </div>
             </div>
 
-           
+            <div class="rounded-xl border border-violet-200 bg-violet-50/60 p-3 md:col-span-2">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-violet-600">Cliente vinculado</p>
+                        <p class="mt-1 text-sm font-semibold text-slate-800" x-text="clientsList.find(client => String(client.id) === String(selectedClientId))?.label || 'Seleccione un vehiculo o cliente para continuar'"></p>
+                    </div>
+                    <button
+                        type="button"
+                        class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-violet-200 bg-white px-4 text-sm font-semibold text-violet-700 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        :disabled="!selectedClientId"
+                        @click="$dispatch('open-maintenance-client-history')"
+                    >
+                        <i class="ri-history-line"></i>
+                        <span>Ver historial</span>
+                    </button>
+                </div>
+            </div>
 
             <input name="mileage_in" type="number" min="0" x-model="mileageIn" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="KM ingreso">
 
@@ -766,6 +793,30 @@
                     <x-ui.button type="button" size="md" variant="outline" @click="open = false"><i class="ri-close-line"></i><span>Cancelar</span></x-ui.button>
                 </div>
             </form>
+        </div>
+    </x-ui.modal>
+
+    <x-ui.modal x-data="{ open: false }" x-on:open-maintenance-client-history.window="open = true" x-on:close-maintenance-client-history.window="open = false" :isOpen="false" :showCloseButton="false" class="max-w-7xl">
+        <div class="p-5 sm:p-6">
+            <div class="mb-4 flex items-center justify-between gap-3">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">Historial del cliente</h3>
+                    <p class="mt-1 text-sm text-gray-500">Mantenimientos, tecnico responsable, observaciones y vehiculos asociados.</p>
+                </div>
+                <button type="button" @click="open = false" class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
+                    <i class="ri-close-line text-xl"></i>
+                </button>
+            </div>
+            <div class="overflow-hidden rounded-2xl border border-gray-200">
+                <template x-if="historyUrl">
+                    <iframe :src="historyUrl" class="h-[75vh] w-full bg-white"></iframe>
+                </template>
+                <template x-if="!historyUrl">
+                    <div class="flex h-80 items-center justify-center bg-gray-50 text-sm font-medium text-gray-500">
+                        Seleccione un cliente para ver su historial.
+                    </div>
+                </template>
+            </div>
         </div>
     </x-ui.modal>
 </div>

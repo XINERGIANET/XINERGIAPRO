@@ -15,7 +15,7 @@
 
 <div class="flex items-start gap-6" style="display:flex;align-items:flex-start;gap:1.5rem;">
     <section class="min-w-0 space-y-5" style="flex:0 0 60%;max-width:60%;width:60%;">
-        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" x-show="detailType === 'DETALLADO'">
             <div class="grid grid-cols-1 gap-3 xl:grid-cols-12">
                 <div class="xl:col-span-4">
                     <x-form.date-picker
@@ -123,6 +123,73 @@
                 No se encontraron productos para el filtro actual.
             </div>
         </div>
+
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" x-show="detailType === 'GLOSA'">
+            <div class="mb-4 flex items-center justify-between gap-3">
+                <div>
+                    <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Detalle</p>
+                    <h3 class="mt-1 text-lg font-bold text-slate-900">Compra por glosa</h3>
+                    <p class="mt-1 text-sm text-slate-500">Registra conceptos manuales sin obligar un producto del catálogo.</p>
+                </div>
+                <button
+                    type="button"
+                    @click="addGlosaItem()"
+                    class="inline-flex h-11 items-center gap-2 rounded-2xl px-4 text-sm font-bold text-white shadow-theme-xs"
+                    style="background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff;box-shadow:0 12px 24px rgba(249,115,22,.24);"
+                >
+                    <i class="ri-add-line"></i>
+                    <span>Agregar glosa</span>
+                </button>
+            </div>
+
+            <div class="space-y-3">
+                <template x-for="(item, idx) in items" :key="`glosa-${idx}`">
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div class="grid gap-3 md:grid-cols-12">
+                            <div class="md:col-span-5">
+                                <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Descripcion</label>
+                                <input
+                                    type="text"
+                                    x-model="item.description"
+                                    class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700"
+                                    placeholder="Ej. Compra administrativa, traslado, ajuste, repuesto externo"
+                                >
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Unidad</label>
+                                <select x-model.number="item.unit_id" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
+                                    <template x-for="unit in units" :key="`glosa-unit-${idx}-${unit.id}`">
+                                        <option :value="unit.id" x-text="unit.description"></option>
+                                    </template>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Cantidad</label>
+                                <input type="number" min="0.0001" step="0.0001" x-model.number="item.quantity" @input="syncPaymentAmounts()" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Monto</label>
+                                <input type="number" min="0" step="0.01" x-model.number="item.amount" @input="syncPaymentAmounts()" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold" style="color:#f97316;">
+                            </div>
+                            <div class="md:col-span-1 flex items-end">
+                                <button type="button" @click="removeItem(idx)" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 hover:bg-rose-50" title="Eliminar">
+                                    <i class="ri-delete-bin-line"></i>
+                                </button>
+                            </div>
+                            <div class="md:col-span-12">
+                                <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Comentario</label>
+                                <input
+                                    type="text"
+                                    x-model="item.comment"
+                                    class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700"
+                                    placeholder="Observacion opcional del concepto"
+                                >
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
     </section>
 
     <aside class="min-w-0" style="flex:0 0 40%;max-width:40%;width:40%;">
@@ -137,7 +204,7 @@
             <div x-show="asideTab==='summary'" class="bg-slate-50 p-5">
                 <div class="rounded-2xl border border-slate-200 bg-white p-4">
                     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div><label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Tipo detalle</label><select name="detail_type" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"><option value="DETALLADO">DETALLADO</option><option value="GLOSA">GLOSA</option></select></div>
+                        <div><label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Tipo detalle</label><select name="detail_type" x-model="detailType" @change="changeDetailType($event.target.value)" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"><option value="DETALLADO">DETALLADO</option><option value="GLOSA">GLOSA</option></select></div>
                         <div><label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Afecta kardex</label><select name="affects_kardex" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"><option value="S" selected>Si</option><option value="N">No</option></select></div>
                         <div><label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Incluye IGV</label><select name="includes_tax" x-model="includesTax" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"><option value="S">Si</option><option value="N">No</option></select></div>
                         <div><label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">IGV %</label><input type="number" step="0.01" min="0" max="100" name="tax_rate_percent" x-model.number="taxRate" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold" style="color:#f97316;" required></div>
@@ -154,8 +221,11 @@
                                     <template x-if="productImage(item)">
                                         <img :src="productImage(item)" :alt="item.description || 'Producto'" class="h-12 w-12 object-cover">
                                     </template>
-                                    <template x-if="!productImage(item)">
+                                    <template x-if="!productImage(item) && detailType !== 'GLOSA'">
                                         <i class="ri-shopping-bag-3-line text-xl text-slate-400"></i>
+                                    </template>
+                                    <template x-if="!productImage(item) && detailType === 'GLOSA'">
+                                        <i class="ri-file-text-line text-xl text-slate-400"></i>
                                     </template>
                                 </div>
                                 <div class="min-w-0 flex-1">

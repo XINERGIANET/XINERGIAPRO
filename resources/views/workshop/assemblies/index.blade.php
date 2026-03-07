@@ -40,6 +40,9 @@
             <x-ui.button size="md" variant="primary" type="button" style="background-color:#334155;color:#fff" @click="$dispatch('open-summary-modal')">
                 <i class="ri-bar-chart-2-line"></i><span>Resumen por Tipo</span>
             </x-ui.button>
+            <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.assembly-locations.index') }}" style="background-color:#7C3AED;color:#fff">
+                <i class="ri-map-pin-line"></i><span>Ubicaciones</span>
+            </x-ui.link-button>
             <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.assemblies.export', ['month' => $month]) }}" style="background-color:#166534;color:#fff">
                 <i class="ri-file-excel-2-line"></i><span>Exportar CSV</span>
             </x-ui.link-button>
@@ -133,6 +136,15 @@
                                 <span class="block text-[8px] font-bold uppercase mb-1" style="color: #FDE6D2;">INGRESO</span>
                                 <span class="block text-xs font-black text-white leading-tight">{{ optional($assembly->entry_at)->format('d/m/y H:i') ?: '--' }}</span>
                             </div>
+                            <div class="rounded-2xl p-3 border col-span-2" style="background-color: rgba(255, 255, 255, 0.03); border-color: rgba(255, 255, 255, 0.05);">
+                                <span class="block text-[8px] font-bold uppercase mb-1" style="color: #FDE6D2;">UBICACION / TECNICO</span>
+                                <span class="block text-xs font-black text-white leading-tight">
+                                    {{ $assembly->location?->name ?: 'Sin ubicacion' }}
+                                    @if($assembly->responsibleTechnician)
+                                        · {{ trim(($assembly->responsibleTechnician->first_name ?? '') . ' ' . ($assembly->responsibleTechnician->last_name ?? '')) }}
+                                    @endif
+                                </span>
+                            </div>
                         </div>
 
                         <!-- Values Row (High Contrast) -->
@@ -148,6 +160,20 @@
                             <div class="flex flex-col items-center justify-center rounded-2xl py-2.5 border" style="background-color: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.2);">
                                 <span class="text-[7px] font-bold uppercase mb-0.5" style="color: #FDE6D2;">TOTAL</span>
                                 <span class="text-xs font-black" style="color: #FDE6D2;">S/{{ number_format($assembly->total_cost, 0) }}</span>
+                            </div>
+                        </div>
+                        <div class="mb-5 grid grid-cols-3 gap-3">
+                            <div class="rounded-2xl p-3 border text-center" style="background-color: rgba(59, 130, 246, 0.12); border-color: rgba(59, 130, 246, 0.2);">
+                                <span class="block text-[8px] font-bold uppercase mb-1 text-blue-200">ESTIMADO</span>
+                                <span class="block text-xs font-black text-white">{{ (int) $assembly->estimated_minutes }} min</span>
+                            </div>
+                            <div class="rounded-2xl p-3 border text-center" style="background-color: rgba(16, 185, 129, 0.12); border-color: rgba(16, 185, 129, 0.2);">
+                                <span class="block text-[8px] font-bold uppercase mb-1 text-emerald-200">REAL</span>
+                                <span class="block text-xs font-black text-white">{{ $assembly->actual_repair_minutes !== null ? $assembly->actual_repair_minutes . ' min' : '--' }}</span>
+                            </div>
+                            <div class="rounded-2xl p-3 border text-center" style="background-color: rgba(245, 158, 11, 0.12); border-color: rgba(245, 158, 11, 0.2);">
+                                <span class="block text-[8px] font-bold uppercase mb-1 text-amber-200">VARIACION</span>
+                                <span class="block text-xs font-black text-white">{{ $assembly->estimated_vs_real_minutes !== null ? ($assembly->estimated_vs_real_minutes > 0 ? '+' : '') . $assembly->estimated_vs_real_minutes . ' min' : '--' }}</span>
                             </div>
                         </div>
 
@@ -335,12 +361,38 @@
                     <p class="mt-1 text-[10px] text-gray-500 italic">* Según marca/tipo.</p>
                 </div>
                 <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">UbicaciÃ³n del armado</label>
+                    <select name="workshop_assembly_location_id" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm">
+                        <option value="">Seleccione ubicaciÃ³n...</option>
+                        @foreach($assemblyLocations as $location)
+                            <option value="{{ $location->id }}">{{ $location->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">TÃ©cnico responsable</label>
+                    <select name="responsible_technician_person_id" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm">
+                        <option value="">Seleccione tÃ©cnico...</option>
+                        @foreach($technicians as $technician)
+                            <option value="{{ $technician->id }}">{{ trim(($technician->first_name ?? '') . ' ' . ($technician->last_name ?? '')) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Fecha de Ingreso</label>
-                    <input type="date" name="entry_at" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm" value="{{ now()->toDateString() }}">
+                    <input type="datetime-local" name="entry_at" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm" value="{{ now()->format('Y-m-d\\TH:i') }}">
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Fecha de Armado (Planificado)</label>
                     <input type="date" name="assembled_at" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm" value="{{ now()->toDateString() }}" required>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Entrega estimada</label>
+                    <input type="datetime-local" name="estimated_delivery_at" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm" value="{{ now()->addHours(2)->format('Y-m-d\\TH:i') }}">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Tiempo estimado (min)</label>
+                    <input type="number" min="0" name="estimated_minutes" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm" value="120" placeholder="120">
                 </div>
                 <div class="md:col-span-2">
                     <label class="mb-1 block text-sm font-medium text-gray-700">Observaciones</label>

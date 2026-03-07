@@ -47,7 +47,7 @@ class WorkshopPurchaseController extends Controller
         }
 
         $records = WorkshopPurchaseRecord::query()
-            ->with(['movement', 'supplier', 'movement.documentType'])
+            ->with(['movement', 'supplier', 'movement.documentType', 'movement.purchaseMovement'])
             ->where('company_id', $branch->company_id)
             ->where('branch_id', $scopeBranchId)
             ->whereRaw("to_char(issued_at, 'YYYY-MM') = ?", [$month])
@@ -57,6 +57,22 @@ class WorkshopPurchaseController extends Controller
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
+
+        $monthSummary = WorkshopPurchaseRecord::query()
+            ->where('company_id', $branch->company_id)
+            ->where('branch_id', $scopeBranchId)
+            ->whereRaw("to_char(issued_at, 'YYYY-MM') = ?", [$month])
+            ->selectRaw('COUNT(*) as total_docs, COALESCE(SUM(total), 0) as total_amount')
+            ->first();
+
+        $pendingCreditTotal = WorkshopPurchaseRecord::query()
+            ->join('movements', 'movements.id', '=', 'workshop_purchase_records.movement_id')
+            ->join('purchase_movements', 'purchase_movements.movement_id', '=', 'movements.id')
+            ->where('workshop_purchase_records.company_id', $branch->company_id)
+            ->where('workshop_purchase_records.branch_id', $scopeBranchId)
+            ->whereRaw("to_char(workshop_purchase_records.issued_at, 'YYYY-MM') = ?", [$month])
+            ->where('purchase_movements.payment_type', 'CREDITO')
+            ->sum('workshop_purchase_records.total');
 
         $suppliers = Person::query()
             ->where('branch_id', $scopeBranchId)
@@ -79,7 +95,9 @@ class WorkshopPurchaseController extends Controller
             'documentKind',
             'scopeBranchId',
             'isAdmin',
-            'perPage'
+            'perPage',
+            'monthSummary',
+            'pendingCreditTotal'
         ));
     }
 }

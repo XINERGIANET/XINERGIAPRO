@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('content')
     <div>
@@ -16,6 +16,17 @@
                 <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first() }}</div>
             @endif
 
+            @php
+                $currentPageItems = $purchases->getCollection();
+                $pageTotal = (float) $currentPageItems->sum(fn ($purchase) => (float) ($purchase->purchaseMovement?->total ?? 0));
+                $pageCreditPending = (float) $currentPageItems->sum(function ($purchase) {
+                    $paymentType = strtoupper((string) ($purchase->purchaseMovement?->payment_type ?? 'CONTADO'));
+                    return $paymentType === 'CREDITO'
+                        ? (float) ($purchase->purchaseMovement?->total ?? 0)
+                        : 0;
+                });
+            @endphp
+
             <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <form method="GET" class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
                     @if ($viewId)
@@ -28,7 +39,7 @@
                             onchange="this.form.submit()"
                         >
                             @foreach ([10, 20, 50, 100] as $size)
-                                <option value="{{ $size }}" @selected($perPage == $size)>{{ $size }} / página</option>
+                                <option value="{{ $size }}" @selected($perPage == $size)>{{ $size }} / pÃ¡gina</option>
                             @endforeach
                         </select>
                     </div>
@@ -40,7 +51,7 @@
                             type="text"
                             name="search"
                             value="{{ $search }}"
-                            placeholder="Buscar por número, proveedor o usuario"
+                            placeholder="Buscar por nÃºmero, proveedor o usuario"
                             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-12 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                         />
                     </div>
@@ -64,8 +75,23 @@
                 </div>
             </div>
 
+            <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Documentos visibles</p>
+                    <p class="mt-2 text-3xl font-black text-slate-900">{{ $purchases->count() }}</p>
+                </div>
+                <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-600">Total listado</p>
+                    <p class="mt-2 text-3xl font-black text-emerald-700">S/ {{ number_format($pageTotal, 2) }}</p>
+                </div>
+                <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-amber-600">Pendiente de pago</p>
+                    <p class="mt-2 text-3xl font-black text-amber-700">S/ {{ number_format($pageCreditPending, 2) }}</p>
+                </div>
+            </div>
+
             <div x-data="{ openRow: null }" class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-                <table class="w-full min-w-[1100px]">
+                <table class="w-full min-w-[1300px]">
                     <thead>
                         <tr class="text-white">
                             <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6 first:rounded-tl-xl">
@@ -87,7 +113,13 @@
                                 <p class="font-semibold text-white text-theme-xs uppercase">Persona</p>
                             </th>
                             <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6">
+                                <p class="font-semibold text-white text-theme-xs uppercase">Pago</p>
+                            </th>
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Moneda</p>
+                            </th>
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6">
+                                <p class="font-semibold text-white text-theme-xs uppercase">Pendiente</p>
                             </th>
                             <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Fecha</p>
@@ -104,6 +136,10 @@
                                     . ($purchase->purchaseMovement?->series ?? '001')
                                     . '-'
                                     . $purchase->number;
+                                $paymentType = strtoupper((string) ($purchase->purchaseMovement?->payment_type ?? 'CONTADO'));
+                                $pendingAmount = $paymentType === 'CREDITO'
+                                    ? (float) ($purchase->purchaseMovement?->total ?? 0)
+                                    : 0;
                             @endphp
                             <tr class="group/row border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5 relative hover:z-[60]">
                                 <td class="px-5 py-4 sm:px-6">
@@ -127,7 +163,15 @@
                                 <td class="px-5 py-4 sm:px-6 text-gray-800 text-theme-sm">S/ {{ number_format((float) ($purchase->purchaseMovement?->tax ?? 0), 2) }}</td>
                                 <td class="px-5 py-4 sm:px-6"><p class="font-bold text-brand-600 text-theme-sm">S/ {{ number_format((float) ($purchase->purchaseMovement?->total ?? 0), 2) }}</p></td>
                                 <td class="px-5 py-4 sm:px-6 text-gray-800 text-theme-sm truncate max-w-[150px]" title="{{ $purchase->person_name ?: '-' }}">{{ $purchase->person_name ?: '-' }}</td>
+                                <td class="px-5 py-4 sm:px-6">
+                                    <span class="inline-flex rounded-full px-3 py-1 text-xs font-bold {{ $paymentType === 'CREDITO' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700' }}">
+                                        {{ $paymentType }}
+                                    </span>
+                                </td>
                                 <td class="px-5 py-4 sm:px-6 text-gray-800 text-theme-sm">{{ $purchase->purchaseMovement?->currency ?? 'PEN' }}</td>
+                                <td class="px-5 py-4 sm:px-6 font-bold {{ $pendingAmount > 0 ? 'text-amber-600' : 'text-slate-400' }}">
+                                    {{ $pendingAmount > 0 ? 'S/ ' . number_format($pendingAmount, 2) : '-' }}
+                                </td>
                                 <td class="px-5 py-4 sm:px-6 text-gray-800 text-theme-sm">{{ $purchase->moved_at ? $purchase->moved_at->format('Y-m-d H:i') : '-' }}</td>
                                 <td class="px-5 py-4 sm:px-6">
                                     <div class="flex items-center justify-end gap-2">
@@ -145,8 +189,8 @@
                                         <form method="POST" action="{{ route('admin.purchases.destroy', array_merge([$purchase], $viewId ? ['view_id' => $viewId] : [])) }}"
                                               class="relative group js-swal-delete"
                                               data-swal-title="Eliminar compra?"
-                                              data-swal-text="Se eliminará la compra {{ $purchase->number }} y se revertirá stock."
-                                              data-swal-confirm="Sí, eliminar"
+                                              data-swal-text="Se eliminarÃ¡ la compra {{ $purchase->number }} y se revertirÃ¡ stock."
+                                              data-swal-confirm="SÃ­, eliminar"
                                               data-swal-cancel="Cancelar"
                                               data-swal-confirm-color="#ef4444"
                                               data-swal-cancel-color="#6b7280">
@@ -167,15 +211,15 @@
                             </tr>
 
                             <tr x-show="openRow === {{ $purchase->id }}" x-cloak class="bg-gray-50/70 dark:bg-gray-800/40 border-b border-gray-100 dark:border-gray-800">
-                                <td colspan="9" class="px-6 py-4">
+                                <td colspan="11" class="px-6 py-4">
                                     <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
                                         <p class="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-200">Detalle de compra</p>
                                         <div class="overflow-x-auto">
                                             <table class="w-full min-w-[700px]">
                                                 <thead>
                                                     <tr class="border-b border-gray-200 dark:border-gray-700">
-                                                        <th class="px-2 py-2 text-left text-xs font-semibold uppercase text-gray-500">Código</th>
-                                                        <th class="px-2 py-2 text-left text-xs font-semibold uppercase text-gray-500">Descripción</th>
+                                                        <th class="px-2 py-2 text-left text-xs font-semibold uppercase text-gray-500">CÃ³digo</th>
+                                                        <th class="px-2 py-2 text-left text-xs font-semibold uppercase text-gray-500">DescripciÃ³n</th>
                                                         <th class="px-2 py-2 text-left text-xs font-semibold uppercase text-gray-500">Unidad</th>
                                                         <th class="px-2 py-2 text-right text-xs font-semibold uppercase text-gray-500">Cantidad</th>
                                                         <th class="px-2 py-2 text-right text-xs font-semibold uppercase text-gray-500">Costo</th>
@@ -203,7 +247,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="px-6 py-12">
+                                <td colspan="11" class="px-6 py-12">
                                     <div class="flex flex-col items-center gap-3 text-center text-sm text-gray-500">
                                         <div class="rounded-full bg-gray-100 p-3 text-gray-400 dark:bg-gray-800 dark:text-gray-300">
                                             <i class="ri-shopping-bag-3-line"></i>
@@ -240,3 +284,4 @@
         </x-common.component-card>
     </div>
 @endsection
+

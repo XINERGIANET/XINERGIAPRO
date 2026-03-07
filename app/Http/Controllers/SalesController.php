@@ -184,6 +184,7 @@ class SalesController extends Controller
             ->orderByRaw("CASE WHEN status = 'A' THEN 0 ELSE 1 END")
             ->orderBy('number')
             ->get(['id', 'number', 'status']);
+        $defaultCashRegisterId = $this->getBranchConfiguredCashRegisterId($branchId, $cashRegisters, 'caja ventas');
 
         return view('sales.create', [
             'products' => $products,
@@ -197,6 +198,7 @@ class SalesController extends Controller
             'cards' => $cards,
             'digitalWallets' => $digitalWallets,
             'cashRegisters' => $cashRegisters,
+            'defaultCashRegisterId' => $defaultCashRegisterId,
             // Compatibilidad con implementaciones previas en la vista
             'productsBranches' => $productBranches,
         ]);
@@ -242,6 +244,7 @@ class SalesController extends Controller
             ->orderByRaw("CASE WHEN status = 'A' THEN 0 ELSE 1 END")
             ->orderBy('number')
             ->get(['id', 'number', 'status']);
+        $defaultCashRegisterId = $this->getBranchConfiguredCashRegisterId($branchId, $cashRegisters, 'caja ventas');
 
         $people = Person::query()
             ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
@@ -334,6 +337,7 @@ class SalesController extends Controller
             'cards' => $cards,
             'digitalWallets' => $digitalWallets,
             'cashRegisters' => $cashRegisters,
+            'defaultCashRegisterId' => $defaultCashRegisterId,
             'people' => $people,
             'defaultClientId' => $defaultClientId,
             'draftSale' => $draftSale,
@@ -1175,7 +1179,7 @@ class SalesController extends Controller
             ->where('bp.branch_id', $branchId)
             ->whereNull('bp.deleted_at')
             ->whereNull('p.deleted_at')
-            ->whereRaw('LOWER(p.description) = ?', ['tipo venta por defecto'])
+            ->where('p.description', 'ILIKE', '%tipo venta por defecto%')
             ->value('bp.value');
 
         if (is_numeric($configuredValue)) {
@@ -1187,6 +1191,32 @@ class SalesController extends Controller
         }
 
         return $documentTypes->first()?->id ? (int) $documentTypes->first()->id : null;
+    }
+
+    private function getBranchConfiguredCashRegisterId(int $branchId, $cashRegisters, string $needle): ?int
+    {
+        if ($branchId <= 0) {
+            return $cashRegisters->firstWhere('status', 'A')->id ?? $cashRegisters->first()->id ?? null;
+        }
+
+        $configuredValue = DB::table('branch_parameters as bp')
+            ->join('parameters as p', 'p.id', '=', 'bp.parameter_id')
+            ->where('bp.branch_id', $branchId)
+            ->whereNull('bp.deleted_at')
+            ->whereNull('p.deleted_at')
+            ->where('p.description', 'ILIKE', '%' . $needle . '%')
+            ->orderBy('p.id')
+            ->value('bp.value');
+
+        if (is_numeric($configuredValue)) {
+            $configuredId = (int) $configuredValue;
+            $exists = $cashRegisters->contains(fn ($cashRegister) => (int) $cashRegister->id === $configuredId);
+            if ($exists) {
+                return $configuredId;
+            }
+        }
+
+        return $cashRegisters->firstWhere('status', 'A')->id ?? $cashRegisters->first()->id ?? null;
     }
 
     /**
