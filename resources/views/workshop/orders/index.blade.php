@@ -5,49 +5,56 @@
     <x-common.page-breadcrumb pageTitle="Ordenes Taller" />
 
     <x-common.component-card title="Ordenes de servicio" desc="Consulta y gestiona ordenes del taller.">
-        {{-- Barra de Herramientas Premium (Estilo solicitado) --}}
-        <form method="GET" action="{{ route('workshop.orders.index') }}" class="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-white/[0.02]">
+        {{-- Barra de Herramientas Premium --}}
+        <form method="GET" action="{{ route('workshop.orders.index') }}" class="mb-5 flex flex-wrap items-center gap-3">
+            @if (request('view_id'))
+                <input type="hidden" name="view_id" value="{{ request('view_id') }}">
+            @endif
+
             {{-- Selector de Registros --}}
-            <div class="flex items-center gap-2">
-                <select name="per_page" class="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="this.form.submit()">
-                    <option value="10" @selected(($perPage ?? 10) == 10)>10 / pág</option>
-                    <option value="25" @selected(($perPage ?? 10) == 25)>25 / pág</option>
-                    <option value="50" @selected(($perPage ?? 10) == 50)>50 / pág</option>
-                    <option value="100" @selected(($perPage ?? 10) == 100)>100 / pág</option>
+            <div class="w-32 flex-none">
+                <select name="per_page" class="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none transition-all" onchange="this.form.submit()">
+                    <option value="10" @selected(($perPage ?? 10) == 10)>10 / página</option>
+                    <option value="25" @selected(($perPage ?? 10) == 25)>25 / página</option>
+                    <option value="50" @selected(($perPage ?? 10) == 50)>50 / página</option>
+                    <option value="100" @selected(($perPage ?? 10) == 100)>100 / página</option>
                 </select>
             </div>
 
             {{-- Buscador Principal --}}
-            <div class="relative flex-1 min-w-0 sm:min-w-[300px]">
+            <div class="relative flex-1 min-w-[200px] sm:min-w-[300px]">
                 <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                    <i class="ri-search-line text-lg text-gray-400"></i>
+                    <i class="ri-search-line text-gray-400"></i>
                 </div>
                 <input 
                     name="search" 
                     value="{{ $search }}" 
-                    class="h-11 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-4 text-sm shadow-sm transition-all focus:border-blue-500 focus:ring-blue-500 placeholder:text-gray-400" 
+                    class="h-11 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-4 text-sm shadow-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none placeholder:text-gray-400" 
                     placeholder="Buscar OS, placa o cliente..."
                 >
             </div>
 
-            {{-- Acciones del Formulario --}}
+            {{-- Acciones --}}
             <div class="flex items-center gap-2">
-                <button type="submit" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#334155] px-6 text-sm font-bold text-white shadow-lg shadow-blue-100 transition-all hover:brightness-110 active:scale-95">
+                <x-ui.button size="md" variant="primary" type="submit" class="h-11 px-5 shadow-sm active:scale-95 transition-all" style="background-color: #334155; border-color: #334155;">
                     <i class="ri-search-line"></i>
                     <span>Buscar</span>
-                </button>
-                <a href="{{ route('workshop.orders.index') }}" class="inline-flex h-11 items-center justify-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-bold text-gray-700 shadow-sm transition-all hover:bg-gray-50 active:scale-95">
-                    Limpiar
-                </a>
+                </x-ui.button>
+                <x-ui.link-button size="md" variant="outline" href="{{ route('workshop.orders.index') }}" class="h-11 px-4 border-gray-200 text-gray-600 hover:bg-gray-50 transition-all active:scale-95">
+                    <i class="ri-refresh-line"></i>
+                    <span>Limpiar</span>
+                </x-ui.link-button>
             </div>
 
-            {{-- Botón Nuevo (Al final a la derecha) --}}
+            {{-- Botones de Acción (Reportes y Nueva OS) --}}
             <div class="ml-auto flex gap-2">
-                <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.reports.index') }}" class="!h-11 rounded-2xl px-6 font-bold shadow-lg transition-all hover:scale-[1.02]" style="background-color:#1d4ed8;color:#fff">
-                    <i class="ri-bar-chart-2-line"></i><span>Reportes</span>
+                <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.reports.index') }}" class="h-11 rounded-xl px-5 font-bold shadow-sm transition-all hover:brightness-105 active:scale-95" style="background-color: #4F46E5; color: #FFFFFF; border-color: #4F46E5;">
+                    <i class="ri-bar-chart-2-line"></i>
+                    <span>Reportes</span>
                 </x-ui.link-button>
-                <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.orders.create') }}" class="!h-11 rounded-2xl px-6 font-bold shadow-lg transition-all hover:scale-[1.02]" style="background-color:#00A389;color:#fff">
-                    <i class="ri-add-line"></i><span>Nueva OS</span>
+                <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.orders.create') }}" class="h-11 rounded-xl px-5 font-bold shadow-sm transition-all hover:brightness-105 active:scale-95" style="background-color: #00A389; color: #FFFFFF; border-color: #00A389;">
+                    <i class="ri-add-line"></i>
+                    <span>Nueva OS</span>
                 </x-ui.link-button>
             </div>
         </form>
@@ -57,39 +64,48 @@
         @endif
 
         <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-            <table class="w-full min-w-[1100px]">
-                <thead>
+            <table class="w-full">
+                <thead style="background-color: #334155; color: #FFFFFF;">
                     <tr>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">OS</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Ingreso</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Cliente</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Vehiculo</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Estado</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Total</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Pagado</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Acciones</th>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider first:rounded-tl-xl text-white">OS</th>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Ingreso</th>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Cliente</th>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Vehículo</th>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Estado</th>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Total</th>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Pagado</th>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider last:rounded-tr-xl text-white">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($orders as $order)
-                        <tr class="relative hover:z-[60] border-t border-gray-100 dark:border-gray-800">
-                            <td class="px-4 py-3 text-sm text-center font-medium">{{ $order->movement?->number }}</td>
-                            <td class="px-4 py-3 text-sm text-center">{{ $order->intake_date?->format('Y-m-d H:i') }}</td>
-                            <td class="px-4 py-3 text-sm text-center">{{ $order->client?->full_name }}</td>
-                            <td class="px-4 py-3 text-sm text-center">{{ $order->vehicle?->brand }} {{ $order->vehicle?->model }} ({{ $order->vehicle?->plate }})</td>
-                            <td class="px-4 py-3 text-sm text-center">
-                                <span class="px-2 py-1 rounded-lg text-xs font-bold uppercase {{ match($order->status) {
-                                    'open' => 'bg-blue-100 text-blue-700',
-                                    'finished' => 'bg-green-100 text-green-700',
-                                    'cancelled' => 'bg-red-100 text-red-700',
-                                    default => 'bg-gray-100 text-gray-700'
-                                } }}">
-                                    {{ $order->status }}
-                                </span>
+                        <tr class="relative hover:z-[60] border-t border-gray-100 dark:border-gray-800 transition hover:bg-gray-50 dark:hover:bg-white/5">
+                            <td class="px-3 py-3 text-sm text-center align-middle font-medium text-gray-800 dark:text-white/90">{{ $order->movement?->number }}</td>
+                            <td class="px-3 py-3 text-sm text-center align-middle whitespace-nowrap">{{ $order->intake_date?->format('j/m/Y H:i A') }}</td>
+                            <td class="px-3 py-3 text-sm text-center align-middle">{{ $order->client?->full_name }}</td>
+                            <td class="px-3 py-3 text-sm text-center align-middle">{{ $order->vehicle?->brand }} {{ $order->vehicle?->model }} <span class="text-xs text-gray-500">({{ $order->vehicle?->plate }})</span></td>
+                            <td class="px-3 py-3 text-sm text-center align-middle">
+                                @php
+                                    $statusColor = match($order->status) {
+                                        'open' => 'info',
+                                        'finished' => 'success',
+                                        'cancelled' => 'error',
+                                        default => 'warning'
+                                    };
+                                    $statusLabel = match($order->status) {
+                                        'open' => 'Abierta',
+                                        'finished' => 'Finalizada',
+                                        'cancelled' => 'Anulada',
+                                        default => $order->status
+                                    };
+                                @endphp
+                                <x-ui.badge variant="light" color="{{ $statusColor }}">
+                                    {{ $statusLabel }}
+                                </x-ui.badge>
                             </td>
-                            <td class="px-4 py-3 text-sm text-center font-bold">{{ number_format((float) $order->total, 2) }}</td>
-                            <td class="px-4 py-3 text-sm text-center font-bold text-emerald-600">{{ number_format((float) $order->paid_total, 2) }}</td>
-                            <td class="px-4 py-3 text-sm">
+                            <td class="px-3 py-3 text-sm text-center align-middle font-bold text-gray-800 dark:text-white/90">S/ {{ number_format((float) $order->total, 2) }}</td>
+                            <td class="px-3 py-3 text-sm text-center align-middle font-bold text-emerald-600">S/ {{ number_format((float) $order->paid_total, 2) }}</td>
+                            <td class="px-3 py-3 text-sm">
                                 <div class="flex items-center justify-center gap-2">
                                     <div class="relative group">
                                         <x-ui.link-button
