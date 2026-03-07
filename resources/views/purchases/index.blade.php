@@ -168,32 +168,77 @@
 
                             <tr x-show="openRow === {{ $purchase->id }}" x-cloak class="bg-gray-50/70 dark:bg-gray-800/40 border-b border-gray-100 dark:border-gray-800">
                                 <td colspan="9" class="px-6 py-4">
-                                    <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
-                                        <p class="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-200">Detalle de compra</p>
+                                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6 mb-4">
+                                        <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                            <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Persona</p>
+                                            <p class="mt-0.5 truncate text-sm font-medium text-gray-800 dark:text-gray-200" title="{{ $purchase->person_name ?: '-' }}">{{ $purchase->person_name ?: '-' }}</p>
+                                        </div>
+                                        <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                            <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Fecha</p>
+                                            <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $purchase->moved_at ? $purchase->moved_at->format('d/m/Y H:i') : '-' }}</p>
+                                        </div>
+                                        <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                            <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Usuario</p>
+                                            <p class="mt-0.5 truncate text-sm font-medium text-gray-800 dark:text-gray-200">{{ $purchase->user_name ?: '-' }}</p>
+                                        </div>
+                                        <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                            <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Responsable</p>
+                                            <p class="mt-0.5 truncate text-sm font-medium text-gray-800 dark:text-gray-200">{{ $purchase->responsible_name ?: '-' }}</p>
+                                        </div>
+                                        <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                            <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Moneda</p>
+                                            <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $purchase->purchaseMovement?->currency ?? 'PEN' }}</p>
+                                        </div>
+                                        <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                            <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">T. cambio</p>
+                                            <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ number_format((float) ($purchase->purchaseMovement?->exchange_rate ?? 1), 3) }}</p>
+                                        </div>
+                                        <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                            <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Condición</p>
+                                            <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $purchase->purchaseMovement?->payment_type ?? '-' }}</p>
+                                        </div>
+                                        <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                            <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Afecta Caja</p>
+                                            <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ ($purchase->purchaseMovement?->affects_cash ?? 'N') === 'S' ? 'Sí' : 'No' }}</p>
+                                        </div>
+                                        <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                            <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Afecta Kardex</p>
+                                            <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ ($purchase->purchaseMovement?->affects_kardex ?? 'N') === 'S' ? 'Sí' : 'No' }}</p>
+                                        </div>
+                                        <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50 col-span-2 lg:col-span-3">
+                                            <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Comentario</p>
+                                            <p class="mt-0.5 truncate text-sm font-medium text-gray-800 dark:text-gray-200" title="{{ $purchase->comment ?? '-' }}">{{ $purchase->comment ?? '-' }}</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="rounded-xl border border-gray-200 bg-white p-0 shadow-sm dark:border-gray-800 dark:bg-white/5 overflow-hidden">
+                                        <div class="bg-gray-50 px-4 py-2 border-b border-gray-200 dark:bg-gray-900/50 dark:border-gray-800">
+                                            <p class="text-sm font-bold text-gray-700 dark:text-gray-200">Detalle de compra</p>
+                                        </div>
                                         <div class="overflow-x-auto">
-                                            <table class="w-full min-w-[700px]">
+                                            <table class="w-full">
                                                 <thead>
-                                                    <tr class="border-b border-gray-200 dark:border-gray-700">
-                                                        <th class="px-2 py-2 text-left text-xs font-semibold uppercase text-gray-500">Código</th>
-                                                        <th class="px-2 py-2 text-left text-xs font-semibold uppercase text-gray-500">Descripción</th>
-                                                        <th class="px-2 py-2 text-left text-xs font-semibold uppercase text-gray-500">Unidad</th>
-                                                        <th class="px-2 py-2 text-right text-xs font-semibold uppercase text-gray-500">Cantidad</th>
-                                                        <th class="px-2 py-2 text-right text-xs font-semibold uppercase text-gray-500">Costo</th>
-                                                        <th class="px-2 py-2 text-right text-xs font-semibold uppercase text-gray-500">Subtotal</th>
+                                                    <tr style="background-color: #334155;">
+                                                        <th class="px-4 py-2 text-left text-xs font-semibold uppercase text-white">Código</th>
+                                                        <th class="px-4 py-2 text-left text-xs font-semibold uppercase text-white">Descripción</th>
+                                                        <th class="px-4 py-2 text-left text-xs font-semibold uppercase text-white">Unidad</th>
+                                                        <th class="px-4 py-2 text-right text-xs font-semibold uppercase text-white">Cantidad</th>
+                                                        <th class="px-4 py-2 text-right text-xs font-semibold uppercase text-white">Costo</th>
+                                                        <th class="px-4 py-2 text-right text-xs font-semibold uppercase text-white">Subtotal</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     @forelse($purchase->purchaseMovement?->details ?? [] as $detail)
-                                                        <tr class="border-b border-gray-100 dark:border-gray-800">
-                                                            <td class="px-2 py-2 text-sm">{{ $detail->code }}</td>
-                                                            <td class="px-2 py-2 text-sm">{{ $detail->description }}</td>
-                                                            <td class="px-2 py-2 text-sm">{{ $detail->unit?->description ?? '-' }}</td>
-                                                            <td class="px-2 py-2 text-sm text-right">{{ number_format((float) $detail->quantity, 2) }}</td>
-                                                            <td class="px-2 py-2 text-sm text-right">{{ number_format((float) $detail->amount, 2) }}</td>
-                                                            <td class="px-2 py-2 text-sm text-right">{{ number_format((float) $detail->quantity * (float) $detail->amount, 2) }}</td>
+                                                        <tr class="border-b border-gray-100 last:border-0 dark:border-gray-800 hover:bg-gray-50/50 transition-colors">
+                                                            <td class="px-4 py-3 text-sm text-gray-800 dark:text-gray-200 font-medium">{{ $detail->code }}</td>
+                                                            <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{{ $detail->description }}</td>
+                                                            <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{{ $detail->unit?->description ?? '-' }}</td>
+                                                            <td class="px-4 py-3 text-sm text-right text-gray-800 dark:text-gray-200 font-medium">{{ number_format((float) $detail->quantity, 2) }}</td>
+                                                            <td class="px-4 py-3 text-sm text-right text-gray-800 dark:text-gray-200">S/ {{ number_format((float) $detail->amount, 2) }}</td>
+                                                            <td class="px-4 py-3 text-sm text-right text-brand-600 dark:text-brand-400 font-bold">S/ {{ number_format((float) $detail->quantity * (float) $detail->amount, 2) }}</td>
                                                         </tr>
                                                     @empty
-                                                        <tr><td colspan="6" class="px-2 py-2 text-sm text-gray-500">Sin detalle.</td></tr>
+                                                        <tr><td colspan="6" class="px-4 py-8 text-center text-sm text-gray-500">Sin detalle.</td></tr>
                                                     @endforelse
                                                 </tbody>
                                             </table>

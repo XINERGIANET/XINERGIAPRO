@@ -306,18 +306,18 @@
                                         }
                                     @endphp
                                     @if($productBranch)
-                                        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 text-sm">
-                                            <div>
-                                                <p class="text-xs uppercase tracking-wide text-gray-400">Stock</p>
-                                                <p class="font-medium text-gray-700 dark:text-gray-200">{{ $productBranch->stock }}</p>
+                                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Stock</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ number_format($productBranch->stock, 2) }}</p>
                                             </div>
-                                            <div>
-                                                <p class="text-xs uppercase tracking-wide text-gray-400">Precio</p>
-                                                <p class="font-medium text-gray-700 dark:text-gray-200">${{ number_format($productBranch->price, 2) }}</p>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Precio</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">S/ {{ number_format($productBranch->price, 2) }}</p>
                                             </div>
-                                            <div>
-                                                <p class="text-xs uppercase tracking-wide text-gray-400">Tasa de impuesto</p>
-                                                <p class="font-medium text-gray-700 dark:text-gray-200">
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Tasa de impuesto</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">
                                                     @if($productBranch->tax_rate_id && $productBranch->taxRate)
                                                         {{ number_format($productBranch->taxRate->tax_rate, 2) }}%
                                                     @else
@@ -325,9 +325,9 @@
                                                     @endif
                                                 </p>
                                             </div>
-                                            <div>
-                                                <p class="text-xs uppercase tracking-wide text-gray-400">Sucursal</p>
-                                                <p class="font-medium text-gray-700 dark:text-gray-200">{{ $productBranch->branch?->legal_name ?? '-' }}</p>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Sucursal</p>
+                                                <p class="mt-0.5 truncate text-sm font-medium text-gray-800 dark:text-gray-200" title="{{ $productBranch->branch?->legal_name ?? '-' }}">{{ $productBranch->branch?->legal_name ?? '-' }}</p>
                                             </div>
                                         </div>
                                     @else
