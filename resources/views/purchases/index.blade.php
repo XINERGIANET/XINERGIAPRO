@@ -16,6 +16,17 @@
                 <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first() }}</div>
             @endif
 
+            @php
+                $currentPageItems = $purchases->getCollection();
+                $pageTotal = (float) $currentPageItems->sum(fn ($purchase) => (float) ($purchase->purchaseMovement?->total ?? 0));
+                $pageCreditPending = (float) $currentPageItems->sum(function ($purchase) {
+                    $paymentType = strtoupper((string) ($purchase->purchaseMovement?->payment_type ?? 'CONTADO'));
+                    return $paymentType === 'CREDITO'
+                        ? (float) ($purchase->purchaseMovement?->total ?? 0)
+                        : 0;
+                });
+            @endphp
+
             <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <form method="GET" class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
                     @if ($viewId)
@@ -40,7 +51,7 @@
                             type="text"
                             name="search"
                             value="{{ $search }}"
-                            placeholder="Buscar por nÃºmero, proveedor o usuario"
+                            placeholder="Buscar por número, proveedor o usuario"
                             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-12 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                         />
                     </div>
@@ -104,6 +115,10 @@
                                     . ($purchase->purchaseMovement?->series ?? '001')
                                     . '-'
                                     . $purchase->number;
+                                $paymentType = strtoupper((string) ($purchase->purchaseMovement?->payment_type ?? 'CONTADO'));
+                                $pendingAmount = $paymentType === 'CREDITO'
+                                    ? (float) ($purchase->purchaseMovement?->total ?? 0)
+                                    : 0;
                             @endphp
                             <tr class="group/row border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5 relative hover:z-[60]">
                                 <td class="px-5 py-4 sm:px-6 text-center">
@@ -146,7 +161,7 @@
                                               class="relative group js-swal-delete"
                                               data-swal-title="Eliminar compra?"
                                               data-swal-text="Se eliminará la compra {{ $purchase->number }} y se revertirá stock."
-                                              data-swal-confirm="SÃ­, eliminar"
+                                              data-swal-confirm="Sí, eliminar"
                                               data-swal-cancel="Cancelar"
                                               data-swal-confirm-color="#ef4444"
                                               data-swal-cancel-color="#6b7280">
@@ -248,7 +263,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="px-6 py-12">
+                                <td colspan="11" class="px-6 py-12">
                                     <div class="flex flex-col items-center gap-3 text-center text-sm text-gray-500">
                                         <div class="rounded-full bg-gray-100 p-3 text-gray-400 dark:bg-gray-800 dark:text-gray-300">
                                             <i class="ri-shopping-bag-3-line"></i>

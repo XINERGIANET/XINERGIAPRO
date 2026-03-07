@@ -107,7 +107,7 @@
         listIngresos: {{ Js::from($conceptsIngreso) }},
         listEgresos: {{ Js::from($conceptsEgreso) }},
         currentConcepts: []
-    }" {{-- LÃ“GICA DEL EVENTO --}}
+    }" {{-- LÓGICA DEL EVENTO --}}
         @open-movement-modal.window="
         let conceptText = $event.detail.concept || ''; 
         let receivedId = String($event.detail.docId);
@@ -118,7 +118,7 @@
         formConceptId = ''; 
         formDocId = receivedId;
 
-        // Filtrar listas segÃºn si es Ingreso o Egreso
+        // Filtrar listas según si es Ingreso o Egreso
         if (receivedId === refIngresoId) {
             
             if (conceptText === 'Apertura de caja') {

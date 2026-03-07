@@ -13,17 +13,21 @@ class WorkshopAssembly extends Model
     protected $fillable = [
         'company_id',
         'branch_id',
+        'workshop_assembly_location_id',
         'brand_company',
         'vehicle_type',
         'model',
         'displacement',
         'color',
         'vin',
+        'responsible_technician_person_id',
         'quantity',
         'unit_cost',
         'total_cost',
         'assembled_at',
         'entry_at',
+        'estimated_delivery_at',
+        'estimated_minutes',
         'started_at',
         'finished_at',
         'exit_at',
@@ -38,6 +42,8 @@ class WorkshopAssembly extends Model
         'total_cost' => 'decimal:6',
         'assembled_at' => 'date',
         'entry_at' => 'datetime',
+        'estimated_delivery_at' => 'datetime',
+        'estimated_minutes' => 'integer',
         'started_at' => 'datetime',
         'finished_at' => 'datetime',
         'exit_at' => 'datetime',
@@ -57,5 +63,33 @@ class WorkshopAssembly extends Model
     {
         return $this->belongsTo(User::class, 'created_by');
     }
-}
 
+    public function location()
+    {
+        return $this->belongsTo(WorkshopAssemblyLocation::class, 'workshop_assembly_location_id');
+    }
+
+    public function responsibleTechnician()
+    {
+        return $this->belongsTo(Person::class, 'responsible_technician_person_id');
+    }
+
+    public function getActualRepairMinutesAttribute(): ?int
+    {
+        if (!$this->started_at || !$this->finished_at) {
+            return null;
+        }
+
+        return max(0, $this->started_at->diffInMinutes($this->finished_at));
+    }
+
+    public function getEstimatedVsRealMinutesAttribute(): ?int
+    {
+        $actual = $this->actual_repair_minutes;
+        if ($actual === null) {
+            return null;
+        }
+
+        return $actual - (int) $this->estimated_minutes;
+    }
+}

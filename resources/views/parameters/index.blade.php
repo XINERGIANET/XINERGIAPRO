@@ -188,7 +188,7 @@
                                     </td>
                                     <td class="px-5 py-4 sm:px-6 text-center">
                                         <p class="font-medium text-gray-900 text-theme-sm dark:text-white/90">
-                                            {{ $parameter->parameterCategory?->description ?? 'Sin categorÃ­a' }}</p>
+                                            {{ $parameter->parameterCategory?->description ?? 'Sin categoría' }}</p>
                                     </td>
                                     <td class="px-5 py-4 sm:px-6 text-center">
                                         <p class="font-medium text-gray-900 text-theme-sm dark:text-white/90">
@@ -283,7 +283,7 @@
                 </div>
             </div>
         @endif
-        {{-- PAGINACIÃ“N INFERIOR --}}
+        {{-- PAGINACIÓN INFERIOR --}}
         <div class="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="text-sm text-gray-500 dark:text-gray-400">
                 Mostrando

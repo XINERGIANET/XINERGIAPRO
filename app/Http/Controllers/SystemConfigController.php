@@ -64,12 +64,19 @@ class SystemConfigController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        $cashRegisters = DB::table('cash_registers')
+            ->where('branch_id', $branchId)
+            ->whereNull('deleted_at')
+            ->orderBy('number')
+            ->get(['id', 'number']);
+
         return view('system_config.index', [
             'title' => 'Configuracion de sistema',
             'categories' => $categories,
             'operaciones' => $operaciones,
             'viewId' => $viewId,
             'saleDocumentTypes' => $saleDocumentTypes,
+            'cashRegisters' => $cashRegisters,
         ]);
     }
 

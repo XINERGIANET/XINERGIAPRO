@@ -213,7 +213,7 @@
                                                     <form method="POST" action="{{ $actionUrl }}"
                                                         class="relative group js-swal-delete" data-swal-title="Eliminar empresa?"
                                                         data-swal-text="Se eliminará {{ $company->legal_name }}. Esta acción no se puede deshacer."
-                                                        data-swal-confirm="SÃ­, eliminar" data-swal-cancel="Cancelar"
+                                                        data-swal-confirm="Sí, eliminar" data-swal-cancel="Cancelar"
                                                         data-swal-confirm-color="#ef4444" data-swal-cancel-color="#6b7280">
                                                         @csrf
                                                         @method('DELETE')

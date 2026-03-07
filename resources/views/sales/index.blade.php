@@ -193,9 +193,9 @@
                                 <td class="px-5 py-4 sm:px-6 text-center">
                                     <p class="font-bold text-brand-600 text-theme-sm dark:text-brand-400">S/ {{ number_format((float) ($sale->salesMovement?->total ?? 0), 2) }}</p>
                                 </td>
-                                <td class="px-5 py-4 sm:px-6 text-center">
-                                    <p class="text-gray-800 text-theme-sm dark:text-white/90 truncate max-w-[150px] mx-auto" title="{{ $sale->person_name ?? 'PÃºblico General' }}">
-                                        {{ $sale->person_name ?? 'PÃºblico General' }}
+                                <td class="px-5 py-4 sm:px-6">
+                                    <p class="text-gray-800 text-theme-sm dark:text-white/90 truncate max-w-[150px]" title="{{ $sale->person_name ?? 'Público General' }}">
+                                        {{ $sale->person_name ?? 'Público General' }}
                                     </p>
                                 </td>
                                 <td class="px-5 py-4 sm:px-6 text-center">
@@ -455,7 +455,7 @@
                                         </div>
                                         <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
                                             <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Por consumo</p>
-                                            <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ ($sale->salesMovement?->consumption ?? 'N') === 'Y' ? 'SÃ­' : 'No' }}</p>
+                                            <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ ($sale->salesMovement?->consumption ?? 'N') === 'Y' ? 'Sí' : 'No' }}</p>
                                         </div>
                                         <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
                                             <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Tipo de pago</p>

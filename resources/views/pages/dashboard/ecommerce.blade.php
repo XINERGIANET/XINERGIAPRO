@@ -28,26 +28,24 @@
     <x-common.page-breadcrumb pageTitle="Dashboard Taller" />
 
     <div class="space-y-6" id="workshop-dashboard">
-     
-
         <section class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <article class="wk-kpi-card rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Órdenes Activas</p>
+                <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Órdenes activas</p>
                 <p class="mt-2 text-4xl font-black text-slate-900">{{ number_format((int) ($d['ordersActive'] ?? 0)) }}</p>
                 <p class="mt-2 text-sm font-semibold text-slate-500">En flujo de atención</p>
             </article>
             <article class="wk-kpi-card rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Cerradas Hoy</p>
+                <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Cerradas hoy</p>
                 <p class="mt-2 text-4xl font-black text-emerald-600">{{ number_format((int) ($d['ordersClosedToday'] ?? 0)) }}</p>
-                <p class="mt-2 text-sm font-semibold text-slate-500">Finalizadas/entregadas</p>
+                <p class="mt-2 text-sm font-semibold text-slate-500">Finalizadas o entregadas</p>
             </article>
             <article class="wk-kpi-card rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Pendiente Aprobación</p>
+                <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Pendiente de aprobación</p>
                 <p class="mt-2 text-4xl font-black text-amber-600">{{ number_format((int) ($d['ordersPendingApproval'] ?? 0)) }}</p>
                 <p class="mt-2 text-sm font-semibold text-slate-500">Esperando confirmación</p>
             </article>
             <article class="wk-kpi-card rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Vehículos En Taller</p>
+                <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Vehículos en taller</p>
                 <p class="mt-2 text-4xl font-black text-slate-900">{{ number_format((int) ($d['vehiclesInWorkshop'] ?? 0)) }}</p>
                 <p class="mt-2 text-sm font-semibold text-slate-500">Actualmente atendidos</p>
             </article>
@@ -57,7 +55,7 @@
             <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm xl:col-span-8">
                 <div class="mb-5 flex items-center justify-between gap-3">
                     <div>
-                        <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Ingresos Taller</p>
+                        <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Ingresos taller</p>
                         <h3 class="mt-1 text-lg font-black text-slate-900">Últimos 7 días</h3>
                     </div>
                     <span class="rounded-xl bg-slate-100 px-3 py-1 text-sm font-bold text-slate-600">
@@ -89,7 +87,7 @@
 
             <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm xl:col-span-4">
                 <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Balance rápido</p>
-                <h3 class="mt-1 text-lg font-black text-slate-900">Caja y Citas</h3>
+                <h3 class="mt-1 text-lg font-black text-slate-900">Caja y citas</h3>
                 <div class="mt-5 space-y-4">
                     <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
                         <p class="text-xs font-bold uppercase tracking-[0.14em] text-emerald-600">Facturado hoy</p>

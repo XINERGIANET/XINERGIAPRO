@@ -5,9 +5,9 @@
 @endphp
 
 @section('content')
-    <x-common.page-breadcrumb pageTitle="Configuracion | Mi sucursal" />
+    <x-common.page-breadcrumb pageTitle="Configuración | Mi sucursal" />
 
-    <x-common.component-card title="Configuracion de sistema" desc="Parametros por sucursal.">
+    <x-common.component-card title="Configuración de sistema" desc="Parámetros por sucursal.">
         <form method="POST" action="{{ route('admin.system-config.update', $viewId ? ['view_id' => $viewId] : []) }}" x-data="{ activeTab: '{{ (string) $activeTab }}' }">
             @csrf
             @if ($viewId)
@@ -38,9 +38,14 @@
                         @foreach ($category->parameters as $parameter)
                             @php
                                 $currentValue = old("values.{$parameter->id}", $parameter->branch_value ?? $parameter->value);
+                                $parameterDescription = strtolower(trim((string) $parameter->description));
                                 $normalized = strtolower(trim((string) $currentValue));
-                                $isBoolean = in_array($normalized, ['si', 'no', 'yes', 'no', 'true', 'false', '1', '0'], true);
-                                $isDefaultSaleDocType = str_contains(strtolower((string) $parameter->description), 'tipo venta por defecto');
+                                $isBoolean = in_array($normalized, ['si', 'no', 'yes', 'true', 'false', '1', '0'], true);
+                                $isDefaultSaleDocType = str_contains($parameterDescription, 'tipo venta por defecto');
+                                $isCashRegisterParameter = str_contains($parameterDescription, 'caja ventas del') || str_contains($parameterDescription, 'caja factur');
+                                $isMaintenanceDaysParameter = str_contains($parameterDescription, 'periodo de mantenimiento')
+                                    || str_contains($parameterDescription, 'dias previos de recordatorio')
+                                    || str_contains($parameterDescription, 'días previos de recordatorio');
                                 $type = is_numeric($currentValue) ? 'number' : 'text';
                             @endphp
                             <div class="rounded-xl border border-gray-200 bg-white p-4">
@@ -59,14 +64,37 @@
                                             <option value="">Sin tipos de documento de venta</option>
                                         @endforelse
                                     </select>
+                                @elseif ($isCashRegisterParameter)
+                                    <select
+                                        name="values[{{ $parameter->id }}]"
+                                        class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-700 focus:border-orange-400 focus:outline-none"
+                                    >
+                                        <option value="">Seleccione caja</option>
+                                        @forelse (($cashRegisters ?? collect()) as $cashRegister)
+                                            <option value="{{ $cashRegister->id }}" @selected((string) $currentValue === (string) $cashRegister->id)>
+                                                {{ $cashRegister->number }}
+                                            </option>
+                                        @empty
+                                            <option value="">Sin cajas registradas</option>
+                                        @endforelse
+                                    </select>
                                 @elseif ($isBoolean)
                                     <select
                                         name="values[{{ $parameter->id }}]"
                                         class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-700 focus:border-orange-400 focus:outline-none"
                                     >
-                                        <option value="Si" @selected(in_array($normalized, ['si', 'yes', 'true', '1'], true))>Si</option>
+                                        <option value="Si" @selected(in_array($normalized, ['si', 'yes', 'true', '1'], true))>Sí</option>
                                         <option value="No" @selected(in_array($normalized, ['no', 'false', '0'], true))>No</option>
                                     </select>
+                                @elseif ($isMaintenanceDaysParameter)
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="1"
+                                        name="values[{{ $parameter->id }}]"
+                                        value="{{ $currentValue }}"
+                                        class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-700 focus:border-orange-400 focus:outline-none"
+                                    />
                                 @else
                                     <input
                                         type="{{ $type }}"
@@ -85,7 +113,7 @@
             <div class="mt-6 flex justify-end">
                 <x-ui.button type="submit" size="md" variant="primary" class="h-11 px-6" style="background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff;">
                     <i class="ri-save-line"></i>
-                    <span>Guardar configuracion</span>
+                    <span>Guardar configuración</span>
                 </x-ui.button>
             </div>
         </form>

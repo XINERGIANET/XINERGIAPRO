@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div x-data="{}">
+<div x-data="{ historyModalOpen: false, historyUrl: '' }">
     <x-common.page-breadcrumb pageTitle="Personas" />
 
     <x-common.component-card title="Personas" desc="Gestiona personas del taller (clientes y personal tecnico).">
@@ -98,16 +98,17 @@
                             <td class="px-4 py-3 text-sm">
                                 <div class="flex items-center justify-center gap-2">
                                     <div class="relative group hover:z-[100]">
-                                        <x-ui.link-button
+                                        <x-ui.button
                                             size="icon"
                                             variant="primary"
-                                            href="{{ route('workshop.clients.history', $client) }}"
+                                            type="button"
+                                            @click="historyUrl = '{{ route('workshop.clients.history', $client) }}?modal=1'; historyModalOpen = true"
                                             className="rounded-xl"
                                             style="background-color: #334155; color: #FFFFFF;"
                                             aria-label="Ver historial"
                                         >
                                             <i class="ri-history-line"></i>
-                                        </x-ui.link-button>
+                                        </x-ui.button>
                                         <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[1000] shadow-xl">
                                             Historial
                                             <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
@@ -170,7 +171,7 @@
             </table>
         </div>
 
-        {{-- PAGINACIÃ“N INFERIOR --}}
+        {{-- PAGINACIÓN INFERIOR --}}
         <div class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="text-sm text-gray-500 dark:text-gray-400">
                 Mostrando
@@ -276,6 +277,18 @@
             </div>
         </x-ui.modal>
     @endforeach
+
+    <x-ui.modal x-data="{ open: false }" x-effect="open = historyModalOpen" :isOpen="false" :showCloseButton="false" class="max-w-7xl">
+        <div class="p-4 sm:p-6">
+            <div class="mb-4 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Historial del cliente</h3>
+                <button type="button" @click="historyModalOpen = false; historyUrl = ''; open = false" class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
+                    <i class="ri-close-line text-xl"></i>
+                </button>
+            </div>
+            <iframe :src="historyUrl" class="h-[75vh] w-full rounded-2xl border border-gray-200 bg-white"></iframe>
+        </div>
+    </x-ui.modal>
 </div>
 <script>
 function splitReniecName(fullName) {

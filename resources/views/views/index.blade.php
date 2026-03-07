@@ -77,9 +77,9 @@
     
     <x-common.page-breadcrumb pageTitle="Vistas" />
 
-    <x-common.component-card title="Gestión de Vistas" desc="Administra las vistas del sistema para asociarlas a los menÃºs.">
+    <x-common.component-card title="Gestión de Vistas" desc="Administra las vistas del sistema para asociarlas a los menús.">
         
-        {{-- BARRA DE BÃšSQUEDA Y ACCIONES --}}
+        {{-- BARRA DE BÚSQUEDA Y ACCIONES --}}
         <div class="flex flex-col gap-4 mb-6 xl:flex-row xl:items-center xl:justify-between">
             <form method="GET" class="flex flex-1 flex-wrap gap-2 sm:flex-nowrap sm:items-center min-w-0">
                 @if ($viewId)
@@ -216,7 +216,7 @@
                                                     class="relative group js-swal-delete"
                                                     data-swal-title="Eliminar vista?"
                                                     data-swal-text="Se eliminará {{ $view->name }}. Esta acción no se puede deshacer."
-                                                    data-swal-confirm="SÃ­, eliminar"
+                                                    data-swal-confirm="Sí, eliminar"
                                                     data-swal-cancel="Cancelar"
                                                     data-swal-confirm-color="#ef4444"
                                                     data-swal-cancel-color="#6b7280">

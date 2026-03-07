@@ -34,7 +34,7 @@
                             <select id="cash-register-id"
                                 class="w-full rounded-lg border border-gray-300 bg-gray-50 px-2.5 py-2 text-xs text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400">
                                 @foreach ($cashRegisters as $cashRegister)
-                                    <option value="{{ $cashRegister->id }}" @selected($cashRegister->status === 'A')>
+                                    <option value="{{ $cashRegister->id }}" @selected((int) ($defaultCashRegisterId ?? 0) === (int) $cashRegister->id)>
                                         {{ $cashRegister->number }}{{ $cashRegister->status === 'A' ? ' (Activa)' : '' }}
                                     </option>
                                 @endforeach

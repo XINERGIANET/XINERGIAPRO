@@ -207,7 +207,13 @@ class WorkshopClientController extends Controller
             ->get();
 
         $orders = WorkshopMovement::query()
-            ->with(['movement', 'vehicle'])
+            ->with([
+                'movement',
+                'vehicle',
+                'details.service',
+                'details.technician',
+                'technicians.technician',
+            ])
             ->where('client_person_id', $person->id)
             ->where('company_id', $companyId)
             ->orderByDesc('id')
@@ -242,22 +248,33 @@ class WorkshopClientController extends Controller
         $totalPurchases = (float) $purchases->sum('total');
         $totalPayments = (float) $payments->sum('total');
 
-        return view('workshop.clients.history', compact(
-            'person',
-            'vehicles',
-            'appointments',
-            'orders',
-            'sales',
-            'purchases',
-            'payments',
-            'totalOrders',
-            'totalPaidOrders',
-            'debtOrders',
-            'totalSales',
-            'totalPurchases',
-            'totalPayments'
+        $historyView = view('workshop.clients.history', array_merge(
+            compact(
+                'person',
+                'vehicles',
+                'appointments',
+                'orders',
+                'sales',
+                'purchases',
+                'payments',
+                'totalOrders',
+                'totalPaidOrders',
+                'debtOrders',
+                'totalSales',
+                'totalPurchases',
+                'totalPayments'
+            ),
+            [
+                'isModal' => $request->boolean('modal'),
+            ]
         ));
-    }
+
+        if ($request->boolean('modal')) {
+            return response($historyView->render());
+        }
+
+        return $historyView;
+    }   
 
     private function assertClientScope(Person $person, int $branchId): void
     {

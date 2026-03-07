@@ -81,7 +81,7 @@
             };
         @endphp
         <x-common.page-breadcrumb
-            pageTitle="Opciones de MenÃº"
+            pageTitle="Opciones de Menú"
             :breadcrumbs="[
                 ['name' => 'Módulos', 'href' => route('admin.modules.index')],
                 ['name' => $module->name, 'href' => '#'],
@@ -91,9 +91,9 @@
 
         <x-common.component-card
             title="Opciones: {{ $module->name }}"
-            desc="Gestiona los sub-menÃºs asociados a este módulo."
+            desc="Gestiona los sub-menús asociados a este módulo."
         >
-            {{-- BARRA DE BÃšSQUEDA Y ACCIONES --}}
+            {{-- BARRA DE BÚSQUEDA Y ACCIONES --}}
             <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between mb-6">
                 <form method="GET" action="{{ route('admin.modules.menu_options.index', $module) }}" class="flex flex-1 flex-wrap gap-2 sm:flex-nowrap sm:items-center min-w-0">
                     @if ($viewId)
@@ -333,7 +333,7 @@
                                                 <i class="ri-list-settings-line text-2xl"></i>
                                             </div>
                                             <p class="text-base font-semibold text-gray-700 dark:text-gray-200">No hay opciones registradas</p>
-                                            <p class="text-gray-500">Agrega la primera opción al menÃº de este módulo.</p>
+                                            <p class="text-gray-500">Agrega la primera opción al menú de este módulo.</p>
                                         </div>
                                     </td>
                                 </tr>
@@ -367,7 +367,7 @@
                             <i class="ri-menu-add-line text-2xl"></i>
                         </div>
                         <div>
-                            <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Registrar Opción de MenÃº</h3>
+                            <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Registrar Opción de Menú</h3>
                             <p class="mt-1 text-sm text-gray-500">Módulo actual: <strong>{{ $module->name }}</strong></p>
                         </div>
                     </div>
@@ -427,11 +427,11 @@
                 }
 
                 Swal.fire({
-                    title: 'Â¿Eliminar opción?',
+                    title: '¿Eliminar opción?',
                     text: `Se eliminará "${name}".`,
                     icon: 'warning',
                     showCancelButton: true,
-                    confirmButtonText: 'SÃ­, eliminar',
+                    confirmButtonText: 'Sí, eliminar',
                     cancelButtonText: 'Cancelar',
                     confirmButtonColor: '#ef4444',
                     cancelButtonColor: '#6b7280',

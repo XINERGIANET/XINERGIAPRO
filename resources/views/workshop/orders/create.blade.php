@@ -1,7 +1,7 @@
 ﻿@extends('layouts.app')
 
 @section('content')
-<div class="space-y-4">
+<div class="space-y-4" x-data="{ selectedClientId: '', historyUrl: '', historyBase: @js(route('workshop.clients.history', ['person' => '__PERSON__'])) }">
     <h1 class="text-xl font-semibold">Nueva Orden de Servicio</h1>
 
     @if ($errors->any())
@@ -22,12 +22,29 @@
 
         <div>
             <label class="mb-1 block text-sm font-medium text-gray-700">Cliente <span class="text-red-500">*</span></label>
-            <select name="client_person_id" class="w-full rounded border px-3 py-2" required>
-                <option value="">Seleccione cliente</option>
+            <div class="flex gap-2">
+                <select
+                    name="client_person_id"
+                    x-model="selectedClientId"
+                    @change="historyUrl = selectedClientId ? historyBase.replace('__PERSON__', selectedClientId) + '?modal=1' : ''"
+                    class="w-full rounded border px-3 py-2"
+                    required
+                >
+                    <option value="">Seleccione cliente</option>
                 @foreach($clients as $client)
                     <option value="{{ $client->id }}">{{ $client->first_name }} {{ $client->last_name }}</option>
                 @endforeach
-            </select>
+                </select>
+                <button
+                    type="button"
+                    class="inline-flex items-center justify-center rounded border border-violet-200 bg-violet-50 px-3 text-violet-700 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="!selectedClientId"
+                    @click="$dispatch('open-order-client-history')"
+                    title="Ver historial"
+                >
+                    <i class="ri-history-line text-lg"></i>
+                </button>
+            </div>
         </div>
 
         <div>
@@ -86,6 +103,29 @@
 
         <button class="rounded bg-[#244BB3] px-3 py-3 text-white font-semibold transition-colors hover:bg-[#1f3f98] md:col-span-2">Crear Orden de Servicio</button>
     </form>
+
+    <x-ui.modal x-data="{ open: false }" x-on:open-order-client-history.window="open = true" x-on:close-order-client-history.window="open = false" :isOpen="false" :showCloseButton="false" class="max-w-7xl">
+        <div class="p-5 sm:p-6">
+            <div class="mb-4 flex items-center justify-between gap-3">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">Historial del cliente</h3>
+                    <p class="mt-1 text-sm text-gray-500">Consulta mantenimientos, tecnico, observaciones y vehiculos asociados.</p>
+                </div>
+                <button type="button" @click="open = false" class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
+                    <i class="ri-close-line text-xl"></i>
+                </button>
+            </div>
+            <div class="overflow-hidden rounded-2xl border border-gray-200">
+                <template x-if="historyUrl">
+                    <iframe :src="historyUrl" class="h-[75vh] w-full bg-white"></iframe>
+                </template>
+                <template x-if="!historyUrl">
+                    <div class="flex h-80 items-center justify-center bg-gray-50 text-sm font-medium text-gray-500">
+                        Seleccione un cliente para ver su historial.
+                    </div>
+                </template>
+            </div>
+        </div>
+    </x-ui.modal>
 </div>
 @endsection
-

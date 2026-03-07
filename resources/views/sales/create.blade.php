@@ -139,7 +139,7 @@
                                                 class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
                                             >
                                                 @foreach ($cashRegisters ?? [] as $cashRegister)
-                                                    <option value="{{ $cashRegister->id }}" @selected($cashRegister->status === 'A')>
+                                                    <option value="{{ $cashRegister->id }}" @selected((int) ($defaultCashRegisterId ?? 0) === (int) $cashRegister->id)>
                                                         {{ $cashRegister->number }}{{ $cashRegister->status === 'A' ? ' (Activa)' : '' }}
                                                     </option>
                                                 @endforeach

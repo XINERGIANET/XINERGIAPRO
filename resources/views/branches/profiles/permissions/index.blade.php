@@ -208,7 +208,7 @@
 
                     @if ($modules->isEmpty())
                         <div class="rounded-xl border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-500 dark:border-gray-800">
-                            No hay opciones de menÃº disponibles para asignar.
+                            No hay opciones de menú disponibles para asignar.
                         </div>
                     @else
                         <div class="space-y-5">

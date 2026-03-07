@@ -39,6 +39,7 @@ use App\Http\Controllers\UnitController;
 use App\Http\Controllers\WarehouseMovementController;
 use App\Http\Controllers\WorkshopAppointmentController;
 use App\Http\Controllers\WorkshopAssemblyController;
+use App\Http\Controllers\WorkshopAssemblyLocationController;
 use App\Http\Controllers\WorkshopClientController;
 use App\Http\Controllers\WorkshopMaintenanceBoardController;
 use App\Http\Controllers\WorkshopPurchaseController;
@@ -445,6 +446,10 @@ Route::middleware('auth')->group(function () {
     Route::put('/tipos-vehiculo/{vehicleType}', [WorkshopVehicleTypeController::class, 'update'])->name('vehicle-types.update');
     Route::delete('/tipos-vehiculo/{vehicleType}', [WorkshopVehicleTypeController::class, 'destroy'])->name('vehicle-types.destroy');
         Route::get('/clientes/{person}/historial', [WorkshopClientController::class, 'show'])->name('clients.history');
+        Route::get('/armados/ubicaciones', [WorkshopAssemblyLocationController::class, 'index'])->name('assembly-locations.index');
+        Route::post('/armados/ubicaciones', [WorkshopAssemblyLocationController::class, 'store'])->name('assembly-locations.store');
+        Route::put('/armados/ubicaciones/{assemblyLocation}', [WorkshopAssemblyLocationController::class, 'update'])->name('assembly-locations.update');
+        Route::delete('/armados/ubicaciones/{assemblyLocation}', [WorkshopAssemblyLocationController::class, 'destroy'])->name('assembly-locations.destroy');
         Route::get('/compras', [WorkshopPurchaseController::class, 'index'])->name('purchases.index');
         Route::get('/ventas', [WorkshopSalesRegisterController::class, 'index'])->name('sales-register.index');
 

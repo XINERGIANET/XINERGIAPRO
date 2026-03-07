@@ -26,7 +26,7 @@
                         $routeCandidates[] = 'admin.' . $action;
                         $routeCandidates[] = 'admin.' . $normalizedAction;
                     }
-                    // Agregar variantes con .index solo si no tiene ya un método especÃ­fico
+                    // Agregar variantes con .index solo si no tiene ya un método específico
                     if (!str_contains($action, '.') || str_ends_with($action, '.index')) {
                         $routeCandidates = array_merge(
                             $routeCandidates,
@@ -101,7 +101,7 @@
                                 <i class="ri-search-line"></i>
                             </span>
                             <input type="text" name="search" value="{{ $search }}"
-                                placeholder="Buscar por nÃºmero, persona, usuario..."
+                                placeholder="Buscar por número, persona, usuario..."
                                 class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
                         </div>
                     </div>

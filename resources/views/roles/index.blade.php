@@ -72,7 +72,7 @@
 
         <x-common.component-card title="Gestión de Roles" desc="Administra los roles del sistema para definir permisos.">
             
-            {{-- BARRA DE BÃšSQUEDA Y ACCIONES --}}
+            {{-- BARRA DE BÚSQUEDA Y ACCIONES --}}
             <div class="flex flex-col gap-4 mb-6 xl:flex-row xl:items-center xl:justify-between">
                 <form method="GET" class="flex flex-1 flex-wrap gap-2 sm:flex-nowrap sm:items-center min-w-0">
                     @if ($viewId)
@@ -308,11 +308,11 @@
                 }
 
                 Swal.fire({
-                    title: 'Â¿Eliminar rol?',
+                    title: '¿Eliminar rol?',
                     text: `Se eliminará "${name}". Esta acción no se puede deshacer.`,
                     icon: 'warning',
                     showCancelButton: true,
-                    confirmButtonText: 'SÃ­, eliminar',
+                    confirmButtonText: 'Sí, eliminar',
                     cancelButtonText: 'Cancelar',
                     confirmButtonColor: '#ef4444',
                     cancelButtonColor: '#6b7280',

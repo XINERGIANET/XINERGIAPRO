@@ -14,9 +14,11 @@ use App\Models\SalesMovement;
 use App\Models\SalesMovementDetail;
 use App\Models\Shift;
 use App\Models\TaxRate;
+use App\Models\Technician;
 use App\Models\Unit;
 use App\Models\WorkshopAssembly;
 use App\Models\WorkshopAssemblyCost;
+use App\Models\WorkshopAssemblyLocation;
 use App\Support\WorkshopAuthorization;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -46,6 +48,7 @@ class WorkshopAssemblyController extends Controller
         $vehicleType = trim((string) $request->input('vehicle_type', ''));
 
         $assemblies = WorkshopAssembly::query()
+            ->with(['location:id,name,address', 'responsibleTechnician:id,first_name,last_name,document_number'])
             ->where('company_id', $companyId)
             ->where('branch_id', $branchId)
             ->whereRaw("to_char(assembled_at, 'YYYY-MM') = ?", [$month])
@@ -97,6 +100,28 @@ class WorkshopAssemblyController extends Controller
 
         $paymentMethods = PaymentMethod::query()->where('status', true)->orderBy('order_num')->get();
 
+        $assemblyLocations = WorkshopAssemblyLocation::query()
+            ->where('company_id', $companyId)
+            ->where('active', true)
+            ->where(function ($query) use ($branchId) {
+                $query->whereNull('branch_id')->orWhere('branch_id', $branchId);
+            })
+            ->orderBy('name')
+            ->get();
+
+        $technicians = Technician::query()
+            ->with('person:id,first_name,last_name,document_number')
+            ->where('company_id', $companyId)
+            ->where('active', true)
+            ->where(function ($query) use ($branchId) {
+                $query->whereNull('branch_id')->orWhere('branch_id', $branchId);
+            })
+            ->orderBy('id')
+            ->get()
+            ->pluck('person')
+            ->filter()
+            ->values();
+
         return view('workshop.assemblies.index', compact(
             'assemblies',
             'costTable',
@@ -107,7 +132,9 @@ class WorkshopAssemblyController extends Controller
             'clients',
             'documentTypes',
             'cashRegisters',
-            'paymentMethods'
+            'paymentMethods',
+            'assemblyLocations',
+            'technicians'
         ));
     }
 
@@ -122,10 +149,14 @@ class WorkshopAssemblyController extends Controller
             'displacement' => ['nullable', 'string', 'max:20'],
             'color' => ['nullable', 'string', 'max:40'],
             'vin' => ['nullable', 'string', 'max:100'],
+            'workshop_assembly_location_id' => ['nullable', 'integer', 'exists:workshop_assembly_locations,id'],
+            'responsible_technician_person_id' => ['nullable', 'integer', 'exists:people,id'],
             'quantity' => ['required', 'integer', 'min:1'],
             'unit_cost' => ['nullable', 'numeric', 'min:0'],
             'assembled_at' => ['required', 'date'],
             'entry_at' => ['nullable', 'date'],
+            'estimated_delivery_at' => ['nullable', 'date'],
+            'estimated_minutes' => ['nullable', 'integer', 'min:0'],
             'notes' => ['nullable', 'string'],
         ]);
 
@@ -153,11 +184,15 @@ class WorkshopAssemblyController extends Controller
             'displacement' => $data['displacement'] ?? null,
             'color' => $data['color'] ?? null,
             'vin' => $data['vin'] ?? null,
+            'workshop_assembly_location_id' => $data['workshop_assembly_location_id'] ?? null,
+            'responsible_technician_person_id' => $data['responsible_technician_person_id'] ?? null,
             'quantity' => (int) $data['quantity'],
             'unit_cost' => $resolvedUnitCost,
             'total_cost' => round(((int) $data['quantity']) * $resolvedUnitCost, 6),
             'assembled_at' => $data['assembled_at'],
             'entry_at' => $data['entry_at'] ?? now(),
+            'estimated_delivery_at' => $data['estimated_delivery_at'] ?? null,
+            'estimated_minutes' => (int) ($data['estimated_minutes'] ?? 0),
             'notes' => $data['notes'] ?? null,
             'created_by' => auth()->id(),
         ]);
@@ -177,10 +212,14 @@ class WorkshopAssemblyController extends Controller
             'displacement' => ['nullable', 'string', 'max:20'],
             'color' => ['nullable', 'string', 'max:40'],
             'vin' => ['nullable', 'string', 'max:100'],
+            'workshop_assembly_location_id' => ['nullable', 'integer', 'exists:workshop_assembly_locations,id'],
+            'responsible_technician_person_id' => ['nullable', 'integer', 'exists:people,id'],
             'quantity' => ['required', 'integer', 'min:1'],
             'unit_cost' => ['required', 'numeric', 'min:0'],
             'assembled_at' => ['required', 'date'],
             'entry_at' => ['nullable', 'date'],
+            'estimated_delivery_at' => ['nullable', 'date'],
+            'estimated_minutes' => ['nullable', 'integer', 'min:0'],
             'notes' => ['nullable', 'string'],
         ]);
 
@@ -194,11 +233,15 @@ class WorkshopAssemblyController extends Controller
             'displacement' => $data['displacement'] ?? null,
             'color' => $data['color'] ?? null,
             'vin' => $data['vin'] ?? null,
+            'workshop_assembly_location_id' => $data['workshop_assembly_location_id'] ?? null,
+            'responsible_technician_person_id' => $data['responsible_technician_person_id'] ?? null,
             'quantity' => $quantity,
             'unit_cost' => $unitCost,
             'total_cost' => round($quantity * $unitCost, 6),
             'assembled_at' => $data['assembled_at'],
             'entry_at' => $data['entry_at'] ?? $assembly->entry_at,
+            'estimated_delivery_at' => $data['estimated_delivery_at'] ?? null,
+            'estimated_minutes' => (int) ($data['estimated_minutes'] ?? 0),
             'notes' => $data['notes'] ?? null,
         ]);
 
@@ -232,7 +275,7 @@ class WorkshopAssemblyController extends Controller
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Fecha', 'Empresa/Marca', 'Tipo Vehiculo', 'Modelo', 'Cilindrada', 'Color', 'VIN', 'Ingreso', 'Inicio', 'Fin', 'Salida', 'Cantidad', 'Costo Unitario', 'Costo Total', 'Observaciones']);
+            fputcsv($out, ['Fecha', 'Empresa/Marca', 'Tipo Vehiculo', 'Modelo', 'Cilindrada', 'Color', 'VIN', 'Ubicacion', 'Tecnico', 'Ingreso', 'Entrega estimada', 'Inicio', 'Fin', 'Tiempo estimado', 'Tiempo real', 'Diferencia', 'Salida', 'Cantidad', 'Costo Unitario', 'Costo Total', 'Observaciones']);
             foreach ($rows as $row) {
                 fputcsv($out, [
                     optional($row->assembled_at)->format('Y-m-d'),
@@ -242,9 +285,15 @@ class WorkshopAssemblyController extends Controller
                     (string) $row->displacement,
                     (string) $row->color,
                     (string) $row->vin,
+                    optional($row->location)->name,
+                    trim((string) optional($row->responsibleTechnician)->first_name . ' ' . (string) optional($row->responsibleTechnician)->last_name),
                     optional($row->entry_at)->format('Y-m-d H:i'),
+                    optional($row->estimated_delivery_at)->format('Y-m-d H:i'),
                     optional($row->started_at)->format('Y-m-d H:i'),
                     optional($row->finished_at)->format('Y-m-d H:i'),
+                    (int) $row->estimated_minutes,
+                    $row->actual_repair_minutes,
+                    $row->estimated_vs_real_minutes,
                     optional($row->exit_at)->format('Y-m-d H:i'),
                     (int) $row->quantity,
                     number_format((float) $row->unit_cost, 6, '.', ''),
@@ -323,7 +372,15 @@ class WorkshopAssemblyController extends Controller
         [$branchId, $companyId] = $this->resolveContext();
         $this->assertScope($assembly, $branchId, $companyId);
 
-        $assembly->update(['started_at' => now()]);
+        $estimatedDeliveryAt = $assembly->estimated_delivery_at;
+        if (!$estimatedDeliveryAt && (int) $assembly->estimated_minutes > 0) {
+            $estimatedDeliveryAt = now()->copy()->addMinutes((int) $assembly->estimated_minutes);
+        }
+
+        $assembly->update([
+            'started_at' => now(),
+            'estimated_delivery_at' => $estimatedDeliveryAt,
+        ]);
 
         return back()->with('status', 'Armado iniciado correctamente.');
     }
