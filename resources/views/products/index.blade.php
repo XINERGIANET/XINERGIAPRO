@@ -173,27 +173,27 @@
                 </div>
             </div>
 
-            <div class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-                <table class="w-full min-w-[1100px]">
+            <div class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] shadow-sm overflow-hidden">
+                <table class="w-full">
                     <thead>
                         <tr class="text-white">
                             <th style="background-color: #334155; color: #FFFFFF;" class="w-12 px-4 py-4 text-center first:rounded-tl-xl"></th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="hidden md:table-cell px-5 py-3 text-center sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="hidden md:table-cell w-32 px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Código</p>
                             </th>
                             <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Descripción</p>
                             </th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="hidden sm:table-cell px-5 py-3 text-center sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="hidden sm:table-cell w-48 px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Categoría</p>
                             </th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="hidden lg:table-cell px-5 py-3 text-center sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="hidden lg:table-cell w-40 px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Unidad base</p>
                             </th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="hidden xl:table-cell px-5 py-3 text-center sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="hidden xl:table-cell w-40 px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Tipo</p>
                             </th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6 last:rounded-tr-xl">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="w-40 px-5 py-3 text-center sm:px-6 last:rounded-tr-xl">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Acciones</p>
                             </th>
                         </tr>
@@ -306,7 +306,7 @@
                                         }
                                     @endphp
                                     @if($productBranch)
-                                        <div class="grid gap-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 max-w-4xl">
                                             <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
                                                 <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Código</p>
                                                 <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $product->code ?: '-' }}</p>

@@ -152,29 +152,29 @@
                     </x-ui.link-button>
                 @endif
             </div>
-            <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-                    <table class="w-full min-w-[1100px]">
+            <div class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+                    <table class="w-full">
                         <thead style="background-color: #334155; color: #FFFFFF;">
                             <tr>
-                                <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-4 text-center first:rounded-tl-xl sticky-left-header">
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-3 py-3 text-center first:rounded-tl-xl">
                                     <p class="font-bold text-gray-100 text-xs uppercase tracking-wider">Número</p>
                                 </th>
-                                <th class="px-5 py-4 text-center align-middle break-words">
-                                    <p class="font-bold text-gray-100 text-xs uppercase tracking-wider">Origen</p>
+                                <th class="px-3 py-3 text-center align-middle">
+                                    <p class="font-bold text-gray-100 text-xs uppercase tracking-wider">Tipo</p>
                                 </th>
-                                    <th  class="px-5 py-4 text-center align-middle break-words">
+                                <th class="px-3 py-3 text-center align-middle">
                                     <p class="font-bold text-gray-100 text-xs uppercase tracking-wider">Persona</p>
                                 </th>
-                                <th  class="px-5 py-4 text-center align-middle break-words">
+                                <th class="px-3 py-3 text-center align-middle">
                                     <p class="font-bold text-gray-100 text-xs uppercase tracking-wider">Comentario</p>
                                 </th>
-                                <th  class="px-5 py-4 text-center align-middle break-words">
+                                <th class="px-3 py-3 text-center align-middle">
                                     <p class="font-bold text-gray-100 text-xs uppercase tracking-wider">Estado</p>
                                 </th>
-                                <th  class="px-5 py-4 text-center align-middle break-words">
+                                <th class="px-3 py-3 text-center align-middle">
                                     <p class="font-bold text-gray-100 text-xs uppercase tracking-wider">Fecha</p>
                                 </th>
-                                <th  class="px-5 py-4 text-center last:rounded-tr-xl">
+                                <th class="px-3 py-3 text-center last:rounded-tr-xl">
                                     <p class="font-bold text-gray-100 text-xs uppercase tracking-wider">Acciones</p>
                                 </th>
                             </tr>
@@ -192,8 +192,8 @@
                                     $statusColor = $statusColors[$warehouseMovement->status] ?? 'info';
                                 @endphp
                                 <tr class="group/row transition hover:bg-gray-50/80 dark:hover:bg-white/5 relative hover:z-[60]">
-                                    <td class="px-5 py-4 align-middle">
-                                        <div class="flex items-center gap-2">
+                                    <td class="px-3 py-3 align-middle text-center">
+                                        <div class="flex items-center justify-center gap-2">
                                             <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-500 dark:bg-brand-500/10 shrink-0">
                                                 <i class="ri-archive-line text-xs"></i>
                                             </div>
@@ -202,32 +202,38 @@
                                             </p>
                                         </div>
                                     </td>
-                                    <td class="px-5 py-4 text-center align-middle break-words">
-                                        <x-ui.badge variant="light" color="info">
-                                            {{ $movement->movementType->description ?? '-' }}
+                                    <td class="px-3 py-3 text-center align-middle">
+                                        @php
+                                            $stockType = $movement->documentType->stock ?? 'none';
+                                            $typeLabel = $stockType === 'add' ? 'Entrada' : ($stockType === 'subtract' ? 'Salida' : 'Otros');
+                                            $typeColor = $stockType === 'add' ? 'success' : ($stockType === 'subtract' ? 'error' : 'info');
+                                        @endphp
+                                        <x-ui.badge variant="light" color="{{ $typeColor }}">
+                                            {{ $typeLabel }}
                                         </x-ui.badge>
                                     </td>
-                                    <td class="px-5 py-4 align-middle break-words">
-                                        <p class="text-gray-600 text-theme-sm dark:text-gray-400">
+                                    <td class="px-3 py-3 align-middle text-center">
+                                        <p class="text-gray-600 text-theme-sm dark:text-gray-400 truncate max-w-[150px] mx-auto" title="{{ $movement->person_name ?? $movement->user_name ?? '-' }}">
                                             {{ $movement->person_name ?? $movement->user_name ?? '-' }}
                                         </p>
                                     </td>
-                                    <td class="px-5 py-4 align-middle break-words">
-                                        <p class="text-gray-600 text-theme-sm dark:text-gray-400 " title="{{ $movement->comment ?? '-' }}">
+                                    <td class="px-3 py-3 align-middle text-center">
+                                        <p class="text-gray-600 text-theme-sm dark:text-gray-400 truncate max-w-[150px] mx-auto" title="{{ $movement->comment ?? '-' }}">
                                             {{ $movement->comment ?? '-' }}
                                         </p>
                                     </td>
-                                    <td class="px-5 py-4 text-center align-middle break-words">
+                                    <td class="px-3 py-3 text-center align-middle">
                                         <x-ui.badge variant="light" color="{{ $statusColor }}">
                                             {{ $warehouseMovement->status ?? 'FINALIZED' }}
                                         </x-ui.badge>
                                     </td>
-                                    <td class="px-5 py-4 text-center align-middle break-words">
-                                        <span class="text-xs text-gray-500 dark:text-gray-400">
-                                            {{ $movement->moved_at ? $movement->moved_at->format('d/m/Y H:i') : '-' }}
-                                        </span>
+                                    <td class="px-3 py-3 text-center align-middle whitespace-nowrap">
+                                        <div class="flex flex-col items-center">
+                                            <p class="text-gray-800 text-[11px] font-medium dark:text-white/90">{{ $movement->moved_at ? $movement->moved_at->format('j/m/Y') : '-' }}</p>
+                                            <p class="text-gray-500 text-[10px] dark:text-gray-400">{{ $movement->moved_at ? $movement->moved_at->format('h:i A') : '' }}</p>
+                                        </div>
                                     </td>
-                                    <td class="px-5 py-4 align-middle">
+                                    <td class="px-3 py-3 align-middle">
                                         <div class="flex items-center justify-center gap-2">
                                             @if ($rowOperations->isNotEmpty())
                                                 @foreach ($rowOperations as $operation)

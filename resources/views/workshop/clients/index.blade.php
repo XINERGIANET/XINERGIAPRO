@@ -12,59 +12,64 @@
             <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first() }}</div>
         @endif
 
-        {{-- Barra de Herramientas Premium (Estilo solicitado) --}}
-        <form method="GET" action="{{ route('workshop.clients.index') }}" class="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-white/[0.02]">
+        {{-- Barra de Herramientas Premium --}}
+        <form method="GET" action="{{ route('workshop.clients.index') }}" class="mb-5 flex flex-wrap items-center gap-3">
+            @if (request('view_id'))
+                <input type="hidden" name="view_id" value="{{ request('view_id') }}">
+            @endif
+
             {{-- Selector de Registros --}}
-            <div class="flex items-center gap-2">
-                <select name="per_page" class="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="this.form.submit()">
-                    <option value="10" @selected(($per_page ?? 10) == 10)>10 / pág</option>
-                    <option value="25" @selected(($per_page ?? 10) == 25)>25 / pág</option>
-                    <option value="50" @selected(($per_page ?? 10) == 50)>50 / pág</option>
-                    <option value="100" @selected(($per_page ?? 10) == 100)>100 / pág</option>
+            <div class="w-32 flex-none">
+                <select name="per_page" class="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none transition-all" onchange="this.form.submit()">
+                    <option value="10" @selected(($per_page ?? 10) == 10)>10 / página</option>
+                    <option value="25" @selected(($per_page ?? 10) == 25)>25 / página</option>
+                    <option value="50" @selected(($per_page ?? 10) == 50)>50 / página</option>
+                    <option value="100" @selected(($per_page ?? 10) == 100)>100 / página</option>
                 </select>
             </div>
 
             {{-- Buscador Principal --}}
-            <div class="relative flex-1 min-w-0 sm:min-w-[300px]">
+            <div class="relative flex-1 min-w-[200px] sm:min-w-[300px]">
                 <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                    <i class="ri-search-line text-lg text-gray-400"></i>
+                    <i class="ri-search-line text-gray-400"></i>
                 </div>
                 <input 
                     name="search" 
                     value="{{ $search }}" 
-                    class="h-11 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-4 text-sm shadow-sm transition-all focus:border-blue-500 focus:ring-blue-500 placeholder:text-gray-400" 
-                    placeholder="Buscar por nombre, DNI o RUC..."
+                    class="h-11 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-4 text-sm shadow-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none placeholder:text-gray-400" 
+                    placeholder="Buscar por nombre, documento..."
                 >
             </div>
 
-            {{-- Filtros Extra (Opcional, se mantienen para no perder funcionalidad) --}}
-            <div class="flex items-center gap-2">
-                <select name="type" class="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+            {{-- Filtro de Tipo --}}
+            <div class="w-40 flex-none">
+                <select name="type" class="h-11 w-full rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-600 shadow-sm focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none transition-all">
                     <option value="">Tipo: Todos</option>
                     <option value="NATURAL" @selected($type === 'NATURAL')>Natural</option>
                     <option value="CORPORATIVO" @selected($type === 'CORPORATIVO')>Corporativo</option>
                 </select>
             </div>
 
-            {{-- Acciones del Formulario --}}
+            {{-- Acciones --}}
             <div class="flex items-center gap-2">
-                <button type="submit" class="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#334155] px-6 text-sm font-bold text-white shadow-lg shadow-blue-100 transition-all hover:brightness-110 active:scale-95">
+                <x-ui.button size="md" variant="primary" type="submit" class="h-11 px-5 shadow-sm active:scale-95 transition-all" style="background-color: #334155; border-color: #334155;">
                     <i class="ri-search-line"></i>
                     <span>Buscar</span>
-                </button>
-                <a href="{{ route('workshop.clients.index') }}" class="inline-flex h-11 items-center justify-center rounded-xl border border-gray-200 bg-white px-4 text-sm font-bold text-gray-700 shadow-sm transition-all hover:bg-gray-50 active:scale-95">
-                    Limpiar
-                </a>
+                </x-ui.button>
+                <x-ui.link-button size="md" variant="outline" href="{{ route('workshop.clients.index') }}" class="h-11 px-4 border-gray-200 text-gray-600 hover:bg-gray-50 transition-all active:scale-95">
+                    <i class="ri-refresh-line"></i>
+                    <span>Limpiar</span>
+                </x-ui.link-button>
             </div>
 
-            {{-- Botón Nuevo (Al final a la derecha) --}}
+            {{-- Botón Nuevo --}}
             <div class="ml-auto">
                 <x-ui.button 
                     size="md" 
                     variant="primary" 
                     type="button" 
-                    class="!h-11 rounded-2xl px-6 font-bold shadow-lg transition-all hover:scale-[1.02]" 
-                    style="background-color:#00A389;color:#fff" 
+                    class="h-11 rounded-xl px-6 font-bold shadow-sm transition-all hover:brightness-105 active:scale-95" 
+                    style="background-color: #00A389; color: #FFFFFF;" 
                     @click="$dispatch('open-client-modal')"
                 >
                     <i class="ri-add-line text-lg"></i>
@@ -74,28 +79,32 @@
         </form>
 
         <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-            <table class="w-full min-w-[1050px]">
-                <thead>
+            <table class="w-full">
+                <thead style="background-color: #334155; color: #FFFFFF;">
                     <tr>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">ID</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Tipo</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Documento</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Cliente</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Telefono</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Correo</th>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Acciones</th>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider first:rounded-tl-xl text-white">ID</th>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Tipo</th>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Documento</th>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Cliente</th>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Teléfono</th>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Correo</th>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider last:rounded-tr-xl text-white">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($clients as $client)
-                        <tr class="border-t border-gray-100 dark:border-gray-800">
-                            <td class="px-4 py-3 text-sm text-center">{{ $client->id }}</td>
-                            <td class="px-4 py-3 text-sm text-center">{{ $client->person_type === 'RUC' ? 'CORPORATIVO' : 'NATURAL' }}</td>
-                            <td class="px-4 py-3 text-sm text-center">{{ $client->person_type }}: {{ $client->document_number }}</td>
-                            <td class="px-4 py-3 text-sm text-center">{{ $client->first_name }} {{ $client->last_name }}</td>
-                            <td class="px-4 py-3 text-sm text-center">{{ $client->phone }}</td>
-                            <td class="px-4 py-3 text-sm text-center">{{ $client->email }}</td>
-                            <td class="px-4 py-3 text-sm">
+                        <tr class="border-t border-gray-100 dark:border-gray-800 transition hover:bg-gray-50 dark:hover:bg-white/5">
+                            <td class="px-3 py-3 text-sm text-center align-middle">{{ $client->id }}</td>
+                            <td class="px-3 py-3 text-sm text-center align-middle">
+                                <x-ui.badge variant="light" color="{{ $client->person_type === 'RUC' ? 'info' : 'success' }}">
+                                    {{ $client->person_type === 'RUC' ? 'Corporativo' : 'Natural' }}
+                                </x-ui.badge>
+                            </td>
+                            <td class="px-3 py-3 text-sm text-center align-middle whitespace-nowrap">{{ $client->person_type }}: {{ $client->document_number }}</td>
+                            <td class="px-3 py-3 text-sm text-center align-middle font-medium text-gray-800 dark:text-white/90">{{ $client->first_name }} {{ $client->last_name }}</td>
+                            <td class="px-3 py-3 text-sm text-center align-middle">{{ $client->phone ?: '-' }}</td>
+                            <td class="px-3 py-3 text-sm text-center align-middle">{{ $client->email ?: '-' }}</td>
+                            <td class="px-3 py-3 text-sm">
                                 <div class="flex items-center justify-center gap-2">
                                     <div class="relative group hover:z-[100]">
                                         <x-ui.button

@@ -75,56 +75,35 @@
                 </div>
             </div>
 
-            <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-                <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Documentos visibles</p>
-                    <p class="mt-2 text-3xl font-black text-slate-900">{{ $purchases->count() }}</p>
-                </div>
-                <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
-                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-600">Total listado</p>
-                    <p class="mt-2 text-3xl font-black text-emerald-700">S/ {{ number_format($pageTotal, 2) }}</p>
-                </div>
-                <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-amber-600">Pendiente de pago</p>
-                    <p class="mt-2 text-3xl font-black text-amber-700">S/ {{ number_format($pageCreditPending, 2) }}</p>
-                </div>
-            </div>
-
-            <div x-data="{ openRow: null }" class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-                <table class="w-full min-w-[1300px]">
+            <div x-data="{ openRow: null }" class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+                <table class="w-full">
                     <thead>
                         <tr class="text-white">
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6 first:rounded-tl-xl">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6 first:rounded-tl-xl">
                                 <p class="font-semibold text-white text-theme-xs uppercase">ID</p>
                             </th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Comprobante</p>
                             </th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Subtotal</p>
                             </th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">IGV</p>
                             </th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Total</p>
                             </th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Persona</p>
                             </th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6">
-                                <p class="font-semibold text-white text-theme-xs uppercase">Pago</p>
-                            </th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Moneda</p>
                             </th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6">
-                                <p class="font-semibold text-white text-theme-xs uppercase">Pendiente</p>
-                            </th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Fecha</p>
                             </th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-right sm:px-6 last:rounded-tr-xl">
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6 last:rounded-tr-xl">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Acciones</p>
                             </th>
                         </tr>
@@ -142,8 +121,8 @@
                                     : 0;
                             @endphp
                             <tr class="group/row border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5 relative hover:z-[60]">
-                                <td class="px-5 py-4 sm:px-6">
-                                    <div class="flex items-center gap-2">
+                                <td class="px-5 py-4 sm:px-6 text-center">
+                                    <div class="flex items-center justify-center gap-2">
                                         <button type="button"
                                             @click="openRow === {{ $purchase->id }} ? openRow = null : openRow = {{ $purchase->id }}"
                                             class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-white transition hover:bg-brand-600">
@@ -153,28 +132,20 @@
                                         <p class="font-bold text-gray-800 text-theme-sm dark:text-white/90">#{{ $purchase->id }}</p>
                                     </div>
                                 </td>
-                                <td class="px-5 py-4 sm:px-6">
-                                    <div>
+                                <td class="px-5 py-4 sm:px-6 text-center">
+                                    <div class="flex flex-col items-center">
                                         <p class="font-bold text-gray-800 text-theme-sm dark:text-white/90">{{ $purchaseDoc }}</p>
                                         <p class="text-[11px] text-gray-500 dark:text-gray-400 uppercase font-medium">{{ $purchase->documentType?->name ?? '-' }}</p>
                                     </div>
                                 </td>
-                                <td class="px-5 py-4 sm:px-6 text-gray-800 text-theme-sm">S/ {{ number_format((float) ($purchase->purchaseMovement?->subtotal ?? 0), 2) }}</td>
-                                <td class="px-5 py-4 sm:px-6 text-gray-800 text-theme-sm">S/ {{ number_format((float) ($purchase->purchaseMovement?->tax ?? 0), 2) }}</td>
-                                <td class="px-5 py-4 sm:px-6"><p class="font-bold text-brand-600 text-theme-sm">S/ {{ number_format((float) ($purchase->purchaseMovement?->total ?? 0), 2) }}</p></td>
-                                <td class="px-5 py-4 sm:px-6 text-gray-800 text-theme-sm truncate max-w-[150px]" title="{{ $purchase->person_name ?: '-' }}">{{ $purchase->person_name ?: '-' }}</td>
-                                <td class="px-5 py-4 sm:px-6">
-                                    <span class="inline-flex rounded-full px-3 py-1 text-xs font-bold {{ $paymentType === 'CREDITO' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700' }}">
-                                        {{ $paymentType }}
-                                    </span>
-                                </td>
-                                <td class="px-5 py-4 sm:px-6 text-gray-800 text-theme-sm">{{ $purchase->purchaseMovement?->currency ?? 'PEN' }}</td>
-                                <td class="px-5 py-4 sm:px-6 font-bold {{ $pendingAmount > 0 ? 'text-amber-600' : 'text-slate-400' }}">
-                                    {{ $pendingAmount > 0 ? 'S/ ' . number_format($pendingAmount, 2) : '-' }}
-                                </td>
-                                <td class="px-5 py-4 sm:px-6 text-gray-800 text-theme-sm">{{ $purchase->moved_at ? $purchase->moved_at->format('Y-m-d H:i') : '-' }}</td>
-                                <td class="px-5 py-4 sm:px-6">
-                                    <div class="flex items-center justify-end gap-2">
+                                <td class="px-5 py-4 sm:px-6 text-gray-800 text-theme-sm text-center">S/ {{ number_format((float) ($purchase->purchaseMovement?->subtotal ?? 0), 2) }}</td>
+                                <td class="px-5 py-4 sm:px-6 text-gray-800 text-theme-sm text-center">S/ {{ number_format((float) ($purchase->purchaseMovement?->tax ?? 0), 2) }}</td>
+                                <td class="px-5 py-4 sm:px-6 text-center"><p class="font-bold text-brand-600 text-theme-sm">S/ {{ number_format((float) ($purchase->purchaseMovement?->total ?? 0), 2) }}</p></td>
+                                <td class="px-5 py-4 sm:px-6 text-gray-800 text-theme-sm text-center truncate max-w-[150px]" title="{{ $purchase->person_name ?: '-' }}">{{ $purchase->person_name ?: '-' }}</td>
+                                <td class="px-5 py-4 sm:px-6 text-gray-800 text-theme-sm text-center">{{ $purchase->purchaseMovement?->currency ?? 'PEN' }}</td>
+                                <td class="px-5 py-4 sm:px-6 text-gray-800 text-theme-sm text-center">{{ $purchase->moved_at ? $purchase->moved_at->format('Y-m-d H:i') : '-' }}</td>
+                                <td class="px-5 py-4 sm:px-6 text-center">
+                                    <div class="flex items-center justify-center gap-2">
                                         <div class="relative group">
                                             <a href="{{ route('admin.purchases.edit', array_merge([$purchase], $viewId ? ['view_id' => $viewId] : [])) }}"
                                                class="inline-flex h-12 w-12 items-center justify-center rounded-2xl shadow-sm transition hover:brightness-95"
@@ -211,8 +182,10 @@
                             </tr>
 
                             <tr x-show="openRow === {{ $purchase->id }}" x-cloak class="bg-gray-50/70 dark:bg-gray-800/40 border-b border-gray-100 dark:border-gray-800">
+
                                 <td colspan="11" class="px-6 py-4">
                                     <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6 mb-4">
+
                                         <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
                                             <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Persona</p>
                                             <p class="mt-0.5 truncate text-sm font-medium text-gray-800 dark:text-gray-200" title="{{ $purchase->person_name ?: '-' }}">{{ $purchase->person_name ?: '-' }}</p>
@@ -322,8 +295,8 @@
                     de
                     <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $purchases->total() }}</span>
                 </div>
-                <div>
-                    {{ $purchases->links() }}
+                <div class="flex-none pagination-simple">
+                    {{ $purchases->links('vendor.pagination.forced') }}
                 </div>
             </div>
         </x-common.component-card>
