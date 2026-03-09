@@ -211,7 +211,7 @@
                             </tr>
 
                             <tr x-show="openRow === {{ $purchase->id }}" x-cloak class="bg-gray-50/70 dark:bg-gray-800/40 border-b border-gray-100 dark:border-gray-800">
-                                <td colspan="9" class="px-6 py-4">
+                                <td colspan="11" class="px-6 py-4">
                                     <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6 mb-4">
                                         <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
                                             <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Persona</p>
@@ -329,5 +329,4 @@
         </x-common.component-card>
     </div>
 @endsection
-
 
