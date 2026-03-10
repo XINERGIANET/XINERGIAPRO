@@ -1,6 +1,8 @@
 @props([
     'isOpen' => false,
     'showCloseButton' => true,
+    'bodyScrollable' => true,
+    'bodyClass' => '',
 ])
 
 @php
@@ -14,7 +16,7 @@
     x-show="open"
     x-cloak
     x-effect="document.body.style.overflow = open ? 'hidden' : 'unset'"
-    class="modal fixed inset-0 z-99999 flex items-center justify-center overflow-y-auto p-4 sm:p-6"
+    class="modal fixed inset-0 z-99999 flex items-start justify-center overflow-y-auto p-3 pt-4 sm:items-center sm:p-6"
     {{ $attributes->except(['class', 'x-data']) }}>
 
     <!-- Backdrop -->
@@ -25,7 +27,7 @@
     </div>
 
     <!-- Modal Content -->
-    <div @click.stop class="relative flex w-full max-h-[90vh] flex-col overflow-hidden rounded-3xl bg-[#F4F6FA] dark:bg-gray-900 {{ $attributes->get('class') }}"
+    <div @click.stop class="relative my-2 flex w-full max-h-[96vh] flex-col overflow-hidden rounded-3xl bg-[#F4F6FA] dark:bg-gray-900 sm:my-4 {{ $attributes->get('class') }}"
         x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95"
         x-transition:enter-end="opacity-100 transform scale-100" x-transition:leave="transition ease-in duration-200"
         x-transition:leave-start="opacity-100 transform scale-100"
@@ -45,7 +47,7 @@
         @endif
 
         <!-- Modal Body -->
-        <div class="min-h-0 flex-1 overflow-y-auto">
+        <div class="min-h-0 flex-1 {{ $bodyScrollable ? 'overflow-y-auto' : 'overflow-hidden' }} {{ $bodyClass }}">
             {{ $slot }}
         </div>
     </div>
