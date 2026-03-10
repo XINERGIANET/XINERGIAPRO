@@ -268,12 +268,9 @@
         <div class="p-6 sm:p-8">
             <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <p class="text-xs uppercase tracking-[0.3em] text-gray-400">Sistema</p>
-                    <h3 class="mt-2 text-lg font-semibold text-gray-800 dark:text-white/90">Registrar caja</h3>
-                    <p class="mt-1 text-sm text-gray-500">Ingresa la informacion principal de la caja.</p>
-                </div>
-                <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-500 dark:bg-brand-500/10">
-                    <i class="ri-eye-line"></i>
+                    <p class="text-[10px] uppercase tracking-[0.2em] text-gray-400">Sistema</p>
+                    <h3 class="mt-1 text-base font-semibold text-gray-800 dark:text-white/90">Registrar caja</h3>
+                    <p class="mt-0.5 text-xs text-gray-500">Ingresa la informacion principal de la caja.</p>
                 </div>
             </div>
 

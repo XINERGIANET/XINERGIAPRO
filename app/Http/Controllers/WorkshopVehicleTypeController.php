@@ -26,8 +26,8 @@ class WorkshopVehicleTypeController extends Controller
         $branchId = (int) session('branch_id');
         $branch = Branch::query()->findOrFail($branchId);
         $companyId = (int) $branch->company_id;
+        $perPage = (int) $request->input('per_page', 10);
         $search = trim((string) $request->input('search', ''));
-
         $types = VehicleType::query()
             ->where(function ($query) use ($companyId, $branchId) {
                 $query->where(function ($inner) use ($companyId, $branchId) {
@@ -40,10 +40,18 @@ class WorkshopVehicleTypeController extends Controller
             ->orderBy('branch_id')
             ->orderBy('order_num')
             ->orderBy('name')
-            ->paginate(20)
+            ->paginate($perPage)
             ->withQueryString();
 
-        return view('workshop.vehicle-types.index', compact('types', 'search'));
+        $allCosts = \App\Models\WorkshopAssemblyCost::query()
+            ->where('company_id', $companyId)
+            ->where(function ($query) use ($branchId) {
+                $query->whereNull('branch_id')->orWhere('branch_id', $branchId);
+            })
+            ->where('active', true)
+            ->get();
+
+        return view('workshop.vehicle-types.index', compact('types', 'search', 'allCosts', 'perPage'));
     }
 
     public function store(Request $request): RedirectResponse

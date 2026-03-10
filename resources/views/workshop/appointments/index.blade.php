@@ -19,20 +19,35 @@
             <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.orders.index') }}" style="background-color:#4f46e5;color:#fff">
                 <i class="ri-file-list-3-line"></i><span>Ordenes de servicio</span>
             </x-ui.link-button>
-            <x-ui.button size="md" variant="primary" type="button" @click="view = 'calendar'" :class="view === 'calendar' ? 'bg-[#244BB3] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'" class="h-10 rounded-lg px-3 text-sm font-medium transition-all">
-                <i class="ri-calendar-line"></i><span>Ver calendario</span>
-            </x-ui.button>
-            <x-ui.button size="md" variant="primary" type="button" @click="view = 'table'" :class="view === 'table' ? 'bg-[#244BB3] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'" class="h-10 rounded-lg px-3 text-sm font-medium transition-all">
-                <i class="ri-table-line"></i><span>Ver tabla</span>
-            </x-ui.button>
         </div>
 
         <form method="GET" class="mb-4 grid grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-white p-4 md:grid-cols-4 dark:border-gray-800 dark:bg-white/[0.02]">
             <input type="date" name="from" value="{{ $from }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
             <input type="date" name="to" value="{{ $to }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
-            <button class="h-11 rounded-lg bg-[#244BB3] px-4 text-sm font-medium text-white">Filtrar</button>
+            <button class="h-11 rounded-lg bg-[#334155] px-4 text-sm font-medium text-white shadow-sm hover:shadow-md transition-all active:scale-95">Filtrar</button>
             <a href="{{ route('workshop.appointments.index') }}" class="h-11 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 inline-flex items-center justify-center">Limpiar</a>
         </form>
+
+        <div class="mt-6 mb-5">
+            <div class="flex flex-wrap items-center justify-between gap-4 px-1">
+                <h2 class="text-lg font-bold text-gray-800 dark:text-white/90">Gestión de Agenda</h2>
+                
+                <div class="flex items-center gap-1 rounded-xl bg-gray-100 p-1 dark:bg-gray-800">
+                    <button type="button" 
+                        @click="view = 'calendar'"
+                        :class="view === 'calendar' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-700 dark:text-blue-400' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'"
+                        class="flex h-9 w-9 items-center justify-center rounded-lg transition-all">
+                        <i class="ri-calendar-fill text-lg"></i>
+                    </button>
+                    <button type="button" 
+                        @click="view = 'table'"
+                        :class="view === 'table' ? 'bg-white text-blue-600 shadow-sm dark:bg-gray-700 dark:text-blue-400' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'"
+                        class="flex h-9 w-9 items-center justify-center rounded-lg transition-all">
+                        <i class="ri-table-line text-lg"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <style>
             [x-cloak] { display: none !important; }
@@ -42,32 +57,87 @@
                 color: #1e293b !important;
             }
             .fc .fc-button-primary {
-                background-color: #244BB3 !important;
-                border-color: #244BB3 !important;
+                background-color: #334155 !important;
+                border-color: transparent !important;
                 color: #ffffff !important;
                 text-transform: capitalize !important;
                 box-shadow: none !important;
                 outline: none !important;
+                border-radius: 14px !important;
+                padding: 8px 18px !important;
+                font-weight: 700 !important;
+                font-size: 0.85rem !important;
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
             }
-            .fc .fc-button-primary:hover {
-                background-color: #1e3a8a !important;
-                border-color: #1e3a8a !important;
+            /* Botones de Navegación específicos (Flechas tipo paginación) */
+            .fc .fc-prev-button, .fc .fc-next-button {
+                background-color: transparent !important;
+                border: none !important;
+                color: #94a3b8 !important; /* Color gris suave por defecto */
+                padding: 4px !important;
+                width: auto !important;
+                height: auto !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                box-shadow: none !important;
+            }
+            .fc .fc-prev-button:hover, .fc .fc-next-button:hover {
+                background-color: transparent !important;
+                color: #1e293b !important; /* Más oscuro al pasar el cursor */
+                transform: scale(1.1);
+            }
+            /* Flechas más negritas al hover */
+            .fc .fc-prev-button:hover .fc-icon, .fc .fc-next-button:hover .fc-icon {
+                font-weight: 800 !important;
+            }
+            /* Botón Hoy específico */
+            .fc .fc-today-button {
+                background-color: #334155 !important;
+                border-color: transparent !important;
+                opacity: 1 !important;
+                padding-left: 18px !important;
+                padding-right: 18px !important;
+                border-radius: 12px !important;
+                font-weight: 700 !important;
                 color: #ffffff !important;
             }
-            .fc .fc-button-active {
-                background-color: #162d6d !important;
-                border-color: #162d6d !important;
-                color: #ffffff !important;
+            .fc .fc-today-button:hover {
+                background-color: #1e293b !important;
+            }
+            .fc .fc-today-button:disabled {
+                background-color: #94a3b8 !important;
+                opacity: 0.6 !important;
+            }
+            .fc .fc-button-group {
+                gap: 4px !important;
+            }
+            .fc .fc-button-group > .fc-button {
+                border-radius: 14px !important;
+                margin-left: 0 !important;
+            }
+            /* Estilo para días que no pertenecen al mes actual */
+            .fc .fc-day-other {
+                background-color: #f1f5f9 !important; /* Un gris un poco más visible (Slate 100) */
+            }
+            .fc .fc-day-other .fc-daygrid-day-number {
+                color: #94a3b8 !important; /* Gris medio, perfectamente legible */
+                opacity: 1 !important;
+                font-weight: 500 !important;
+            }
+            .fc .fc-day-other .fc-daygrid-day-top {
+                opacity: 1 !important;
             }
             /* Target navigation icons */
             .fc .fc-button .fc-icon {
                 color: #ffffff !important;
             }
             .fc .fc-daygrid-day-number {
-                font-size: 0.875rem !important;
-                font-weight: 500 !important;
-                color: #64748b !important;
+                font-size: 0.9rem !important;
+                font-weight: 700 !important; /* Bolder for better visibility */
+                color: #1e293b !important; /* Darker slate for high contrast */
                 text-decoration: none !important;
+                padding: 8px !important;
             }
             .fc .fc-col-header-cell-cushion {
                 font-size: 0.75rem !important;
@@ -88,7 +158,7 @@
 
         <div class="grid grid-cols-1 gap-6">
             <!-- Table View -->
-            <div x-show="view === 'table'" x-transition x-cloak class="space-y-4">
+            <div x-show="view === 'table'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="space-y-4">
                 <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] shadow-sm">
                     <table class="w-full">
                         <thead>
@@ -125,7 +195,16 @@
                                             };
                                         @endphp
                                         <span class="inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold uppercase" style="background-color: {{ $statusColors['bg'] }}; color: {{ $statusColors['text'] }}">
-                                            {{ $appointment->status }}
+                                            @php
+                                                $statusLabels = [
+                                                    'pending' => 'Pendiente',
+                                                    'confirmed' => 'Confirmado',
+                                                    'arrived' => 'Llegó',
+                                                    'cancelled' => 'Cancelado',
+                                                    'no_show' => 'No se presentó'
+                                                ];
+                                            @endphp
+                                            {{ $statusLabels[$appointment->status] ?? $appointment->status }}
                                         </span>
                                     </td>
                                     <td class="px-4 py-2">
@@ -209,7 +288,7 @@
             </div>
 
             <!-- Calendar View -->
-            <div x-show="view === 'calendar'" x-transition x-cloak class="flex flex-col h-full">
+            <div x-show="view === 'calendar'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="flex flex-col h-full">
                 <div class="bg-white rounded-xl border border-gray-200 p-4 dark:bg-white/[0.03] dark:border-gray-800 shadow-sm flex-1">
                     <div id="workshop-calendar" 
                          data-events-url="{{ route('workshop.appointments.events') }}" 
@@ -276,11 +355,11 @@
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Estado</label>
                     <select name="status" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
-                        <option value="pending">pending</option>
-                        <option value="confirmed">confirmed</option>
-                        <option value="arrived">arrived</option>
-                        <option value="cancelled">cancelled</option>
-                        <option value="no_show">no_show</option>
+                        <option value="pending">Pendiente</option>
+                        <option value="confirmed">Confirmado</option>
+                        <option value="arrived">Llegó</option>
+                        <option value="cancelled">Cancelado</option>
+                        <option value="no_show">No se presentó</option>
                     </select>
                 </div>
                 <div class="md:col-span-3 mt-2 flex gap-2">
@@ -348,11 +427,11 @@
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">Estado</label>
                         <select name="status" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
-                            <option value="pending" @selected($appointment->status === 'pending')>pending</option>
-                            <option value="confirmed" @selected($appointment->status === 'confirmed')>confirmed</option>
-                            <option value="arrived" @selected($appointment->status === 'arrived')>arrived</option>
-                            <option value="cancelled" @selected($appointment->status === 'cancelled')>cancelled</option>
-                            <option value="no_show" @selected($appointment->status === 'no_show')>no_show</option>
+                            <option value="pending" @selected($appointment->status === 'pending')>Pendiente</option>
+                            <option value="confirmed" @selected($appointment->status === 'confirmed')>Confirmado</option>
+                            <option value="arrived" @selected($appointment->status === 'arrived')>Llegó</option>
+                            <option value="cancelled" @selected($appointment->status === 'cancelled')>Cancelado</option>
+                            <option value="no_show" @selected($appointment->status === 'no_show')>No se presentó</option>
                         </select>
                     </div>
                     <div class="md:col-span-3 mt-2 flex gap-2">

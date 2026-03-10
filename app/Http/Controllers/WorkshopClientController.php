@@ -42,7 +42,7 @@ class WorkshopClientController extends Controller
 
         $search = trim((string) $request->input('search', ''));
         $type = (string) $request->input('type', '');
-        $roleId = (int) $request->input('role_id', 3);
+        $roleId = $request->has('role_id') ? (int) $request->input('role_id') : 0;
 
         $perPage = (int) $request->input('per_page', 10);
         
@@ -65,12 +65,12 @@ class WorkshopClientController extends Controller
                         ->orWhere('email', 'ILIKE', "%{$search}%");
                 });
             })
-            ->when($roleId > 0, function ($query) use ($roleId, $branchId) {
-                $query->whereHas('roles', function ($roleQuery) use ($roleId, $branchId) {
-                    $roleQuery->where('roles.id', $roleId)
-                        ->where('role_person.branch_id', $branchId);
+            ->when($roleId > 0, function ($query) use ($roleId) {
+                $query->whereHas('roles', function ($roleQuery) use ($roleId) {
+                    $roleQuery->where('roles.id', $roleId);
                 });
             })
+            ->with('roles')
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();

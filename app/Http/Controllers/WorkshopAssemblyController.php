@@ -109,18 +109,19 @@ class WorkshopAssemblyController extends Controller
             ->orderBy('name')
             ->get();
 
-        $technicians = Technician::query()
-            ->with('person:id,first_name,last_name,document_number')
+        $technicians = Person::query()
+            ->whereHas('roles', function ($query) {
+                $query->where('roles.id', 2); // Role 2 = Empleado
+            })
+            ->orderBy('first_name')
+            ->get();
+
+        $vehicleTypes = \App\Models\VehicleType::query()
             ->where('company_id', $companyId)
             ->where('active', true)
-            ->where(function ($query) use ($branchId) {
-                $query->whereNull('branch_id')->orWhere('branch_id', $branchId);
-            })
-            ->orderBy('id')
-            ->get()
-            ->pluck('person')
-            ->filter()
-            ->values();
+            ->orderBy('order_num')
+            ->orderBy('name')
+            ->get();
 
         return view('workshop.assemblies.index', compact(
             'assemblies',
@@ -128,13 +129,14 @@ class WorkshopAssemblyController extends Controller
             'summaryByType',
             'month',
             'brandCompany',
-            'vehicleType',
+            'vehicleType', 
             'clients',
             'documentTypes',
             'cashRegisters',
             'paymentMethods',
             'assemblyLocations',
-            'technicians'
+            'technicians',
+            'vehicleTypes'
         ));
     }
 
@@ -307,7 +309,7 @@ class WorkshopAssemblyController extends Controller
         ]);
     }
 
-    public function storeCost(Request $request): RedirectResponse
+    public function storeCost(Request $request)
     {
         [$branchId, $companyId] = $this->resolveContext();
 
@@ -318,7 +320,7 @@ class WorkshopAssemblyController extends Controller
             'apply_to_all_branches' => ['nullable', 'boolean'],
         ]);
 
-        WorkshopAssemblyCost::updateOrCreate(
+        $cost = WorkshopAssemblyCost::updateOrCreate(
             [
                 'company_id' => $companyId,
                 'branch_id' => empty($data['apply_to_all_branches']) ? $branchId : null,
@@ -331,10 +333,18 @@ class WorkshopAssemblyController extends Controller
             ]
         );
 
+        if ($request->wantsJson()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Costo configurado correctamente.',
+                'cost' => $cost
+            ]);
+        }
+
         return back()->with('status', 'Costo configurado correctamente.');
     }
 
-    public function updateCost(Request $request, WorkshopAssemblyCost $cost): RedirectResponse
+    public function updateCost(Request $request, WorkshopAssemblyCost $cost)
     {
         [$branchId, $companyId] = $this->resolveContext();
         if ((int)$cost->company_id !== $companyId) {
@@ -353,10 +363,18 @@ class WorkshopAssemblyController extends Controller
             'unit_cost' => round((float) $data['unit_cost'], 6),
         ]);
 
+        if ($request->wantsJson()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Costo actualizado.',
+                'cost' => $cost
+            ]);
+        }
+
         return back()->with('status', 'Costo actualizado.');
     }
 
-    public function destroyCost(WorkshopAssemblyCost $cost): RedirectResponse
+    public function destroyCost(Request $request, WorkshopAssemblyCost $cost)
     {
         [$branchId, $companyId] = $this->resolveContext();
         if ((int)$cost->company_id !== $companyId) {
@@ -364,6 +382,13 @@ class WorkshopAssemblyController extends Controller
         }
 
         $cost->delete();
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Costo eliminado.'
+            ]);
+        }
 
         return back()->with('status', 'Costo eliminado.');
     }
