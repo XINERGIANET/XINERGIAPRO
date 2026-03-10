@@ -1,4 +1,4 @@
-<div class="space-y-8">
+<div class="space-y-4">
 
     {{-- ========================================================= --}}
     {{-- SECCIÓN 1: DATOS GENERALES --}}
@@ -10,7 +10,7 @@
             <i class="ri-file-list-3-line text-brand-500"></i> Información General
         </h3>
         <div
-            class="bg-gray-50 rounded-xl p-5 border border-gray-100 dark:bg-white/[0.02] dark:border-gray-800 grid grid-cols-1 gap-5">
+            class="bg-gray-50 rounded-xl p-4 border border-gray-100 dark:bg-white/[0.02] dark:border-gray-800 grid grid-cols-1 gap-4">
 
             {{-- NOTA / DESCRIPCIÓN --}}
             <div class="col-span-full">
@@ -27,7 +27,7 @@
                 @enderror
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {{-- TURNO --}}
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-600 dark:text-gray-400">Turno <span
@@ -92,19 +92,17 @@
 
         {{-- HEADER DE PAGOS Y TOTAL --}}
         <div
-            class="flex flex-col sm:flex-row sm:items-end justify-between mb-6 pb-4 border-b border-gray-100 dark:border-gray-800">
+            class="flex flex-col sm:flex-row sm:items-end justify-between mb-4 pb-2 border-b border-gray-100 dark:border-gray-800">
             <div>
-                <h3 class="text-base font-medium text-gray-800 dark:text-white flex items-center gap-2">
+                <h3 class="text-sm font-medium text-gray-800 dark:text-white flex items-center gap-2">
                     <i class="ri-wallet-3-line text-brand-500"></i> Desglose de Pagos
                 </h3>
-                <p class="text-sm text-gray-500 mt-1">Agrega uno o más métodos para cubrir el monto.</p>
             </div>
 
-            <div class="mt-4 sm:mt-0 text-right bg-brand-50/50 dark:bg-brand-900/10 px-4 py-2 rounded-lg">
+            <div class="mt-2 sm:mt-0 text-right bg-brand-50/50 dark:bg-brand-900/10 px-3 py-1.5 rounded-lg border border-brand-100/50">
                 <span
-                    class="block text-xs text-brand-600 dark:text-brand-400 font-medium uppercase tracking-wider">Total
-                    a Pagar</span>
-                <span class="block text-2xl font-bold text-gray-900 dark:text-white">
+                    class="block text-[10px] text-brand-600 dark:text-brand-400 font-bold uppercase tracking-wider">Total</span>
+                <span class="block text-xl font-bold text-gray-900 dark:text-white">
                     S/. <span x-text="totalAmount"></span>
                 </span>
             </div>
@@ -117,7 +115,7 @@
 
                 {{-- CONTENEDOR DE FILA INDIVIDUAL --}}
                 <div
-                    class="relative bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 transition-all hover:border-brand-300 dark:hover:border-brand-700">
+                    class="relative bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 transition-all hover:border-brand-300 dark:hover:border-brand-700">
 
                     {{-- Botón Eliminar (Visible si hay > 1) --}}
                     <template x-if="rows.length > 1">
@@ -285,7 +283,7 @@
             </template>
         </div>
 
-        <div class="mt-5">
+        <div class="mt-3">
             <button type="button" @click="addNewRow()"
                 class="inline-flex items-center gap-2 text-sm font-medium text-brand-600 hover:text-brand-700 transition-colors py-2 px-3 rounded-lg hover:bg-brand-50 dark:hover:bg-brand-900/20">
                 <span>Agregar otro método de pago</span>

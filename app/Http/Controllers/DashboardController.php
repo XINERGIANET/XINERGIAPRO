@@ -117,13 +117,29 @@ class DashboardController extends Controller
         $income = (float) $cashMovements->filter(function ($row) {
             return strtoupper((string) ($row->paymentConcept->type ?? '')) === 'I';
         })->sum('total');
-        $expenses = (float) $cashMovements->filter(function ($row) {
+
+        $expensesCash = (float) $cashMovements->filter(function ($row) {
             return strtoupper((string) ($row->paymentConcept->type ?? '')) === 'E';
         })->sum('total');
-        $expensesToday = (float) $cashMovements->filter(function ($row) use ($today) {
+
+        $expensesPurchases = (float) \App\Models\WorkshopPurchaseRecord::query()
+            ->where('branch_id', $branchId)
+            ->whereBetween('issued_at', [$dateFrom, $dateTo])
+            ->sum('total');
+
+        $expenses = $expensesCash + $expensesPurchases;
+
+        $expensesTodayCash = (float) $cashMovements->filter(function ($row) use ($today) {
             return strtoupper((string) ($row->paymentConcept->type ?? '')) === 'E'
                 && optional($row->created_at)->toDateString() === $today;
         })->sum('total');
+
+        $expensesTodayPurchases = (float) \App\Models\WorkshopPurchaseRecord::query()
+            ->where('branch_id', $branchId)
+            ->whereDate('issued_at', $today)
+            ->sum('total');
+
+        $expensesToday = $expensesTodayCash + $expensesTodayPurchases;
         $utility = $income - $expenses;
 
         $servicesDone = WorkshopMovementDetail::query()

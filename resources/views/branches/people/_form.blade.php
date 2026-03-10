@@ -21,6 +21,7 @@
     data-profiles='@json($profiles ?? [], JSON_HEX_APOS | JSON_HEX_QUOT)'
     data-selected-profile='@json($selectedProfileId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT)'
     x-data="{
+        
         departments: JSON.parse($el.dataset.departments || '[]'),
         provinces: JSON.parse($el.dataset.provinces || '[]'),
         districts: JSON.parse($el.dataset.districts || '[]'),
@@ -327,14 +328,14 @@
         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Roles</label>
         <div class="flex items-center gap-4 flex-nowrap">
             <template x-for="role in roles" :key="role.id">
-                <label class="inline-flex items-center gap-2 whitespace-nowrap  bg-white px-4 py-2 text-sm text-gray-700 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-200">
+                <label class="inline-flex items-center gap-3 whitespace-nowrap text-base font-medium text-gray-700 dark:text-gray-200 cursor-pointer">
                     <input
                         type="checkbox"
                         name="roles[]"
                         :value="role.id"
                         :checked="selectedRoleIds.includes(role.id)"
                         @change="toggleRole(role.id)"
-                        class="h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500/10"
+                        class="h-5 w-5 rounded border-gray-300 text-brand-500 focus:ring-brand-500/10 transition-all"
                     />
                     <span x-text="role.name"></span>
                 </label>

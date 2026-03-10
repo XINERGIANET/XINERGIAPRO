@@ -546,26 +546,22 @@
 
         </x-common.component-card>
 
-        <x-ui.modal x-data="{}" x-show="open" x-cloak class="max-w-3xl z-[9999]" :showCloseButton="true">
-            <div class="p-6 sm:p-8">
-                <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <x-ui.modal x-data="{}" x-show="open" x-cloak class="max-w-2xl z-[9999]" :showCloseButton="true">
+            <div class="p-5 sm:p-6">
+                <div class="mb-4 flex items-center justify-between">
                     <div>
-                        <p class="text-xs uppercase tracking-[0.3em] text-gray-400">
-                            <span x-text="formDocId == ingresoId ? 'Ingreso' : 'Egreso'"></span>
+                        <p class="text-[10px] uppercase tracking-[0.2em] text-gray-400">
+                            <span x-text="formDocId == ingresoId ? 'Operación de Ingreso' : 'Operación de Egreso'"></span>
                         </p>
-                        <h3 class="mt-2 text-lg font-semibold text-gray-800 dark:text-white/90"
+                        <h3 class="mt-1 text-base font-semibold text-gray-800 dark:text-white/90"
                             x-text="formDocId == ingresoId ? 'Registrar Ingreso' : 'Registrar Egreso'">
                         </h3>
-                    </div>
-                    <div class="flex h-12 w-12 items-center justify-center rounded-2xl transition-colors duration-300"
-                        :class="formDocId == ingresoId ? 'bg-brand-50 text-brand-500' : 'bg-red-50 text-red-500'">
-                        <i class="text-xl" :class="formDocId == ingresoId ? 'ri-add-line' : 'ri-subtract-line'"></i>
                     </div>
                 </div>
 
                 <form method="POST"
                     action="{{ route('admin.petty-cash.store', ['cash_register_id' => $selectedBoxId]) }}"
-                    class="space-y-6">
+                    class="space-y-4">
                     @csrf
                     @if ($viewId)
                         <input type="hidden" name="view_id" value="{{ $viewId }}">
@@ -575,11 +571,11 @@
 
                     @include('petty_cash._form', ['movement' => null])
 
-                    <div class="flex flex-wrap gap-3">
-                        <x-ui.button type="submit" size="md" variant="primary">
+                    <div class="flex flex-wrap gap-2 pt-2">
+                        <x-ui.button type="submit" size="md" variant="primary" class="flex-1 sm:flex-none">
                             <i class="ri-save-line"></i><span>Guardar</span>
                         </x-ui.button>
-                        <x-ui.button type="button" size="md" variant="outline" @click="open = false">
+                        <x-ui.button type="button" size="md" variant="outline" @click="open = false" class="flex-1 sm:flex-none">
                             <i class="ri-close-line"></i><span>Cancelar</span>
                         </x-ui.button>
                     </div>

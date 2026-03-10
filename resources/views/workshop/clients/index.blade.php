@@ -2,9 +2,9 @@
 
 @section('content')
 <div x-data="{ historyModalOpen: false, historyUrl: '' }">
-    <x-common.page-breadcrumb pageTitle="Personas" />
+    <x-common.page-breadcrumb pageTitle="Personas Taller" />
 
-    <x-common.component-card title="Personas" desc="Gestiona personas del taller (clientes y personal tecnico).">
+    <x-common.component-card title="Personas Taller" desc="Gestiona personas del taller (clientes y personal tecnico).">
         @if (session('status'))
             <div class="mb-4 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-700">{{ session('status') }}</div>
         @endif
@@ -45,8 +45,18 @@
             <div class="w-40 flex-none">
                 <select name="type" class="h-11 w-full rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-600 shadow-sm focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none transition-all">
                     <option value="">Tipo: Todos</option>
-                    <option value="NATURAL" @selected($type === 'NATURAL')>Natural</option>
-                    <option value="CORPORATIVO" @selected($type === 'CORPORATIVO')>Corporativo</option>
+                    <option value="NATURAL" @selected(($type ?? '') === 'NATURAL')>Natural</option>
+                    <option value="CORPORATIVO" @selected(($type ?? '') === 'CORPORATIVO')>Corporativo</option>
+                </select>
+            </div>
+
+            {{-- Filtro de Rol --}}
+            <div class="w-44 flex-none">
+                <select name="role_id" class="h-11 w-full rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-600 shadow-sm focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none transition-all">
+                    <option value="0">Rol: Todos</option>
+                    @foreach($roles as $role)
+                        <option value="{{ $role->id }}" @selected(($roleId ?? 0) == $role->id)>{{ $role->name }}</option>
+                    @endforeach
                 </select>
             </div>
 
@@ -73,7 +83,7 @@
                     @click="$dispatch('open-client-modal')"
                 >
                     <i class="ri-add-line text-lg"></i>
-                    <span>Nuevo cliente</span>
+                    <span>Nueva Persona</span>
                 </x-ui.button>
             </div>
         </form>
@@ -85,9 +95,10 @@
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider first:rounded-tl-xl text-white">ID</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Tipo</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Documento</th>
-                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Cliente</th>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Nombres</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Teléfono</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Correo</th>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Rol</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider last:rounded-tr-xl text-white">Acciones</th>
                     </tr>
                 </thead>
@@ -104,6 +115,18 @@
                             <td class="px-3 py-3 text-sm text-center align-middle font-medium text-gray-800 dark:text-white/90">{{ $client->first_name }} {{ $client->last_name }}</td>
                             <td class="px-3 py-3 text-sm text-center align-middle">{{ $client->phone ?: '-' }}</td>
                             <td class="px-3 py-3 text-sm text-center align-middle">{{ $client->email ?: '-' }}</td>
+                            <td class="px-3 py-3 text-sm text-center align-middle">
+                                <div class="flex flex-wrap justify-center gap-1">
+                                    @foreach($client->roles as $role)
+                                        <x-ui.badge variant="light" color="secondary" class="text-[10px] py-0.5">
+                                            {{ $role->name }}
+                                        </x-ui.badge>
+                                    @endforeach
+                                    @if($client->roles->isEmpty())
+                                        <span class="text-xs text-gray-400">-</span>
+                                    @endif
+                                </div>
+                            </td>
                             <td class="px-3 py-3 text-sm">
                                 <div class="flex items-center justify-center gap-2">
                                     <div class="relative group hover:z-[100]">
@@ -231,54 +254,18 @@
                     </button>
                 </div>
 
-                <form method="POST" action="{{ route('workshop.clients.update', $client) }}" class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <form method="POST" action="{{ route('workshop.clients.update', $client) }}" class="space-y-6">
                     @csrf
                     @method('PUT')
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Tipo <span class="text-red-500">*</span></label>
-                        <select name="person_type" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
-                            <option value="DNI" @selected($client->person_type === 'DNI')>DNI</option>
-                            <option value="RUC" @selected($client->person_type === 'RUC')>RUC</option>
-                            <option value="CARNET DE EXTRANGERIA" @selected($client->person_type === 'CARNET DE EXTRANGERIA')>CARNET DE EXTRANGERIA</option>
-                            <option value="PASAPORTE" @selected($client->person_type === 'PASAPORTE')>PASAPORTE</option>
-                        </select>
-                    </div>
-                    <div class="md:col-span-2">
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Documento <span class="text-red-500">*</span></label>
-                        <div class="flex items-center gap-2">
-                            <input name="document_number" value="{{ $client->document_number }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Documento" required>
-                            <button
-                                type="button"
-                                onclick="fetchReniecForClientEdit(this)"
-                                class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-[#334155] px-4 text-sm font-medium text-white hover:bg-[#1f3f98] disabled:opacity-60"
-                            >
-                                <i class="ri-search-line"></i>
-                                <span class="ml-1">Buscar</span>
-                            </button>
-                        </div>
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Nombres <span class="text-red-500">*</span></label>
-                        <input name="first_name" value="{{ $client->first_name }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nombres / Razon social" required>
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Apellidos <span class="text-red-500">*</span></label>
-                        <input name="last_name" value="{{ $client->last_name }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Apellidos" required>
-                    </div>
-                    <p class="md:col-span-3 text-xs text-red-600 hidden js-reniec-error"></p>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Telefono</label>
-                        <input name="phone" value="{{ $client->phone }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Telefono">
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Correo</label>
-                        <input name="email" type="email" value="{{ $client->email }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Correo">
-                    </div>
-                    <div class="md:col-span-2">
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Direccion <span class="text-red-500">*</span></label>
-                        <input name="address" value="{{ $client->address }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Direccion" required>
-                    </div>
-                    <div class="md:col-span-3 mt-2 flex gap-2">
+                    
+                    @include('branches.people._form', [
+                        'person' => $client,
+                        'selectedRoleIds' => $client->roles->pluck('id')->toArray(),
+                        'userName' => $client->user?->name,
+                        'selectedProfileId' => $client->user?->profile_id
+                    ])
+
+                    <div class="mt-2 flex gap-2">
                         <x-ui.button type="submit" size="md" variant="primary"><i class="ri-save-line"></i><span>Guardar cambios</span></x-ui.button>
                         <x-ui.button type="button" size="md" variant="outline" @click="open = false"><i class="ri-close-line"></i><span>Cancelar</span></x-ui.button>
                     </div>
@@ -300,73 +287,6 @@
     </x-ui.modal>
 </div>
 <script>
-function splitReniecName(fullName) {
-    const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
-    if (parts.length <= 1) return { first_name: parts[0] || '', last_name: '' };
-    if (parts.length === 2) return { first_name: parts[0], last_name: parts[1] };
-    if (parts.length === 3) return { first_name: parts[0], last_name: parts.slice(1).join(' ') };
-    return { first_name: parts.slice(0, 2).join(' '), last_name: parts.slice(2).join(' ') };
-}
-
-async function fetchReniecForClientEdit(button) {
-    const form = button.closest('form');
-    if (!form) return;
-
-    const personType = (form.querySelector('[name="person_type"]')?.value || '').toUpperCase();
-    const documentInput = form.querySelector('[name="document_number"]');
-    const firstNameInput = form.querySelector('[name="first_name"]');
-    const lastNameInput = form.querySelector('[name="last_name"]');
-    const errorNode = form.querySelector('.js-reniec-error');
-
-    if (errorNode) {
-        errorNode.classList.add('hidden');
-        errorNode.textContent = '';
-    }
-
-    if (personType !== 'DNI') {
-        if (errorNode) {
-            errorNode.textContent = 'La busqueda RENIEC solo aplica para DNI.';
-            errorNode.classList.remove('hidden');
-        }
-        return;
-    }
-
-    const dni = String(documentInput?.value || '').trim();
-    if (!/^\d{8}$/.test(dni)) {
-        if (errorNode) {
-            errorNode.textContent = 'Ingrese un DNI valido de 8 digitos.';
-            errorNode.classList.remove('hidden');
-        }
-        return;
-    }
-
-    const originalLabel = button.querySelector('span')?.textContent || 'Buscar';
-    button.disabled = true;
-    const labelNode = button.querySelector('span');
-    if (labelNode) labelNode.textContent = 'Buscando...';
-
-    try {
-        const response = await fetch(`/api/reniec?dni=${encodeURIComponent(dni)}`, {
-            headers: { 'Accept': 'application/json' }
-        });
-        const payload = await response.json();
-        if (!response.ok || !payload?.status || !payload?.name) {
-            throw new Error(payload?.message || 'No se encontro informacion en RENIEC.');
-        }
-
-        const parsed = splitReniecName(payload.name);
-        if (firstNameInput) firstNameInput.value = parsed.first_name;
-        if (lastNameInput) lastNameInput.value = parsed.last_name;
-    } catch (error) {
-        if (errorNode) {
-            errorNode.textContent = error?.message || 'Error consultando RENIEC.';
-            errorNode.classList.remove('hidden');
-        }
-    } finally {
-        button.disabled = false;
-        if (labelNode) labelNode.textContent = originalLabel;
-    }
-}
 </script>
 @endsection
 
