@@ -96,11 +96,20 @@ class SalesController extends Controller
 
     public function create()
     {
+        return view('sales.create', $this->getSalesPosViewData());
+    }
+
+    private function getSalesPosViewData(?Movement $sale = null): array
+    {
         $user = auth()->user();
         $branchId = (int) (session('branch_id') ?? $user?->branch_id ?? $user?->person?->branch_id);
 
         if (!$branchId) {
             abort(403, 'No se pudo determinar la sucursal del usuario logueado.');
+        }
+
+        if ($sale && (int) $sale->branch_id !== $branchId) {
+            abort(403, 'La venta no pertenece a la sucursal actual.');
         }
 
         $products = Product::query()
@@ -131,6 +140,7 @@ class SalesController extends Controller
             ->map(function ($productBranch) {
                 $taxRate = $productBranch->taxRate;
                 $taxRatePct = $taxRate ? (float) $taxRate->tax_rate : null;
+
                 return [
                     'id' => (int) $productBranch->id,
                     'product_id' => (int) $productBranch->product_id,
@@ -186,7 +196,17 @@ class SalesController extends Controller
             ->get(['id', 'number', 'status']);
         $defaultCashRegisterId = $this->getBranchConfiguredCashRegisterId($branchId, $cashRegisters, 'caja ventas');
 
-        return view('sales.create', [
+        $initialSaleData = null;
+        $posMode = 'create';
+
+        if ($sale) {
+            $initialSaleData = $this->serializeSaleForPosEditor($sale, $defaultDocumentTypeId, $defaultCashRegisterId);
+            $defaultDocumentTypeId = (int) ($initialSaleData['document_type_id'] ?? $defaultDocumentTypeId);
+            $defaultCashRegisterId = (int) ($initialSaleData['cash_register_id'] ?? $defaultCashRegisterId);
+            $posMode = 'edit';
+        }
+
+        return [
             'products' => $products,
             'productBranches' => $productBranches,
             'people' => $people,
@@ -199,9 +219,70 @@ class SalesController extends Controller
             'digitalWallets' => $digitalWallets,
             'cashRegisters' => $cashRegisters,
             'defaultCashRegisterId' => $defaultCashRegisterId,
-            // Compatibilidad con implementaciones previas en la vista
             'productsBranches' => $productBranches,
-        ]);
+            'initialSaleData' => $initialSaleData,
+            'posMode' => $posMode,
+        ];
+    }
+
+    private function serializeSaleForPosEditor(Movement $sale, int $defaultDocumentTypeId, int $defaultCashRegisterId): array
+    {
+        $sale->loadMissing(['salesMovement.details.product']);
+        $cashMovement = $this->resolveCashMovementBySaleMovement((int) $sale->id);
+
+        $paymentMethods = [];
+        if ($cashMovement) {
+            $paymentMethods = DB::table('cash_movement_details')
+                ->where('cash_movement_id', $cashMovement->id)
+                ->where('status', 'A')
+                ->where('type', '!=', 'DEUDA')
+                ->orderBy('id')
+                ->get([
+                    'payment_method_id',
+                    'amount',
+                    'payment_gateway_id',
+                    'card_id',
+                    'digital_wallet_id',
+                ])
+                ->map(fn ($row) => [
+                    'payment_method_id' => $row->payment_method_id ? (int) $row->payment_method_id : null,
+                    'amount' => (float) ($row->amount ?? 0),
+                    'payment_gateway_id' => $row->payment_gateway_id ? (int) $row->payment_gateway_id : null,
+                    'card_id' => $row->card_id ? (int) $row->card_id : null,
+                    'digital_wallet_id' => $row->digital_wallet_id ? (int) $row->digital_wallet_id : null,
+                ])
+                ->values()
+                ->all();
+        }
+
+        $items = collect($sale->salesMovement?->details ?? [])
+            ->sortBy('id')
+            ->values()
+            ->map(function (SalesMovementDetail $detail) {
+                $quantity = (float) ($detail->quantity ?: 1);
+                $amountWithTax = (float) ($detail->amount ?? 0);
+
+                return [
+                    'pId' => (int) ($detail->product_id ?? 0),
+                    'name' => $detail->product->description ?? $detail->description ?? ('Producto #' . $detail->product_id),
+                    'qty' => $quantity,
+                    'price' => $quantity > 0 ? ($amountWithTax / $quantity) : 0,
+                    'note' => (string) ($detail->comment ?? ''),
+                ];
+            })
+            ->all();
+
+        return [
+            'id' => (int) $sale->id,
+            'number' => (string) ($sale->number ?? ''),
+            'clientId' => $sale->person_id ? (int) $sale->person_id : null,
+            'clientName' => $sale->person_name ?: 'Publico General',
+            'notes' => (string) ($sale->comment ?? ''),
+            'document_type_id' => (int) ($sale->document_type_id ?: $defaultDocumentTypeId),
+            'cash_register_id' => (int) ($cashMovement?->cash_register_id ?: $defaultCashRegisterId),
+            'items' => $items,
+            'payment_methods' => $paymentMethods,
+        ];
     }
 
     // POS: vista de cobro
@@ -505,6 +586,8 @@ class SalesController extends Controller
                 
                 $number = $movement->number;
                 
+                $previousMovementStatus = (string) $movement->status;
+
                 // Actualizar el movimiento - siempre se completa el pago completo
                 $movement->update([
                     'comment' => $request->notes ?? 'Venta completada desde punto de venta',
@@ -516,8 +599,28 @@ class SalesController extends Controller
                         : 'Publico General',
                 ]);
                 
-                // Eliminar los detalles anteriores para recrearlos
+                // Al editar una venta activa, primero reponer el stock previo antes de recalcular.
                 if ($movement->salesMovement) {
+                    if ($previousMovementStatus === 'A') {
+                        foreach ($movement->salesMovement->details()->get(['product_id', 'quantity']) as $existingDetail) {
+                            if (!$existingDetail->product_id) {
+                                continue;
+                            }
+
+                            $productBranchToRestore = ProductBranch::query()
+                                ->where('product_id', $existingDetail->product_id)
+                                ->where('branch_id', $branchId)
+                                ->lockForUpdate()
+                                ->first();
+
+                            if ($productBranchToRestore) {
+                                $productBranchToRestore->update([
+                                    'stock' => (float) ($productBranchToRestore->stock ?? 0) + (float) ($existingDetail->quantity ?? 0),
+                                ]);
+                            }
+                        }
+                    }
+
                     SalesMovementDetail::where('sales_movement_id', $movement->salesMovement->id)->delete();
                 }
             } else {
@@ -1088,9 +1191,7 @@ class SalesController extends Controller
 
     public function edit(Movement $sale)
     {
-        return view('sales.edit', [
-            'sale' => $sale,
-        ] + $this->getFormData($sale));
+        return view('sales.create', $this->getSalesPosViewData($sale));
     }
 
     public function update(Request $request, Movement $sale)

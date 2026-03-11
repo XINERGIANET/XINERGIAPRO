@@ -14,16 +14,16 @@
             desc="Interfaz de venta rápida. Puedes seguir agregando productos aunque el stock mostrado sea 0."
         >
             <div class="flex items-start gap-6" style="display:flex; align-items:flex-start; gap:1.5rem;">
-                <section class="min-w-0 space-y-5" style="flex: 0 0 60%; max-width: 60%; width: 60%;">
+                <section class="min-w-0 space-y-5" style="flex: 0 0 68%; max-width: 68%; width: 68%;">
                   
-                    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div class="hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                             <div class="relative flex-1">
                                 <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
                                     <i class="ri-search-line text-lg"></i>
                                 </span>
                                 <input
-                                    id="product-search"
+                                    id="product-search-legacy"
                                     type="text"
                                     placeholder="Buscar por nombre o categoría"
                                     class="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-12 pr-4 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
@@ -34,7 +34,7 @@
                                     <i class="ri-arrow-left-line"></i>
                                     <span>Volver</span>
                                 </a>
-                                <button type="button" id="clear-sale-button" class="inline-flex h-12 items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-5 text-sm font-semibold text-rose-700 hover:bg-rose-100">
+                                <button type="button" id="clear-sale-button-legacy" class="inline-flex h-12 items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-5 text-sm font-semibold text-rose-700 hover:bg-rose-100">
                                     <i class="ri-delete-bin-6-line"></i>
                                     <span>Limpiar orden</span>
                                 </button>
@@ -42,19 +42,41 @@
                         </div>
                     </div>
 
-                    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div class="flex flex-wrap items-center justify-end gap-2">
+                        <a href="{{ $salesIndexUrl }}" class="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                            <i class="ri-arrow-left-line"></i>
+                            <span>Volver</span>
+                        </a>
+                        <button type="button" id="clear-sale-button" class="inline-flex h-10 items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 hover:bg-rose-100">
+                            <i class="ri-delete-bin-6-line"></i>
+                            <span>Limpiar orden</span>
+                        </button>
+                    </div>
+
+                    <div class="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                        <div class="mb-5 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                             <div>
                                 <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Catálogo</p>
                                 <h3 class="mt-1 text-lg font-bold text-slate-900">Productos</h3>
                             </div>
-                            <div id="category-filters" class="flex flex-wrap gap-2"></div>
+                            <div id="category-filters" class="flex flex-wrap gap-3"></div>
                         </div>
-                        <div id="products-grid" class="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"></div>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-800">
+                                <i class="ri-search-line text-[22px]"></i>
+                            </span>
+                            <input
+                                id="product-search"
+                                type="text"
+                                placeholder="Buscar por nombre o categoria"
+                                class="h-14 w-full rounded-[22px] border border-slate-200 bg-slate-50 pl-14 pr-4 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                            >
+                        </div>
+                        <div id="products-grid" class="mt-5 grid gap-4"></div>
                     </div>
                 </section>
 
-                <aside class="min-w-0" style="flex: 0 0 40%; max-width: 40%; width: 40%;">
+                <aside class="min-w-0" style="flex: 0 0 32%; max-width: 32%; width: 32%;">
                     <div class="sticky top-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
                         <div class="border-b border-slate-800 bg-slate-900 px-4 py-3 text-white" style="background-color: #334155">
                             <div class="grid grid-cols-2 gap-1.5 rounded-xl bg-slate-800/90 p-1">
@@ -226,6 +248,23 @@
             outline: none !important;
         }
 
+        #sales-create-view #products-grid {
+            grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+            gap: 0.95rem !important;
+        }
+
+        @media (max-width: 1199px) {
+            #sales-create-view #products-grid {
+                grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+            }
+        }
+
+        @media (max-width: 991px) {
+            #sales-create-view #products-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            }
+        }
+
         @media (max-width: 1279px) {
             #sales-create-view .flex.items-start.gap-6[style*="display:flex"] {
                 flex-direction: column !important;
@@ -358,7 +397,7 @@
             const getImageUrl = (imgUrl) => imgUrl && String(imgUrl).trim() !== ''
                 ? imgUrl
                 : 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIj48cmVjdCBmaWxsPSIjZTJlOGYwIiB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiM2NDc0OGIiPlNpbiBpbWFnZW48L3RleHQ+PC9zdmc+';
-            const formatMoney = (value) => `$${Number(value || 0).toFixed(2)}`;
+            const formatMoney = (value) => `S/ ${Number(value || 0).toFixed(2)}`;
             const saveDB = () => { db[activeKey] = currentSale; localStorage.setItem('restaurantDB', JSON.stringify(db)); };
             const getProductCategory = (prod) => (prod && prod.category && String(prod.category).trim() !== '') ? String(prod.category).trim() : 'Sin categoria';
             const filteredClients = () => {
@@ -784,14 +823,14 @@
                 getCategories().forEach((category) => {
                     const button = document.createElement('button');
                     button.type = 'button';
-                    button.className = 'inline-flex h-10 items-center rounded-2xl border px-4 text-xs font-bold uppercase tracking-[0.14em] transition';
+                    button.className = 'inline-flex h-12 items-center justify-center rounded-[22px] border px-6 text-sm font-bold transition';
                     const isActive = category === selectedCategory;
                     button.className += isActive
                         ? ' border-transparent text-white shadow-theme-xs'
-                        : ' border-slate-200 bg-white text-slate-600 hover:border-orange-300 hover:text-orange-700';
+                        : ' border-slate-200 bg-white text-slate-800 hover:border-orange-300 hover:text-orange-700';
                     button.style.background = isActive ? 'linear-gradient(90deg,#ff7a00,#ff4d00)' : '';
                     button.style.color = isActive ? '#fff' : '';
-                    button.style.boxShadow = isActive ? '0 10px 20px rgba(249,115,22,0.18)' : '';
+                    button.style.boxShadow = isActive ? '0 12px 24px rgba(249,115,22,0.22)' : '';
                     button.textContent = category;
                     button.addEventListener('click', () => {
                         selectedCategory = category;
@@ -826,51 +865,57 @@
 
                     const card = document.createElement('button');
                     card.type = 'button';
-                    card.className = 'group overflow-hidden border bg-white text-center transition-all duration-200';
-                    card.style.borderRadius = '28px';
-                    card.style.borderColor = '#dbe3ef';
+                    card.className = 'group relative overflow-hidden border bg-white text-center transition-all duration-200';
+                    card.style.borderRadius = '30px';
+                    card.style.borderColor = '#e4e9f1';
                     card.style.borderWidth = '1px';
                     card.style.borderStyle = 'solid';
-                    card.style.boxShadow = '0 10px 24px rgba(15, 23, 42, 0.06)';
+                    card.style.backgroundColor = '#ffffff';
+                    card.style.boxShadow = '0 10px 24px rgba(15, 23, 42, 0.05)';
+                    card.style.height = '190px';
+                    card.style.minHeight = '190px';
                     card.addEventListener('click', () => addToCart(prod, price));
                     card.addEventListener('mouseenter', () => {
                         const orb = card.querySelector('[data-role="product-orb"]');
                         card.style.transform = 'translateY(-4px)';
-                        card.style.borderColor = '#fdba74';
-                        card.style.boxShadow = '0 18px 34px rgba(249, 115, 22, 0.16)';
-                        card.style.backgroundColor = '#fdfefe';
+                        card.style.borderColor = '#ffd1a4';
+                        card.style.boxShadow = '0 18px 34px rgba(249, 115, 22, 0.12)';
+                        card.style.backgroundColor = '#fffdfb';
                         if (orb) {
-                            orb.style.transform = 'scale(1.04)';
-                            orb.style.boxShadow = '0 16px 28px rgba(249, 115, 22, 0.24)';
+                            orb.style.transform = 'translateY(-1px) scale(1.03)';
+                            orb.style.boxShadow = '0 18px 30px rgba(249, 115, 22, 0.12), 0 8px 16px rgba(15, 23, 42, 0.06)';
                         }
                     });
                     card.addEventListener('mouseleave', () => {
                         const orb = card.querySelector('[data-role="product-orb"]');
                         card.style.transform = '';
-                        card.style.borderColor = '#dbe3ef';
-                        card.style.boxShadow = '0 10px 24px rgba(15, 23, 42, 0.06)';
+                        card.style.borderColor = '#e4e9f1';
+                        card.style.boxShadow = '0 10px 24px rgba(15, 23, 42, 0.05)';
                         card.style.backgroundColor = '#ffffff';
                         if (orb) {
                             orb.style.transform = '';
-                            orb.style.boxShadow = '0 12px 24px rgba(249, 115, 22, 0.18)';
+                            orb.style.boxShadow = '0 12px 24px rgba(249, 115, 22, 0.08), 0 6px 14px rgba(15, 23, 42, 0.04)';
                         }
                     });
 
                     card.innerHTML = `
-                        <div class="relative px-3 pt-3">
-                         
-                            <div class="absolute right-2 top-[2.9rem] z-20 rounded-full border px-1.5 py-0.5 text-[9px] font-bold leading-none ${stock > 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-orange-200 bg-orange-50 text-orange-700'}" style="box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);">
+                        <div class="relative flex h-full w-full flex-col items-center px-3 pb-4 pt-4">
+                            <div class="absolute right-3 top-4 z-20 inline-flex min-w-[62px] items-center justify-center rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-center text-[10px] font-bold leading-none text-orange-600" style="box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);">
                                 Stock: ${Number(stock).toFixed(0)}
                             </div>
-                            <div data-role="product-orb" class="mx-auto mt-2 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-gradient-to-b from-orange-400 to-orange-500 transition-transform duration-200" style="box-shadow: 0 12px 24px rgba(249, 115, 22, 0.18);">
-                                ${hasImage
-                                    ? `<img src="${getImageUrl(prod.img)}" alt="${prod.name || 'Producto'}" class="h-14 w-14 object-cover" onerror="this.onerror=null; this.src='${getImageUrl(null)}'">`
-                                    : `<i class="ri-shopping-bag-3-line text-3xl text-white"></i>`}
+                            <div class="flex h-[102px] w-full items-center justify-center pt-2">
+                                <div data-role="product-orb" class="mx-auto flex h-[92px] w-[92px] items-center justify-center overflow-hidden rounded-full bg-white transition-transform duration-200" style="box-shadow: 0 12px 24px rgba(249, 115, 22, 0.08), 0 6px 14px rgba(15, 23, 42, 0.04);">
+                                    ${hasImage
+                                        ? `<img src="${getImageUrl(prod.img)}" alt="${prod.name || 'Producto'}" class="h-16 w-16 object-contain" onerror="this.onerror=null; this.src='${getImageUrl(null)}'">`
+                                        : `<i class="ri-shopping-bag-3-line text-[30px] text-orange-500"></i>`}
+                                </div>
                             </div>
-                        </div>
-                        <div class="px-3 pb-3 pt-2.5">
-                            <h4 class="line-clamp-2 min-h-[40px] text-[14px] font-bold leading-5 text-slate-900">${prod.name || 'Sin nombre'}</h4>
-                            <p class="mt-1 text-[1.85rem] font-black leading-none tracking-tight transition-colors duration-200 group-hover:text-orange-600" style="color:#f97316;">${formatMoney(price)}</p>
+                            <div class="mt-2 flex h-[50px] w-full items-start justify-center px-1">
+                                <h4 class="line-clamp-2 block w-full text-center text-[12px] font-black leading-[1.28] text-slate-900">${prod.name || 'Sin nombre'}</h4>
+                            </div>
+                            <div class="mt-1 flex h-[24px] w-full items-center justify-center">
+                                <p class="text-[0.95rem] font-black leading-none tracking-tight transition-colors duration-200 group-hover:text-orange-600" style="color:#f97316;">${formatMoney(price)}</p>
+                            </div>
                         </div>
                     `;
 

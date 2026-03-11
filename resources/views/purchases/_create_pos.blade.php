@@ -14,7 +14,7 @@
 </div>
 
 <div class="flex items-start gap-6" style="display:flex;align-items:flex-start;gap:1.5rem;">
-    <section class="min-w-0 space-y-5" style="flex:0 0 60%;max-width:60%;width:60%;">
+    <section class="min-w-0 space-y-5" style="flex:0 0 68%;max-width:68%;width:68%;">
         <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" x-show="detailType === 'DETALLADO'">
             <div class="grid grid-cols-1 gap-3 xl:grid-cols-12">
                 <div class="xl:col-span-4">
@@ -49,72 +49,72 @@
             </div>
         </div>
 
-        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div class="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <div class="mb-5 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                 <div>
                     <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Catálogo</p>
                     <h3 class="mt-1 text-lg font-bold text-slate-900">Productos</h3>
                 </div>
-                <div class="flex flex-wrap gap-2">
+                <div class="flex flex-wrap gap-3">
                     <template x-for="category in catalogCategories" :key="`purchase-category-${category}`">
                         <button
                             type="button"
                             @click="selectedCategory = category"
-                            class="inline-flex h-12 items-center justify-center rounded-2xl border px-5 text-sm font-bold transition-all duration-200"
+                            class="inline-flex h-12 items-center justify-center rounded-[22px] border px-6 text-sm font-bold transition"
                             :class="selectedCategory === category ? 'border-transparent text-white shadow-theme-xs' : 'border-slate-200 bg-white text-slate-900 hover:border-orange-200 hover:text-orange-600'"
-                            :style="selectedCategory === category ? 'background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff;box-shadow:0 12px 24px rgba(249,115,22,.24);' : ''"
+                            :style="selectedCategory === category ? 'background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff;box-shadow:0 12px 24px rgba(249,115,22,.22);' : ''"
                             x-text="category"
                         ></button>
                     </template>
                 </div>
             </div>
 
-            <div class="mb-4 relative w-full">
-                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-                    <i class="ri-search-line text-lg"></i>
+            <div class="relative">
+                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-800">
+                    <i class="ri-search-line text-[22px]"></i>
                 </span>
                 <input
                     type="text"
                     x-model="productSearch"
                     placeholder="Buscar por nombre o categoría"
-                    class="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-12 pr-4 text-sm font-medium text-slate-700"
+                    class="h-14 w-full rounded-[22px] border border-slate-200 bg-slate-50 pl-14 pr-4 text-sm font-medium text-slate-700"
                 >
             </div>
 
-            <div class="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+            <div id="purchase-products-grid" class="mt-5 grid gap-4">
                 <template x-for="product in filteredCatalogProducts" :key="`catalog-${product.id}`">
                     <button
                         type="button"
                         @click="addProductCard(product)"
-                        class="group relative overflow-hidden border bg-white text-center transition-all duration-200 hover:-translate-y-1"
-                        style="border-radius:28px;border-color:#dbe3ef;border-width:1px;border-style:solid;box-shadow:0 10px 24px rgba(15,23,42,.06);"
-                        @mouseenter="$el.style.transform='translateY(-4px)';$el.style.borderColor='#fdba74';$el.style.boxShadow='0 18px 34px rgba(249,115,22,.16)';$el.style.backgroundColor='#fdfefe';const orb=$el.querySelector('[data-role=product-orb]'); if(orb){orb.style.transform='scale(1.04)';orb.style.boxShadow='0 16px 28px rgba(249,115,22,.24)';}"
-                        @mouseleave="$el.style.transform='';$el.style.borderColor='#dbe3ef';$el.style.boxShadow='0 10px 24px rgba(15,23,42,.06)';$el.style.backgroundColor='#ffffff';const orb=$el.querySelector('[data-role=product-orb]'); if(orb){orb.style.transform='';orb.style.boxShadow='0 12px 24px rgba(249,115,22,.18)';}"
+                        class="group relative overflow-hidden border bg-white text-center transition-all duration-200"
+                        style="border-radius:30px;border-color:#e4e9f1;border-width:1px;border-style:solid;background-color:#ffffff;box-shadow:0 10px 24px rgba(15,23,42,.05);height:190px;min-height:190px;"
+                        @mouseenter="$el.style.transform='translateY(-4px)';$el.style.borderColor='#ffd1a4';$el.style.boxShadow='0 18px 34px rgba(249,115,22,.12)';$el.style.backgroundColor='#fffdfb';const orb=$el.querySelector('[data-role=product-orb]'); if(orb){orb.style.transform='translateY(-1px) scale(1.03)';orb.style.boxShadow='0 18px 30px rgba(249,115,22,.12), 0 8px 16px rgba(15,23,42,.06)';}"
+                        @mouseleave="$el.style.transform='';$el.style.borderColor='#e4e9f1';$el.style.boxShadow='0 10px 24px rgba(15,23,42,.05)';$el.style.backgroundColor='#ffffff';const orb=$el.querySelector('[data-role=product-orb]'); if(orb){orb.style.transform='';orb.style.boxShadow='0 12px 24px rgba(249,115,22,.08), 0 6px 14px rgba(15,23,42,.04)';}"
                     >
-                        <div class="relative px-3 pt-3">
-                            <div
-                                class="absolute right-2 top-[2.9rem] z-20 rounded-full border px-1.5 py-0.5 text-[9px] font-bold leading-none"
-                                :class="Number(product.stock || 0) > 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-orange-200 bg-orange-50 text-orange-700'"
-                                style="box-shadow:0 6px 14px rgba(15,23,42,.08);"
-                            >
+                        <div class="relative flex h-full w-full flex-col items-center px-3 pb-4 pt-4">
+                            <div class="absolute right-3 top-4 z-20 inline-flex min-w-[62px] items-center justify-center rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-center text-[10px] font-bold leading-none text-orange-600" style="box-shadow:0 6px 14px rgba(15,23,42,.08);">
                                 Stock: <span x-text="Number(product.stock || 0).toFixed(0)"></span>
                             </div>
-                            <div
-                                data-role="product-orb"
-                                class="mx-auto mt-2 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-gradient-to-b from-orange-400 to-orange-500 transition-transform duration-200"
-                                style="box-shadow:0 12px 24px rgba(249,115,22,.18);"
-                            >
-                                <template x-if="product.img">
-                                    <img :src="product.img" :alt="productLabel(product)" class="h-14 w-14 object-cover" x-on:error="$el.style.display='none'">
-                                </template>
-                                <template x-if="!product.img">
-                                    <i class="ri-shopping-bag-3-line text-3xl text-white"></i>
-                                </template>
+                            <div class="flex h-[102px] w-full items-center justify-center pt-2">
+                                <div
+                                    data-role="product-orb"
+                                    class="mx-auto flex h-[92px] w-[92px] items-center justify-center overflow-hidden rounded-full bg-white transition-transform duration-200"
+                                    style="box-shadow:0 12px 24px rgba(249,115,22,.08), 0 6px 14px rgba(15,23,42,.04);"
+                                >
+                                    <template x-if="product.img">
+                                        <img :src="product.img" :alt="productLabel(product)" class="h-16 w-16 object-contain" x-on:error="$el.style.display='none'">
+                                    </template>
+                                    <template x-if="!product.img">
+                                        <i class="ri-shopping-bag-3-line text-[30px] text-orange-500"></i>
+                                    </template>
+                                </div>
                             </div>
-                        </div>
-                        <div class="px-3 pb-3 pt-2.5">
-                            <h4 class="line-clamp-2 min-h-[40px] text-[14px] font-bold leading-5 text-slate-900" x-text="productLabel(product)"></h4>
-                            <p class="mt-1 text-[1.85rem] font-black leading-none tracking-tight transition-colors duration-200 group-hover:text-orange-600" style="color:#f97316;" x-text="money(productAmount(product))"></p>
+                            <div class="mt-2 flex h-[50px] w-full items-start justify-center px-1">
+                                <h4 class="line-clamp-2 block w-full text-center text-[12px] font-black leading-[1.28] text-slate-900" x-text="productLabel(product)"></h4>
+                            </div>
+                            <div class="mt-1 flex h-[24px] w-full items-center justify-center">
+                                <p class="text-[0.95rem] font-black leading-none tracking-tight transition-colors duration-200 group-hover:text-orange-600" style="color:#f97316;" x-text="money(productAmount(product))"></p>
+                            </div>
                         </div>
                     </button>
                 </template>
@@ -192,7 +192,7 @@
         </div>
     </section>
 
-    <aside class="min-w-0" style="flex:0 0 40%;max-width:40%;width:40%;">
+    <aside class="min-w-0" style="flex:0 0 32%;max-width:32%;width:32%;">
         <div class="sticky top-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
             <div class="border-b border-slate-800 bg-slate-900 px-4 py-3 text-white" style="background-color:#334155;">
                 <div class="grid grid-cols-2 gap-1.5 rounded-xl bg-slate-800/90 p-1">
@@ -362,6 +362,13 @@
 <style>
     #purchases-create-view input:focus,#purchases-create-view select:focus,#purchases-create-view textarea:focus{outline:none!important;box-shadow:0 0 0 3px rgba(249,115,22,.16)!important;border-color:#f97316!important}
     #purchases-create-view input:focus-visible,#purchases-create-view select:focus-visible,#purchases-create-view textarea:focus-visible{outline:none!important}
+    #purchases-create-view #purchase-products-grid{grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:.95rem!important}
+    @media (max-width:1199px){
+        #purchases-create-view #purchase-products-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+    }
+    @media (max-width:991px){
+        #purchases-create-view #purchase-products-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+    }
     @media (max-width:1279px){
         #purchases-create-view .flex.items-start.gap-6[style*="display:flex"]{flex-direction:column!important;gap:1rem!important}
         #purchases-create-view .flex.items-start.gap-6[style*="display:flex"]>section,
@@ -369,7 +376,7 @@
         #purchases-create-view aside .sticky{position:static!important;top:auto!important}
     }
     @media (max-width:767px){
-        #purchases-create-view .grid.grid-cols-2.gap-3.lg\:grid-cols-3.xl\:grid-cols-4.2xl\:grid-cols-5{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:.65rem!important}
+        #purchases-create-view #purchase-products-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:.65rem!important}
     }
 </style>
 
