@@ -506,11 +506,11 @@
                     <span class="text-xs text-gray-600">Se agregara y seleccionara automaticamente.</span>
                 </div>
             </div>
-            <div class="md:col-span-3 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2.2fr)_minmax(150px,0.7fr)_auto_minmax(0,1.8fr)] lg:items-center">
-                <div class="min-w-0">
-                    <div class="relative flex items-center gap-2">
+            <div class="md:col-span-3 flex flex-col gap-3 md:flex-row md:items-center">
+                <div class="w-full min-w-0 md:flex-[2.4_1_0%]">
+                    <div class="relative flex w-full items-center gap-2">
                         <input type="hidden" name="vehicle_id" x-model="selectedVehicleId" required>
-                        <div class="relative w-full min-w-0" @click.outside="closeVehicleDropdown()">
+                        <div class="relative min-w-0 flex-1" @click.outside="closeVehicleDropdown()">
                             <input
                                 x-model="vehicleSearch"
                                 @focus="vehicleDropdownOpen = true"
@@ -556,14 +556,21 @@
                     </div>
                 </div>
 
-                <input name="mileage_in" type="number" min="0" x-model="mileageIn" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="KM ingreso">
+                <input
+                    name="mileage_in"
+                    type="number"
+                    min="0"
+                    x-model="mileageIn"
+                    class="h-11 shrink-0 rounded-lg border border-gray-300 px-3 text-sm"
+                    style="width: 96px; min-width: 96px; max-width: 96px; flex: 0 0 96px;"
+                    placeholder="KM ingreso">
+                <input name="diagnosis_text" class="h-11 min-w-0 w-full rounded-lg border border-gray-300 px-3 text-sm md:flex-[2.5_1_0%]" placeholder="Diagnostico inicial (opcional)">
 
                 <label class="inline-flex h-11 shrink-0 items-center gap-2 whitespace-nowrap text-sm text-gray-700">
                     <input type="checkbox" name="tow_in" value="1" class="h-4 w-4 rounded border-gray-300">
                     Ingreso en grua
                 </label>
 
-                <input name="diagnosis_text" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Diagnostico inicial (opcional)">
             </div>
 
             <textarea name="observations" rows="3" class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-3" placeholder="Observaciones"></textarea>
