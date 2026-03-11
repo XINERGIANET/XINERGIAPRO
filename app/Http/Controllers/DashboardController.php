@@ -178,6 +178,7 @@ class DashboardController extends Controller
             ->get([
                 DB::raw("CONCAT(COALESCE(people.first_name,''), ' ', COALESCE(people.last_name,'')) as technician"),
                 DB::raw('COUNT(DISTINCT workshop_movements.id) as orders'),
+                DB::raw('AVG(EXTRACT(EPOCH FROM (workshop_movements.finished_at - workshop_movements.started_at))/60) as avg_minutes')
             ]);
 
         $monthStartClient = now()->startOfMonth();

@@ -147,10 +147,14 @@
 
                     <div class="relative z-10 mt-3.5 flex flex-wrap gap-2">
                         @if($card->status === 'approved')
-                            <form method="POST" action="{{ route('workshop.maintenance-board.start', $card) }}">
-                                @csrf
-                                <button class="rounded-xl bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700">Iniciar servicio</button>
-                            </form>
+                            <button type="button"
+                                    class="rounded-xl bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700"
+                                    @click="$dispatch('open-start-service-modal', {
+                                        action: @js(route('workshop.maintenance-board.start', $card)),
+                                        order_label: @js('OS ' . ($card->movement?->number ?? ('#' . $card->id)) . ' - ' . trim(($card->vehicle?->brand ?? '') . ' ' . ($card->vehicle?->model ?? '')))
+                                    })">
+                                Iniciar servicio
+                            </button>
                         @endif
                         @if($card->status === 'in_progress')
                             <form method="POST" action="{{ route('workshop.maintenance-board.finish', $card) }}">
@@ -300,6 +304,66 @@
                     <x-ui.button type="button" size="md" variant="outline" @click="open = false">
                         <i class="ri-close-line"></i><span>Cancelar</span>
                     </x-ui.button>
+                </div>
+            </form>
+        </div>
+    </x-ui.modal>
+
+    <x-ui.modal
+        x-data="{
+            open: false,
+            action: '',
+            order_label: '',
+            technician_id: '',
+        }"
+        x-on:open-start-service-modal.window="
+            open = true;
+            action = $event.detail.action;
+            order_label = $event.detail.order_label;
+            technician_id = '';
+        "
+        :isOpen="false"
+        class="max-w-md">
+        <div class="p-6">
+            <div class="mb-5 flex items-center justify-between">
+                <div>
+                    <p class="text-[10px] font-bold uppercase tracking-wider text-orange-600">Comenzar Trabajo</p>
+                    <h3 class="text-xl font-extrabold text-slate-800">Asignar Técnico</h3>
+                    <p class="text-sm text-slate-500" x-text="order_label"></p>
+                </div>
+                <button type="button" @click="open = false" class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
+                    <i class="ri-close-line text-lg"></i>
+                </button>
+            </div>
+
+            <form method="POST" :action="action" class="space-y-6">
+                @csrf
+                <div>
+                    <label class="mb-2 block text-sm font-bold text-slate-700">¿Quién se encargará de este servicio?</label>
+                    <div class="relative">
+                        <select name="technician_person_id" x-model="technician_id" required
+                                class="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 py-3.5 pl-4 pr-10 text-sm font-medium text-slate-700 transition-all focus:border-orange-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-orange-500/10">
+                            <option value="">Seleccione un técnico...</option>
+                            @foreach($technicians ?? [] as $tech)
+                                <option value="{{ $tech['id'] }}">{{ $tech['name'] }}</option>
+                            @endforeach
+                        </select>
+                        <div class="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">
+                            <i class="ri-arrow-down-s-line text-lg"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-3 pt-2">
+                    <button type="submit" :disabled="!technician_id"
+                            class="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-600 py-3.5 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition-all hover:bg-orange-700 hover:shadow-orange-600/30 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">
+                        <i class="ri-play-circle-line text-lg"></i>
+                        <span>Iniciar Servicio Ahora</span>
+                    </button>
+                    <button type="button" @click="open = false"
+                            class="w-full rounded-xl border border-slate-200 py-3 text-sm font-bold text-slate-500 transition-all hover:bg-slate-50 hover:text-slate-700">
+                        Cancelar
+                    </button>
                 </div>
             </form>
         </div>

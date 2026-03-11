@@ -15,6 +15,7 @@ use App\Models\ProductBranch;
 use App\Models\Vehicle;
 use App\Models\VehicleType;
 use App\Models\WorkshopMovement;
+use App\Models\WorkshopMovementTechnician;
 use App\Models\WorkshopService;
 use App\Services\Workshop\WorkshopFlowService;
 use App\Support\WorkshopAuthorization;
@@ -193,6 +194,20 @@ class WorkshopMaintenanceBoardController extends Controller
             ->orderBy('order_num')
             ->get(['id', 'description']);
 
+        $technicians = \App\Models\Person::query()
+            ->whereHas('roles', function ($query) {
+                $query->where('roles.id', 2); // Role 2 = Empleado
+            })
+            ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name'])
+            ->map(fn ($p) => [
+                'id' => (int) $p->id,
+                'name' => trim(($p->first_name ?? '') . ' ' . ($p->last_name ?? '')),
+            ])
+            ->values();
+
         $products = ProductBranch::query()
             ->join('products', 'products.id', '=', 'product_branch.product_id')
             ->where('product_branch.branch_id', $branchId)
@@ -266,12 +281,10 @@ class WorkshopMaintenanceBoardController extends Controller
             'departments',
             'provinces',
             'districts',
-            'selectedDepartmentId',
-            'selectedProvinceId',
-            'selectedDistrictId',
             'selectedDepartmentName',
             'selectedProvinceName',
-            'selectedDistrictName'
+            'selectedDistrictName',
+            'technicians'
         );
     }
             
@@ -644,15 +657,32 @@ class WorkshopMaintenanceBoardController extends Controller
         ]);
     }
 
-    public function start(WorkshopMovement $order): RedirectResponse
+    public function start(Request $request, WorkshopMovement $order): RedirectResponse
     {
         $this->assertOrderScope($order);
+        $validated = $request->validate([
+            'technician_person_id' => ['required', 'integer', 'exists:people,id'],
+        ]);
 
         try {
-            $this->flowService->updateOrder($order, [
-                'status' => 'in_progress',
-                'comment' => 'Inicio de mantenimiento desde tablero',
-            ]);
+            DB::transaction(function () use ($order, $validated) {
+                // Assign technician
+                WorkshopMovementTechnician::query()->updateOrCreate(
+                    [
+                        'workshop_movement_id' => $order->id,
+                        'technician_person_id' => $validated['technician_person_id'],
+                    ],
+                    [
+                        'commission_percentage' => 0,
+                        'commission_amount' => 0,
+                    ]
+                );
+
+                $this->flowService->updateOrder($order, [
+                    'status' => 'in_progress',
+                    'comment' => 'Inicio de mantenimiento desde tablero',
+                ]);
+            });
         } catch (\Throwable $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
         }

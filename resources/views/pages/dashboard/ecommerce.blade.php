@@ -246,7 +246,7 @@
                 </div>
             </article>
 
-            <article class="rounded-[1.5rem] border border-slate-100 bg-white p-6 xl:col-span-4 h-full flex flex-col">
+            <article class="rounded-[1.5rem] border border-slate-100 bg-white p-6 xl:col-span-4 h-full flex flex-col overflow-hidden">
                 <div class="mb-8 flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-orange-600 text-white flex items-center justify-center shadow-lg shadow-orange-600/20">
                         <i class="ri-cake-2-fill text-xl"></i>
@@ -265,7 +265,7 @@
                                     {{ substr($bday->first_name, 0, 1) }}{{ substr($bday->last_name, 0, 1) }}
                                 </div>
                                 <div class="flex-1 min-w-0">
-                                    <h4 class="font-black text-slate-800 uppercase text-sm leading-tight mb-1 truncate">{{ $bday->first_name }} {{ $bday->last_name }}</h4>
+                                    <h4 class="font-black text-slate-800 uppercase text-sm leading-tight mb-1 whitespace-normal break-words">{{ $bday->first_name }} {{ $bday->last_name }}</h4>
                                     <p class="text-[10px] font-black text-slate-400 flex items-center gap-1 uppercase">
                                         <i class="ri-cake-2-line text-orange-400"></i>
                                         {{ \Carbon\Carbon::parse($bday->fecha_nacimiento)->translatedFormat('d \d\e M') }}
@@ -289,7 +289,7 @@
         <!-- SECONDARY GRID: PRODUCTIVITY & FREQUENT CLIENTS -->
         <section class="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <!-- PRODUCTIVITY -->
-            <article class="rounded-[1.5rem] border border-slate-100 bg-white p-6 flex flex-col h-full">
+            <article class="rounded-[1.5rem] border border-slate-100 bg-white p-6 flex flex-col h-full overflow-hidden">
                 <div class="mb-8 flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl text-white flex items-center justify-center shadow-lg" style="background-color: #9333ea !important;">
                         <i class="ri-time-fill text-xl"></i>
@@ -308,8 +308,8 @@
                                     {{ substr($tech->technician, 0, 1) }}
                                 </div>
                                 <div>
-                                    <p class="text-sm font-black text-slate-800">{{ $tech->technician }}</p>
-                                    <p class="text-[10px] text-slate-400 font-bold uppercase">Tiempo promedio: 4.2h</p>
+                                    <p class="text-sm font-black text-slate-800 whitespace-normal break-words">{{ $tech->technician }}</p>
+                                    <p class="text-[10px] text-slate-400 font-bold uppercase">Tiempo promedio: {{ number_format(($tech->avg_minutes ?? 0) / 60, 1) }}h</p>
                                 </div>
                             </div>
                             <div class="text-right">
@@ -327,7 +327,7 @@
             </article>
 
             <!-- FREQUENT CLIENTS -->
-            <article class="rounded-[1.5rem] border border-slate-100 bg-white p-6 flex flex-col h-full">
+            <article class="rounded-[1.5rem] border border-slate-100 bg-white p-6 flex flex-col h-full overflow-hidden">
                 <div class="mb-8 flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl text-white flex items-center justify-center shadow-lg" style="background-color: #2563eb !important;">
                         <i class="ri-group-fill text-xl"></i>
@@ -345,7 +345,7 @@
                                 {{ $loop->iteration }}
                             </div>
                             <div class="flex-1 min-w-0">
-                                <p class="text-[13px] font-black text-slate-800 truncate uppercase tracking-tight">{{ $client->client }}</p>
+                                <p class="text-[13px] font-black text-slate-800 whitespace-normal break-words uppercase tracking-tight">{{ $client->client }}</p>
                                 <p class="text-[10px] text-slate-500 font-bold mt-0.5 uppercase">
                                     {{ $client->visits }} ÓRDENES • S/ {{ number_format($client->total_spent ?? 0, 2) }}
                                 </p>
@@ -367,7 +367,7 @@
         <!-- BOTTOM GRID: TOP SERVICES & RECENT ORDERS -->
         <section class="grid grid-cols-1 gap-6 xl:grid-cols-12">
             <!-- TOP SERVICES -->
-            <article class="rounded-[1.5rem] border border-slate-100 bg-white p-6 xl:col-span-4 h-full flex flex-col">
+            <article class="rounded-[1.5rem] border border-slate-100 bg-white p-6 xl:col-span-4 h-full flex flex-col overflow-hidden">
                 <div class="mb-8 flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl text-white flex items-center justify-center shadow-lg" style="background-color: #10b981 !important;">
                         <i class="ri-medal-fill text-xl"></i>
