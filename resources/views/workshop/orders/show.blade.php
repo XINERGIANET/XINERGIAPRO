@@ -348,6 +348,40 @@
                         </tbody>
                     </table>
                 </div>
+
+                @if($order->deletedDetails->count() > 0)
+                    <div class="mt-8">
+                        <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-red-700 flex items-center">
+                            <i class="ri-history-line mr-2"></i> Items Rechazados / Historial (Eliminados)
+                        </h3>
+                        <div class="table-responsive rounded-xl border border-red-100 bg-red-50/30">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr>
+                                        <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-red-800 bg-red-100">Tipo</th>
+                                        <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-red-800 bg-red-100">Descripcion</th>
+                                        <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-red-800 bg-red-100">Cant</th>
+                                        <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-red-800 bg-red-100">P.Unit</th>
+                                        <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-red-800 bg-red-100">Total</th>
+                                        <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-red-800 bg-red-100">Fecha Elim.</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($order->deletedDetails as $deleted)
+                                        <tr class="border-t border-red-100">
+                                            <td class="px-3 py-2 text-red-700">{{ $deleted->line_type }}</td>
+                                            <td class="px-3 py-2 text-red-700">{{ $deleted->description }}</td>
+                                            <td class="px-3 py-2 text-red-700">{{ $deleted->qty }}</td>
+                                            <td class="px-3 py-2 text-red-700">{{ number_format((float) $deleted->unit_price, 2) }}</td>
+                                            <td class="px-3 py-2 text-red-700 font-bold">{{ number_format((float) $deleted->total, 2) }}</td>
+                                            <td class="px-3 py-2 text-red-600 text-xs">{{ $deleted->deleted_at->format('d/m/Y H:i') }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                @endif
             </div>
 
             <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">

@@ -112,6 +112,16 @@ class WorkshopMovement extends Model
         return $this->hasMany(WorkshopMovementDetail::class);
     }
 
+    public function deletedDetails()
+    {
+        return $this->hasMany(WorkshopMovementDetail::class)->onlyTrashed();
+    }
+
+    public function getHasRejectionsAttribute(): bool
+    {
+        return $this->deletedDetails()->count() > 0;
+    }
+
     public function checklists()
     {
         return $this->hasMany(WorkshopChecklist::class);

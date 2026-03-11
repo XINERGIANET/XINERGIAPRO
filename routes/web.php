@@ -51,6 +51,7 @@ use App\Http\Controllers\WorkshopServiceCatalogController;
 use App\Http\Controllers\WorkshopVehicleTypeController;
 use App\Http\Controllers\WorkshopVehicleController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\WorkshopQuotationController;
 
 Route::prefix('restaurante')->name('restaurant.')->group(function () {
     Route::view('/', 'restaurant.home', ['title' => 'Xinergia Restaurante'])->name('home');
@@ -141,6 +142,9 @@ Route::middleware('auth')->group(function () {
         ->name('admin.purchases.providers.store');
     Route::get('/admin/ventas/{sale}/imprimir/pdf', [SalesController::class, 'printPdf'])->name('admin.sales.print.pdf');
     Route::get('/admin/ventas/{sale}/imprimir/ticket', [SalesController::class, 'printTicket'])->name('admin.sales.print.ticket');
+
+    // Gestión de Cotizaciones (Taller)
+    Route::get('/admin/ventas/cotizaciones', [WorkshopQuotationController::class, 'index'])->name('admin.sales.quotations.index');
 
     // POS: Pedidos
     Route::group(['prefix' => 'admin/pedidos', 'as' => 'admin.orders.'], function () {
