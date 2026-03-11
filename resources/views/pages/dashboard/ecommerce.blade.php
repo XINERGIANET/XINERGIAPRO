@@ -309,7 +309,7 @@
                                 </div>
                                 <div>
                                     <p class="text-sm font-black text-slate-800 whitespace-normal break-words">{{ $tech->technician }}</p>
-                                    <p class="text-[10px] text-slate-400 font-bold uppercase">Tiempo promedio: {{ number_format(($tech->avg_minutes ?? 0) / 60, 1) }}h</p>
+                                    <p class="text-[10px] text-slate-400 font-bold uppercase">Tiempo promedio: {{ number_format($tech->avg_minutes ?? 0, 0) }} min</p>
                                 </div>
                             </div>
                             <div class="text-right">
