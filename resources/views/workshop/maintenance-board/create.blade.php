@@ -22,6 +22,9 @@
     servicesCatalog: @js($services->map(fn($s) => ['id' => $s->id, 'name' => $s->name, 'base_price' => (float) $s->base_price, 'type' => $s->type])),
     historyBase: @js(route('workshop.clients.history', ['person' => '__PERSON__'])),
     historyUrl: '',
+    historyHtml: '',
+    historyLoading: false,
+    historyRequestToken: 0,
     selectedVehicleId: @js((string) old('vehicle_id', '')),
     vehicleSearch: '',
     vehicleDropdownOpen: false,
@@ -73,9 +76,37 @@
         this.vehicleSearch = selected.display_label || selected.label || '';
         this.syncHistoryUrl();
     },
+    async openClientHistory() {
+        if (!String(this.selectedClientId || '').trim()) return;
+        this.syncHistoryUrl();
+        const requestToken = ++this.historyRequestToken;
+        this.historyLoading = true;
+        this.historyHtml = '';
+        this.$dispatch('open-maintenance-client-history');
+        try {
+            const response = await fetch(this.historyUrl, {
+                cache: 'no-store',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'text/html',
+                },
+            });
+            const html = await response.text();
+            if (requestToken !== this.historyRequestToken) return;
+            this.historyHtml = response.ok ? html : `<div class='p-6 text-sm text-red-600'>No se pudo cargar el historial del cliente.</div>`;
+        } catch (error) {
+            if (requestToken !== this.historyRequestToken) return;
+            this.historyHtml = `<div class='p-6 text-sm text-red-600'>No se pudo cargar el historial del cliente.</div>`;
+        } finally {
+            if (requestToken === this.historyRequestToken) {
+                this.historyLoading = false;
+                this.$nextTick(() => this.$dispatch('maintenance-client-history-loaded'));
+            }
+        }
+    },
     syncHistoryUrl() {
         this.historyUrl = this.selectedClientId
-            ? `${this.historyBase.replace('__PERSON__', this.selectedClientId)}?modal=1`
+            ? `${this.historyBase.replace('__PERSON__', this.selectedClientId)}?modal=1&_=${Date.now()}`
             : '';
     },
     resolveDefaultClientId() {
@@ -115,6 +146,7 @@
         this.vehicleSearch = vehicle.display_label || vehicle.label || '';
         this.vehicleDropdownOpen = false;
         this.syncVehicle();
+        this.openClientHistory();
     },
     onVehicleSearchInput() {
         this.vehicleDropdownOpen = true;
@@ -229,6 +261,7 @@
             this.syncHistoryUrl();
             this.creatingVehicle = false;
             this.resetQuickVehicle();
+            this.openClientHistory();
         } catch (error) {
             this.quickVehicleError = error?.message || 'Error registrando vehiculo.';
         } finally {
@@ -473,81 +506,73 @@
                     <span class="text-xs text-gray-600">Se agregara y seleccionara automaticamente.</span>
                 </div>
             </div>
-            <div class="md:col-span-1">
-                <div class="relative flex items-center gap-2">
-                    <input type="hidden" name="vehicle_id" x-model="selectedVehicleId" required>
-                    <div class="relative w-full" @click.outside="closeVehicleDropdown()">
-                        <input
-                            x-model="vehicleSearch"
-                            @focus="vehicleDropdownOpen = true"
-                            @click="vehicleDropdownOpen = true"
-                            @input="onVehicleSearchInput()"
-                            class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
-                            placeholder="Buscar vehiculo o cliente"
-                            autocomplete="off"
-                            required
-                        >
-                        <div
-                            x-show="vehicleDropdownOpen"
-                            x-cloak
-                            class="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg"
-                        >
-                            <div class="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-3 py-2">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-gray-600">Vehiculos</p>
-                                <button type="button" @click="closeVehicleDropdown()" class="text-xs font-semibold text-gray-500 hover:text-gray-700">
-                                    Cerrar
-                                </button>
+            <div class="md:col-span-3 flex flex-col gap-3 md:flex-row md:items-center">
+                <div class="w-full min-w-0 md:flex-[2.4_1_0%]">
+                    <div class="relative flex w-full items-center gap-2">
+                        <input type="hidden" name="vehicle_id" x-model="selectedVehicleId" required>
+                        <div class="relative min-w-0 flex-1" @click.outside="closeVehicleDropdown()">
+                            <input
+                                x-model="vehicleSearch"
+                                @focus="vehicleDropdownOpen = true"
+                                @click="vehicleDropdownOpen = true"
+                                @input="onVehicleSearchInput()"
+                                class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                                placeholder="Buscar vehiculo o cliente"
+                                autocomplete="off"
+                                required
+                            >
+                            <div
+                                x-show="vehicleDropdownOpen"
+                                x-cloak
+                                class="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg"
+                            >
+                                <div class="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-3 py-2">
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-600">Vehiculos</p>
+                                    <button type="button" @click="closeVehicleDropdown()" class="text-xs font-semibold text-gray-500 hover:text-gray-700">
+                                        Cerrar
+                                    </button>
+                                </div>
+                                <template x-if="filteredVehicles.length === 0">
+                                    <p class="px-3 py-2 text-sm text-gray-500">Sin resultados.</p>
+                                </template>
+                                <template x-for="vehicle in filteredVehicles" :key="`vehicle-search-${vehicle.id}`">
+                                    <button
+                                        type="button"
+                                        @click="selectVehicle(vehicle)"
+                                        class="flex w-full items-start justify-between border-b border-gray-100 px-3 py-2 text-left text-sm hover:bg-indigo-50"
+                                    >
+                                        <span class="font-medium text-gray-800" x-text="vehicle.label || `Vehiculo #${vehicle.id}`"></span>
+                                        <span class="ml-3 text-xs text-gray-500" x-text="vehicle.client_name ? `(${vehicle.client_name})` : ''"></span>
+                                    </button>
+                                </template>
                             </div>
-                            <template x-if="filteredVehicles.length === 0">
-                                <p class="px-3 py-2 text-sm text-gray-500">Sin resultados.</p>
-                            </template>
-                            <template x-for="vehicle in filteredVehicles" :key="`vehicle-search-${vehicle.id}`">
-                                <button
-                                    type="button"
-                                    @click="selectVehicle(vehicle)"
-                                    class="flex w-full items-start justify-between border-b border-gray-100 px-3 py-2 text-left text-sm hover:bg-indigo-50"
-                                >
-                                    <span class="font-medium text-gray-800" x-text="vehicle.label || `Vehiculo #${vehicle.id}`"></span>
-                                    <span class="ml-3 text-xs text-gray-500" x-text="vehicle.client_name ? `(${vehicle.client_name})` : ''"></span>
-                                </button>
-                            </template>
                         </div>
+                        <button type="button"
+                                @click="toggleQuickVehicle()"
+                                class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">
+                            <i class="ri-add-line"></i>
+                            <span class="ml-1 hidden sm:inline">Nuevo</span>
+                        </button>
                     </div>
-                    <button type="button"
-                            @click="toggleQuickVehicle()"
-                            class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">
-                        <i class="ri-add-line"></i>
-                        <span class="ml-1 hidden sm:inline">Nuevo</span>
-                    </button>
                 </div>
+
+                <input
+                    name="mileage_in"
+                    type="number"
+                    min="0"
+                    x-model="mileageIn"
+                    class="h-11 shrink-0 rounded-lg border border-gray-300 px-3 text-sm"
+                    style="width: 96px; min-width: 96px; max-width: 96px; flex: 0 0 96px;"
+                    placeholder="KM ingreso">
+                <input name="diagnosis_text" class="h-11 min-w-0 w-full rounded-lg border border-gray-300 px-3 text-sm md:flex-[2.5_1_0%]" placeholder="Diagnostico inicial (opcional)">
+
+                <label class="inline-flex h-11 shrink-0 items-center gap-2 whitespace-nowrap text-sm text-gray-700">
+                    <input type="checkbox" name="tow_in" value="1" class="h-4 w-4 rounded border-gray-300">
+                    Ingreso en grua
+                </label>
+
             </div>
 
-            <div class="rounded-xl border border-violet-200 bg-violet-50/60 p-3 md:col-span-2">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-violet-600">Cliente vinculado</p>
-                        <p class="mt-1 text-sm font-semibold text-slate-800" x-text="clientsList.find(client => String(client.id) === String(selectedClientId))?.label || 'Seleccione un vehiculo o cliente para continuar'"></p>
-                    </div>
-                    <button
-                        type="button"
-                        class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-violet-200 bg-white px-4 text-sm font-semibold text-violet-700 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        :disabled="!selectedClientId"
-                        @click="$dispatch('open-maintenance-client-history')"
-                    >
-                        <i class="ri-history-line"></i>
-                        <span>Ver historial</span>
-                    </button>
-                </div>
-            </div>
-
-            <input name="mileage_in" type="number" min="0" x-model="mileageIn" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="KM ingreso">
-
-            <label class="inline-flex items-center gap-2 text-sm text-gray-700 md:col-span-1">
-                <input type="checkbox" name="tow_in" value="1" class="h-4 w-4 rounded border-gray-300">
-                Ingreso en grua
-            </label>
-
-            <input name="diagnosis_text" class="h-11 rounded-lg border border-gray-300 px-3 text-sm md:col-span-3   " placeholder="Diagnostico inicial (opcional)">
             <textarea name="observations" rows="3" class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-3" placeholder="Observaciones"></textarea>
 
             <div class="rounded-xl border border-gray-200 bg-white p-4 md:col-span-3">
@@ -796,23 +821,52 @@
         </div>
     </x-ui.modal>
 
-    <x-ui.modal x-data="{ open: false }" x-on:open-maintenance-client-history.window="open = true" x-on:close-maintenance-client-history.window="open = false" :isOpen="false" :showCloseButton="false" class="max-w-7xl">
-        <div class="p-5 sm:p-6">
-            <div class="mb-4 flex items-center justify-between gap-3">
+    <x-ui.modal
+        x-data="{
+            open: false,
+            resetPosition() {
+                this.$el.scrollTop = 0;
+                this.$refs.historyViewport?.scrollTo({ top: 0, behavior: 'auto' });
+                this.$refs.historyScroll?.scrollTo({ top: 0, behavior: 'auto' });
+            },
+            close() {
+                this.open = false;
+                this.resetPosition();
+            }
+        }"
+        x-on:open-maintenance-client-history.window="open = true; $nextTick(() => resetPosition())"
+        x-on:maintenance-client-history-loaded.window="if (open) { $nextTick(() => resetPosition()) }"
+        x-on:close-maintenance-client-history.window="close()"
+        :isOpen="false"
+        :showCloseButton="false"
+        :bodyScrollable="false"
+        class="max-w-5xl w-[92vw]">
+        <div x-ref="historyViewport" class="flex max-h-full min-h-0 flex-col p-4 sm:p-5" style="height: min(78vh, calc(100vh - 5rem), calc(100dvh - 5rem)); max-height: min(78vh, calc(100vh - 5rem), calc(100dvh - 5rem));">
+            <div class="mb-3 flex shrink-0 items-center justify-between gap-3">
                 <div>
                     <h3 class="text-lg font-semibold text-gray-800">Historial del cliente</h3>
-                    <p class="mt-1 text-sm text-gray-500">Mantenimientos, tecnico responsable, observaciones y vehiculos asociados.</p>
+                    <p class="mt-1 text-sm text-gray-500">Incluye fecha del servicio, tecnico responsable, observaciones y vehiculo.</p>
                 </div>
-                <button type="button" @click="open = false" class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
+                <button type="button" @click="close()" class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
                     <i class="ri-close-line text-xl"></i>
                 </button>
             </div>
-            <div class="overflow-hidden rounded-2xl border border-gray-200">
-                <template x-if="historyUrl">
-                    <iframe :src="historyUrl" class="h-[75vh] w-full bg-white"></iframe>
+            <div class="min-h-0 flex-1 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <template x-if="historyLoading">
+                    <div class="flex h-full min-h-[18rem] items-center justify-center bg-slate-50">
+                        <div class="text-center">
+                            <div class="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-orange-500"></div>
+                            <p class="mt-4 text-sm font-medium text-slate-500">Cargando historial del cliente...</p>
+                        </div>
+                    </div>
                 </template>
-                <template x-if="!historyUrl">
-                    <div class="flex h-80 items-center justify-center bg-gray-50 text-sm font-medium text-gray-500">
+                <template x-if="!historyLoading && historyHtml">
+                    <div x-ref="historyScroll" class="h-full overflow-y-auto overscroll-contain bg-slate-50" style="overscroll-behavior: contain;">
+                        <div  x-html="historyHtml"></div>
+                    </div>
+                </template>
+                <template x-if="!historyLoading && !historyHtml">
+                    <div class="flex h-full items-center justify-center bg-slate-50 text-sm font-medium text-gray-500">
                         Seleccione un cliente para ver su historial.
                     </div>
                 </template>
@@ -821,4 +875,3 @@
     </x-ui.modal>
 </div>
 @endsection
-

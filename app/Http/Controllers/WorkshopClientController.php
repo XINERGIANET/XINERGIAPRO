@@ -248,32 +248,46 @@ class WorkshopClientController extends Controller
         $totalPurchases = (float) $purchases->sum('total');
         $totalPayments = (float) $payments->sum('total');
 
-        $historyView = view('workshop.clients.history', array_merge(
-            compact(
-                'person',
-                'vehicles',
-                'appointments',
-                'orders',
-                'sales',
-                'purchases',
-                'payments',
-                'totalOrders',
-                'totalPaidOrders',
-                'debtOrders',
-                'totalSales',
-                'totalPurchases',
-                'totalPayments'
-            ),
-            [
-                'isModal' => $request->boolean('modal'),
-            ]
-        ));
-
         if ($request->boolean('modal')) {
-            return response($historyView->render());
+            return response(view('workshop.clients._history_content', array_merge(
+                compact(
+                    'person',
+                    'vehicles',
+                    'appointments',
+                    'orders',
+                    'sales',
+                    'purchases',
+                    'payments',
+                    'totalOrders',
+                    'totalPaidOrders',
+                    'debtOrders',
+                    'totalSales',
+                    'totalPurchases',
+                    'totalPayments'
+                ),
+                ['isModal' => true]
+            ))->render(), 200, [
+                'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+                'Pragma' => 'no-cache',
+                'Expires' => '0',
+            ]);
         }
 
-        return $historyView;
+        return view('workshop.clients.history', compact(
+            'person',
+            'vehicles',
+            'appointments',
+            'orders',
+            'sales',
+            'purchases',
+            'payments',
+            'totalOrders',
+            'totalPaidOrders',
+            'debtOrders',
+            'totalSales',
+            'totalPurchases',
+            'totalPayments'
+        ));
     }   
 
     private function assertClientScope(Person $person, int $branchId): void
