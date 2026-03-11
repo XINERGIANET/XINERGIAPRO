@@ -1,3 +1,10 @@
+@if (!empty($isModal))
+<div>
+    <div class="mx-auto max-w-[1600px]">
+        @include('workshop.clients._history_technical')
+    </div>
+</div>
+@else
 <div class="{{ !empty($isModal) ? 'p-5 sm:p-6' : '' }}">
     <div class="mx-auto max-w-[1600px] space-y-6">
         <section class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -289,3 +296,4 @@
         </div>
     </div>
 </div>
+@endif

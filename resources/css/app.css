@@ -35,7 +35,7 @@
   }
 
   .modal > .relative {
-    max-height: calc(100vh - 1.5rem) !important;
+    max-height: calc(100dvh - 1.5rem) !important;
     border-radius: 1rem !important;
   }
 }
