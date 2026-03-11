@@ -26,7 +26,7 @@
         <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">📋 Información General</h3>
         <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Código <span class="text-red-500">*</span></label>
+                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Código</label>
                 <input
                     type="text"
                     name="code"
@@ -38,7 +38,7 @@
             </div>
 
             <div class="lg:col-span-3">
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Nombre del Platillo <span class="text-red-500">*</span></label>
+                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Nombre del Platillo</label>
                 <input
                     type="text"
                     name="name"
@@ -60,7 +60,7 @@
             </div>
 
             <div>
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Categoría <span class="text-red-500">*</span></label>
+                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Categoría</label>
                 <select
                     name="category_id"
                     required
@@ -102,7 +102,7 @@
             </div>
 
             <div>
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Rendimiento <span class="text-red-500">*</span></label>
+                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Rendimiento</label>
                 <div class="flex gap-2">
                     <input
                         type="number"
@@ -129,7 +129,7 @@
             </div>
 
             <div>
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Estado <span class="text-red-500">*</span></label>
+                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Estado</label>
                 <select
                     name="status"
                     required

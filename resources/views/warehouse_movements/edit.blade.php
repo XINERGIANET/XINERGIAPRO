@@ -91,7 +91,7 @@
                                 <p class="h-11 flex items-center rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-dark-900 px-4 py-2.5 text-sm text-gray-800 dark:text-white/90">{{ $movement->person_name ?? $movement->user_name ?? '—' }}</p>
                             </div>
                             <div>
-                                <label class="mb-1.5 block text-sm font-medium text-gray-600 dark:text-gray-400">Estado <span class="text-red-500">*</span></label>
+                                <label class="mb-1.5 block text-sm font-medium text-gray-600 dark:text-gray-400">Estado</label>
                                 <select name="status" required class="h-11 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-dark-900 px-4 py-2.5 text-sm text-gray-800 dark:text-white/90">
                                     <option value="C" {{ old('status', $wm->status) === 'C' ? 'selected' : '' }}>Cerrado</option>
                                     <option value="A" {{ old('status', $wm->status) === 'A' ? 'selected' : '' }}>Anulado</option>

@@ -125,7 +125,7 @@
     x-init="init()"
 >
     <div>
-        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Tipo de persona <span class="text-red-500">*</span></label>
+        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Tipo de persona</label>
         <select
             name="person_type"
             x-model="personType"
@@ -143,7 +143,7 @@
     </div>
 
     <div>
-        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Documento <span class="text-red-500">*</span></label>
+        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Documento</label>
         <div class="flex items-center gap-2">
             <input
                 type="text"
@@ -169,7 +169,7 @@
         @enderror
     </div>
     <div>
-        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Nombres <span class="text-red-500">*</span></label>
+        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Nombres</label>
         <input
             type="text"
             name="first_name"
@@ -185,7 +185,7 @@
 
 
     <div>
-        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Apellidos <span class="text-red-500">*</span></label>
+        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Apellidos</label>
         <input
             type="text"
             name="last_name"
@@ -262,7 +262,7 @@
     </div>
 
     <div class="sm:col-span-1 ">
-        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Direccion <span class="text-red-500">*</span></label>
+        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Direccion</label>
         <input
             type="text"
             name="address"
@@ -307,7 +307,7 @@
     </div>
 
     <div class="sm:col-span-1">
-        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Distrito <span class="text-red-500">*</span></label>
+        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Distrito</label>
         <select
             name="location_id"
             x-model="districtId"

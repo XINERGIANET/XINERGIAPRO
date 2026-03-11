@@ -310,7 +310,7 @@
             <form method="POST" action="{{ route('workshop.appointments.store') }}" class="grid grid-cols-1 gap-4 md:grid-cols-3">
                 @csrf
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">Vehiculo <span class="text-red-500">*</span></label>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Vehiculo</label>
                     <select name="vehicle_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
                         <option value="">Seleccione vehiculo</option>
                         @foreach($vehicles as $vehicle)
@@ -319,7 +319,7 @@
                     </select>
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">Cliente <span class="text-red-500">*</span></label>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Cliente</label>
                     <select name="client_person_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
                         <option value="">Seleccione cliente</option>
                         @foreach($clients as $client)
@@ -337,15 +337,15 @@
                     </select>
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">Inicio <span class="text-red-500">*</span></label>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Inicio</label>
                     <input type="datetime-local" name="start_at" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">Fin <span class="text-red-500">*</span></label>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Fin</label>
                     <input type="datetime-local" name="end_at" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">Motivo <span class="text-red-500">*</span></label>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Motivo</label>
                     <input name="reason" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Motivo" required>
                 </div>
                 <div class="md:col-span-2">
@@ -384,7 +384,7 @@
                     @csrf
                     @method('PUT')
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Vehiculo <span class="text-red-500">*</span></label>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Vehiculo</label>
                         <select name="vehicle_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
                             @foreach($vehicles as $vehicle)
                                 <option value="{{ $vehicle->id }}" @selected((int)$appointment->vehicle_id === (int)$vehicle->id)>{{ $vehicle->brand }} {{ $vehicle->model }} - {{ $vehicle->plate }}</option>
@@ -392,7 +392,7 @@
                         </select>
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Cliente <span class="text-red-500">*</span></label>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Cliente</label>
                         <select name="client_person_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
                             @foreach($clients as $client)
                                 <option value="{{ $client->id }}" @selected((int)$appointment->client_person_id === (int)$client->id)>{{ $client->first_name }} {{ $client->last_name }}</option>
@@ -409,15 +409,15 @@
                         </select>
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Inicio <span class="text-red-500">*</span></label>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Inicio</label>
                         <input type="datetime-local" name="start_at" value="{{ optional($appointment->start_at)->format('Y-m-d\\TH:i') }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Fin <span class="text-red-500">*</span></label>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Fin</label>
                         <input type="datetime-local" name="end_at" value="{{ optional($appointment->end_at)->format('Y-m-d\\TH:i') }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Motivo <span class="text-red-500">*</span></label>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Motivo</label>
                         <input name="reason" value="{{ $appointment->reason }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Motivo" required>
                     </div>
                     <div class="md:col-span-2">

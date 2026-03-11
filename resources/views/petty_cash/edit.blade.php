@@ -105,7 +105,7 @@
                 <div class="bg-gray-50 rounded-xl p-5 border border-gray-100 dark:bg-white/[0.02] dark:border-gray-800 space-y-5">
                     
                     <div class="col-span-full">
-                        <label class="mb-1.5 block text-sm font-medium text-gray-600 dark:text-gray-400">Nota / Descripción <span class="text-red-500">*</span></label>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-600 dark:text-gray-400">Nota / Descripción</label>
                         <input type="text" name="comment" required x-model="formConcept"
                             :readonly="formConcept.includes('Apertura') || formConcept.includes('Cierre')"
                             :class="formConcept.includes('Apertura') || formConcept.includes('Cierre') ? 'bg-gray-100 text-gray-400' : 'bg-white dark:bg-dark-900'"
@@ -114,7 +114,7 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                         <div>
-                            <label class="mb-1.5 block text-sm font-medium text-gray-600 dark:text-gray-400">Turno <span class="text-red-500">*</span></label>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-600 dark:text-gray-400">Turno</label>
                             <select name="shift_id" required class="h-11 w-full rounded-lg border-gray-200 dark:bg-dark-900 dark:text-white/90">
                                 @foreach($shifts as $shift)
                                     <option value="{{ $shift->id }}" {{ old('shift_id', $movement->cashMovement->shift_id) == $shift->id ? 'selected' : '' }}>
@@ -125,7 +125,7 @@
                         </div>
 
                         <div>
-                            <label class="mb-1.5 block text-sm font-medium text-gray-600 dark:text-gray-400">Concepto <span class="text-red-500">*</span></label>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-600 dark:text-gray-400">Concepto</label>
                             <select name="payment_concept_id" required x-model="formConceptId" class="h-11 w-full rounded-lg border-gray-200 dark:bg-dark-900 dark:text-white/90">
                                 <template x-for="item in currentConcepts" :key="item.id">
                                     <option :value="item.id" x-text="item.description" :selected="item.id == formConceptId"></option>

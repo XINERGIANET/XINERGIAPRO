@@ -170,7 +170,7 @@
             <form method="POST" action="{{ route('workshop.vehicles.store') }}" class="grid grid-cols-1 gap-4 md:grid-cols-4">
                 @csrf
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">Cliente <span class="text-red-500">*</span></label>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Cliente</label>
                     <select name="client_person_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
                         <option value="">Seleccione cliente</option>
                         @foreach($clients as $client)
@@ -179,7 +179,7 @@
                     </select>
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">Tipo de vehiculo <span class="text-red-500">*</span></label>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Tipo de vehiculo</label>
                     <select name="vehicle_type_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
                         @foreach($vehicleTypes as $vehicleType)
                             <option value="{{ $vehicleType->id }}" @selected((int) old('vehicle_type_id', optional($vehicleTypes->firstWhere('name', 'moto lineal'))->id) === (int) $vehicleType->id)>
@@ -189,11 +189,11 @@
                     </select>
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">Marca <span class="text-red-500">*</span></label>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Marca</label>
                     <input name="brand" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Marca" required>
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">Modelo <span class="text-red-500">*</span></label>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Modelo</label>
                     <input name="model" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Modelo" required>
                 </div>
                 <div>
@@ -250,7 +250,7 @@
                     @csrf
                     @method('PUT')
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Cliente <span class="text-red-500">*</span></label>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Cliente</label>
                         <select name="client_person_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
                             @foreach($clients as $client)
                                 <option value="{{ $client->id }}" @selected((int)$vehicle->client_person_id === (int)$client->id)>{{ $client->first_name }} {{ $client->last_name }}</option>
@@ -258,7 +258,7 @@
                         </select>
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Tipo de vehiculo <span class="text-red-500">*</span></label>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Tipo de vehiculo</label>
                         <select name="vehicle_type_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
                             @foreach($vehicleTypes as $vehicleType)
                                 <option value="{{ $vehicleType->id }}" @selected((int) old('vehicle_type_id', $vehicle->vehicle_type_id) === (int) $vehicleType->id)>
@@ -268,11 +268,11 @@
                         </select>
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Marca <span class="text-red-500">*</span></label>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Marca</label>
                         <input name="brand" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->brand }}" placeholder="Marca" required>
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Modelo <span class="text-red-500">*</span></label>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Modelo</label>
                         <input name="model" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->model }}" placeholder="Modelo" required>
                     </div>
                     <div>

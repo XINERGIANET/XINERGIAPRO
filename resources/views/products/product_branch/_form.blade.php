@@ -17,7 +17,7 @@
 
         <div>
             <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                Tasa de impuesto <span class="text-red-500">*</span>
+                Tasa de impuesto
             </label>
             <select name="tax_rate_id" x-model="formData.tax_rate_id" required @change="formData.tax_rate_id = $event.target.value" value="{{ old('tax_rate_id', isset($productBranch) && $productBranch ? $productBranch->tax_rate_id : '') }}"
                 class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
@@ -34,7 +34,7 @@
 
         <div>
             <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                Stock <span class="text-red-500">*</span>
+                Stock
             </label>
             <input type="number" name="stock" x-model="formData.stock" value="{{ old('stock', isset($productBranch) && $productBranch ? $productBranch->stock : 0) }}" required @change="formData.stock = $event.target.value"
                 placeholder="Ingrese el stock"
@@ -43,7 +43,7 @@
 
         <div>
              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                Precio <span class="text-red-500">*</span>
+                Precio
             </label>
             <input type="number" step="0.01" name="price" x-model="formData.price" required @change="formData.price = $event.target.value"
                 placeholder="Ingrese el precio"

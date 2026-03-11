@@ -184,22 +184,22 @@
             <form method="POST" action="{{ route('workshop.services.store') }}" class="grid grid-cols-1 gap-5 md:grid-cols-2">
                 @csrf
                 <div class="md:col-span-2">
-                    <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Nombre del Servicio <span class="text-red-500">*</span></label>
+                    <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Nombre del Servicio</label>
                     <input name="name" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" placeholder="Ej: Mantenimiento Preventivo 5K" required>
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Tipo de Servicio <span class="text-red-500">*</span></label>
+                    <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Tipo de Servicio</label>
                     <select name="type" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" required>
                         <option value="preventivo">Preventivo</option>
                         <option value="correctivo">Correctivo</option>
                     </select>
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Precio Base (S/) <span class="text-red-500">*</span></label>
+                    <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Precio Base (S/)</label>
                     <input type="number" step="0.01" min="0" name="base_price" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" placeholder="0.00" required>
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Tiempo Estimado (Minutos) <span class="text-red-500">*</span></label>
+                    <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Tiempo Estimado (Minutos)</label>
                     <input type="number" min="0" name="estimated_minutes" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" placeholder="Ej: 60" required>
                 </div>
                 <div class="md:col-span-2 mt-4 flex items-center justify-end gap-3">
@@ -228,26 +228,26 @@
                     @csrf
                     @method('PUT')
                     <div class="md:col-span-2">
-                        <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Nombre del Servicio <span class="text-red-500">*</span></label>
+                        <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Nombre del Servicio</label>
                         <input name="name" value="{{ $service->name }}" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" required>
                     </div>
                     <div>
-                        <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Tipo de Servicio <span class="text-red-500">*</span></label>
+                        <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Tipo de Servicio</label>
                         <select name="type" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" required>
                             <option value="preventivo" @selected($service->type === 'preventivo')>Preventivo</option>
                             <option value="correctivo" @selected($service->type === 'correctivo')>Correctivo</option>
                         </select>
                     </div>
                     <div>
-                        <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Precio Base (S/) <span class="text-red-500">*</span></label>
+                        <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Precio Base (S/)</label>
                         <input type="number" step="0.01" min="0" name="base_price" value="{{ (float) $service->base_price }}" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" required>
                     </div>
                     <div>
-                        <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Tiempo Estimado (Minutos) <span class="text-red-500">*</span></label>
+                        <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Tiempo Estimado (Minutos)</label>
                         <input type="number" min="0" name="estimated_minutes" value="{{ (int) $service->estimated_minutes }}" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" required>
                     </div>
                     <div>
-                        <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Estado <span class="text-red-500">*</span></label>
+                        <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Estado</label>
                         <select name="active" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" required>
                             <option value="1" @selected((int)$service->active === 1)>Activo</option>
                             <option value="0" @selected((int)$service->active === 0)>Inactivo</option>

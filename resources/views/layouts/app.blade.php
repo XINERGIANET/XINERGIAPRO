@@ -222,6 +222,7 @@
             backdrop-filter: blur(8px) !important;
             -webkit-backdrop-filter: blur(8px) !important;
         }
+
     </style>
 </head>
 
@@ -359,5 +360,28 @@
     }
 </script>
     @stack('scripts')
+    
+    <!-- Indicadores de Campos Obligatorios (*) -->
+    <style>
+        label::after, 
+        label::before {
+            content: none !important;
+        }
+
+        label:has(+ :required)::after,
+        label:has(+ * :required)::after,
+        label:has(+ * * :required)::after,
+        label:has(~ :required)::after,
+        label:has(~ * :required)::after,
+        label:has(~ * * :required)::after,
+        label:has(:required)::after,
+        div:has(> label):has(:required) > label::after,
+        div:has(> label):has([required]) > label::after {
+            content: " *" !important;
+            color: #ef4444 !important;
+            font-weight: bold !important;
+            display: inline !important;
+        }
+    </style>
 </body> 
 </html>

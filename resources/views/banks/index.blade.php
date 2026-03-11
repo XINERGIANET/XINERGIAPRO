@@ -315,13 +315,13 @@
             @endif
             
             <div>
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Descripción <span class="text-red-500">*</span></label>
+                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Descripción</label>
                 <input type="text" name="description" x-model="bankData.description" required
                     class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30">
             </div>
 
             <div>
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Orden <span class="text-red-500">*</span></label>
+                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Orden</label>
                 <input type="number" name="order_num" x-model="bankData.order_num" required
                     class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30">
             </div>

@@ -1267,3 +1267,30 @@ pre[class*='language-'] {
     background-color: rgba(51, 65, 85, 0.25);
   }
 }
+
+/* 
+|--------------------------------------------------------------------------
+| Indicadores de Campos Obligatorios (*)
+|--------------------------------------------------------------------------
+| 1. Resetear asteriscos fantasmas para evitar duplicidad o estilos heredados.
+| 2. Aplicar el indicador consistente a campos con atributo 'required'.
+*/
+label::after, 
+label::before {
+    content: none !important;
+}
+
+label:has(+ :required)::after,
+label:has(+ * :required)::after,
+label:has(+ * * :required)::after,
+label:has(~ :required)::after,
+label:has(~ * :required)::after,
+label:has(~ * * :required)::after,
+label:has(:required)::after,
+div:has(> label):has(:required) > label::after,
+div:has(> label):has([required]) > label::after {
+    content: " *" !important;
+    color: #ef4444 !important;
+    font-weight: bold !important;
+    display: inline !important;
+}

@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('content')
 <div class="space-y-4" x-data="{ selectedClientId: '', historyUrl: '', historyBase: @js(route('workshop.clients.history', ['person' => '__PERSON__'])) }">
@@ -11,7 +11,7 @@
     <form method="POST" action="{{ route('workshop.orders.store') }}" class="grid grid-cols-1 gap-4 rounded border p-4 md:grid-cols-2">
         @csrf
         <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">Vehiculo <span class="text-red-500">*</span></label>
+            <label class="mb-1 block text-sm font-medium text-gray-700">Vehiculo</label>
             <select name="vehicle_id" class="w-full rounded border px-3 py-2" required>
                 <option value="">Seleccione vehiculo</option>
                 @foreach($vehicles as $vehicle)
@@ -21,7 +21,7 @@
         </div>
 
         <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">Cliente <span class="text-red-500">*</span></label>
+            <label class="mb-1 block text-sm font-medium text-gray-700">Cliente</label>
             <div class="flex gap-2">
                 <select
                     name="client_person_id"
@@ -68,7 +68,7 @@
         </div>
 
         <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700">Fecha de ingreso <span class="text-red-500">*</span></label>
+            <label class="mb-1 block text-sm font-medium text-gray-700">Fecha de ingreso</label>
             <input type="datetime-local" name="intake_date" class="w-full rounded border px-3 py-2" value="{{ now()->format('Y-m-d\TH:i') }}" required>
         </div>
 

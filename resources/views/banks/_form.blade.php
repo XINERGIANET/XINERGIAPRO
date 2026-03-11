@@ -1,6 +1,6 @@
 <div>
     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-        Descripción <span class="text-red-500">*</span>
+        Descripción
     </label>
     <input type="text" name="description" value="{{ old('description', $bank->description ?? '') }}" required
         placeholder="Ingrese el nombre del banco"
@@ -12,7 +12,7 @@
 
 <div>
     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-        Orden <span class="text-red-500">*</span>
+        Orden
     </label>
     <input type="number" name="order_num" value="{{ old('order_num', $bank->order_num ?? '') }}" required
         placeholder="Ingrese el número de orden"
