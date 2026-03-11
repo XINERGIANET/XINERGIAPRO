@@ -4,10 +4,20 @@
     @php
         $viewId = request('view_id');
         $salesIndexUrl = route('admin.sales.index', $viewId ? ['view_id' => $viewId] : []);
+        $posMode = $posMode ?? 'create';
+        $isEditMode = $posMode === 'edit';
+        $pageTitle = $isEditMode ? 'Editar venta' : 'Nueva venta';
+        $cardDescription = $isEditMode
+            ? 'Actualiza la venta con la misma interfaz del punto de venta.'
+            : 'Interfaz de venta rapida. Puedes seguir agregando productos aunque el stock mostrado sea 0.';
+        $secondaryActionLabel = $isEditMode ? 'Cancelar' : 'Guardar';
+        $secondaryActionIcon = $isEditMode ? 'ri-close-line' : 'ri-save-line';
+        $primaryActionLabel = $isEditMode ? 'Guardar cambios' : 'Cobrar';
+        $primaryActionIcon = $isEditMode ? 'ri-save-line' : 'ri-cash-line';
     @endphp
 
     <div id="sales-create-view">
-        <x-common.page-breadcrumb pageTitle="Nueva venta" />
+        <x-common.page-breadcrumb :pageTitle="$pageTitle" />
 
         <x-common.component-card
             title="Punto de Venta"
@@ -195,11 +205,11 @@
                             </div>
                          
                             <div class="mt-4 grid grid-cols-2 gap-3">
-                                <button type="button" onclick="goBack()" class="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-100">
-                                    <i class="ri-save-line"></i><span>Guardar</span>
+                                <button type="button" onclick="{{ $isEditMode ? 'cancelEditSale()' : 'goBack()' }}" class="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                                    <i class="{{ $secondaryActionIcon }}"></i><span>{{ $secondaryActionLabel }}</span>
                                 </button>
                                 <button type="button" onclick="processSaleNow()" class="inline-flex h-12 items-center justify-center gap-2 rounded-2xl text-sm font-semibold text-white shadow-theme-xs" style="background:linear-gradient(90deg,#ff7a00,#ff4d00); color:#fff; box-shadow:0 12px 24px rgba(249,115,22,0.24);">
-                                    <i class="ri-cash-line"></i><span>Cobrar</span>
+                                    <i class="{{ $primaryActionIcon }}"></i><span>{{ $primaryActionLabel }}</span>
                                 </button>
                             </div>
                         </div>
@@ -363,24 +373,59 @@
             let paymentRows = [];
             let currentAsideTab = 'summary';
 
+            const posMode = @json($posMode ?? 'create');
+            const isEditMode = posMode === 'edit';
+            const initialSaleData = @json($initialSaleData ?? null);
+            const defaultDocumentTypeId = Number(@json($defaultDocumentTypeId ?? 0)) || null;
+            const defaultCashRegisterId = Number(@json($defaultCashRegisterId ?? 0)) || null;
             const ACTIVE_SALE_KEY_STORAGE = 'restaurantActiveSaleKey';
-            let db = JSON.parse(localStorage.getItem('restaurantDB') || '{}');
-            let activeKey = localStorage.getItem(ACTIVE_SALE_KEY_STORAGE);
+            let db = {};
+            let activeKey = null;
 
-            if (!activeKey || !db[activeKey] || db[activeKey]?.status === 'completed') {
-                activeKey = `sale-${Date.now()}`;
-                localStorage.setItem(ACTIVE_SALE_KEY_STORAGE, activeKey);
+            if (!isEditMode) {
+                db = JSON.parse(localStorage.getItem('restaurantDB') || '{}');
+                activeKey = localStorage.getItem(ACTIVE_SALE_KEY_STORAGE);
+
+                if (!activeKey || !db[activeKey] || db[activeKey]?.status === 'completed') {
+                    activeKey = `sale-${Date.now()}`;
+                    localStorage.setItem(ACTIVE_SALE_KEY_STORAGE, activeKey);
+                }
             }
 
             const defaultClient = people.find((person) => Number(person.id) === Number(defaultClientId)) || null;
-            let currentSale = db[activeKey] || {
-                id: Date.now(),
-                clientId: defaultClient ? defaultClient.id : null,
-                clientName: defaultClient ? defaultClient.label : 'Publico General',
-                status: 'in_progress',
-                notes: '',
-                items: []
-            };
+            let currentSale = isEditMode && initialSaleData
+                ? {
+                    id: Number(initialSaleData.id || 0) || null,
+                    clientId: initialSaleData.clientId ? Number(initialSaleData.clientId) : (defaultClient ? defaultClient.id : null),
+                    clientName: initialSaleData.clientName || (defaultClient ? defaultClient.label : 'Publico General'),
+                    status: 'editing',
+                    notes: String(initialSaleData.notes || ''),
+                    items: Array.isArray(initialSaleData.items)
+                        ? initialSaleData.items.map((item) => ({
+                            pId: Number(item.pId || 0),
+                            name: String(item.name || ''),
+                            qty: Number(item.qty || 0),
+                            price: Number(item.price || 0),
+                            note: String(item.note || ''),
+                        }))
+                        : [],
+                    payment_methods: Array.isArray(initialSaleData.payment_methods) ? initialSaleData.payment_methods : [],
+                    document_type_id: Number(initialSaleData.document_type_id || defaultDocumentTypeId || 0) || null,
+                    cash_register_id: Number(initialSaleData.cash_register_id || defaultCashRegisterId || 0) || null,
+                }
+                : (db[activeKey] || {
+                    id: Date.now(),
+                    clientId: defaultClient ? defaultClient.id : null,
+                    clientName: defaultClient ? defaultClient.label : 'Publico General',
+                    status: 'in_progress',
+                    notes: '',
+                    items: [],
+                    payment_methods: [],
+                    document_type_id: defaultDocumentTypeId,
+                    cash_register_id: defaultCashRegisterId,
+                });
+            currentSale.document_type_id = Number(currentSale.document_type_id || defaultDocumentTypeId || 0) || null;
+            currentSale.cash_register_id = Number(currentSale.cash_register_id || defaultCashRegisterId || 0) || null;
             paymentRows = Array.isArray(currentSale.payment_methods)
                 ? currentSale.payment_methods.map((row) => ({
                     payment_method_id: Number(row.payment_method_id || row.methodId || paymentMethods[0]?.id || 0),
@@ -391,14 +436,20 @@
                     method_variant_key: row.method_variant_key || null,
                 }))
                 : [];
-            db[activeKey] = currentSale;
-            localStorage.setItem('restaurantDB', JSON.stringify(db));
+            if (!isEditMode) {
+                db[activeKey] = currentSale;
+                localStorage.setItem('restaurantDB', JSON.stringify(db));
+            }
 
             const getImageUrl = (imgUrl) => imgUrl && String(imgUrl).trim() !== ''
                 ? imgUrl
                 : 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIj48cmVjdCBmaWxsPSIjZTJlOGYwIiB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiM2NDc0OGIiPlNpbiBpbWFnZW48L3RleHQ+PC9zdmc+';
             const formatMoney = (value) => `S/ ${Number(value || 0).toFixed(2)}`;
-            const saveDB = () => { db[activeKey] = currentSale; localStorage.setItem('restaurantDB', JSON.stringify(db)); };
+            const saveDB = () => {
+                if (isEditMode) return;
+                db[activeKey] = currentSale;
+                localStorage.setItem('restaurantDB', JSON.stringify(db));
+            };
             const getProductCategory = (prod) => (prod && prod.category && String(prod.category).trim() !== '') ? String(prod.category).trim() : 'Sin categoria';
             const filteredClients = () => {
                 const term = clientQuery.toLowerCase().trim();
@@ -984,8 +1035,11 @@
                     container.innerHTML = '<div class="flex min-h-[240px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-center"><div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-sm"><i class="ri-shopping-bag-3-line text-3xl"></i></div><p class="mt-4 text-base font-bold text-slate-800">Sin productos en la orden</p><p class="mt-1 text-sm text-slate-500">Agrega productos desde el catálogo.</p></div>';
                 } else {
                     currentSale.items.forEach((item, index) => {
-                        const prod = products.find((p) => Number(p.id) === Number(item.pId));
-                        if (!prod) return;
+                        const prod = products.find((p) => Number(p.id) === Number(item.pId)) || {
+                            id: Number(item.pId) || 0,
+                            name: item.name || 'Producto',
+                            img: null,
+                        };
 
                         const itemTotal = (Number(item.price) || 0) * (Number(item.qty) || 0);
                         const taxPct = taxRateByProductId.get(Number(item.pId)) ?? defaultTaxPct;
@@ -1105,6 +1159,9 @@
                     })),
                     notes: document.getElementById('sale-notes')?.value || '',
                 };
+                if (isEditMode && currentSale.id) {
+                    payload.movement_id = Number(currentSale.id);
+                }
 
                 const payButton = document.querySelector('button[onclick="processSaleNow()"]');
                 if (payButton) {
@@ -1125,13 +1182,23 @@
                         if (!response.ok || !data.success) {
                             throw new Error(data.message || 'No se pudo procesar la venta.');
                         }
+                        if (isEditMode) {
+                            showNotice('Venta actualizada correctamente.');
+                            setTimeout(() => {
+                                window.location.href = @json($salesIndexUrl);
+                            }, 350);
+                            return;
+                        }
                         currentSale = {
                             id: Date.now(),
                             clientId: defaultClient ? defaultClient.id : null,
                             clientName: defaultClient ? defaultClient.label : 'Publico General',
                             status: 'in_progress',
                             notes: '',
-                            items: []
+                            items: [],
+                            payment_methods: [],
+                            document_type_id: defaultDocumentTypeId,
+                            cash_register_id: defaultCashRegisterId,
                         };
                         paymentRows = [];
                         db[activeKey] = currentSale;
@@ -1186,6 +1253,10 @@
                 });
             }
 
+            function cancelEditSale() {
+                window.location.href = @json($salesIndexUrl);
+            }
+
             document.getElementById('product-search')?.addEventListener('input', (event) => {
                 productSearch = String(event.target.value || '').trim().toLowerCase();
                 renderProducts();
@@ -1196,6 +1267,14 @@
             document.getElementById('payment-tab-button')?.addEventListener('click', () => setAsideTab('payment'));
             document.getElementById('sale-notes')?.addEventListener('input', (event) => {
                 currentSale.notes = String(event.target.value || '');
+                saveDB();
+            });
+            document.getElementById('document-type-select')?.addEventListener('change', (event) => {
+                currentSale.document_type_id = Number(event.target.value || 0) || null;
+                saveDB();
+            });
+            document.getElementById('cash-register-select')?.addEventListener('change', (event) => {
+                currentSale.cash_register_id = Number(event.target.value || 0) || null;
                 saveDB();
             });
             document.getElementById('client-autocomplete')?.addEventListener('focus', () => {
@@ -1249,6 +1328,14 @@
             if (notesInput) {
                 notesInput.value = currentSale.notes || '';
             }
+            const documentTypeSelect = document.getElementById('document-type-select');
+            if (documentTypeSelect && currentSale.document_type_id) {
+                documentTypeSelect.value = String(currentSale.document_type_id);
+            }
+            const cashRegisterSelect = document.getElementById('cash-register-select');
+            if (cashRegisterSelect && currentSale.cash_register_id) {
+                cashRegisterSelect.value = String(currentSale.cash_register_id);
+            }
 
             renderCategoryFilters();
             renderProducts();
@@ -1257,6 +1344,7 @@
             setAsideTab('summary');
 
             window.goBack = goBack;
+            window.cancelEditSale = cancelEditSale;
             window.processSaleNow = processSaleNow;
             window.updateQty = updateQty;
             window.setQty = setQty;
