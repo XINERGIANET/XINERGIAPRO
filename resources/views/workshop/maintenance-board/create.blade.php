@@ -555,54 +555,22 @@
                             </button>
                         </div>
                     </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Tipo de vehiculo</label>
-                        <select x-model="quickVehicle.vehicle_type_id" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
-                            <template x-for="type in vehicleTypes" :key="`type-${type.id}`">
-                                <option :value="type.id" x-text="type.name"></option>
-                            </template>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Marca</label>
-                        <input x-model="quickVehicle.brand" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Marca" required>
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Modelo</label>
-                        <input x-model="quickVehicle.model" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Modelo" required>
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Anio</label>
-                        <input x-model="quickVehicle.year" type="number" min="1900" max="2100" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Anio">
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Color</label>
-                        <input x-model="quickVehicle.color" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Color">
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Placa</label>
-                        <input x-model="quickVehicle.plate" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Placa">
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">VIN</label>
-                        <input x-model="quickVehicle.vin" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="VIN">
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Nro motor</label>
-                        <input x-model="quickVehicle.engine_number" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nro motor">
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Nro chasis</label>
-                        <input x-model="quickVehicle.chassis_number" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nro chasis">
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Serial</label>
-                        <input x-model="quickVehicle.serial_number" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Serial">
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">KM actual</label>
-                        <input x-model="quickVehicle.current_mileage" type="number" min="0" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="KM actual">
-                    </div>
+                                                          <select x-model="quickVehicle.vehicle_type_id" class="h-10 rounded-lg border border-gray-300 px-3 text-sm">
+                        <template x-for="type in vehicleTypes" :key="`type-${type.id}`">
+                            <option :value="type.id" x-text="type.name"></option>
+                        </template>
+                    </select>
+                    <input x-model="quickVehicle.brand" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Marca">
+                    <input x-model="quickVehicle.model" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Modelo">
+                    <input x-model="quickVehicle.year" type="number" min="1900" max="2100" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Anio">
+                    <input x-model="quickVehicle.color" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Color">
+                    <input x-model="quickVehicle.plate" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Placa">
+                    <input x-model="quickVehicle.vin" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="VIN">
+                    <input x-model="quickVehicle.engine_number" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nro motor">
+                    <input x-model="quickVehicle.chassis_number" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nro chasis">
+                    <input x-model="quickVehicle.serial_number" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Serial">
+                    <input x-model="quickVehicle.current_mileage" type="number" min="0" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="KM actual">
+                    <input x-model="quickVehicle.engine_displacement_cc" type="number" min="1" max="5000" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Cilindrada (cc)">
                 </div>
 
                 <div class="mt-3 flex items-center gap-2">
