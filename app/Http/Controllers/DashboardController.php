@@ -233,10 +233,12 @@ class DashboardController extends Controller
             })
             ->sum('purchase_movements.total');
 
+        $totalOrdersCount = (clone $baseQuery)->count();
+
         $recentOrders = (clone $baseQuery)
             ->with(['movement:id,number,moved_at', 'vehicle:id,brand,model,plate', 'client:id,first_name,last_name,document_number'])
             ->latest('id')
-            ->limit(6)
+            ->limit(10)
             ->get();
 
         $dashboardData = [
@@ -266,6 +268,7 @@ class DashboardController extends Controller
             'topServices' => $topServices,
             'incomeByDay' => $incomeByDay,
             'recentOrders' => $recentOrders,
+            'totalOrdersCount' => $totalOrdersCount,
             'dateFrom' => $dateFrom->toDateString(),
             'dateTo' => $dateTo->toDateString(),
         ];

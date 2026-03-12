@@ -100,6 +100,7 @@ class WorkshopAppointmentController extends Controller
             ->withQueryString();
 
         $vehicles = Vehicle::query()
+            ->with(['client:id,first_name,last_name'])
             ->when($companyId > 0, fn ($query) => $query->where('company_id', $companyId))
             ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
             ->orderBy('brand')

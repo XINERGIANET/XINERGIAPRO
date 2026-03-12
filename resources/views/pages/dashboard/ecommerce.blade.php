@@ -406,7 +406,40 @@
                 </div>
             </article>
 
-            <article class="rounded-[1.5rem] border border-slate-200 bg-white p-6 xl:col-span-8 flex flex-col h-full overflow-hidden">
+            @php
+                $statusLabelsMap = @js($statusLabels);
+                $ordersData = $recentOrders->map(function($row) use ($statusLabels) {
+                    $cliente = trim(($row->client->first_name ?? '') . ' ' . ($row->client->last_name ?? '')) ?: 'S/C';
+                    $vehicle = trim(($row->vehicle->brand ?? '') . ' ' . ($row->vehicle->model ?? '') . ' (' . ($row->vehicle->plate ?? '-') . ')');
+                    $pending = max(0, (float) $row->total - (float) $row->paid_total);
+                    $rawStatus = strtoupper(str_replace('_', ' ', (string) $row->status));
+                    $displayStatus = $statusLabels[$rawStatus] ?? $rawStatus;
+                    $orderNumber = $row->movement->number ?? sprintf("%08d", $row->id);
+                    
+                    return [
+                        'id' => $row->id,
+                        'number' => $orderNumber,
+                        'client' => $cliente,
+                        'vehicle' => $vehicle,
+                        'pending' => $pending,
+                        'status' => $row->status,
+                        'displayStatus' => $displayStatus,
+                        'date' => \Carbon\Carbon::parse($row->created_at)->format('d/m/Y'),
+                        'searchText' => strtolower($orderNumber . ' ' . $cliente . ' ' . $vehicle)
+                    ];
+                });
+            @endphp
+
+            <article x-data="{
+                search: '',
+                orders: @js($ordersData),
+                totalCount: {{ $dashboardData['totalOrdersCount'] ?? 0 }},
+                get filteredOrders() {
+                    if (!this.search.trim()) return this.orders;
+                    const q = this.search.toLowerCase();
+                    return this.orders.filter(o => o.searchText.includes(q));
+                }
+            }" class="rounded-[1.5rem] border border-slate-200 bg-white p-6 xl:col-span-8 flex flex-col h-full overflow-hidden">
                 <div class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-xl text-white flex items-center justify-center shadow-lg" style="background-color: #1e293b !important;">
@@ -421,7 +454,7 @@
                     <div class="flex items-center gap-2">
                         <div class="relative group">
                             <i class="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm group-focus-within:text-[#465fff] transition-colors"></i>
-                            <input type="text" placeholder="Buscar..." class="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:border-[#465fff] focus:bg-white transition-all w-full md:w-56 placeholder:text-slate-300">
+                            <input type="text" x-model="search" placeholder="Buscar..." class="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:border-[#465fff] focus:bg-white transition-all w-full md:w-56 placeholder:text-slate-300">
                         </div>
                         <button class="p-2.5 bg-slate-50 border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-100 transition-all">
                             <i class="ri-filter-3-line"></i>
@@ -441,47 +474,48 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
-                            @forelse ($recentOrders as $row)
-                                @php
-                                    $cliente = trim(($row->client->first_name ?? '') . ' ' . ($row->client->last_name ?? '')) ?: 'S/C';
-                                    $vehicle = trim(($row->vehicle->brand ?? '') . ' ' . ($row->vehicle->model ?? '') . ' (' . ($row->vehicle->plate ?? '-') . ')');
-                                    $pending = max(0, (float) $row->total - (float) $row->paid_total);
-                                    $rawStatus = strtoupper(str_replace('_', ' ', (string) $row->status));
-                                    $displayStatus = $statusLabels[$rawStatus] ?? $rawStatus;
-                                @endphp
+                            <template x-for="order in filteredOrders" :key="order.id">
                                 <tr class="group hover:bg-slate-50 transition-all duration-200">
                                     <td class="px-6 py-4">
-                                        <span class="text-[11px] font-black text-slate-400 group-hover:text-slate-900 transition-colors">
-                                            {{ $row->movement->number ?? sprintf("%08d", $row->id) }}
-                                        </span>
+                                        <span class="text-[11px] font-black text-slate-400 group-hover:text-slate-900 transition-colors" x-text="order.number"></span>
                                     </td>
                                     <td class="px-6 py-4">
-                                        <p class="text-[13px] font-black text-slate-800 uppercase leading-tight">{{ $cliente }}</p>
-                                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-tight mt-0.5">{{ $vehicle }}</p>
+                                        <p class="text-[13px] font-black text-slate-800 uppercase leading-tight" x-text="order.client"></p>
+                                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-tight mt-0.5" x-text="order.vehicle"></p>
                                     </td>
                                     <td class="px-6 py-4">
-                                        <span class="inline-flex items-center px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border 
-                                            {{ in_array($row->status, ['delivered', 'finished']) ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : ($row->status === 'cancelled' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-blue-50 text-blue-600 border-blue-100') }}">
-                                            {{ $displayStatus }}
+                                        <span class="inline-flex items-center px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border"
+                                            :class="{
+                                                'bg-emerald-50 text-emerald-600 border-emerald-100': ['delivered', 'finished'].includes(order.status),
+                                                'bg-red-50 text-red-600 border-red-100': order.status === 'cancelled',
+                                                'bg-blue-50 text-blue-600 border-blue-100': !['delivered', 'finished', 'cancelled'].includes(order.status)
+                                            }" 
+                                            x-text="order.displayStatus">
                                         </span>
                                     </td>
-                                    <td class="px-6 py-4 text-center text-[11px] font-bold text-slate-500">
-                                        {{ \Carbon\Carbon::parse($row->created_at)->format('d/m/Y') }}
-                                    </td>
+                                    <td class="px-6 py-4 text-center text-[11px] font-bold text-slate-500" x-text="order.date"></td>
                                     <td class="px-6 py-4 text-right">
-                                        <span class="text-[13px] font-black {{ $pending > 0 ? 'text-slate-900' : 'text-slate-300' }}">
-                                            S/ {{ number_format($pending, 2) }}
-                                        </span>
+                                        <span class="text-[13px] font-black" :class="order.pending > 0 ? 'text-slate-900' : 'text-slate-300'" x-text="'S/ ' + parseFloat(order.pending).toFixed(2)"></span>
                                     </td>
                                 </tr>
-                            @empty
+                            </template>
+                            <template x-if="filteredOrders.length === 0">
                                 <tr>
-                                    <td colspan="5" class="py-16 text-center text-sm text-slate-300 italic">No hay órdenes registradas.</td>
+                                    <td colspan="5" class="py-16 text-center text-sm text-slate-300 italic">No hay órdenes que coincidan con la búsqueda.</td>
                                 </tr>
-                            @endforelse
+                            </template>
                         </tbody>
                     </table>
                 </div>
+
+                @if(($dashboardData['totalOrdersCount'] ?? 0) > $recentOrders->count())
+                    <div class="mt-6 flex justify-center border-t border-slate-100 pt-6">
+                        <x-ui.link-button size="md" variant="outline" href="{{ route('workshop.orders.index') }}" class="group/btn">
+                            <span>Ver todas las órdenes</span>
+                            <i class="ri-arrow-right-line ml-1 group-hover/btn:translate-x-1 transition-transform"></i>
+                        </x-ui.link-button>
+                    </div>
+                @endif
             </article>
         </section>
 

@@ -3,6 +3,16 @@
 @section('content')
 <div x-data="{ 
     view: 'calendar',
+    vehicles: @js($vehicles->map(function ($v) {
+        $clientName = trim(((string) ($v->client->first_name ?? '')) . ' ' . ((string) ($v->client->last_name ?? '')));
+        return [
+            'id' => $v->id,
+            'client_person_id' => $v->client_person_id,
+            'client_name' => $clientName,
+            'label' => trim($v->brand . ' ' . $v->model . ' ' . ($v->plate ? ('- ' . $v->plate) : '')),
+            'display_label' => trim($v->brand . ' ' . $v->model . ' ' . ($v->plate ? ('- ' . $v->plate) : '')) . ($clientName !== '' ? ' (Cliente: ' . $clientName . ')' : ''),
+        ];
+    })),
     vehicleClientMap: {{ $vehicles->pluck('client_person_id', 'id')->toJson() }}
 }">
     <x-common.page-breadcrumb pageTitle="Agenda Taller" />
@@ -303,14 +313,37 @@
 
     <x-ui.modal x-data="{
         open: false,
-        selectedVehicle: '',
+        selectedVehicleId: '',
+        vehicleSearch: '',
+        vehicleDropdownOpen: false,
         selectedClient: '',
-        onVehicleChange() {
-            if (this.vehicleClientMap[this.selectedVehicle]) {
-                this.selectedClient = this.vehicleClientMap[this.selectedVehicle];
+        get filteredVehicles() {
+            const q = String(this.vehicleSearch || '').trim().toLowerCase();
+            if (!q) return this.vehicles.slice(0, 30);
+            return this.vehicles
+                .filter(v => {
+                    const vehicleText = String(v.label || '').toLowerCase();
+                    const clientText = String(v.client_name || '').toLowerCase();
+                    return vehicleText.includes(q) || clientText.includes(q);
+                })
+                .slice(0, 30);
+        },
+        selectVehicle(vehicle) {
+            this.selectedVehicleId = String(vehicle.id);
+            this.vehicleSearch = vehicle.display_label || vehicle.label || '';
+            this.vehicleDropdownOpen = false;
+            if (this.vehicleClientMap[this.selectedVehicleId]) {
+                this.selectedClient = this.vehicleClientMap[this.selectedVehicleId];
+            }
+        },
+        onVehicleSearchInput() {
+            this.vehicleDropdownOpen = true;
+            if (!String(this.vehicleSearch || '').trim()) {
+                this.selectedVehicleId = '';
+                this.selectedClient = '';
             }
         }
-    }" x-on:open-appointment-modal.window="open = true" :isOpen="false" :showCloseButton="false" class="max-w-5xl">
+    }" x-on:open-appointment-modal.window="open = true; selectedVehicleId = ''; vehicleSearch = ''; selectedClient = '';" :isOpen="false" :showCloseButton="false" class="max-w-5xl">
         <div class="p-6 sm:p-8">
             <div class="mb-6 flex items-center justify-between">
                 <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Registrar cita</h3>
@@ -323,12 +356,42 @@
                 @csrf
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Vehiculo</label>
-                    <select name="vehicle_id" x-model="selectedVehicle" @change="onVehicleChange()" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
-                        <option value="">Seleccione vehiculo</option>
-                        @foreach($vehicles as $vehicle)
-                            <option value="{{ $vehicle->id }}">{{ $vehicle->brand }} {{ $vehicle->model }} - {{ $vehicle->plate }}</option>
-                        @endforeach
-                    </select>
+                    <div class="relative" x-on:click.outside="vehicleDropdownOpen = false">
+                        <input type="hidden" name="vehicle_id" x-model="selectedVehicleId">
+                        <input
+                            type="text"
+                            x-model="vehicleSearch"
+                            @input="onVehicleSearchInput()"
+                            @focus="vehicleDropdownOpen = true"
+                            @keydown.escape="vehicleDropdownOpen = false"
+                            @blur="setTimeout(() => { vehicleDropdownOpen = false }, 200)"
+                            class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                            placeholder="Buscar vehiculo o cliente..."
+                            required
+                        >
+                        <div
+                            x-show="vehicleDropdownOpen && filteredVehicles.length > 0"
+                            x-cloak
+                            class="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg"
+                        >
+                            <div class="sticky top-0 flex items-center justify-between border-b border-gray-100 bg-gray-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                                <span>Vehiculos</span>
+                                <button type="button" @click="vehicleDropdownOpen = false" class="text-indigo-600 hover:text-indigo-800">Cerrar</button>
+                            </div>
+                            <div class="py-1">
+                                <template x-for="vehicle in filteredVehicles" :key="`vehicle-${vehicle.id}`">
+                                    <button
+                                        type="button"
+                                        @click="selectVehicle(vehicle)"
+                                        class="flex w-full items-start justify-between border-b border-gray-100 px-3 py-2 text-left text-sm hover:bg-indigo-50"
+                                    >
+                                        <span class="font-medium text-gray-800" x-text="vehicle.label || `Vehiculo #${vehicle.id}`"></span>
+                                        <span class="ml-3 text-xs text-gray-500" x-text="vehicle.client_name ? `(${vehicle.client_name})` : ''"></span>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Cliente</label>
@@ -385,11 +448,34 @@
     @foreach($appointments as $appointment)
         <x-ui.modal x-data="{
             open: false,
-            selectedVehicle: '{{ $appointment->vehicle_id }}',
+            selectedVehicleId: '{{ $appointment->vehicle_id }}',
+            vehicleSearch: '{{ $appointment->vehicle ? $appointment->vehicle->brand . ' ' . $appointment->vehicle->model . ' - ' . $appointment->vehicle->plate : '' }}',
+            vehicleDropdownOpen: false,
             selectedClient: '{{ $appointment->client_person_id }}',
-            onVehicleChange() {
-                if (this.vehicleClientMap[this.selectedVehicle]) {
-                    this.selectedClient = this.vehicleClientMap[this.selectedVehicle];
+            get filteredVehicles() {
+                const q = String(this.vehicleSearch || '').trim().toLowerCase();
+                if (!q) return this.vehicles.slice(0, 30);
+                return this.vehicles
+                    .filter(v => {
+                        const vehicleText = String(v.label || '').toLowerCase();
+                        const clientText = String(v.client_name || '').toLowerCase();
+                        return vehicleText.includes(q) || clientText.includes(q);
+                    })
+                    .slice(0, 30);
+            },
+            selectVehicle(vehicle) {
+                this.selectedVehicleId = String(vehicle.id);
+                this.vehicleSearch = vehicle.display_label || vehicle.label || '';
+                this.vehicleDropdownOpen = false;
+                if (this.vehicleClientMap[this.selectedVehicleId]) {
+                    this.selectedClient = this.vehicleClientMap[this.selectedVehicleId];
+                }
+            },
+            onVehicleSearchInput() {
+                this.vehicleDropdownOpen = true;
+                if (!String(this.vehicleSearch || '').trim()) {
+                    this.selectedVehicleId = '';
+                    this.selectedClient = '';
                 }
             }
         }" x-on:open-edit-appointment-modal.window="if ($event.detail === {{ $appointment->id }}) { open = true }" :isOpen="false" :showCloseButton="false" class="max-w-5xl">
@@ -406,11 +492,42 @@
                     @method('PUT')
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">Vehiculo</label>
-                        <select name="vehicle_id" x-model="selectedVehicle" @change="onVehicleChange()" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
-                            @foreach($vehicles as $vehicle)
-                                <option value="{{ $vehicle->id }}" @selected((int)$appointment->vehicle_id === (int)$vehicle->id)>{{ $vehicle->brand }} {{ $vehicle->model }} - {{ $vehicle->plate }}</option>
-                            @endforeach
-                        </select>
+                        <div class="relative" x-on:click.outside="vehicleDropdownOpen = false">
+                            <input type="hidden" name="vehicle_id" x-model="selectedVehicleId">
+                            <input
+                                type="text"
+                                x-model="vehicleSearch"
+                                @input="onVehicleSearchInput()"
+                                @focus="vehicleDropdownOpen = true"
+                                @keydown.escape="vehicleDropdownOpen = false"
+                                @blur="setTimeout(() => { vehicleDropdownOpen = false }, 200)"
+                                class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                                placeholder="Buscar vehiculo o cliente..."
+                                required
+                            >
+                            <div
+                                x-show="vehicleDropdownOpen && filteredVehicles.length > 0"
+                                x-cloak
+                                class="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg"
+                            >
+                                <div class="sticky top-0 flex items-center justify-between border-b border-gray-100 bg-gray-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                                    <span>Vehiculos</span>
+                                    <button type="button" @click="vehicleDropdownOpen = false" class="text-indigo-600 hover:text-indigo-800">Cerrar</button>
+                                </div>
+                                <div class="py-1">
+                                    <template x-for="vehicle in filteredVehicles" :key="`edit-vehicle-${vehicle.id}`">
+                                        <button
+                                            type="button"
+                                            @click="selectVehicle(vehicle)"
+                                            class="flex w-full items-start justify-between border-b border-gray-100 px-3 py-2 text-left text-sm hover:bg-indigo-50"
+                                        >
+                                            <span class="font-medium text-gray-800" x-text="vehicle.label || `Vehiculo #${vehicle.id}`"></span>
+                                            <span class="ml-3 text-xs text-gray-500" x-text="vehicle.client_name ? `(${vehicle.client_name})` : ''"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">Cliente</label>
