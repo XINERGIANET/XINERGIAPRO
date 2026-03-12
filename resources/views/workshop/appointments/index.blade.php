@@ -3,7 +3,7 @@
 @section('content')
 <div x-data="{ 
     view: 'calendar',
-    vehicles: @js($vehicles->map(function ($v) {
+    vehicles: {{ \Illuminate\Support\Js::from($vehicles->map(function ($v) {
         $clientName = trim(((string) ($v->client->first_name ?? '')) . ' ' . ((string) ($v->client->last_name ?? '')));
         return [
             'id' => $v->id,
@@ -12,7 +12,7 @@
             'label' => trim($v->brand . ' ' . $v->model . ' ' . ($v->plate ? ('- ' . $v->plate) : '')),
             'display_label' => trim($v->brand . ' ' . $v->model . ' ' . ($v->plate ? ('- ' . $v->plate) : '')) . ($clientName !== '' ? ' (Cliente: ' . $clientName . ')' : ''),
         ];
-    })),
+    })) }},
     vehicleClientMap: {{ $vehicles->pluck('client_person_id', 'id')->toJson() }}
 }">
     <x-common.page-breadcrumb pageTitle="Agenda Taller" />

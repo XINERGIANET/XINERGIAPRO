@@ -238,7 +238,7 @@ class DashboardController extends Controller
         $recentOrders = (clone $baseQuery)
             ->with(['movement:id,number,moved_at', 'vehicle:id,brand,model,plate', 'client:id,first_name,last_name,document_number'])
             ->latest('id')
-            ->limit(10)
+            ->limit(6)
             ->get();
 
         $dashboardData = [

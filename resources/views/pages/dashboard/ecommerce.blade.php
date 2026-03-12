@@ -407,7 +407,6 @@
             </article>
 
             @php
-                $statusLabelsMap = @js($statusLabels);
                 $ordersData = $recentOrders->map(function($row) use ($statusLabels) {
                     $cliente = trim(($row->client->first_name ?? '') . ' ' . ($row->client->last_name ?? '')) ?: 'S/C';
                     $vehicle = trim(($row->vehicle->brand ?? '') . ' ' . ($row->vehicle->model ?? '') . ' (' . ($row->vehicle->plate ?? '-') . ')');
@@ -432,7 +431,7 @@
 
             <article x-data="{
                 search: '',
-                orders: @js($ordersData),
+                orders: {{ \Illuminate\Support\Js::from($ordersData) }},
                 totalCount: {{ $dashboardData['totalOrdersCount'] ?? 0 }},
                 get filteredOrders() {
                     if (!this.search.trim()) return this.orders;
