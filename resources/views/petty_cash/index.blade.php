@@ -567,7 +567,6 @@
                         <input type="hidden" name="view_id" value="{{ $viewId }}">
                     @endif
                     <input type="hidden" name="document_type_id" x-model="formDocId">
-                    <input type="hidden" name="cash_register_id" value="{{ $selectedBoxId }}">
 
                     @include('petty_cash._form', ['movement' => null])
 
@@ -585,4 +584,3 @@
 
     </div>
 @endsection
-

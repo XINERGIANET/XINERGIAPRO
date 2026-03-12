@@ -76,7 +76,7 @@
                     <tr>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider first:rounded-tl-xl text-white">Nombre</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Tipo</th>
-                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Precio Base</th>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Tarifas</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Tiempo Est.</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Estado</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider last:rounded-tr-xl text-white">Acciones</th>
@@ -91,7 +91,27 @@
                                     {{ ucfirst($service->type) }}
                                 </x-ui.badge>
                             </td>
-                            <td class="px-3 py-3 text-sm text-center align-middle font-bold text-emerald-600">S/ {{ number_format((float)$service->base_price, 2) }}</td>
+                            <td class="px-3 py-3 text-sm align-middle">
+                                @if ($service->priceTiers->isNotEmpty())
+                                    <div class="space-y-1">
+                                        @foreach($service->priceTiers as $tier)
+                                            <div class="flex items-center justify-between gap-3 rounded-lg bg-gray-50 px-3 py-1.5 text-xs">
+                                                <span class="font-semibold text-gray-600">Hasta {{ number_format((int) $tier->max_cc) }}cc</span>
+                                                <span class="font-black text-emerald-600">S/ {{ number_format((float) $tier->price, 2) }}</span>
+                                            </div>
+                                        @endforeach
+                                        @if ((float) $service->base_price > 0)
+                                            <div class="pt-1 text-[11px] font-semibold text-gray-500 text-center">
+                                                Base / sin cilindrada: S/ {{ number_format((float) $service->base_price, 2) }}
+                                            </div>
+                                        @endif
+                                    </div>
+                                @else
+                                    <div class="text-center font-bold text-emerald-600">
+                                        S/ {{ number_format((float) $service->base_price, 2) }}
+                                    </div>
+                                @endif
+                            </td>
                             <td class="px-3 py-3 text-sm text-center align-middle">{{ $service->estimated_minutes }} min</td>
                             <td class="px-3 py-3 text-sm text-center align-middle">
                                 <x-ui.badge variant="light" color="{{ $service->active ? 'success' : 'error' }}">
@@ -172,7 +192,7 @@
         </div>
     </x-common.component-card>
 
-    <x-ui.modal x-data="{ open: false }" x-on:open-service-modal.window="open = true" :isOpen="false" :showCloseButton="false" class="max-w-3xl">
+    <x-ui.modal x-data="{ open: false }" x-on:open-service-modal.window="open = true" :isOpen="false" :showCloseButton="false" class="max-w-4xl">
         <div class="p-6 sm:p-8">
             <div class="mb-6 flex items-center justify-between">
                 <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Registrar servicio</h3>
@@ -181,9 +201,12 @@
                 </button>
             </div>
 
-            <form method="POST" action="{{ route('workshop.services.store') }}" class="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <form method="POST"
+                action="{{ route('workshop.services.store') }}"
+                class="grid grid-cols-1 gap-5 md:grid-cols-3"
+                x-data="workshopServicePriceTierForm(@js(old('price_tiers', [['max_cc' => '', 'price' => '']])))">
                 @csrf
-                <div class="md:col-span-2">
+                <div class="md:col-span-3">
                     <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Nombre del Servicio</label>
                     <input name="name" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" placeholder="Ej: Mantenimiento Preventivo 5K" required>
                 </div>
@@ -195,14 +218,46 @@
                     </select>
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Precio Base (S/)</label>
-                    <input type="number" step="0.01" min="0" name="base_price" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" placeholder="0.00" required>
+                    <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Precio Base / sin cilindrada (S/)</label>
+                    <input type="number" step="0.01" min="0" name="base_price" value="{{ old('base_price') }}" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" placeholder="Opcional">
                 </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Tiempo Estimado (Minutos)</label>
                     <input type="number" min="0" name="estimated_minutes" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" placeholder="Ej: 60" required>
                 </div>
-                <div class="md:col-span-2 mt-4 flex items-center justify-end gap-3">
+                <div class="md:col-span-3 rounded-2xl border border-gray-200 bg-gray-50/60 p-4">
+                    <div class="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Precios por cilindrada</label>
+                            <p class="text-xs text-gray-500">Configura tramos como: Hasta 250cc S/ 25, Hasta 500cc S/ 50.</p>
+                        </div>
+                        <button type="button" @click="addRow()" class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 text-sm font-semibold text-emerald-700 hover:bg-emerald-50">
+                            <i class="ri-add-line"></i>
+                            <span>Agregar tramo</span>
+                        </button>
+                    </div>
+
+                    <div class="space-y-3">
+                        <template x-for="(tier, index) in rows" :key="tier.key">
+                            <div class="rounded-2xl border border-gray-200 bg-white p-3" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 44px;gap:0.75rem;align-items:end;">
+                                <div>
+                                    <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Hasta (cc)</label>
+                                    <input type="number" min="1" step="1" :name="`price_tiers[${index}][max_cc]`" x-model="tier.max_cc" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" placeholder="Ej: 250">
+                                </div>
+                                <div>
+                                    <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Precio (S/)</label>
+                                    <input type="number" min="0" step="0.01" :name="`price_tiers[${index}][price]`" x-model="tier.price" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" placeholder="0.00">
+                                </div>
+                                <div class="flex items-end justify-end">
+                                    <button type="button" @click="removeRow(index)" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100">
+                                        <i class="ri-delete-bin-line"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                <div class="md:col-span-3 mt-4 flex items-center justify-end gap-3">
                     <x-ui.button type="button" size="md" variant="outline" class="rounded-xl px-6" @click="open = false">
                         <span>Cancelar</span>
                     </x-ui.button>
@@ -215,7 +270,7 @@
     </x-ui.modal>
 
     @foreach($services as $service)
-        <x-ui.modal x-data="{ open: false }" x-on:open-edit-service-modal.window="if ($event.detail === {{ $service->id }}) { open = true }" :isOpen="false" :showCloseButton="false" class="max-w-3xl">
+        <x-ui.modal x-data="{ open: false }" x-on:open-edit-service-modal.window="if ($event.detail === {{ $service->id }}) { open = true }" :isOpen="false" :showCloseButton="false" class="max-w-4xl">
             <div class="p-6 sm:p-8">
                 <div class="mb-6 flex items-center justify-between">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Editar servicio</h3>
@@ -224,10 +279,13 @@
                     </button>
                 </div>
 
-                <form method="POST" action="{{ route('workshop.services.update', $service) }}" class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <form method="POST"
+                    action="{{ route('workshop.services.update', $service) }}"
+                    class="grid grid-cols-1 gap-5 md:grid-cols-3"
+                    x-data="workshopServicePriceTierForm(@js($service->priceTiers->map(fn($tier) => ['max_cc' => (int) $tier->max_cc, 'price' => (float) $tier->price])->values()->all()))">
                     @csrf
                     @method('PUT')
-                    <div class="md:col-span-2">
+                    <div class="md:col-span-3">
                         <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Nombre del Servicio</label>
                         <input name="name" value="{{ $service->name }}" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" required>
                     </div>
@@ -239,8 +297,8 @@
                         </select>
                     </div>
                     <div>
-                        <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Precio Base (S/)</label>
-                        <input type="number" step="0.01" min="0" name="base_price" value="{{ (float) $service->base_price }}" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" required>
+                        <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Precio Base / sin cilindrada (S/)</label>
+                        <input type="number" step="0.01" min="0" name="base_price" value="{{ (float) $service->base_price }}" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" placeholder="Opcional">
                     </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Tiempo Estimado (Minutos)</label>
@@ -253,8 +311,40 @@
                             <option value="0" @selected((int)$service->active === 0)>Inactivo</option>
                         </select>
                     </div>
+                    <div class="md:col-span-3 rounded-2xl border border-gray-200 bg-gray-50/60 p-4">
+                        <div class="mb-3 flex items-center justify-between gap-3">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300">Precios por cilindrada</label>
+                                <p class="text-xs text-gray-500">Ordena los tramos de menor a mayor cilindrada maxima.</p>
+                            </div>
+                            <button type="button" @click="addRow()" class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 text-sm font-semibold text-emerald-700 hover:bg-emerald-50">
+                                <i class="ri-add-line"></i>
+                                <span>Agregar tramo</span>
+                            </button>
+                        </div>
 
-                    <div class="md:col-span-2 mt-4 flex items-center justify-end gap-3">
+                        <div class="space-y-3">
+                            <template x-for="(tier, index) in rows" :key="tier.key">
+                                <div class="rounded-2xl border border-gray-200 bg-white p-3" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 44px;gap:0.75rem;align-items:end;">
+                                    <div>
+                                        <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Hasta (cc)</label>
+                                        <input type="number" min="1" step="1" :name="`price_tiers[${index}][max_cc]`" x-model="tier.max_cc" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" placeholder="Ej: 250">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Precio (S/)</label>
+                                        <input type="number" min="0" step="0.01" :name="`price_tiers[${index}][price]`" x-model="tier.price" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" placeholder="0.00">
+                                    </div>
+                                    <div class="flex items-end justify-end">
+                                        <button type="button" @click="removeRow(index)" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100">
+                                            <i class="ri-delete-bin-line"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-3 mt-4 flex items-center justify-end gap-3">
                         <x-ui.button type="button" size="md" variant="outline" class="rounded-xl px-6" @click="open = false">
                             <span>Cancelar</span>
                         </x-ui.button>
@@ -267,6 +357,42 @@
         </x-ui.modal>
     @endforeach
 </div>
+
+<script>
+    function workshopServicePriceTierForm(initialRows = []) {
+        return {
+            rows: [],
+            init() {
+                const seededRows = Array.isArray(initialRows) ? initialRows : [];
+                this.rows = seededRows.length
+                    ? seededRows.map((row, index) => this.normalizeRow(row, index))
+                    : [this.emptyRow()];
+            },
+            emptyRow() {
+                return {
+                    key: `${Date.now()}-${Math.random()}`,
+                    max_cc: '',
+                    price: '',
+                };
+            },
+            normalizeRow(row, index) {
+                return {
+                    key: `${Date.now()}-${index}-${Math.random()}`,
+                    max_cc: row?.max_cc ?? '',
+                    price: row?.price ?? '',
+                };
+            },
+            addRow() {
+                this.rows.push(this.emptyRow());
+            },
+            removeRow(index) {
+                if (this.rows.length === 1) {
+                    this.rows = [this.emptyRow()];
+                    return;
+                }
+                this.rows.splice(index, 1);
+            },
+        };
+    }
+</script>
 @endsection
-
-

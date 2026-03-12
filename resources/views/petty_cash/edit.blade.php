@@ -106,7 +106,7 @@
                     
                     <div class="col-span-full">
                         <label class="mb-1.5 block text-sm font-medium text-gray-600 dark:text-gray-400">Nota / Descripción</label>
-                        <input type="text" name="comment" required x-model="formConcept"
+                        <input type="text" name="comment" x-model="formConcept"
                             :readonly="formConcept.includes('Apertura') || formConcept.includes('Cierre')"
                             :class="formConcept.includes('Apertura') || formConcept.includes('Cierre') ? 'bg-gray-100 text-gray-400' : 'bg-white dark:bg-dark-900'"
                             class="h-11 w-full rounded-lg border-gray-200 px-4 py-2.5 text-sm transition-all" />

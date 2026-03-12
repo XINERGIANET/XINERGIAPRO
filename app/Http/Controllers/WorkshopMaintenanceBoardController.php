@@ -130,7 +130,7 @@ class WorkshopMaintenanceBoardController extends Controller
             ->where('branch_id', $branchId)
             ->orderBy('brand')
             ->orderBy('model')
-            ->get(['id', 'client_person_id', 'brand', 'model', 'plate', 'current_mileage']);
+            ->get(['id', 'client_person_id', 'brand', 'model', 'plate', 'current_mileage', 'engine_displacement_cc']);
 
         $vehicleTypes = VehicleType::query()
             ->where(function ($query) use ($companyId, $branchId) {
@@ -161,6 +161,7 @@ class WorkshopMaintenanceBoardController extends Controller
             ->get(['id', 'first_name', 'last_name', 'document_number', 'person_type']);
 
         $services = WorkshopService::query()
+            ->with(['priceTiers:id,workshop_service_id,max_cc,price,order_num'])
             ->where('active', true)
             ->where(function ($query) use ($companyId) {
                 $query->whereNull('company_id')->orWhere('company_id', $companyId);
@@ -384,6 +385,7 @@ class WorkshopMaintenanceBoardController extends Controller
             );
 
             $serviceCatalog = WorkshopService::query()
+                ->with(['priceTiers'])
                 ->whereIn('id', $serviceLines->pluck('service_id')->map(fn ($value) => (int) $value)->all())
                 ->get()
                 ->keyBy('id');
@@ -391,10 +393,17 @@ class WorkshopMaintenanceBoardController extends Controller
             foreach ($serviceLines as $line) {
                 $serviceId = (int) $line['service_id'];
                 $qty = round((float) $line['qty'], 6);
-                $unitPrice = round((float) $line['unit_price'], 6);
                 $service = $serviceCatalog->get($serviceId);
-                if (!$service || $qty <= 0 || $unitPrice < 0) {
+                if (!$service || $qty <= 0) {
                     continue;
+                }
+
+                $unitPrice = round(
+                    (float) $service->resolvePriceForDisplacement((int) ($vehicle->engine_displacement_cc ?? 0)),
+                    6
+                );
+                if ($unitPrice < 0) {
+                    $unitPrice = 0;
                 }
 
                 $this->flowService->addDetail($workshop, [
@@ -534,6 +543,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'chassis_number' => ['nullable', 'string', 'max:255'],
             'serial_number' => ['nullable', 'string', 'max:255'],
             'current_mileage' => ['nullable', 'integer', 'min:0'],
+            'engine_displacement_cc' => ['nullable', 'integer', 'min:1', 'max:5000'],
         ]);
 
         $hasClientRole = Person::query()
@@ -569,6 +579,9 @@ class WorkshopMaintenanceBoardController extends Controller
             'branch_id' => $branchId,
             'status' => 'active',
             'current_mileage' => (int) ($validated['current_mileage'] ?? 0),
+            'engine_displacement_cc' => isset($validated['engine_displacement_cc']) && $validated['engine_displacement_cc'] !== ''
+                ? (int) $validated['engine_displacement_cc']
+                : null,
         ]));
 
         return response()->json([
@@ -576,6 +589,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'client_person_id' => (int) $vehicle->client_person_id,
             'label' => trim($vehicle->brand . ' ' . $vehicle->model . ' ' . ($vehicle->plate ? ('- ' . $vehicle->plate) : '')),
             'km' => (int) ($vehicle->current_mileage ?? 0),
+            'engine_displacement_cc' => $vehicle->engine_displacement_cc ? (int) $vehicle->engine_displacement_cc : null,
         ]);
     }
 

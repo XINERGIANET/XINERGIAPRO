@@ -57,6 +57,7 @@ class StoreVehicleRequest extends FormRequest
             'chassis_number' => ['nullable', 'string', 'max:255'],
             'serial_number' => ['nullable', 'string', 'max:255'],
             'current_mileage' => ['nullable', 'integer', 'min:0'],
+            'engine_displacement_cc' => ['nullable', 'integer', 'min:1', 'max:5000'],
             'status' => ['nullable', 'string', 'max:30'],
         ];
     }

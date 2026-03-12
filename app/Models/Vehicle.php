@@ -26,7 +26,14 @@ class Vehicle extends Model
         'chassis_number',
         'serial_number',
         'current_mileage',
+        'engine_displacement_cc',
         'status',
+    ];
+
+    protected $casts = [
+        'year' => 'integer',
+        'current_mileage' => 'integer',
+        'engine_displacement_cc' => 'integer',
     ];
 
     public function company()

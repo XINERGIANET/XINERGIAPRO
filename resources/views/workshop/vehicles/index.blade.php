@@ -72,6 +72,7 @@
                         <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Cliente</th>
                         <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Vehiculo</th>
                         <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Placa</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Cilindrada</th>
                         <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">KM</th>
                         <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white last:rounded-tr-xl">Acciones</th>
                     </tr>
@@ -83,6 +84,7 @@
                             <td class="px-4 py-3 text-sm text-center uppercase">{{ $vehicle->client?->first_name }} {{ $vehicle->client?->last_name }}</td>
                             <td class="px-4 py-3 text-sm text-center uppercase">{{ $vehicle->brand }} {{ $vehicle->model }} ({{ ucfirst($vehicle->vehicleType?->name ?? $vehicle->type) }})</td>
                             <td class="px-4 py-3 text-sm text-center font-bold">{{ $vehicle->plate }}</td>
+                            <td class="px-4 py-3 text-sm text-center">{{ $vehicle->engine_displacement_cc ? number_format((int) $vehicle->engine_displacement_cc) . ' cc' : '-' }}</td>
                             <td class="px-4 py-3 text-sm text-center">{{ number_format($vehicle->current_mileage) }}</td>
                             <td class="px-4 py-3 text-sm">
                                 <div class="flex items-center justify-center gap-2">
@@ -136,7 +138,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="px-4 py-4 text-sm text-gray-500 text-center">Sin vehiculos registrados.</td></tr>
+                        <tr><td colspan="7" class="px-4 py-4 text-sm text-gray-500 text-center">Sin vehiculos registrados.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -228,6 +230,10 @@
                     <label class="mb-1 block text-sm font-medium text-gray-700">Kilometraje</label>
                     <input name="current_mileage" type="number" min="0" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Kilometraje">
                 </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Cilindrada (cc)</label>
+                    <input name="engine_displacement_cc" type="number" min="1" max="5000" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Ej: 250" value="{{ old('engine_displacement_cc') }}">
+                </div>
                 <div class="md:col-span-4 mt-2 flex gap-2">
                     <x-ui.button type="submit" size="md" variant="primary"><i class="ri-save-line"></i><span>Guardar</span></x-ui.button>
                     <x-ui.button type="button" size="md" variant="outline" @click="open = false"><i class="ri-close-line"></i><span>Cancelar</span></x-ui.button>
@@ -307,6 +313,10 @@
                         <label class="mb-1 block text-sm font-medium text-gray-700">Kilometraje</label>
                         <input name="current_mileage" type="number" min="0" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" value="{{ (float) $vehicle->current_mileage }}" placeholder="Kilometraje">
                     </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Cilindrada (cc)</label>
+                        <input name="engine_displacement_cc" type="number" min="1" max="5000" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" value="{{ old('engine_displacement_cc', $vehicle->engine_displacement_cc) }}" placeholder="Ej: 250">
+                    </div>
                     <div class="md:col-span-4 mt-2 flex gap-2">
                         <x-ui.button type="submit" size="md" variant="primary"><i class="ri-save-line"></i><span>Guardar cambios</span></x-ui.button>
                         <x-ui.button type="button" size="md" variant="outline" @click="open = false"><i class="ri-close-line"></i><span>Cancelar</span></x-ui.button>
@@ -317,5 +327,3 @@
     @endforeach
 </div>
 @endsection
-
-

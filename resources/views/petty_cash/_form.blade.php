@@ -6,32 +6,37 @@
     <input type="hidden" name="movement_type_id" value="4">
 
     <div>
-        <h3 class="text-base font-medium text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-            <i class="ri-file-list-3-line text-brand-500"></i> Información General
-        </h3>
+     
         <div
             class="bg-gray-50 rounded-xl p-4 border border-gray-100 dark:bg-white/[0.02] dark:border-gray-800 grid grid-cols-1 gap-4">
 
-            {{-- NOTA / DESCRIPCIÓN --}}
-            <div class="col-span-full">
-                <label class="mb-1.5 block text-sm font-medium text-gray-600 dark:text-gray-400">Nota / Descripción <span
-                        class="text-red-500">*</span></label>
-                <input type="text" name="comment" required placeholder="Ej: Pago de servicios de luz..."
-                    x-model="formConcept"
-                    :readonly="formConcept === 'Apertura de caja' || formConcept === 'Cierre de caja'"
-                    :class="formConcept === 'Apertura de caja' || formConcept === 'Cierre de caja' ?
-                        'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white dark:bg-dark-900'"
-                    class="h-11 w-full rounded-lg border-gray-200 px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:text-white/90 transition-all" />
-                @error('comment')
-                    <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
-                @enderror
-            </div>
+      
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {{-- CAJA --}}
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-600 dark:text-gray-400">Caja</label>
+                    <div class="relative">
+                        <i class="ri-safe-2-line absolute top-1/2 left-3 -translate-y-1/2 text-gray-400"></i>
+                        <select name="cash_register_id" required
+                            class="h-11 w-full rounded-lg border-gray-200 bg-white pl-10 pr-4 text-sm text-gray-800 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-dark-900 dark:text-white/90 appearance-none transition-all">
+                            @if (isset($cashRegisters) && count($cashRegisters) > 0)
+                                @foreach ($cashRegisters as $register)
+                                    <option value="{{ $register->id }}"
+                                        {{ (string) old('cash_register_id', $selectedBoxId ?? '') === (string) $register->id ? 'selected' : '' }}>
+                                        {{ $register->number }}
+                                    </option>
+                                @endforeach
+                            @else
+                                <option value="" disabled selected>No hay cajas</option>
+                            @endif
+                        </select>
+                    </div>
+                </div>
+
                 {{-- TURNO --}}
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-600 dark:text-gray-400">Turno <span
-                            class="text-red-500">*</span></label>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-600 dark:text-gray-400">Turno</label>
                     <div class="relative">
                         <i class="ri-time-line absolute top-1/2 left-3 -translate-y-1/2 text-gray-400"></i>
                         <select name="shift_id" required
@@ -51,8 +56,7 @@
 
                 {{-- CONCEPTO --}}
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-600 dark:text-gray-400">Concepto <span
-                            class="text-red-500">*</span></label>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-600 dark:text-gray-400">Concepto</label>
                     <div class="relative">
                         <i class="ri-price-tag-3-line absolute top-1/2 left-3 -translate-y-1/2 text-gray-400"></i>
                         <select name="payment_concept_id" required x-model="formConceptId"
@@ -64,6 +68,19 @@
                     </div>
                 </div>
             </div>
+                  {{-- NOTA / DESCRIPCIÓN --}}
+            <div class="col-span-full">
+                <label class="mb-1.5 block text-sm font-medium text-gray-600 dark:text-gray-400">Nota / Descripción</label>
+                <input type="text" name="comment" placeholder="Ej: Pago de servicios de luz..."
+                    x-model="formConcept"
+                    :readonly="formConcept === 'Apertura de caja' || formConcept === 'Cierre de caja'"
+                    :class="formConcept === 'Apertura de caja' || formConcept === 'Cierre de caja' ?
+                        'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white dark:bg-dark-900'"
+                    class="h-11 w-full rounded-lg border-gray-200 px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:text-white/90 transition-all" />
+                @error('comment')
+                    <p class="mt-1 text-xs text-red-500">{{ $message }}</p>
+                @enderror
+            </div>
         </div>
     </div>
 
@@ -73,10 +90,18 @@
     {{-- ========================================================= --}}
 
     <div x-data="{
-        rows: [{ id: 1, methodId: '', methodName: '', amount: '' }],
-    
+        defaultPaymentRow(id = 1) {
+            return { id, methodId: '1', methodName: 'Efectivo', amount: '' };
+        },
+
+        rows: [],
+
+        init() {
+            this.rows = [this.defaultPaymentRow()];
+        },
+
         addNewRow() {
-            this.rows.push({ id: Date.now(), methodId: '', methodName: '', amount: '' });
+            this.rows.push(this.defaultPaymentRow(Date.now()));
         },
     
         removeRow(index) {
@@ -93,11 +118,7 @@
         {{-- HEADER DE PAGOS Y TOTAL --}}
         <div
             class="flex flex-col sm:flex-row sm:items-end justify-between mb-4 pb-2 border-b border-gray-100 dark:border-gray-800">
-            <div>
-                <h3 class="text-sm font-medium text-gray-800 dark:text-white flex items-center gap-2">
-                    <i class="ri-wallet-3-line text-brand-500"></i> Desglose de Pagos
-                </h3>
-            </div>
+          
 
             <div class="mt-2 sm:mt-0 text-right bg-brand-50/50 dark:bg-brand-900/10 px-3 py-1.5 rounded-lg border border-brand-100/50">
                 <span
@@ -129,11 +150,7 @@
 
                         {{-- 1. NUMERACIÓN Y MÉTODO (Ancho MD: 5) --}}
                         <div class="md:col-span-5 flex gap-3">
-                            {{-- Número de Fila --}}
-                            <div
-                                class="flex-shrink-0 h-11 w-11 flex items-center justify-center bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 font-bold rounded-lg">
-                                <span x-text="index + 1"></span>
-                            </div>
+                       
 
                             <div class="flex-grow">
                                 <label

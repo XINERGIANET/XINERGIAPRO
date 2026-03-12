@@ -233,10 +233,12 @@ class PettyCashController extends Controller
 
     public function store(Request $request, $cash_register_id)
     {
-        $request->merge(['cash_register_id' => $cash_register_id]);
+        $selectedCashRegisterId = (int) ($request->input('cash_register_id') ?: $cash_register_id);
+        $request->merge(['cash_register_id' => $selectedCashRegisterId]);
 
         $validated = $request->validate([
-            'comment'            => 'required|string|max:255',
+            'comment'            => 'nullable|string|max:255',
+            'cash_register_id'   => 'required|exists:cash_registers,id',
             'document_type_id'   => 'nullable|exists:document_types,id',
             'payment_concept_id' => 'required|exists:payment_concepts,id',
             'shift_id'           => 'required|exists:shifts,id',
@@ -248,7 +250,8 @@ class PettyCashController extends Controller
         ]);
 
         try {
-            DB::transaction(function () use ($request, $validated, $cash_register_id) {
+            DB::transaction(function () use ($request, $validated) {
+                $selectedCashRegisterId = (int) $validated['cash_register_id'];
                 $selectedShift = Shift::findOrFail($request->shift_id);
                 $shiftSnapshotData = [
                     'name'       => $selectedShift->name,
@@ -261,7 +264,7 @@ class PettyCashController extends Controller
                 $lastRecord = Movement::select('movements.*')
                     ->join('cash_movements', 'movements.id', '=', 'cash_movements.movement_id')
                     ->where('movements.movement_type_id', $typeId)
-                    ->where('cash_movements.cash_register_id', $cash_register_id)
+                    ->where('cash_movements.cash_register_id', $selectedCashRegisterId)
                     ->latest('movements.id')
                     ->lockForUpdate()
                     ->first();
@@ -276,8 +279,10 @@ class PettyCashController extends Controller
 
                 // En cierre se registra automaticamente el efectivo real disponible en caja.
                 if ($isClosingConcept) {
-                    $totalAmount = (float) $this->resolveCurrentCashAmount((int) $cash_register_id, (int) session('branch_id'));
+                    $totalAmount = (float) $this->resolveCurrentCashAmount($selectedCashRegisterId, (int) session('branch_id'));
                 }
+
+                $baseComment = $validated['comment'] ?? null;
 
                 $movement = Movement::create([
                     'number'             => $generatedNumber,
@@ -288,7 +293,7 @@ class PettyCashController extends Controller
                     'person_name'        => session('person_fullname'),
                     'responsible_id'     => session('user_id'),
                     'responsible_name'   => session('user_name') ?? session('person_fullname'),
-                    'comment'            => $validated['comment'],
+                    'comment'            => $baseComment,
                     'status'             => '1',
                     'movement_type_id'   => $typeId,
                     'document_type_id'   => $request->document_type_id,
@@ -297,7 +302,7 @@ class PettyCashController extends Controller
                     'shift_snapshot'     => $shiftSnapshotJson,
                 ]);
 
-                $box = CashRegister::find($request->cash_register_id);
+                $box = CashRegister::find($selectedCashRegisterId);
                 $boxName = $box ? $box->number : 'Caja Desconocida';
 
                 $cashMovement = CashMovements::create([
@@ -305,7 +310,7 @@ class PettyCashController extends Controller
                     'currency'           => 'PEN',
                     'exchange_rate'      => 3.71,
                     'total'              => $totalAmount,
-                    'cash_register_id'   => $cash_register_id,
+                    'cash_register_id'   => $selectedCashRegisterId,
                     'cash_register'      => $boxName,
                     'shift_id'           => $selectedShift->id,
                     'shift_snapshot'     => $shiftSnapshotJson,
@@ -347,7 +352,7 @@ class PettyCashController extends Controller
 
                     $individualComment = ($paymentData['payment_method_id'] != 1 && !empty($paymentData['number']))
                         ? $paymentData['number']
-                        : $validated['comment'];
+                        : $baseComment;
 
                     CashMovementDetail::create([
                         'cash_movement_id'   => $cashMovement->id,
@@ -389,8 +394,8 @@ class PettyCashController extends Controller
                 } elseif (str_contains($conceptName, 'cierre')) {
                     $openRelation = CashShiftRelation::where('branch_id', session('branch_id'))
                         ->where('status', '1')
-                        ->whereHas('cashMovementStart', function ($query) use ($cash_register_id) {
-                            $query->where('cash_register_id', $cash_register_id);
+                        ->whereHas('cashMovementStart', function ($query) use ($selectedCashRegisterId) {
+                            $query->where('cash_register_id', $selectedCashRegisterId);
                         })
                         ->latest('id')
                         ->first();
@@ -405,7 +410,7 @@ class PettyCashController extends Controller
                 }
             });
 
-            $params = ['cash_register_id' => $cash_register_id];
+            $params = ['cash_register_id' => $selectedCashRegisterId];
             if ($request->filled('view_id')) {
                 $params['view_id'] = $request->input('view_id');
             }
@@ -477,7 +482,7 @@ class PettyCashController extends Controller
     public function update(Request $request, $cash_register_id, $id)
     {
         $validated = $request->validate([
-            'comment'            => 'required|string|max:255',
+            'comment'            => 'nullable|string|max:255',
             'shift_id'           => 'required|exists:shifts,id',
             'payment_concept_id' => 'required|exists:payment_concepts,id',
             'payments'           => 'required|array|min:1',
@@ -501,8 +506,10 @@ class PettyCashController extends Controller
 
                 $newTotalAmount = collect($request->payments)->sum('amount');
 
+                $baseComment = $validated['comment'] ?? null;
+
                 $movement->update([
-                    'comment'        => $validated['comment'],
+                    'comment'        => $baseComment,
                     'shift_id'       => $selectedShift->id,
                     'shift_snapshot' => $shiftSnapshotJson,
                     'document_type_id' => $request->document_type_id
@@ -526,7 +533,7 @@ class PettyCashController extends Controller
 
                     $individualComment = ($paymentData['payment_method_id'] != 1 && !empty($paymentData['number']))
                         ? $paymentData['number']
-                        : $validated['comment'];
+                        : $baseComment;
 
                     CashMovementDetail::create([
                         'cash_movement_id'   => $cashMovement->id,

@@ -12,6 +12,7 @@
             'label' => trim($v->brand . ' ' . $v->model . ' ' . ($v->plate ? ('- ' . $v->plate) : '')),
             'display_label' => trim($v->brand . ' ' . $v->model . ' ' . ($v->plate ? ('- ' . $v->plate) : '')) . ($clientName !== '' ? ' (Cliente: ' . $clientName . ')' : ''),
             'km' => (int) ($v->current_mileage ?? 0),
+            'engine_displacement_cc' => $v->engine_displacement_cc ? (int) $v->engine_displacement_cc : null,
         ];
     })),
     clientsList: @js($clients->map(fn($c) => ['id' => $c->id, 'first_name' => $c->first_name, 'last_name' => $c->last_name, 'person_type' => $c->person_type, 'document_number' => $c->document_number, 'label' => trim($c->first_name . ' ' . $c->last_name . ' - ' . $c->person_type . ' ' . $c->document_number)])),
@@ -19,7 +20,16 @@
     provinces: @js($provinces ?? []),
     districts: @js($districts ?? []),
     vehicleTypes: @js($vehicleTypes->map(fn($type) => ['id' => $type->id, 'name' => $type->name])),
-    servicesCatalog: @js($services->map(fn($s) => ['id' => $s->id, 'name' => $s->name, 'base_price' => (float) $s->base_price, 'type' => $s->type])),
+    servicesCatalog: @js($services->map(fn($s) => [
+        'id' => $s->id,
+        'name' => $s->name,
+        'base_price' => (float) $s->base_price,
+        'type' => $s->type,
+        'price_tiers' => $s->priceTiers->map(fn($tier) => [
+            'max_cc' => (int) $tier->max_cc,
+            'price' => (float) $tier->price,
+        ])->values(),
+    ])),
     historyBase: @js(route('workshop.clients.history', ['person' => '__PERSON__'])),
     historyUrl: '',
     historyHtml: '',
@@ -47,7 +57,8 @@
         engine_number: '',
         chassis_number: '',
         serial_number: '',
-        current_mileage: ''
+        current_mileage: '',
+        engine_displacement_cc: ''
     },
     quickClient: {
         person_type: 'DNI',
@@ -75,6 +86,7 @@
         this.mileageIn = selected.km ? String(selected.km) : '';
         this.vehicleSearch = selected.display_label || selected.label || '';
         this.syncHistoryUrl();
+        this.refreshServiceLinePrices();
     },
     async openClientHistory() {
         if (!String(this.selectedClientId || '').trim()) return;
@@ -153,6 +165,7 @@
         if (!String(this.vehicleSearch || '').trim()) {
             this.selectedVehicleId = '';
             this.selectedClientId = '';
+            this.refreshServiceLinePrices();
         }
     },
     closeVehicleDropdown() {
@@ -160,6 +173,67 @@
     },
     isServiceSelected(serviceId) {
         return this.selectedServiceIds.includes(String(serviceId));
+    },
+    orderedServiceTiers(service) {
+        return Array.isArray(service?.price_tiers)
+            ? [...service.price_tiers].sort((a, b) => Number(a.max_cc || 0) - Number(b.max_cc || 0))
+            : [];
+    },
+    selectedVehicleCc() {
+        const selected = this.vehicles.find(v => String(v.id) === String(this.selectedVehicleId));
+        return Number(selected?.engine_displacement_cc || 0);
+    },
+    resolveServicePricing(service) {
+        const tiers = this.orderedServiceTiers(service);
+        const basePrice = Number(service?.base_price || 0);
+
+        if (!tiers.length) {
+            return {
+                price: basePrice,
+                label: basePrice > 0 ? 'Precio base' : 'Sin tarifa configurada',
+            };
+        }
+
+        const vehicleCc = this.selectedVehicleCc();
+        if (vehicleCc > 0) {
+            const matchedTier = tiers.find(tier => vehicleCc <= Number(tier.max_cc || 0)) || tiers[tiers.length - 1];
+            return {
+                price: Number(matchedTier?.price || 0),
+                label: `Hasta ${Number(matchedTier?.max_cc || 0)}cc`,
+            };
+        }
+
+        if (basePrice > 0) {
+            return {
+                price: basePrice,
+                label: 'Base / sin cilindrada',
+            };
+        }
+
+        const firstTier = tiers[0];
+        return {
+            price: Number(firstTier?.price || 0),
+            label: `Tabla desde ${Number(firstTier?.max_cc || 0)}cc`,
+        };
+    },
+    resolveServicePrice(service) {
+        return Number(this.resolveServicePricing(service).price || 0);
+    },
+    servicePricingLabel(service) {
+        return this.resolveServicePricing(service).label;
+    },
+    refreshServiceLinePrices() {
+        this.serviceLines = this.serviceLines.map(line => {
+            const service = this.servicesCatalog.find(item => String(item.id) === String(line.service_id));
+            if (!service) {
+                return line;
+            }
+
+            return {
+                ...line,
+                unit_price: this.resolveServicePrice(service),
+            };
+        });
     },
     toggleService(serviceId) {
         const id = String(serviceId);
@@ -178,7 +252,7 @@
                 return {
                     service_id: String(service.id),
                     qty: 1,
-                    unit_price: Number(service.base_price || 0),
+                    unit_price: this.resolveServicePrice(service),
                 };
             })
             .filter(Boolean);
@@ -218,7 +292,8 @@
             engine_number: '',
             chassis_number: '',
             serial_number: '',
-            current_mileage: this.mileageIn || ''
+            current_mileage: this.mileageIn || '',
+            engine_displacement_cc: ''
         };
         this.quickVehicleError = '';
     },
@@ -259,6 +334,7 @@
             this.mileageIn = payload.km ? String(payload.km) : this.mileageIn;
             this.vehicleSearch = this.vehicles[0].display_label || payload.label || '';
             this.syncHistoryUrl();
+            this.refreshServiceLinePrices();
             this.creatingVehicle = false;
             this.resetQuickVehicle();
             this.openClientHistory();
@@ -493,6 +569,7 @@
                     <input x-model="quickVehicle.chassis_number" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nro chasis">
                     <input x-model="quickVehicle.serial_number" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Serial">
                     <input x-model="quickVehicle.current_mileage" type="number" min="0" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="KM actual">
+                    <input x-model="quickVehicle.engine_displacement_cc" type="number" min="1" max="5000" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Cilindrada (cc)">
                 </div>
 
                 <div class="mt-3 flex items-center gap-2">
@@ -685,13 +762,19 @@
                 <div class="grid grid-cols-1 gap-x-6 gap-y-2 md:grid-cols-3">
                     <template x-for="service in servicesCatalog" :key="`service-check-${service.id}`">
                         <label class="inline-flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 hover:border-indigo-300">
-                            <span class="truncate" x-text="service.name"></span>
-                            <input
-                                type="checkbox"
-                                :checked="isServiceSelected(service.id)"
-                                @change="toggleService(service.id)"
-                                class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                            >
+                            <div class="min-w-0 flex-1">
+                                <span class="block truncate font-medium" x-text="service.name"></span>
+                                <span class="block text-xs text-gray-500" x-text="servicePricingLabel(service)"></span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="whitespace-nowrap text-xs font-bold text-emerald-600" x-text="`S/ ${resolveServicePrice(service).toFixed(2)}`"></span>
+                                <input
+                                    type="checkbox"
+                                    :checked="isServiceSelected(service.id)"
+                                    @change="toggleService(service.id)"
+                                    class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                >
+                            </div>
                         </label>
                     </template>
                 </div>

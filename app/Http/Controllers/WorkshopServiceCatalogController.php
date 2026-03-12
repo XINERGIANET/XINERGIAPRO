@@ -6,6 +6,8 @@ use App\Models\WorkshopService;
 use App\Support\WorkshopAuthorization;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class WorkshopServiceCatalogController extends Controller
 {
@@ -29,6 +31,7 @@ class WorkshopServiceCatalogController extends Controller
         $perPage = (int) $request->input('per_page', 10);
 
         $services = WorkshopService::query()
+            ->with(['priceTiers'])
             ->when($companyId > 0, fn ($query) => $query->where(function ($inner) use ($companyId) {
                 $inner->where('company_id', $companyId)->orWhereNull('company_id');
             }))
@@ -45,26 +48,24 @@ class WorkshopServiceCatalogController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'type' => ['required', 'in:preventivo,correctivo'],
-            'base_price' => ['required', 'numeric', 'min:0'],
-            'estimated_minutes' => ['required', 'integer', 'min:0'],
-            'active' => ['nullable', 'boolean'],
-        ]);
+        $validated = $this->validateServicePayload($request);
 
         $branchId = (int) session('branch_id');
         $branch = \App\Models\Branch::query()->findOrFail($branchId);
 
-        WorkshopService::query()->create([
-            'company_id' => $branch->company_id,
-            'branch_id' => $branchId,
-            'name' => $validated['name'],
-            'type' => $validated['type'],
-            'base_price' => $validated['base_price'],
-            'estimated_minutes' => $validated['estimated_minutes'],
-            'active' => (bool) ($validated['active'] ?? true),
-        ]);
+        DB::transaction(function () use ($validated, $branch, $branchId) {
+            $service = WorkshopService::query()->create([
+                'company_id' => $branch->company_id,
+                'branch_id' => $branchId,
+                'name' => $validated['name'],
+                'type' => $validated['type'],
+                'base_price' => $validated['base_price'],
+                'estimated_minutes' => $validated['estimated_minutes'],
+                'active' => (bool) ($validated['active'] ?? true),
+            ]);
+
+            $this->syncPriceTiers($service, $validated['normalized_price_tiers']);
+        });
 
         return back()->with('status', 'Servicio registrado correctamente.');
     }
@@ -72,15 +73,19 @@ class WorkshopServiceCatalogController extends Controller
     public function update(Request $request, WorkshopService $service): RedirectResponse
     {
         $this->assertServiceScope($service);
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'type' => ['required', 'in:preventivo,correctivo'],
-            'base_price' => ['required', 'numeric', 'min:0'],
-            'estimated_minutes' => ['required', 'integer', 'min:0'],
-            'active' => ['nullable', 'boolean'],
-        ]);
+        $validated = $this->validateServicePayload($request);
 
-        $service->update($validated);
+        DB::transaction(function () use ($service, $validated) {
+            $service->update([
+                'name' => $validated['name'],
+                'type' => $validated['type'],
+                'base_price' => $validated['base_price'],
+                'estimated_minutes' => $validated['estimated_minutes'],
+                'active' => (bool) ($validated['active'] ?? false),
+            ]);
+
+            $this->syncPriceTiers($service, $validated['normalized_price_tiers']);
+        });
 
         return back()->with('status', 'Servicio actualizado correctamente.');
     }
@@ -107,5 +112,82 @@ class WorkshopServiceCatalogController extends Controller
             abort(404);
         }
     }
-}
 
+    private function validateServicePayload(Request $request): array
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'type' => ['required', 'in:preventivo,correctivo'],
+            'base_price' => ['nullable', 'numeric', 'min:0'],
+            'estimated_minutes' => ['required', 'integer', 'min:0'],
+            'active' => ['nullable', 'boolean'],
+            'price_tiers' => ['nullable', 'array'],
+            'price_tiers.*.max_cc' => ['nullable', 'integer', 'min:1', 'max:5000'],
+            'price_tiers.*.price' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $normalizedTiers = collect($validated['price_tiers'] ?? [])
+            ->map(function ($tier, $index) {
+                $maxCc = $tier['max_cc'] ?? null;
+                $price = $tier['price'] ?? null;
+                $hasMaxCc = $maxCc !== null && $maxCc !== '';
+                $hasPrice = $price !== null && $price !== '';
+
+                if ($hasMaxCc xor $hasPrice) {
+                    throw ValidationException::withMessages([
+                        "price_tiers.{$index}.max_cc" => 'Completa la cilindrada y el precio del tramo.',
+                    ]);
+                }
+
+                if (!$hasMaxCc && !$hasPrice) {
+                    return null;
+                }
+
+                return [
+                    'max_cc' => (int) $maxCc,
+                    'price' => round((float) $price, 6),
+                ];
+            })
+            ->filter()
+            ->sortBy('max_cc')
+            ->values();
+
+        $duplicatedMaxCc = $normalizedTiers->pluck('max_cc')->duplicates()->first();
+        if ($duplicatedMaxCc !== null) {
+            throw ValidationException::withMessages([
+                'price_tiers' => "La cilindrada {$duplicatedMaxCc}cc esta repetida.",
+            ]);
+        }
+
+        $fallbackPrice = $normalizedTiers->isNotEmpty()
+            ? (float) ($normalizedTiers->first()['price'] ?? 0)
+            : 0;
+
+        $validated['base_price'] = $validated['base_price'] !== null && $validated['base_price'] !== ''
+            ? round((float) $validated['base_price'], 6)
+            : $fallbackPrice;
+        $validated['normalized_price_tiers'] = $normalizedTiers->all();
+
+        return $validated;
+    }
+
+    private function syncPriceTiers(WorkshopService $service, array $tiers): void
+    {
+        $service->priceTiers()->delete();
+
+        if (empty($tiers)) {
+            return;
+        }
+
+        $service->priceTiers()->createMany(
+            collect($tiers)
+                ->values()
+                ->map(fn ($tier, $index) => [
+                    'max_cc' => (int) $tier['max_cc'],
+                    'price' => round((float) $tier['price'], 6),
+                    'order_num' => $index + 1,
+                ])
+                ->all()
+        );
+    }
+}
