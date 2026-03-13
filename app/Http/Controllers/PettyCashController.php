@@ -18,6 +18,7 @@ use App\Models\DigitalWallet;
 use App\Models\Card;
 use App\Models\CashMovementDetail;
 use App\Models\Operation;
+use Carbon\Carbon;
 
 
 class PettyCashController extends Controller
@@ -104,8 +105,9 @@ class PettyCashController extends Controller
         $hasOpening = CashShiftRelation::query()
             ->where('branch_id', $branchId)
             ->where('status', '1')
-            ->whereHas('cashMovementStart', function ($query) use ($branchId) {
+            ->whereHas('cashMovementStart', function ($query) use ($branchId, $selectedBoxId) {
                 $query->where('branch_id', $branchId)
+                    ->when($selectedBoxId, fn($cashQuery) => $cashQuery->where('cash_register_id', $selectedBoxId))
                     ->whereHas('cashRegister', function ($cashRegisterQuery) use ($branchId) {
                         $cashRegisterQuery->where('branch_id', $branchId);
                     });
@@ -231,6 +233,111 @@ class PettyCashController extends Controller
         return view('petty_cash.show', compact('cash_register_id', 'movement', 'viewId'));
     }
 
+    public function closePage(Request $request, $cash_register_id)
+    {
+        $branchId = (int) $request->session()->get('branch_id');
+        $cashRegister = CashRegister::query()
+            ->where('branch_id', $branchId)
+            ->where('status', '1')
+            ->findOrFail($cash_register_id);
+
+        $activeRelation = $this->findActiveCashRelation((int) $cashRegister->id, $branchId);
+        if (!$activeRelation) {
+            $params = ['cash_register_id' => $cashRegister->id];
+            if ($request->filled('view_id')) {
+                $params['view_id'] = $request->input('view_id');
+            }
+
+            return redirect()
+                ->route('admin.petty-cash.index', $params)
+                ->with('error', 'La caja seleccionada no tiene una apertura activa para cerrar.');
+        }
+
+        $closeSummary = $this->buildClosePageData($activeRelation, $cashRegister, $branchId);
+        $viewId = $request->input('view_id');
+
+        return view('petty_cash.close', array_merge($closeSummary, [
+            'title' => 'Caja chica | Cerrar caja',
+            'cashRegister' => $cashRegister,
+            'activeRelation' => $activeRelation,
+            'viewId' => $viewId,
+            'cashRegisterId' => (int) $cashRegister->id,
+            'shiftId' => (int) ($activeRelation->cashMovementStart?->shift_id ?? 0),
+            'shiftName' => (string) ($activeRelation->cashMovementStart?->shift?->name ?? 'Sin turno'),
+            'personLabel' => '0 - CLIENTES VARIOS',
+            'responsibleLabel' => (string) (session('user_name') ?: session('person_fullname') ?: 'CAJERO'),
+            'movementComment' => (string) old('comment', 'Cierre de caja'),
+            'coins' => $this->buildDenominationRows([
+                ['key' => 'coin_010', 'label' => '10 centimos', 'value' => 0.10],
+                ['key' => 'coin_020', 'label' => '20 centimos', 'value' => 0.20],
+                ['key' => 'coin_050', 'label' => '50 centimos', 'value' => 0.50],
+                ['key' => 'coin_1', 'label' => '1 sol', 'value' => 1],
+                ['key' => 'coin_2', 'label' => '2 soles', 'value' => 2],
+                ['key' => 'coin_5', 'label' => '5 soles', 'value' => 5],
+            ], (array) old('counting.coins', [])),
+            'bills' => $this->buildDenominationRows([
+                ['key' => 'bill_10', 'label' => '10 soles', 'value' => 10],
+                ['key' => 'bill_20', 'label' => '20 soles', 'value' => 20],
+                ['key' => 'bill_50', 'label' => '50 soles', 'value' => 50],
+                ['key' => 'bill_100', 'label' => '100 soles', 'value' => 100],
+                ['key' => 'bill_200', 'label' => '200 soles', 'value' => 200],
+            ], (array) old('counting.bills', [])),
+        ]));
+    }
+
+    public function closeStore(Request $request, $cash_register_id)
+    {
+        $branchId = (int) $request->session()->get('branch_id');
+        $cashRegister = CashRegister::query()
+            ->where('branch_id', $branchId)
+            ->where('status', '1')
+            ->findOrFail($cash_register_id);
+
+        $activeRelation = $this->findActiveCashRelation((int) $cashRegister->id, $branchId);
+        if (!$activeRelation) {
+            $params = ['cash_register_id' => $cashRegister->id];
+            if ($request->filled('view_id')) {
+                $params['view_id'] = $request->input('view_id');
+            }
+
+            return redirect()
+                ->route('admin.petty-cash.index', $params)
+                ->with('error', 'La caja seleccionada no tiene una apertura activa para cerrar.');
+        }
+
+        $closingConcept = $this->resolveClosingConcept();
+        $egresoDocument = $this->resolveCashDocumentType('egreso');
+        $cashMethod = $this->resolveCashPaymentMethod();
+
+        if (!$closingConcept || !$egresoDocument || !$cashMethod) {
+            return back()
+                ->withErrors([
+                    'error' => 'No se pudo preparar el cierre de caja. Verifica el concepto de cierre, el documento de egreso y el metodo de pago Efectivo.',
+                ])
+                ->withInput();
+        }
+
+        $request->merge([
+            'cash_register_id' => (int) $cashRegister->id,
+            'document_type_id' => (int) $egresoDocument->id,
+            'payment_concept_id' => (int) $closingConcept->id,
+            'shift_id' => (int) ($activeRelation->cashMovementStart?->shift_id ?? 0),
+            'comment' => trim((string) $request->input('comment')) !== '' ? trim((string) $request->input('comment')) : 'Cierre de caja',
+            'payments' => [[
+                'amount' => (float) $this->resolveCurrentCashAmount((int) $cashRegister->id, $branchId),
+                'payment_method_id' => (int) $cashMethod->id,
+                'payment_method' => (string) $cashMethod->description,
+                'number' => null,
+                'card_id' => null,
+                'bank_id' => null,
+                'digital_wallet_id' => null,
+                'payment_gateway_id' => null,
+            ]],
+        ]);
+
+        return $this->store($request, $cash_register_id);
+    }
+
     public function store(Request $request, $cash_register_id)
     {
         $selectedCashRegisterId = (int) ($request->input('cash_register_id') ?: $cash_register_id);
@@ -276,9 +383,14 @@ class PettyCashController extends Controller
                 $concept = PaymentConcept::findOrFail((int) $validated['payment_concept_id']);
                 $conceptName = mb_strtolower((string) $concept->description, 'UTF-8');
                 $isClosingConcept = str_contains($conceptName, 'cierre');
+                $countingSnapshot = $isClosingConcept ? $this->buildCountingSnapshot($request) : null;
+                $cashMethod = $isClosingConcept ? $this->resolveCashPaymentMethod() : null;
 
                 // En cierre se registra automaticamente el efectivo real disponible en caja.
                 if ($isClosingConcept) {
+                    if (!$cashMethod) {
+                        throw new \RuntimeException('No se encontro el metodo de pago Efectivo para registrar el cierre de caja.');
+                    }
                     $totalAmount = (float) $this->resolveCurrentCashAmount($selectedCashRegisterId, (int) session('branch_id'));
                 }
 
@@ -314,6 +426,7 @@ class PettyCashController extends Controller
                     'cash_register'      => $boxName,
                     'shift_id'           => $selectedShift->id,
                     'shift_snapshot'     => $shiftSnapshotJson,
+                    'counting_snapshot'  => $countingSnapshot,
                     'movement_id'        => $movement->id,
                     'branch_id'          => session('branch_id'),
                 ]);
@@ -322,8 +435,8 @@ class PettyCashController extends Controller
                 if ($isClosingConcept) {
                     $payments = [[
                         'amount' => $totalAmount,
-                        'payment_method_id' => 1,
-                        'payment_method' => 'Efectivo',
+                        'payment_method_id' => $cashMethod->id,
+                        'payment_method' => $cashMethod->description,
                         'number' => null,
                         'card_id' => null,
                         'bank_id' => null,
@@ -333,6 +446,8 @@ class PettyCashController extends Controller
                 }
 
                 foreach ($payments as $paymentData) {
+                    $paymentMethodName = (string) ($paymentData['payment_method'] ?? PaymentMethod::find($paymentData['payment_method_id'])?->description ?? 'Desconocido');
+                    $isCashPayment = $this->isCashMethod($paymentMethodName);
 
                     $cardName = !empty($paymentData['card_id'])
                         ? Card::find($paymentData['card_id'])?->description
@@ -350,7 +465,7 @@ class PettyCashController extends Controller
                         ? PaymentGateways::find($paymentData['payment_gateway_id'])?->description
                         : null;
 
-                    $individualComment = ($paymentData['payment_method_id'] != 1 && !empty($paymentData['number']))
+                    $individualComment = (!$isCashPayment && !empty($paymentData['number']))
                         ? $paymentData['number']
                         : $baseComment;
 
@@ -364,7 +479,7 @@ class PettyCashController extends Controller
 
                         'amount'             => $paymentData['amount'],
                         'payment_method_id'  => $paymentData['payment_method_id'],
-                        'payment_method'     => $paymentData['payment_method'] ?? 'Desconocido',
+                        'payment_method'     => $paymentMethodName,
                         'comment'            => $individualComment,
 
                         'number'             => $paymentData['number'] ?? null,
@@ -507,6 +622,15 @@ class PettyCashController extends Controller
                 $newTotalAmount = collect($request->payments)->sum('amount');
 
                 $baseComment = $validated['comment'] ?? null;
+                $updatedConcept = PaymentConcept::findOrFail((int) $validated['payment_concept_id']);
+                $updatedConceptName = mb_strtolower((string) $updatedConcept->description, 'UTF-8');
+                $isClosingConcept = str_contains($updatedConceptName, 'cierre');
+                $countingSnapshot = $cashMovement->counting_snapshot;
+                if ($isClosingConcept && $request->has('counting')) {
+                    $countingSnapshot = $this->buildCountingSnapshot($request);
+                } elseif (!$isClosingConcept) {
+                    $countingSnapshot = null;
+                }
 
                 $movement->update([
                     'comment'        => $baseComment,
@@ -520,18 +644,21 @@ class PettyCashController extends Controller
                     'total'              => $newTotalAmount,
                     'shift_id'           => $selectedShift->id,
                     'shift_snapshot'     => $shiftSnapshotJson,
+                    'counting_snapshot'  => $countingSnapshot,
                 ]);
 
                 CashMovementDetail::where('cash_movement_id', $cashMovement->id)->delete();
 
                 foreach ($request->payments as $paymentData) {
+                    $paymentMethodName = (string) ($paymentData['payment_method'] ?? PaymentMethod::find($paymentData['payment_method_id'])?->description ?? 'Desconocido');
+                    $isCashPayment = $this->isCashMethod($paymentMethodName);
 
                     $cardName = !empty($paymentData['card_id']) ? Card::find($paymentData['card_id'])?->description : null;
                     $bankName = !empty($paymentData['bank_id']) ? Bank::find($paymentData['bank_id'])?->description : null;
                     $walletName = !empty($paymentData['digital_wallet_id']) ? DigitalWallet::find($paymentData['digital_wallet_id'])?->description : null;
                     $gatewayName = !empty($paymentData['payment_gateway_id']) ? PaymentGateways::find($paymentData['payment_gateway_id'])?->description : null;
 
-                    $individualComment = ($paymentData['payment_method_id'] != 1 && !empty($paymentData['number']))
+                    $individualComment = (!$isCashPayment && !empty($paymentData['number']))
                         ? $paymentData['number']
                         : $baseComment;
 
@@ -544,7 +671,7 @@ class PettyCashController extends Controller
 
                         'amount'             => $paymentData['amount'],
                         'payment_method_id'  => $paymentData['payment_method_id'],
-                        'payment_method'     => $paymentData['payment_method'] ?? 'Desconocido',
+                        'payment_method'     => $paymentMethodName,
 
                         'comment'            => $individualComment,
 
@@ -597,6 +724,335 @@ class PettyCashController extends Controller
         } catch (\Exception $e) {
             return back()->withErrors(['error' => 'Error al eliminar: ' . $e->getMessage()]);
         }
+    }
+
+    private function findActiveCashRelation(int $cashRegisterId, int $branchId): ?CashShiftRelation
+    {
+        return CashShiftRelation::query()
+            ->with([
+                'cashMovementStart:id,total,cash_register_id,shift_id,movement_id,branch_id',
+                'cashMovementStart.shift:id,name',
+                'cashMovementStart.cashRegister:id,number,series',
+                'cashMovementStart.movement:id,number,moved_at,person_name,responsible_name,user_name,comment,document_type_id',
+            ])
+            ->where('branch_id', $branchId)
+            ->where('status', '1')
+            ->whereHas('cashMovementStart', function ($query) use ($cashRegisterId) {
+                $query->where('cash_register_id', $cashRegisterId);
+            })
+            ->latest('id')
+            ->first();
+    }
+
+    private function resolveClosingConcept(): ?PaymentConcept
+    {
+        return PaymentConcept::query()
+            ->where('type', 'E')
+            ->whereRaw("LOWER(description) LIKE '%cierre%'")
+            ->orderBy('id')
+            ->first();
+    }
+
+    private function resolveCashDocumentType(string $name): ?DocumentType
+    {
+        return DocumentType::query()
+            ->where('movement_type_id', 4)
+            ->whereRaw('LOWER(name) = ?', [mb_strtolower($name, 'UTF-8')])
+            ->first();
+    }
+
+    private function resolveCashPaymentMethod(): ?PaymentMethod
+    {
+        return PaymentMethod::query()
+            ->where('status', true)
+            ->where(function ($query) {
+                $query->whereRaw("LOWER(description) LIKE '%efectivo%'")
+                    ->orWhereRaw("LOWER(description) LIKE '%cash%'");
+            })
+            ->orderBy('order_num')
+            ->orderBy('id')
+            ->first();
+    }
+
+    private function buildDenominationRows(array $definitions, array $oldRows): array
+    {
+        $rows = [];
+
+        foreach ($definitions as $index => $definition) {
+            $previous = $oldRows[$index] ?? [];
+            $rows[] = [
+                'key' => (string) $definition['key'],
+                'label' => (string) $definition['label'],
+                'value' => (float) $definition['value'],
+                'quantity' => (int) ($previous['quantity'] ?? 0),
+                'note' => (string) ($previous['note'] ?? ''),
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function buildCountingSnapshot(Request $request): ?array
+    {
+        $coins = collect((array) $request->input('counting.coins', []))
+            ->map(function ($row) {
+                $value = (float) ($row['value'] ?? 0);
+                $quantity = (int) ($row['quantity'] ?? 0);
+
+                return [
+                    'key' => (string) ($row['key'] ?? ''),
+                    'label' => (string) ($row['label'] ?? ''),
+                    'value' => $value,
+                    'quantity' => $quantity,
+                    'note' => trim((string) ($row['note'] ?? '')),
+                    'subtotal' => round($value * $quantity, 2),
+                ];
+            })
+            ->values()
+            ->all();
+
+        $bills = collect((array) $request->input('counting.bills', []))
+            ->map(function ($row) {
+                $value = (float) ($row['value'] ?? 0);
+                $quantity = (int) ($row['quantity'] ?? 0);
+
+                return [
+                    'key' => (string) ($row['key'] ?? ''),
+                    'label' => (string) ($row['label'] ?? ''),
+                    'value' => $value,
+                    'quantity' => $quantity,
+                    'note' => trim((string) ($row['note'] ?? '')),
+                    'subtotal' => round($value * $quantity, 2),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return [
+            'currency' => 'PEN',
+            'coins' => $coins,
+            'bills' => $bills,
+            'real_total' => round(collect($coins)->sum('subtotal') + collect($bills)->sum('subtotal'), 2),
+        ];
+    }
+
+    private function buildClosePageData(CashShiftRelation $relation, CashRegister $cashRegister, int $branchId): array
+    {
+        $from = Carbon::parse($relation->started_at);
+        $to = $relation->ended_at ? Carbon::parse($relation->ended_at) : now();
+
+        $periodMovements = CashMovements::query()
+            ->with([
+                'paymentConcept:id,description,type',
+                'shift:id,name',
+                'movement:id,number,moved_at,user_name,person_name,responsible_name,comment,document_type_id',
+                'movement.documentType:id,name',
+                'movement.salesMovement:id,movement_id',
+                'details:id,cash_movement_id,type,payment_method_id,payment_method,amount,card,digital_wallet,payment_gateway,bank,comment,paid_at',
+            ])
+            ->where('branch_id', $branchId)
+            ->where('cash_register_id', $cashRegister->id)
+            ->whereHas('movement', function ($query) use ($from, $to) {
+                $query->whereBetween('moved_at', [$from, $to])
+                    ->whereNull('deleted_at');
+            })
+            ->when($relation->cash_movement_end_id, fn($query) => $query->where('id', '!=', $relation->cash_movement_end_id))
+            ->orderBy('id')
+            ->get();
+
+        $openingCash = 0.0;
+        $cashSales = 0.0;
+        $otherCashIncome = 0.0;
+        $cashExpenses = 0.0;
+        $totalSales = 0.0;
+        $totalOtherIncome = 0.0;
+        $totalExpenses = 0.0;
+        $detailGroups = [];
+        $categoryOrder = [
+            'opening' => 0,
+            'sale' => 1,
+            'income' => 2,
+            'expense' => 3,
+            'closing' => 4,
+        ];
+
+        foreach ($periodMovements as $cashMovement) {
+            $conceptLabel = trim((string) ($cashMovement->paymentConcept?->description ?? 'Sin concepto'));
+            $category = $this->classifyCloseMovementCategory($cashMovement);
+            $movementTypeLabel = $category === 'expense' ? 'Egreso' : 'Ingreso';
+
+            if ($category === 'sale') {
+                $totalSales += (float) $cashMovement->total;
+            } elseif ($category === 'income') {
+                $totalOtherIncome += (float) $cashMovement->total;
+            } elseif ($category === 'expense') {
+                $totalExpenses += (float) $cashMovement->total;
+            }
+
+            foreach ($cashMovement->details as $detail) {
+                $amount = (float) $detail->amount;
+                $method = trim((string) ($detail->payment_method ?: 'Sin medio'));
+                $suffix = $this->resolveCloseDetailSuffix($detail);
+                $detailType = mb_strtoupper((string) ($detail->type ?: 'PAGADO'), 'UTF-8');
+                $groupKey = implode('|', [$detailType, $category, $conceptLabel, $method, $suffix]);
+
+                if (!isset($detailGroups[$groupKey])) {
+                    $detailGroups[$groupKey] = [
+                        'type' => $detailType,
+                        'type_label' => $this->resolveCloseDetailTypeLabel($detailType),
+                        'category' => $category,
+                        'sort_order' => $categoryOrder[$category] ?? 99,
+                        'amount' => 0.0,
+                        'method' => $method,
+                        'detail' => $suffix,
+                        'note' => $conceptLabel,
+                        'records' => [],
+                    ];
+                }
+
+                $detailGroups[$groupKey]['amount'] += $amount;
+
+                $recordKey = (string) $cashMovement->id;
+                if (!isset($detailGroups[$groupKey]['records'][$recordKey])) {
+                    $detailGroups[$groupKey]['records'][$recordKey] = [
+                        'number' => (string) ($cashMovement->movement?->number ?? str_pad((string) $cashMovement->id, 8, '0', STR_PAD_LEFT)),
+                        'type_label' => $movementTypeLabel,
+                        'concept' => $conceptLabel,
+                        'movement_total' => (float) $cashMovement->total,
+                        'method_total' => 0.0,
+                        'moved_at' => optional($cashMovement->movement?->moved_at)->format('Y-m-d h:i:s A') ?? '-',
+                        'user_name' => (string) ($cashMovement->movement?->user_name ?? '-'),
+                        'cash_register' => (string) ($cashRegister->number ?? '-'),
+                        'shift' => (string) ($cashMovement->shift?->name ?? 'Sin turno'),
+                        'person_name' => (string) ($cashMovement->movement?->person_name ?: 'CLIENTES VARIOS'),
+                        'method' => $method,
+                        'suffix' => $suffix,
+                        'payment_label' => '',
+                    ];
+                }
+
+                $detailGroups[$groupKey]['records'][$recordKey]['method_total'] += $amount;
+
+                if ($this->isCashMethod($method)) {
+                    if ($category === 'opening') {
+                        $openingCash += $amount;
+                    } elseif ($category === 'sale') {
+                        $cashSales += $amount;
+                    } elseif ($category === 'income') {
+                        $otherCashIncome += $amount;
+                    } elseif ($category === 'expense') {
+                        $cashExpenses += $amount;
+                    }
+                }
+            }
+        }
+
+        $detailGroups = collect($detailGroups)
+            ->map(function ($group) {
+                $group['records'] = collect($group['records'])
+                    ->map(function ($record) {
+                        $record['payment_label'] = $record['method'] . ': S/ ' . number_format((float) $record['method_total'], 2);
+                        if ($record['suffix'] !== '') {
+                            $record['payment_label'] .= ' (' . $record['suffix'] . ')';
+                        }
+                        unset($record['method'], $record['suffix']);
+
+                        return $record;
+                    })
+                    ->values()
+                    ->all();
+
+                $group['detail_label'] = $group['detail'] !== ''
+                    ? $group['detail']
+                    : ($this->isCashMethod($group['method']) ? 'Efectivo' : 'Sin detalles adicionales');
+                $group['records_count'] = count($group['records']);
+                $group['modal_title'] = 'Caja chica | ' . $group['note'] . ' | ' . $group['method'];
+                if ($group['detail'] !== '' && !$this->isCashMethod($group['method'])) {
+                    $group['modal_title'] .= ' | ' . $group['detail'];
+                }
+
+                return $group;
+            })
+            ->sortBy([
+                ['sort_order', 'asc'],
+                ['note', 'asc'],
+                ['method', 'asc'],
+                ['detail_label', 'asc'],
+            ])
+            ->values()
+            ->all();
+
+        $cashInBox = round($openingCash + $cashSales + $otherCashIncome - $cashExpenses, 2);
+
+        return [
+            'startedAt' => $from,
+            'systemCash' => $cashInBox,
+            'openingCash' => round($openingCash, 2),
+            'cashSales' => round($cashSales, 2),
+            'otherCashIncome' => round($otherCashIncome, 2),
+            'cashExpenses' => round($cashExpenses, 2),
+            'cashWithoutOpening' => round($cashSales + $otherCashIncome - $cashExpenses, 2),
+            'totalSales' => round($totalSales, 2),
+            'totalOtherIncome' => round($totalOtherIncome, 2),
+            'totalExpenses' => round($totalExpenses, 2),
+            'detailGroups' => $detailGroups,
+        ];
+    }
+
+    private function classifyCloseMovementCategory(CashMovements $cashMovement): string
+    {
+        $conceptName = mb_strtolower((string) ($cashMovement->paymentConcept?->description ?? ''), 'UTF-8');
+        $documentName = mb_strtolower((string) ($cashMovement->movement?->documentType?->name ?? ''), 'UTF-8');
+        $conceptType = mb_strtoupper((string) ($cashMovement->paymentConcept?->type ?? ''), 'UTF-8');
+
+        if (str_contains($conceptName, 'apertura')) {
+            return 'opening';
+        }
+
+        if (str_contains($conceptName, 'cierre')) {
+            return 'closing';
+        }
+
+        if ($conceptType === 'E' || str_contains($documentName, 'egreso')) {
+            return 'expense';
+        }
+
+        if (
+            str_contains($conceptName, 'pago de cliente')
+            || str_contains($conceptName, 'venta')
+            || !is_null($cashMovement->movement?->salesMovement)
+        ) {
+            return 'sale';
+        }
+
+        return 'income';
+    }
+
+    private function resolveCloseDetailTypeLabel(string $type): string
+    {
+        return match (mb_strtoupper($type, 'UTF-8')) {
+            'DEUDA' => 'Deuda',
+            default => 'Pagado',
+        };
+    }
+
+    private function isCashMethod(?string $method): bool
+    {
+        $value = mb_strtolower(trim((string) $method), 'UTF-8');
+
+        return str_contains($value, 'efectivo') || str_contains($value, 'cash');
+    }
+
+    private function resolveCloseDetailSuffix(CashMovementDetail $detail): string
+    {
+        $parts = array_filter([
+            trim((string) ($detail->bank ?? '')),
+            trim((string) ($detail->card ?? '')),
+            trim((string) ($detail->digital_wallet ?? '')),
+            trim((string) ($detail->payment_gateway ?? '')),
+        ]);
+
+        return implode(' | ', $parts);
     }
 
     private function resolveCurrentCashAmount(int $cashRegisterId, int $branchId): float

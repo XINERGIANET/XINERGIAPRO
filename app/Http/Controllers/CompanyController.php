@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
+use App\Models\CashRegister;
 use App\Models\Company;
 use App\Models\Operation;
 use App\Models\Person;
 use App\Models\Role;
+use App\Models\Shift;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -367,6 +369,20 @@ class CompanyController extends Controller
                     'created_at' => now(),
                 ]
             );
+              Shift::create([
+                'name' => 'Día',
+                'abbreviation' => 'Día',
+                'start_time' => '08:00:00',
+                'end_time' => '06:00:00',
+                'branch_id' => $branch->id,
+            ]);
+             CashRegister::create([
+                'number' => 'Principal',
+                'status' => '1',
+                'series' => '001',
+                'branch_id' => $branch->id,
+            ]);
+
         
     }
 }

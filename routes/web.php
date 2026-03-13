@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DigitalWalletController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AccountReceivablePayableController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\BankController;
 use App\Http\Controllers\BranchController;
@@ -134,6 +135,8 @@ Route::middleware('auth')->group(function () {
         ->names('admin.sales')
         ->parameters(['ventas' => 'sale'])
         ->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
+    Route::post('/admin/ventas/{sale}/facturar', [SalesController::class, 'invoice'])
+        ->name('admin.sales.invoice');
     Route::resource('/admin/compras', PurchaseController::class)
         ->names('admin.purchases')
         ->parameters(['compras' => 'purchase'])
@@ -370,14 +373,18 @@ Route::middleware('auth')->group(function () {
     //Caja chica
     Route::get('/caja/caja-chica', [PettyCashController::class, 'redirectBase'])
         ->name('admin.petty-cash.base');
-    Route::get('/caja/caja-chica/{cash_register_id}/{movement}', [PettyCashController::class, 'show'])->name('admin.petty-cash.show');
     Route::group(['prefix' => 'caja/caja-chica/{cash_register_id}', 'as' => 'admin.petty-cash.'], function () {
         Route::get('/', [PettyCashController::class, 'index'])->name('index');
+        Route::get('/cerrar', [PettyCashController::class, 'closePage'])->name('close');
+        Route::post('/cerrar', [PettyCashController::class, 'closeStore'])->name('close.store');
         Route::post('/', [PettyCashController::class, 'store'])->name('store');
         Route::get('/{movement}/edit', [PettyCashController::class, 'edit'])->name('edit');
         Route::put('/{movement}', [PettyCashController::class, 'update'])->name('update');
         Route::delete('/{movement}', [PettyCashController::class, 'destroy'])->name('destroy');
     });
+    Route::get('/caja/caja-chica/{cash_register_id}/{movement}', [PettyCashController::class, 'show'])
+        ->whereNumber('movement')
+        ->name('admin.petty-cash.show');
 
     //Cajas
     Route::resource('/caja/cajas', BoxController::class)
@@ -387,6 +394,12 @@ Route::middleware('auth')->group(function () {
     //Relación caja-turno
     Route::get('/caja/relacion-turnos-caja', [CashShiftRelationController::class, 'index'])
         ->name('admin.cash-shift-relations.index');
+    Route::get('/admin/caja/cuentas-por-cobrar', [AccountReceivablePayableController::class, 'receivables'])
+        ->name('admin.cash-accounts.receivables');
+    Route::get('/admin/caja/cuentas-por-pagar', [AccountReceivablePayableController::class, 'payables'])
+        ->name('admin.cash-accounts.payables');
+    Route::post('/admin/caja/cuentas/{account}/liquidar', [AccountReceivablePayableController::class, 'settle'])
+        ->name('admin.cash-accounts.settle');
 
     //tasa de impuesto
     Route::resource('/admin/herramientas/tasas-impuesto', TaxRateController::class)

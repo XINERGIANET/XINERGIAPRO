@@ -20,12 +20,14 @@ class CashMovements extends Model
         'cash_register',
         'shift_id',
         'shift_snapshot',
+        'counting_snapshot',
         'movement_id',
         'branch_id',
     ];
 
     protected $casts = [
         'shift_snapshot' => 'array',
+        'counting_snapshot' => 'array',
     ];
 
     public function paymentConcept()
@@ -51,5 +53,10 @@ class CashMovements extends Model
     public function details() 
     {
         return $this->hasMany(CashMovementDetail::class, 'cash_movement_id');
+    }
+
+    public function accountReceivablePayable()
+    {
+        return $this->hasOne(AccountReceivablePayable::class, 'cash_movement_id');
     }
 }

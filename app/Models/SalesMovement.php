@@ -13,6 +13,8 @@ class SalesMovement extends Model
     protected $fillable = [
         'branch_snapshot',
         'series',
+        'billing_status',
+        'billing_number',
         'year',
         'detail_type',
         'consumption',

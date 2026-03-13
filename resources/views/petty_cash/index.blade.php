@@ -17,6 +17,18 @@
     $operacionesCollection = collect($operaciones ?? []);
     $topOperations = $operacionesCollection->where('type', 'T');
     $rowOperations = $operacionesCollection->where('type', 'R');
+    $buildCloseUrl = function ($targetViewId = null) use ($selectedBoxId) {
+        if (!$selectedBoxId) {
+            return '#';
+        }
+
+        $params = ['cash_register_id' => $selectedBoxId];
+        if ($targetViewId) {
+            $params['view_id'] = $targetViewId;
+        }
+
+        return route('admin.petty-cash.close', $params);
+    };
 
     $resolveActionUrl = function ($action, $movement = null, $operation = null) use ($viewId, $selectedBoxId) {
         if (!$action) {
@@ -239,9 +251,14 @@
                                     || str_contains($topNameLower, 'cerrar')
                                     || str_contains($topActionLower, 'close')
                                     || str_contains($topNameLower, 'close');
+                                if ($isCloseOp && empty($operation->color)) {
+                                    $topStyle = 'background-color: #FACC15; color: #111827;';
+                                }
+                                $targetViewId = !empty($operation->view_id_action) ? $operation->view_id_action : $viewId;
+                                $closeActionUrl = $buildCloseUrl($targetViewId);
 
-                                // En caja chica estas operaciones deben abrir modal, no navegar.
-                                $isPettyCashModalOp = $isCreateLike || $isIncomeOp || $isExpenseOp || $isOpenOp || $isCloseOp;
+                                // En caja chica ingreso/egreso/apertura quedan en modal; cierre abre una vista dedicada.
+                                $isPettyCashModalOp = $isCreateLike || $isIncomeOp || $isExpenseOp || $isOpenOp;
                                 $modalDocId = ($isExpenseOp || $isCloseOp) ? $egresoDocId : $ingresoDocId;
                                 $modalConcept = $isOpenOp ? 'Apertura de caja' : ($isCloseOp ? 'Cierre de caja' : '');
                             @endphp
@@ -249,7 +266,12 @@
                                 @continue
                             @endif
                             @php $renderedTopOperation = true; @endphp
-                            @if ($isPettyCashModalOp)
+                            @if ($isCloseOp)
+                                <x-ui.link-button size="md" variant="primary" style="{{ $topStyle }}" href="{{ $closeActionUrl }}">
+                                    <i class="{{ $operation->icon }}"></i>
+                                    <span>{{ $operation->name }}</span>
+                                </x-ui.link-button>
+                            @elseif ($isPettyCashModalOp)
                                 <x-ui.button size="md" variant="primary" type="button" style="{{ $topStyle }}"
                                     @click="$dispatch('open-movement-modal', { concept: '{{ $modalConcept }}', docId: '{{ $modalDocId }}' })">
                                     <i class="{{ $operation->icon }}"></i>
@@ -280,10 +302,10 @@
                                     <i class="ri-subtract-line mr-1"></i><span>Egreso</span>
                                 </x-ui.button>
 
-                                <x-ui.button size="md" style="background-color: #FACC15; color: #111827;"
-                                    @click="$dispatch('open-movement-modal', { concept: 'Cierre de caja', docId: '{{ $egresoDocId }}' })">
+                                <x-ui.link-button size="md" style="background-color: #FACC15; color: #111827;"
+                                    href="{{ $buildCloseUrl($viewId) }}">
                                     <i class="ri-lock-2-line"></i> Cerrar
-                                </x-ui.button>
+                                </x-ui.link-button>
                             @endif
                         @endif
                     @else
@@ -304,10 +326,10 @@
                                 <i class="ri-subtract-line mr-1"></i><span>Egreso</span>
                             </x-ui.button>
 
-                            <x-ui.button size="md" style="background-color: #FACC15; color: #111827;"
-                                @click="$dispatch('open-movement-modal', { concept: 'Cierre de caja', docId: '{{ $egresoDocId }}' })">
+                            <x-ui.link-button size="md" style="background-color: #FACC15; color: #111827;"
+                                href="{{ $buildCloseUrl($viewId) }}">
                                 <i class="ri-lock-2-line"></i> Cerrar
-                            </x-ui.button>
+                            </x-ui.link-button>
                         @endif
                     @endif
                 </div>

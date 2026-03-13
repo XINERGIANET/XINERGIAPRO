@@ -1,70 +1,211 @@
 @extends('layouts.app')
 
 @section('content')
-    <div>
-        @php
-            use Illuminate\Support\Facades\Route;
+    @php
+        use Illuminate\Support\Facades\Route;
 
-            $viewId = request('view_id');
-            $operacionesCollection = collect($operaciones ?? []);
-            $topOperations = $operacionesCollection->where('type', 'T');
-            $rowOperations = $operacionesCollection->where('type', 'R');
+        $viewId = request('view_id');
+        $operacionesCollection = collect($operaciones ?? []);
+        $topOperations = $operacionesCollection->where('type', 'T');
+        $rowOperations = $operacionesCollection->where('type', 'R');
 
-            $resolveActionUrl = function ($action, $model = null, $operation = null) use ($viewId) {
-                if (!$action) {
-                    return '#';
+        $resolveActionUrl = function ($action, $model = null, $operation = null) use ($viewId) {
+            if (!$action) {
+                return '#';
+            }
+
+            if (str_starts_with($action, '/') || str_starts_with($action, 'http')) {
+                $url = $action;
+            } else {
+                $routeCandidates = [$action];
+                if (!str_starts_with($action, 'admin.')) {
+                    $routeCandidates[] = 'admin.' . $action;
+                }
+                $routeCandidates = array_merge(
+                    $routeCandidates,
+                    array_map(fn ($name) => $name . '.index', $routeCandidates)
+                );
+
+                $routeName = null;
+                foreach ($routeCandidates as $candidate) {
+                    if (Route::has($candidate)) {
+                        $routeName = $candidate;
+                        break;
+                    }
                 }
 
-                if (str_starts_with($action, '/') || str_starts_with($action, 'http')) {
-                    $url = $action;
-                } else {
-                    $routeCandidates = [$action];
-                    if (!str_starts_with($action, 'admin.')) {
-                        $routeCandidates[] = 'admin.' . $action;
-                    }
-                    $routeCandidates = array_merge(
-                        $routeCandidates,
-                        array_map(fn ($name) => $name . '.index', $routeCandidates)
-                    );
-
-                    $routeName = null;
-                    foreach ($routeCandidates as $candidate) {
-                        if (Route::has($candidate)) {
-                            $routeName = $candidate;
-                            break;
-                        }
-                    }
-
-                    if ($routeName) {
-                        try {
-                            $url = $model ? route($routeName, $model) : route($routeName);
-                        } catch (\Exception $e) {
-                            $url = '#';
-                        }
-                    } else {
+                if ($routeName) {
+                    try {
+                        $url = $model ? route($routeName, $model) : route($routeName);
+                    } catch (\Exception $e) {
                         $url = '#';
                     }
+                } else {
+                    $url = '#';
+                }
+            }
+
+            $targetViewId = $viewId;
+            if ($operation && !empty($operation->view_id_action)) {
+                $targetViewId = $operation->view_id_action;
+            }
+
+            if ($targetViewId && $url !== '#') {
+                $separator = str_contains($url, '?') ? '&' : '?';
+                $url .= $separator . 'view_id=' . urlencode($targetViewId);
+            }
+
+            return $url;
+        };
+
+        $invoicePeopleOptions = collect($people ?? [])
+            ->map(function ($person) {
+                $label = trim((string) ($person->first_name ?? '') . ' ' . (string) ($person->last_name ?? ''));
+
+                return [
+                    'id' => (int) $person->id,
+                    'label' => $label !== '' ? $label : ('Persona #' . $person->id),
+                    'document_number' => (string) ($person->document_number ?? ''),
+                    'search' => mb_strtolower(trim($label . ' ' . ($person->document_number ?? '')), 'UTF-8'),
+                ];
+            })
+            ->values()
+            ->all();
+
+        $invoiceModalSaleId = (int) old('invoice_sale_id', 0);
+        $bootPersonId = (string) old('person_id', '');
+        $bootPerson = collect($invoicePeopleOptions)->first(fn ($item) => (string) ($item['id'] ?? '') === $bootPersonId);
+        $invoiceModalDraftPayload = $invoiceModalSaleId > 0
+            ? [
+                'action' => route('admin.sales.invoice', array_merge([$invoiceModalSaleId], $viewId ? ['view_id' => $viewId] : [])),
+                'sale_id' => $invoiceModalSaleId,
+                'sale_code' => (string) old('invoice_sale_code', 'Venta #' . $invoiceModalSaleId),
+                'person_id' => $bootPersonId,
+                'person_label' => $bootPerson['label'] ?? '',
+                'invoice_series' => (string) old('invoice_series', '001'),
+                'invoice_number' => (string) old('invoice_number', ''),
+            ]
+            : null;
+    @endphp
+
+    <div
+        x-data="{
+            openRow: null,
+            peopleOptions: @js($invoicePeopleOptions),
+            draftPayload: @js($invoiceModalDraftPayload),
+            invoiceModalOpen: false,
+            invoiceDropdownOpen: false,
+            invoiceSearch: '',
+            invoiceForm: {
+                action: '',
+                sale_id: '',
+                sale_code: '',
+                person_id: '',
+                person_label: '',
+                invoice_series: '001',
+                invoice_number: '',
+            },
+            init() {
+                this.ensureClosedWithoutSale();
+                this.$watch('invoiceModalOpen', (value) => {
+                    if (value && String(this.invoiceForm.sale_id || '').trim() === '') {
+                        this.invoiceModalOpen = false;
+                    }
+                });
+            },
+            ensureClosedWithoutSale() {
+                if (String(this.invoiceForm.sale_id || '').trim() === '') {
+                    this.invoiceModalOpen = false;
+                }
+            },
+            resolvePersonLabel(personId, fallback = '') {
+                const match = this.peopleOptions.find((person) => String(person.id) === String(personId || ''));
+                return match ? match.label : fallback;
+            },
+            resolvePersonId(personId, fallbackLabel = '') {
+                if (String(personId || '') !== '') {
+                    return String(personId);
                 }
 
-                $targetViewId = $viewId;
-                if ($operation && !empty($operation->view_id_action)) {
-                    $targetViewId = $operation->view_id_action;
+                const normalizedLabel = String(fallbackLabel || '').trim().toLowerCase();
+                if (normalizedLabel === '') {
+                    return '';
                 }
 
-                if ($targetViewId && $url !== '#') {
-                    $separator = str_contains($url, '?') ? '&' : '?';
-                    $url .= $separator . 'view_id=' . urlencode($targetViewId);
+                const match = this.peopleOptions.find((person) => String(person.label || '').trim().toLowerCase() === normalizedLabel);
+                return match ? String(match.id) : '';
+            },
+            filteredPeople() {
+                const needle = String(this.invoiceSearch || '').trim().toLowerCase();
+                const base = needle === ''
+                    ? this.peopleOptions
+                    : this.peopleOptions.filter((person) => String(person.search || '').includes(needle));
+
+                return base.slice(0, 8);
+            },
+            openInvoiceModal(payload) {
+                const source = this.draftPayload && String(this.draftPayload.sale_id || '') === String(payload.sale_id || '')
+                    ? { ...payload, ...this.draftPayload }
+                    : payload;
+
+                this.invoiceForm.action = String(source.action || '');
+                this.invoiceForm.sale_id = String(source.sale_id || '');
+                this.invoiceForm.sale_code = String(source.sale_code || '');
+                this.invoiceForm.person_id = this.resolvePersonId(source.person_id || '', String(source.person_label || ''));
+                this.invoiceForm.person_label = this.resolvePersonLabel(this.invoiceForm.person_id, String(source.person_label || ''));
+                this.invoiceForm.invoice_series = String(source.invoice_series || '001');
+                this.invoiceForm.invoice_number = String(source.invoice_number || '');
+                this.invoiceSearch = this.invoiceForm.person_label;
+                this.invoiceDropdownOpen = false;
+                this.invoiceModalOpen = String(this.invoiceForm.sale_id || '').trim() !== '';
+            },
+            closeInvoiceModal() {
+                this.invoiceDropdownOpen = false;
+                this.invoiceModalOpen = false;
+                this.invoiceForm.action = '';
+                this.invoiceForm.sale_id = '';
+                this.invoiceForm.sale_code = '';
+                this.invoiceForm.person_id = '';
+                this.invoiceForm.person_label = '';
+                this.invoiceForm.invoice_series = '001';
+                this.invoiceForm.invoice_number = '';
+                this.invoiceSearch = '';
+            },
+            selectPerson(person) {
+                this.invoiceForm.person_id = String(person.id || '');
+                this.invoiceForm.person_label = String(person.label || '');
+                this.invoiceSearch = this.invoiceForm.person_label;
+                this.invoiceDropdownOpen = false;
+            },
+            onInvoiceSearchInput() {
+                if (this.invoiceSearch !== this.invoiceForm.person_label) {
+                    this.invoiceForm.person_id = '';
                 }
-
-                return $url;
-            };
-        @endphp
-
+                this.invoiceDropdownOpen = true;
+            },
+        }"
+    >
         <x-common.page-breadcrumb pageTitle="Ventas" />
 
         <x-common.component-card title="Listado de ventas" desc="Gestiona las ventas registradas.">
+            @if (session('status'))
+                <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+                    {{ session('status') }}
+                </div>
+            @endif
+            @if ($errors->has('error'))
+                <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                    {{ $errors->first('error') }}
+                </div>
+            @endif
+            @if ($errors->has('person_id') || $errors->has('invoice_series') || $errors->has('invoice_number'))
+                <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+                    {{ $errors->first('person_id') ?: ($errors->first('invoice_series') ?: $errors->first('invoice_number')) }}
+                </div>
+            @endif
+
             <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <form method="GET" class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+                <form method="GET" class="flex flex-1 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                     @if ($viewId)
                         <input type="hidden" name="view_id" value="{{ $viewId }}">
                     @endif
@@ -90,6 +231,29 @@
                             placeholder="Buscar por numero, persona o usuario"
                             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-12 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                         />
+                    </div>
+                    <div class="w-full sm:w-44 sm:flex-none">
+                        <select
+                            name="document_type_id"
+                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        >
+                            <option value="all" @selected(($selectedDocumentTypeId ?? 'all') === 'all')>Todos los docs.</option>
+                            @foreach(($saleDocumentTypes ?? collect()) as $documentType)
+                                <option value="{{ $documentType->id }}" @selected((string) ($selectedDocumentTypeId ?? 'all') === (string) $documentType->id)>
+                                    {{ $documentType->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="w-full sm:w-40 sm:flex-none">
+                        <select
+                            name="billing_status"
+                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        >
+                            <option value="all" @selected(($billingStatus ?? 'all') === 'all')>Todas</option>
+                            <option value="pending" @selected(($billingStatus ?? 'all') === 'pending')>Por facturar</option>
+                            <option value="invoiced" @selected(($billingStatus ?? 'all') === 'invoiced')>Facturadas</option>
+                        </select>
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 px-6 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #334155; border-color: #334155;">
@@ -126,7 +290,7 @@
                 </div>
             </div>
 
-            <div x-data="{ openRow: null }" class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+            <div class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
                 <table class="w-full">
                     <thead>
                         <tr class="text-white">
@@ -176,12 +340,15 @@
                                 </td>
                                 <td class="px-5 py-4 sm:px-6 text-center">
                                     <div class="flex flex-col items-center">
-                                        <p class="font-bold text-gray-800 text-theme-sm dark:text-white/90">
-                                            {{ strtoupper(substr($sale->documentType->name, 0, 1)) }}{{ $sale->salesMovement->series }}-{{ $sale->number }}
-                                        </p>
+                                     
                                         <p class="text-[11px] text-gray-500 dark:text-gray-400 uppercase font-medium">
                                             {{ $sale->documentType?->name ?? '-' }}
                                         </p>
+                                        @if ($sale->isSalesInvoice())
+                                            <span class="mt-1 inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide {{ $sale->salesBillingStatus() === 'PENDING' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700' }}">
+                                                {{ $sale->salesBillingStatusLabel() }}
+                                            </span>
+                                        @endif
                                     </div>
                                 </td>
                                 <td class="px-5 py-4 sm:px-6 text-center">
@@ -217,6 +384,17 @@
                                         </x-ui.badge>
                                     </div>
                                 </td>
+                                @php
+                                    $invoicePayload = [
+                                        'action' => route('admin.sales.invoice', array_merge([$sale], $viewId ? ['view_id' => $viewId] : [])),
+                                        'sale_id' => (int) $sale->id,
+                                        'sale_code' => (string) $sale->salesDocumentCode(),
+                                        'person_id' => $sale->person_id ? (string) $sale->person_id : '',
+                                        'person_label' => trim((string) ($sale->person_name ?? '')),
+                                        'invoice_series' => trim((string) ($sale->salesMovement?->series ?? '001')) ?: '001',
+                                        'invoice_number' => trim((string) ($sale->salesMovement?->billing_number ?? '')),
+                                    ];
+                                @endphp
                                 <td class="px-5 py-4 sm:px-6 text-center">
                                     <div class="flex items-center justify-center gap-2">
                                         @if ($rowOperations->isNotEmpty())
@@ -247,7 +425,7 @@
                                                         action="{{ $actionUrl }}"
                                                         class="relative group js-swal-delete"
                                                         data-swal-title="Eliminar venta?"
-                                                        data-swal-text="Se eliminara la venta {{ $sale->number }}. Esta accion no se puede deshacer."
+                                                        data-swal-text="Se eliminara la venta {{ $sale->salesDocumentCode() }}. Esta accion no se puede deshacer."
                                                         data-swal-confirm="Si, eliminar"
                                                         data-swal-cancel="Cancelar"
                                                         data-swal-confirm-color="#ef4444"
@@ -278,6 +456,28 @@
                                                     </div>
                                                 @endif
                                             @endforeach
+
+                                            @if ($sale->isSalesInvoice() && $sale->salesBillingStatus() === 'PENDING')
+                                                <div class="relative group">
+                                                    <x-ui.button
+                                                        size="icon"
+                                                        variant="primary"
+                                                        type="button"
+                                                        className="rounded-xl border-0 shadow-none"
+                                                        style="background-color: #0f766e; color: #ffffff;"
+                                                        onmouseover="this.style.backgroundColor='#115e59'"
+                                                        onmouseout="this.style.backgroundColor='#0f766e'"
+                                                        @click="openInvoiceModal({{ \Illuminate\Support\Js::from($invoicePayload) }})"
+                                                        aria-label="Facturar"
+                                                    >
+                                                        <i class="ri-bill-line"></i>
+                                                    </x-ui.button>
+                                                    <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
+                                                        Facturar
+                                                        <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
+                                                    </span>
+                                                </div>
+                                            @endif
 
                                             <div class="relative group">
                                                     <x-ui.link-button
@@ -334,6 +534,27 @@
                                                     </span>
                                                 </div>
                                             @endif
+                                            @if ($sale->isSalesInvoice() && $sale->salesBillingStatus() === 'PENDING')
+                                                <div class="relative group">
+                                                    <x-ui.button
+                                                        size="icon"
+                                                        variant="primary"
+                                                        type="button"
+                                                        className="rounded-xl border-0 shadow-none"
+                                                        style="background-color: #0f766e; color: #ffffff;"
+                                                        onmouseover="this.style.backgroundColor='#115e59'"
+                                                        onmouseout="this.style.backgroundColor='#0f766e'"
+                                                        @click="openInvoiceModal({{ \Illuminate\Support\Js::from($invoicePayload) }})"
+                                                        aria-label="Facturar"
+                                                    >
+                                                        <i class="ri-bill-line"></i>
+                                                    </x-ui.button>
+                                                    <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                        Facturar
+                                                        <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
+                                                    </span>
+                                                </div>
+                                            @endif
                                             <div class="relative group">
                                                 <x-ui.link-button
                                                     size="icon"
@@ -355,7 +576,7 @@
                                                 action="{{ route('admin.sales.destroy', array_merge([$sale], $viewId ? ['view_id' => $viewId] : [])) }}"
                                                 class="relative group js-swal-delete"
                                                 data-swal-title="Eliminar venta?"
-                                                data-swal-text="Se eliminara la venta {{ $sale->number }}. Esta accion no se puede deshacer."
+                                                data-swal-text="Se eliminara la venta {{ $sale->salesDocumentCode() }}. Esta accion no se puede deshacer."
                                                 data-swal-confirm="Si, eliminar"
                                                 data-swal-cancel="Cancelar"
                                                 data-swal-confirm-color="#ef4444"
@@ -459,7 +680,11 @@
                                         </div>
                                         <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
                                             <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Tipo de pago</p>
-                                            <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $sale->salesMovement?->payment_type ?? '-' }}</p>
+                                            <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ in_array(strtoupper((string) ($sale->salesMovement?->payment_type ?? '')), ['CREDITO', 'CREDIT', 'DEUDA'], true) ? 'CREDITO' : 'CONTADO' }}</p>
+                                        </div>
+                                        <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                            <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Facturación</p>
+                                            <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $sale->salesBillingStatusLabel() }}</p>
                                         </div>
                                         <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50 sm:col-span-2">
                                             <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Comentario</p>
@@ -471,7 +696,7 @@
                                         </div>
                                         <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
                                             <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Origen</p>
-                                            <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $sale->movementType?->description ?? 'Venta' }} - {{ strtoupper(substr($sale->documentType?->name , 0, 1))?? '-' }}{{ $sale->salesMovement?->series }}-{{ $sale->number }}</p>
+                                            <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $sale->movementType?->description ?? 'Venta' }} - {{ $sale->salesDocumentCode() }}</p>
                                         </div>
                                     </div>
                                 </td>
@@ -513,6 +738,131 @@
                 </div>
             </div>
         </x-common.component-card>
+
+        <template x-teleport="body">
+            <div
+                x-show="invoiceModalOpen"
+                x-cloak
+                x-effect="document.body.style.overflow = invoiceModalOpen ? 'hidden' : 'unset'"
+                class="fixed inset-0 z-[100000] flex items-center justify-center overflow-hidden p-3 sm:p-6"
+            >
+                <div @click="closeInvoiceModal()" class="fixed inset-0 bg-gray-400/30 backdrop-blur-[32px]"></div>
+
+                <div
+                    @click.stop
+                    class="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-[#F4F6FA]"
+                    style="max-height: min(calc(100vh - 1.5rem), calc(100dvh - 1.5rem));"
+                >
+                    <form method="POST" :action="invoiceForm.action" class="flex h-full flex-col">
+                        @csrf
+                        @if ($viewId)
+                            <input type="hidden" name="view_id" value="{{ $viewId }}">
+                        @endif
+                        <input type="hidden" name="invoice_sale_id" :value="invoiceForm.sale_id">
+                        <input type="hidden" name="invoice_sale_code" :value="invoiceForm.sale_code">
+
+                        <div class="border-b border-slate-200 px-6 py-5 sm:px-8">
+                            <div class="flex items-start justify-between gap-4">
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Facturacion</p>
+                                    <h3 class="mt-2 text-2xl font-bold text-slate-800">Registrar factura</h3>
+                                    <p class="mt-1 text-sm text-slate-500">Completa el cliente, la serie y el correlativo para marcar la venta como facturada.</p>
+                                </div>
+                                <button type="button" @click="closeInvoiceModal()" class="inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition hover:bg-slate-200 hover:text-slate-700">
+                                    <i class="ri-close-line text-2xl"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-6 sm:px-8">
+                            @if ($errors->any())
+                                <div class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                                    {{ $errors->first() }}
+                                </div>
+                            @endif
+
+                            <div class="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Venta</p>
+                                <p class="mt-2 text-lg font-bold text-slate-800" x-text="invoiceForm.sale_code || ('Venta #' + invoiceForm.sale_id)"></p>
+                            </div>
+
+                            <div class="space-y-1.5">
+                                <label class="block text-sm font-medium text-slate-700">Cliente</label>
+                                <div class="relative" @click.outside="invoiceDropdownOpen = false">
+                                    <input type="hidden" name="person_id" :value="invoiceForm.person_id">
+                                    <input
+                                        x-model="invoiceSearch"
+                                        @focus="invoiceDropdownOpen = true"
+                                        @click="invoiceDropdownOpen = true"
+                                        @input="onInvoiceSearchInput()"
+                                        class="h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-800 outline-none transition focus:border-slate-500"
+                                        placeholder="Buscar cliente por nombre o documento"
+                                        autocomplete="off"
+                                        required
+                                    >
+                                    <div x-show="invoiceDropdownOpen" x-cloak class="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                                        <template x-if="filteredPeople().length === 0">
+                                            <p class="px-4 py-3 text-sm text-slate-500">Sin resultados.</p>
+                                        </template>
+                                        <template x-for="person in filteredPeople()" :key="`invoice-person-${person.id}`">
+                                            <button type="button" @click="selectPerson(person)" class="flex w-full items-start justify-between border-b border-slate-100 px-4 py-3 text-left hover:bg-slate-50">
+                                                <span class="text-sm font-medium text-slate-800" x-text="person.label"></span>
+                                                <span class="ml-3 text-xs text-slate-500" x-text="person.document_number || 'Sin documento'"></span>
+                                            </button>
+                                        </template>
+                                    </div>
+                                </div>
+                                @error('person_id')
+                                    <p class="text-sm text-rose-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div class="space-y-1.5">
+                                    <label class="block text-sm font-medium text-slate-700">Serie</label>
+                                    <input
+                                        type="text"
+                                        name="invoice_series"
+                                        x-model="invoiceForm.invoice_series"
+                                        class="h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-800 outline-none transition focus:border-slate-500"
+                                        placeholder="001"
+                                        required
+                                    >
+                                    @error('invoice_series')
+                                        <p class="text-sm text-rose-600">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                                <div class="space-y-1.5">
+                                    <label class="block text-sm font-medium text-slate-700">Correlativo</label>
+                                    <input
+                                        type="text"
+                                        name="invoice_number"
+                                        x-model="invoiceForm.invoice_number"
+                                        class="h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-800 outline-none transition focus:border-slate-500"
+                                        placeholder="00000001"
+                                        required
+                                    >
+                                    @error('invoice_number')
+                                        <p class="text-sm text-rose-600">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-3 border-t border-slate-200 px-6 py-5 sm:px-8">
+                            <x-ui.button size="md" variant="primary" type="submit" className="px-6">
+                                <i class="ri-save-line"></i>
+                                <span>Guardar factura</span>
+                            </x-ui.button>
+                            <x-ui.button size="md" variant="outline" type="button" className="px-6" @click="closeInvoiceModal()">
+                                <i class="ri-close-line"></i>
+                                <span>Cancelar</span>
+                            </x-ui.button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </template>
     </div>
 
     @push('scripts')
@@ -540,4 +890,3 @@
     </script>
     @endpush
 @endsection
-

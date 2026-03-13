@@ -22,6 +22,7 @@ use App\Models\PurchaseMovementDetail;
 use App\Models\Shift;
 use App\Models\TaxRate;
 use App\Models\Unit;
+use App\Services\AccountReceivablePayableService;
 use App\Services\KardexSyncService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -246,7 +247,16 @@ class PurchaseController extends Controller
 
             app(KardexSyncService::class)->syncMovement($movement);
 
-            if (
+            if (($validated['payment_type'] ?? 'CONTADO') === 'CREDITO') {
+                $this->registerPurchaseDebt(
+                    movement: $movement,
+                    person: $person,
+                    validated: $validated,
+                    total: (float) $totals['total'],
+                    branchId: $branchId,
+                    user: $user
+                );
+            } elseif (
                 ($validated['payment_type'] ?? 'CONTADO') === 'CONTADO'
                 && ($validated['affects_cash'] ?? 'N') === 'S'
             ) {
@@ -895,6 +905,107 @@ class PurchaseController extends Controller
                 'updated_at' => now(),
             ]);
         }
+
+        app(AccountReceivablePayableService::class)->removeDebtAccountByCashMovementId((int) $cashMovement->id);
+    }
+
+    private function registerPurchaseDebt(
+        Movement $movement,
+        Person $person,
+        array $validated,
+        float $total,
+        int $branchId,
+        $user
+    ): void {
+        $cashRegisterId = (int) ($validated['cash_register_id'] ?? 0);
+        if ($cashRegisterId <= 0) {
+            throw new \RuntimeException('Debe seleccionar una caja para registrar la deuda de la compra.');
+        }
+
+        $cashRegister = CashRegister::query()
+            ->where('branch_id', $branchId)
+            ->findOrFail($cashRegisterId);
+
+        $paymentConcept = $this->resolvePurchasePaymentConcept();
+        $cashMovementTypeId = $this->resolveCashMovementTypeId();
+        $cashDocumentTypeId = $this->resolveCashExpenseDocumentTypeId($cashMovementTypeId);
+        $shift = Shift::query()->where('branch_id', $branchId)->first() ?? Shift::query()->first();
+
+        if (!$shift) {
+            throw new \RuntimeException('No hay turno disponible para registrar la deuda de la compra.');
+        }
+
+        $cashOutMovement = Movement::query()->create([
+            'number' => $this->generateCashMovementNumber($branchId, $cashRegisterId, (int) $paymentConcept->id),
+            'moved_at' => $validated['moved_at'],
+            'user_id' => $user?->id,
+            'user_name' => $user?->name ?? 'Sistema',
+            'person_id' => $person->id,
+            'person_name' => trim(($person->first_name ?? '') . ' ' . ($person->last_name ?? '')),
+            'responsible_id' => $user?->id,
+            'responsible_name' => $user?->name ?? 'Sistema',
+            'comment' => 'Registro de deuda de compra ' . $movement->number,
+            'status' => '1',
+            'movement_type_id' => $cashMovementTypeId,
+            'document_type_id' => $cashDocumentTypeId,
+            'branch_id' => $branchId,
+            'parent_movement_id' => $movement->id,
+            'shift_id' => $shift->id,
+            'shift_snapshot' => [
+                'name' => $shift->name,
+                'start_time' => $shift->start_time,
+                'end_time' => $shift->end_time,
+            ],
+        ]);
+
+        $cashMovement = CashMovements::query()->create([
+            'payment_concept_id' => $paymentConcept->id,
+            'currency' => $validated['currency'],
+            'exchange_rate' => (float) $validated['exchange_rate'],
+            'total' => $total,
+            'cash_register_id' => $cashRegisterId,
+            'cash_register' => $cashRegister->number ?? 'Caja Principal',
+            'shift_id' => $shift->id,
+            'shift_snapshot' => [
+                'name' => $shift->name,
+                'start_time' => $shift->start_time,
+                'end_time' => $shift->end_time,
+            ],
+            'movement_id' => $cashOutMovement->id,
+            'branch_id' => $branchId,
+        ]);
+
+        $debtPaymentMethod = $this->resolveDebtPaymentMethod();
+
+        DB::table('cash_movement_details')->insert([
+            'cash_movement_id' => $cashMovement->id,
+            'type' => 'DEUDA',
+            'due_at' => $validated['moved_at'],
+            'paid_at' => null,
+            'payment_method_id' => $debtPaymentMethod->id,
+            'payment_method' => $debtPaymentMethod->description ?? 'Deuda',
+            'number' => $cashOutMovement->number,
+            'card_id' => null,
+            'card' => '',
+            'bank_id' => null,
+            'bank' => '',
+            'digital_wallet_id' => null,
+            'digital_wallet' => '',
+            'payment_gateway_id' => null,
+            'payment_gateway' => '',
+            'amount' => $total,
+            'comment' => $validated['comment'] ?? ('Compra registrada como deuda ' . $movement->number),
+            'status' => 'A',
+            'branch_id' => $branchId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        app(AccountReceivablePayableService::class)->syncDebtAccount(
+            $cashMovement,
+            AccountReceivablePayableService::TYPE_PAYABLE,
+            \Carbon\Carbon::parse((string) $validated['moved_at'])
+        );
     }
 
     private function resolveCashMovementTypeId(): int
@@ -987,6 +1098,24 @@ class PurchaseController extends Controller
         $nextSequence = $lastNumber ? ((int) $lastNumber + 1) : 1;
 
         return str_pad((string) $nextSequence, 8, '0', STR_PAD_LEFT);
+    }
+
+    private function resolveDebtPaymentMethod(): PaymentMethod
+    {
+        $paymentMethod = PaymentMethod::query()
+            ->where('description', 'ILIKE', 'deuda')
+            ->where('status', true)
+            ->first();
+
+        if ($paymentMethod) {
+            return $paymentMethod;
+        }
+
+        return PaymentMethod::query()->create([
+            'description' => 'Deuda',
+            'order_num' => (int) (PaymentMethod::query()->max('order_num') ?? 0) + 1,
+            'status' => true,
+        ]);
     }
 
     private function assertValidPurchaseMovement(Movement $movement): void

@@ -12,33 +12,34 @@
             <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first() }}</div>
         @endif
 
-        <div class="mb-6 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <div class="flex flex-wrap items-center gap-2">
+        <div class="mb-6 flex flex-col gap-3 xl:flex-row xl:items-center">
+            <div class="flex flex-wrap items-center gap-2 whitespace-nowrap xl:shrink-0">
                 <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.maintenance-board.create') }}" style="background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff">
-                    <i class="ri-add-circle-line"></i><span>Agregar Vehiculo e Iniciar</span>
+                    <i class="ri-add-circle-line"></i><span>Agregar Vehiculo</span>
                 </x-ui.link-button>
                 <x-ui.link-button size="md" variant="outline" href="{{ route('workshop.orders.index') }}">
                     <i class="ri-file-list-3-line"></i><span>Ir a Ordenes de Servicio</span>
                 </x-ui.link-button>
             </div>
 
-            <form method="GET" class="flex flex-wrap items-center gap-2">
+            <form method="GET" class="flex min-w-0 flex-1 flex-wrap items-center gap-2 lg:flex-nowrap">
+                @if (request()->filled('view_id'))
+                    <input type="hidden" name="view_id" value="{{ request('view_id') }}">
+                @endif
                 <input
                     type="text"
                     name="search"
                     value="{{ $search ?? '' }}"
-                    class="h-10 min-w-0 sm:min-w-[260px] rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 focus:border-orange-400 focus:outline-none"
+                    class="h-11 w-full flex-1 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 focus:border-orange-400 focus:outline-none sm:min-w-[340px]"
                     placeholder="Buscar por cliente o vehiculo"
                 >
                 <select
                     id="status"
                     name="status"
                     onchange="this.form.submit()"
-                    class="h-10 min-w-0 sm:min-w-[220px] rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 focus:border-orange-400 focus:outline-none"
+                    class="h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 focus:border-orange-400 focus:outline-none sm:w-[250px]"
                 >
                     <option value="all" @selected(($selectedStatus ?? 'in_progress') === 'all')>Todos</option>
-                    <option value="draft" @selected(($selectedStatus ?? 'in_progress') === 'draft')>Borrador</option>
-                    <option value="diagnosis" @selected(($selectedStatus ?? 'in_progress') === 'diagnosis')>Diagnóstico</option>
                     <option value="awaiting_approval" @selected(($selectedStatus ?? 'in_progress') === 'awaiting_approval')>Esperando aprobación</option>
                     <option value="approved" @selected(($selectedStatus ?? 'in_progress') === 'approved')>Aprobado</option>
                     <option value="in_progress" @selected(($selectedStatus ?? 'in_progress') === 'in_progress')>En reparación</option>
@@ -46,10 +47,10 @@
                     <option value="delivered" @selected(($selectedStatus ?? 'in_progress') === 'delivered')>Entregado</option>
                     <option value="cancelled" @selected(($selectedStatus ?? 'in_progress') === 'cancelled')>Anulado</option>
                 </select>
-                <x-ui.button size="sm" variant="primary" type="submit" className="h-10">
+                <x-ui.button size="sm" variant="primary" type="submit" className="h-11 whitespace-nowrap px-5" style="background-color:#334155;border-color:#334155;color:#fff" onmouseover="this.style.backgroundColor='#1e293b';this.style.borderColor='#1e293b'" onmouseout="this.style.backgroundColor='#334155';this.style.borderColor='#334155'">
                     <i class="ri-search-line"></i><span>Filtrar</span>
                 </x-ui.button>
-                <x-ui.link-button size="sm" variant="outline" href="{{ route('workshop.maintenance-board.index', ['status' => 'in_progress']) }}" className="h-10">
+                <x-ui.link-button size="sm" variant="outline" href="{{ route('workshop.maintenance-board.index', array_filter(['status' => 'in_progress', 'view_id' => request('view_id')])) }}" className="h-11 whitespace-nowrap px-5">
                     <i class="ri-refresh-line"></i><span>Limpiar</span>
                 </x-ui.link-button>
             </form>
