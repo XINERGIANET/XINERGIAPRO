@@ -20,289 +20,314 @@
 
 @section('content')
     <style>
-        [x-cloak] {
-            display: none !important;
+        [x-cloak] { display: none !important; }
+
+        /* Dashboard Layout */
+        .pc-container {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 24px;
+            align-items: start;
         }
 
-        .close-page-card {
-            border-radius: 28px;
-            border: 1px solid #d7dde7;
+        @media (max-width: 1024px) {
+            .pc-container { grid-template-columns: 1fr; }
+        }
+
+        /* Generic Card */
+        .pc-card {
             background: #fff;
-            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+            border-radius: 20px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
         }
 
-        .close-field {
-            border-bottom: 1px solid #c9d0db;
-            padding-bottom: 8px;
-        }
-
-        .close-field-label {
-            margin-bottom: 8px;
-            display: block;
-            font-size: 13px;
-            font-weight: 700;
-            color: #99a1b3;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-        }
-
-        .close-field-value {
-            min-height: 38px;
+        /* Sidebar Elements */
+        .pc-sidebar-title {
             display: flex;
             align-items: center;
-            gap: 10px;
-            font-size: 18px;
-            color: #0f172a;
-        }
-
-        .close-amount-card {
-            border-bottom: 1px solid #c9d0db;
-            padding-bottom: 10px;
-        }
-
-        .close-amount-card span {
-            display: block;
-        }
-
-        .close-amount-card .label {
-            margin-bottom: 8px;
-            font-size: 13px;
-            font-weight: 700;
-            color: #99a1b3;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-        }
-
-        .close-amount-card .value {
-            font-size: 34px;
-            line-height: 1;
+            gap: 12px;
+            font-size: 14px;
             font-weight: 800;
-            color: #111827;
+            color: #1e293b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 24px;
         }
 
-        .close-radio {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 18px;
-            color: #7b8497;
+        .pc-sidebar-field {
+            margin-bottom: 12px;
         }
 
-        .close-radio input {
-            accent-color: #14b8a6;
-            width: 20px;
-            height: 20px;
-        }
-
-        .close-note {
-            width: 100%;
-            min-height: 42px;
-            resize: vertical;
-            border: 0;
-            border-bottom: 1px solid #c9d0db;
-            background: transparent;
-            padding: 0 0 8px;
-            font-size: 18px;
-            color: #0f172a;
-            outline: none;
-        }
-
-        .close-summary-card {
-            border-bottom: 1px solid #c9d0db;
-            padding-bottom: 10px;
-        }
-
-        .close-summary-card .label {
+        .pc-sidebar-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
             margin-bottom: 6px;
             display: block;
-            font-size: 14px;
-            font-weight: 700;
-            color: #99a1b3;
         }
 
-        .close-summary-card .value {
-            font-size: 31px;
-            line-height: 1;
-            font-weight: 800;
-            color: #000;
-        }
-
-        .close-section-pill {
+        .pc-sidebar-value {
+            background: #f8fafc;
+            border: 1px solid #f1f5f9;
+            border-radius: 12px;
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #334155;
             display: flex;
             align-items: center;
+            gap: 8px;
+        }
+
+        /* Calculation Tiles (Sidebar) */
+        .pc-tile {
+            border-radius: 16px;
+            padding: 16px;
+            display: flex;
             justify-content: space-between;
-            gap: 12px;
-            border-radius: 999px;
-            background: #353b44;
-            color: #fff;
-            padding: 10px 18px;
-            font-size: 21px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
+            align-items: center;
+            margin-bottom: 12px;
         }
 
-        .close-money-table {
-            width: 100%;
-            overflow: hidden;
-            border-radius: 24px;
-            border: 1px solid #d7dde7;
+        .pc-tile.green { background: #ecfdf5; color: #059669; }
+        .pc-tile.gray { background: #f1f5f9; color: #475569; }
+
+        .pc-tile-label { font-size: 13px; font-weight: 700; }
+        .pc-tile-value { font-size: 20px; font-weight: 800; }
+
+        /* Currency Selector */
+        .pc-currency-box {
+            background: #eff6ff;
+            border-radius: 16px;
+            padding: 16px;
+            margin-top: 24px;
+        }
+
+        .pc-currency-label {
+            font-size: 11px;
+            font-weight: 800;
+            color: #2563eb;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .pc-currency-btns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .pc-currency-btn {
             background: #fff;
-        }
-
-        .close-money-table thead th {
-            background: #353b44;
-            color: #fff;
-            padding: 18px 16px;
-            font-size: 15px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 8px;
+            font-size: 12px;
             font-weight: 700;
-        }
-
-        .close-money-table tbody td {
-            border-bottom: 1px solid #edf1f7;
-            padding: 18px 16px;
-            vertical-align: middle;
-        }
-
-        .close-money-table tbody tr:last-child td {
-            border-bottom: 0;
-        }
-
-        .close-count-input,
-        .close-note-input {
-            width: 100%;
-            border: 0;
-            border-bottom: 1px solid #c9d0db;
-            background: transparent;
-            padding: 0 0 6px;
-            outline: none;
-        }
-
-        .close-count-input {
+            color: #64748b;
             text-align: center;
-            font-size: 23px;
-            font-weight: 800;
-            color: #111827;
+            transition: all 0.2s;
         }
 
-        .close-note-input {
-            font-size: 15px;
-            color: #4b5563;
-        }
-
-        .close-detail-table {
-            width: 100%;
-            border-collapse: collapse;
-            overflow: hidden;
-            border-radius: 22px;
-        }
-
-        .close-detail-table thead th {
-            background: #353b44;
+        .pc-currency-btn.active {
+            background: #2563eb;
             color: #fff;
-            padding: 16px 14px;
-            font-size: 14px;
-            font-weight: 700;
-            text-transform: uppercase;
+            border-color: #2563eb;
         }
 
-        .close-detail-table tbody td {
-            border-bottom: 1px solid #edf1f7;
-            padding: 14px;
-            vertical-align: middle;
-            color: #111827;
+        /* Top Summary Cards */
+        .pc-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
         }
 
-        .close-detail-table tbody tr:last-child td {
-            border-bottom: 0;
+        @media (max-width: 768px) {
+            .pc-summary-grid { grid-template-columns: 1fr 1fr; }
         }
 
-        .close-pill {
-            display: inline-flex;
+        .pc-summary-card {
+            background: #fff;
+            padding: 20px;
+            border-radius: 16px;
+            border: 1px solid #f1f5f9;
+        }
+
+        .pc-summary-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 999px;
+            margin-bottom: 12px;
+        }
+
+        .pc-summary-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #64748b;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .pc-summary-value {
+            font-size: 18px;
+            font-weight: 800;
+            color: #1e293b;
+        }
+
+        /* Big Impact Cards */
+        .pc-impact-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .pc-impact-card {
+            border-radius: 16px;
+            padding: 24px;
+            color: #fff;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .pc-impact-card::after {
+            content: '';
+            position: absolute;
+            top: -20%;
+            right: -10%;
+            width: 150px;
+            height: 150px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+        }
+
+        .pc-impact-card.purple { background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%); }
+        .pc-impact-card.green { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+
+        .pc-impact-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        .pc-impact-value {
+            font-size: 32px;
+            font-weight: 900;
+        }
+
+        /* Table Section */
+        .pc-section-header {
+            margin-bottom: 20px;
+        }
+
+        .pc-section-title {
+            font-size: 18px;
+            font-weight: 800;
+            color: #1e293b;
+        }
+
+        .pc-section-subtitle {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+
+        .pc-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .pc-table thead th {
+            background: #1e293b;
+            color: #fff;
+            padding: 12px 16px;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .pc-table thead th:first-child { border-top-left-radius: 12px; }
+        .pc-table thead th:last-child { border-top-right-radius: 12px; }
+
+        .pc-table tbody td {
+            padding: 14px 16px;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 13px;
+        }
+
+        /* Status Pills */
+        .pc-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
             padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .pc-status.income { background: #dcfce7; color: #166534; }
+        .pc-status.expense { background: #fee2e2; color: #991b1b; }
+
+        /* Action Buttons */
+        .pc-actions-bar {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .pc-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border-radius: 12px;
             font-size: 13px;
             font-weight: 700;
-            white-space: nowrap;
+            transition: all 0.2s;
         }
 
-        .close-eye-btn {
+        .pc-btn-secondary { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; }
+        .pc-btn-primary { background: #059669; color: #fff; box-shadow: 0 4px 10px rgba(5, 150, 105, 0.2); }
+
+        .pc-eye-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #3b82f6;
+            color: #fff;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 42px;
-            height: 42px;
-            border-radius: 999px;
-            border: 0;
-            background: #2090ff;
-            color: #fff;
-            transition: transform .18s ease, opacity .18s ease;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.2);
         }
 
-        .close-eye-btn:hover {
-            opacity: .92;
+        .pc-eye-btn:hover {
+            background: #2563eb;
             transform: translateY(-1px);
+            box-shadow: 0 6px 10px -1px rgba(59, 130, 246, 0.3);
         }
 
-        .close-footer-total {
-            border-top: 1px solid #d7dde7;
-            padding-top: 16px;
-        }
-
-        .close-footer-total .label {
-            display: block;
-            font-size: 14px;
-            font-weight: 700;
-            color: #99a1b3;
-            margin-bottom: 8px;
-        }
-
-        .close-footer-total .value {
-            font-size: 30px;
-            font-weight: 800;
-            color: #111827;
-            line-height: 1;
-        }
-
-        .close-action-link,
-        .close-action-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            min-height: 56px;
-            border-radius: 999px;
-            padding: 0 28px;
-            font-size: 17px;
-            font-weight: 700;
-            transition: transform .18s ease, opacity .18s ease, box-shadow .18s ease;
-        }
-
-        .close-action-link:hover,
-        .close-action-btn:hover {
-            opacity: .95;
-            transform: translateY(-1px);
-        }
-
-        .close-action-link {
-            border: 1px solid #d7dde7;
-            color: #334155;
-            background: #fff;
-        }
-
-        .close-action-btn {
-            border: 0;
-            color: #fff;
-            background: #ff623d;
-            box-shadow: 0 12px 24px rgba(255, 98, 61, 0.24);
-        }
-
+        /* Modal Overrides */
         .close-modal-shell {
             position: fixed;
             inset: 0;
-            z-index: 100000;
+            z-index: 100;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -312,30 +337,24 @@
         .close-modal-backdrop {
             position: absolute;
             inset: 0;
-            background: rgba(15, 23, 42, 0.35);
-            backdrop-filter: blur(16px);
+            background: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(8px);
         }
 
         .close-modal-card {
             position: relative;
-            width: min(1450px, calc(100vw - 48px));
-            max-height: calc(100vh - 48px);
-            overflow: hidden;
-            border-radius: 28px;
+            width: 1000px;
             background: #fff;
-            box-shadow: 0 18px 44px rgba(15, 23, 42, 0.2);
-        }
-
-        .close-modal-body {
-            max-height: calc(100vh - 48px);
-            overflow: auto;
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
         }
     </style>
 
     <x-common.page-breadcrumb
         pageTitle="Caja chica | Cerrar caja"
         :crumbs="$breadcrumbs"
-        iconHtml='<i class="ri-add-line"></i>'
+        iconHtml='<i class="ri-history-line"></i>'
     />
 
     @if (session('error'))
@@ -344,354 +363,296 @@
         </div>
     @endif
 
-    @if ($errors->any())
-        <div class="mb-5 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
-            <p class="mb-2 font-semibold">No se pudo registrar el cierre.</p>
-            <ul class="list-disc pl-5">
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </div>
-    @endif
-
     <div
         x-data="pettyCashClosePage()"
         x-effect="document.body.style.overflow = detailModalOpen ? 'hidden' : ''"
+        class="mt-6"
     >
-        <form action="{{ $storeUrl }}" method="POST" class="space-y-6">
+        <form action="{{ $storeUrl }}" method="POST">
             @csrf
             <input type="hidden" name="cash_register_id" value="{{ $cashRegisterId }}">
             <input type="hidden" name="shift_id" value="{{ $shiftId }}">
 
-            <div class="close-page-card p-5 sm:p-8">
-                <div class="grid gap-8 xl:grid-cols-2">
-                    <div class="space-y-8">
-                        <div class="grid gap-6 lg:grid-cols-3">
-                            <div class="close-field">
-                                <span class="close-field-label">Persona</span>
-                                <div class="close-field-value">{{ $personLabel }}</div>
-                            </div>
-                            <div class="close-field">
-                                <span class="close-field-label">Responsable</span>
-                                <div class="close-field-value">
-                                    <i class="ri-user-star-line text-2xl text-slate-700"></i>
-                                    <span>{{ $responsibleLabel }}</span>
-                                </div>
-                            </div>
-                            <div class="close-field">
-                                <span class="close-field-label">Turno</span>
-                                <div class="close-field-value">
-                                    <i class="ri-time-line text-2xl text-slate-700"></i>
-                                    <span>{{ $shiftName }}</span>
-                                </div>
+            <div class="pc-container">
+                <!-- Sidebar (Left) -->
+                <div class="pc-card p-6">
+                    <div class="pc-sidebar-title">
+                        <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
+                            <i class="ri-safe-2-line"></i>
+                        </div>
+                        <span>INFORMACIÓN DE CAJA</span>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="pc-sidebar-field">
+                            <span class="pc-sidebar-label">Persona</span>
+                            <div class="pc-sidebar-value">
+                                <i class="ri-user-follow-line text-blue-500"></i>
+                                {{ $personLabel }}
                             </div>
                         </div>
 
-                        <div class="grid gap-6 lg:grid-cols-3">
-                            <div class="close-field">
-                                <span class="close-field-label">Caja</span>
-                                <div class="close-field-value">
-                                    <i class="ri-safe-2-line text-2xl text-slate-700"></i>
-                                    <span>{{ $cashRegister->number }}</span>
-                                </div>
-                            </div>
-                            <div class="close-amount-card">
-                                <span class="label">Total</span>
-                                <span class="value">S/ {{ $money($systemCash) }}</span>
-                            </div>
-                            <div class="close-amount-card">
-                                <span class="label">Pagado</span>
-                                <span class="value">S/ {{ $money($systemCash) }}</span>
+                        <div class="pc-sidebar-field">
+                            <span class="pc-sidebar-label">Responsable</span>
+                            <div class="pc-sidebar-value">
+                                <i class="ri-user-star-line text-blue-500"></i>
+                                {{ $responsibleLabel }}
                             </div>
                         </div>
 
-                        <div class="grid gap-6 lg:grid-cols-3">
-                            <div>
-                                <span class="close-field-label">Moneda</span>
-                                <div class="flex items-center gap-6 pt-3">
-                                    <label class="close-radio">
-                                        <input type="radio" checked disabled>
-                                        <span>S/.</span>
-                                    </label>
-                                    <label class="close-radio">
-                                        <input type="radio" disabled>
-                                        <span>$</span>
-                                    </label>
-                                </div>
-                            </div>
-                            <div class="lg:col-span-2">
-                                <label for="comment" class="close-field-label">Notas al movimiento de caja</label>
-                                <textarea id="comment" name="comment" class="close-note" placeholder="Cierre de caja">{{ $movementComment }}</textarea>
+                        <div class="pc-sidebar-field">
+                            <span class="pc-sidebar-label">Turno</span>
+                            <div class="pc-sidebar-value">
+                                <i class="ri-history-line text-blue-500"></i>
+                                {{ $shiftName }}
                             </div>
                         </div>
 
-                        <div class="grid gap-6 xl:grid-cols-2">
-                            <div class="space-y-4">
-                                <div class="close-section-pill">
-                                    <span>Monedas</span>
-                                    <i class="ri-coins-line"></i>
-                                </div>
-
-                                <div class="close-money-table">
-                                    <table class="w-full">
-                                        <thead>
-                                            <tr>
-                                                <th class="text-left">Dinero</th>
-                                                <th class="w-28 text-center">Cant.</th>
-                                                <th class="text-left">Notas</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <template x-for="(row, index) in coins" :key="row.key">
-                                                <tr>
-                                                    <td class="text-base font-medium text-slate-800">
-                                                        <input type="hidden" :name="`counting[coins][${index}][key]`" :value="row.key">
-                                                        <input type="hidden" :name="`counting[coins][${index}][label]`" :value="row.label">
-                                                        <input type="hidden" :name="`counting[coins][${index}][value]`" :value="row.value">
-                                                        <span x-text="row.label"></span>
-                                                    </td>
-                                                    <td>
-                                                        <input type="number" min="0" step="1" x-model.number="row.quantity" :name="`counting[coins][${index}][quantity]`" class="close-count-input">
-                                                    </td>
-                                                    <td>
-                                                        <input type="text" x-model="row.note" :name="`counting[coins][${index}][note]`" class="close-note-input" placeholder="Sin nota">
-                                                    </td>
-                                                </tr>
-                                            </template>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                            <div class="space-y-4">
-                                <div class="close-section-pill">
-                                    <span>Billetes</span>
-                                    <i class="ri-money-dollar-box-line"></i>
-                                </div>
-
-                                <div class="close-money-table">
-                                    <table class="w-full">
-                                        <thead>
-                                            <tr>
-                                                <th class="text-left">Dinero</th>
-                                                <th class="w-28 text-center">Cant.</th>
-                                                <th class="text-left">Notas</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <template x-for="(row, index) in bills" :key="row.key">
-                                                <tr>
-                                                    <td class="text-base font-medium text-slate-800">
-                                                        <input type="hidden" :name="`counting[bills][${index}][key]`" :value="row.key">
-                                                        <input type="hidden" :name="`counting[bills][${index}][label]`" :value="row.label">
-                                                        <input type="hidden" :name="`counting[bills][${index}][value]`" :value="row.value">
-                                                        <span x-text="row.label"></span>
-                                                    </td>
-                                                    <td>
-                                                        <input type="number" min="0" step="1" x-model.number="row.quantity" :name="`counting[bills][${index}][quantity]`" class="close-count-input">
-                                                    </td>
-                                                    <td>
-                                                        <input type="text" x-model="row.note" :name="`counting[bills][${index}][note]`" class="close-note-input" placeholder="Sin nota">
-                                                    </td>
-                                                </tr>
-                                            </template>
-                                        </tbody>
-                                    </table>
-                                </div>
+                        <div class="pc-sidebar-field">
+                            <span class="pc-sidebar-label">Caja</span>
+                            <div class="pc-sidebar-value">
+                                <i class="ri-instance-line text-blue-500"></i>
+                                {{ $cashRegister->number }}
                             </div>
                         </div>
                     </div>
 
-                    <div class="space-y-8">
-                        <div>
-                            <h3 class="mb-6 text-center text-4xl font-bold text-slate-900">Detalle de cierre</h3>
-
-                            <div class="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-                                <div class="close-summary-card">
-                                    <span class="label">Ventas en efectivo</span>
-                                    <span class="value">S/ {{ $money($cashSales) }}</span>
-                                </div>
-                                <div class="close-summary-card">
-                                    <span class="label">Apertura en efectivo</span>
-                                    <span class="value">S/ {{ $money($openingCash) }}</span>
-                                </div>
-                                <div class="close-summary-card">
-                                    <span class="label">Ingresos en efectivo</span>
-                                    <span class="value">S/ {{ $money($otherCashIncome) }}</span>
-                                </div>
-                                <div class="close-summary-card">
-                                    <span class="label">Egresos en efectivo</span>
-                                    <span class="value">S/ {{ $money($cashExpenses) }}</span>
-                                </div>
-                            </div>
-
-                            <div class="mt-6 grid gap-6 md:grid-cols-3">
-                                <div class="close-summary-card">
-                                    <span class="label">Efectivo real</span>
-                                    <span class="value" x-text="'S/ ' + formatMoney(realCashTotal)"></span>
-                                </div>
-                                <div class="close-summary-card">
-                                    <span class="label">Efectivo en caja</span>
-                                    <span class="value">S/ {{ $money($systemCash) }}</span>
-                                </div>
-                                <div class="close-summary-card">
-                                    <span class="label">Efectivo sin apertura</span>
-                                    <span class="value">S/ {{ $money($cashWithoutOpening) }}</span>
-                                </div>
-                            </div>
+                    <div class="mt-8 space-y-3">
+                        <div class="pc-tile green">
+                            <span class="pc-tile-label">Total Contado</span>
+                            <span class="pc-tile-value" x-text="'S/ ' + formatMoney(realCashTotal)"></span>
                         </div>
+                        <div class="pc-tile gray">
+                            <span class="pc-tile-label">Saldo Pasado</span>
+                            <span class="pc-tile-value">S/ {{ $money($systemCash) }}</span>
+                        </div>
+                    </div>
 
-                        <div class="overflow-hidden border border-slate-200" style="border-radius: 24px;">
-                            <div class="overflow-x-auto">
-                                <table class="close-detail-table min-w-full">
-                                    <thead>
-                                        <tr>
-                                            <th class="text-left">Tipo</th>
-                                            <th class="text-left">Monto</th>
-                                            <th class="text-left">Medio</th>
-                                            <th class="text-left">Detalles</th>
-                                            <th class="text-left">Notas</th>
-                                            <th class="text-center">Operaciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @forelse ($detailGroups as $index => $group)
-                                            @php
-                                                $typeStyle = match ($group['type_label']) {
-                                                    'Deuda' => 'background:#fde68a;color:#92400e;',
-                                                    default => 'background:#4CAF50;color:#ffffff;',
-                                                };
-                                                $noteStyle = match ($group['category']) {
-                                                    'opening' => 'background:#fde68a;color:#92400e;',
-                                                    'sale' => 'background:#c084fc;color:#ffffff;',
-                                                    'income' => 'background:#38bdf8;color:#ffffff;',
-                                                    'expense' => 'background:#fca5a5;color:#991b1b;',
-                                                    default => 'background:#e5e7eb;color:#475569;',
-                                                };
-                                            @endphp
-                                            <tr>
-                                                <td>
-                                                    <span class="close-pill" style="{{ $typeStyle }}">{{ $group['type_label'] }}</span>
-                                                </td>
-                                                <td class="text-3xl font-extrabold">S/ {{ $money($group['amount']) }}</td>
-                                                <td class="text-lg font-medium">{{ $group['method'] }}</td>
-                                                <td class="text-base text-slate-700">{{ $group['detail_label'] }}</td>
-                                                <td>
-                                                    <span class="close-pill" style="{{ $noteStyle }}">{{ $group['note'] }}</span>
-                                                </td>
-                                                <td class="text-center">
-                                                    <button type="button" class="close-eye-btn" @click="openDetail({{ $index }})" title="Ver detalle">
-                                                        <i class="ri-eye-line text-xl"></i>
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        @empty
-                                            <tr>
-                                                <td colspan="6" class="px-6 py-8 text-center text-sm text-slate-500">
-                                                    No hay movimientos acumulados para este cierre.
-                                                </td>
-                                            </tr>
-                                        @endforelse
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <div class="grid gap-6 px-4 py-5 md:grid-cols-3">
-                                <div class="close-footer-total">
-                                    <span class="label">Total de ventas</span>
-                                    <span class="value">S/ {{ $money($totalSales) }}</span>
-                                </div>
-                                <div class="close-footer-total">
-                                    <span class="label">Total de ingresos</span>
-                                    <span class="value">S/ {{ $money($totalOtherIncome) }}</span>
-                                </div>
-                                <div class="close-footer-total">
-                                    <span class="label">Total de egresos</span>
-                                    <span class="value">S/ {{ $money($totalExpenses) }}</span>
-                                </div>
-                            </div>
+                    <div class="pc-currency-box">
+                        <span class="pc-currency-label text-[10px]">TIPO DE MONEDA</span>
+                        <div class="pc-currency-btns">
+                            <button type="button" class="pc-currency-btn">Dólar $</button>
+                            <button type="button" class="pc-currency-btn active">Soles S/</button>
                         </div>
                     </div>
                 </div>
 
-                <div class="mt-8 flex flex-wrap items-center justify-end gap-4 border-t border-slate-200 pt-6">
-                    <a href="{{ $backUrl }}" class="close-action-link">
-                        <i class="ri-close-line text-xl"></i>
-                        <span>Cancelar</span>
-                    </a>
-                    <button type="submit" class="close-action-btn">
-                        <span>Guardar cierre</span>
-                        <i class="ri-save-line text-xl"></i>
-                    </button>
+                <!-- Main Content (Right) -->
+                <div class="space-y-6">
+                    <!-- Top Summary Grid -->
+                    <div class="pc-summary-grid">
+                        <div class="pc-summary-card">
+                            <div class="pc-summary-icon bg-emerald-50 text-emerald-600">
+                                <i class="ri-arrow-right-up-line"></i>
+                            </div>
+                            <span class="pc-summary-label">Ventas en efectivo</span>
+                            <span class="pc-summary-value">S/ {{ $money($cashSales) }}</span>
+                        </div>
+                        <div class="pc-summary-card">
+                            <div class="pc-summary-icon bg-blue-50 text-blue-600">
+                                <i class="ri-money-dollar-circle-line"></i>
+                            </div>
+                            <span class="pc-summary-label">Apertura en efectivo</span>
+                            <span class="pc-summary-value">S/ {{ $money($openingCash) }}</span>
+                        </div>
+                        <div class="pc-summary-card">
+                            <div class="pc-summary-icon bg-cyan-50 text-cyan-600">
+                                <i class="ri-line-chart-line"></i>
+                            </div>
+                            <span class="pc-summary-label">Ingresos en efectivo</span>
+                            <span class="pc-summary-value">S/ {{ $money($otherCashIncome) }}</span>
+                        </div>
+                        <div class="pc-summary-card">
+                            <div class="pc-summary-icon bg-rose-50 text-rose-600">
+                                <i class="ri-arrow-right-down-line"></i>
+                            </div>
+                            <span class="pc-summary-label">Egresos en efectivo</span>
+                            <span class="pc-summary-value">S/ {{ $money($cashExpenses) }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Impact Cards -->
+                    <div class="pc-impact-grid">
+                        <div class="pc-impact-card purple">
+                            <span class="pc-impact-label">Total en caja</span>
+                            <span class="pc-impact-value">S/ {{ $money($cashWithoutOpening + $openingCash) }}</span>
+                        </div>
+                        <div class="pc-impact-card green">
+                            <span class="pc-impact-label">Total en caja cierre</span>
+                            <span class="pc-impact-value">S/ {{ $money($systemCash) }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Table Section -->
+                    <div class="pc-card overflow-hidden">
+                        <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                            <div class="pc-section-header mb-0">
+                                <h3 class="pc-section-title">Detalle de cierre</h3>
+                                <p class="pc-section-subtitle">Registro de movimientos de caja</p>
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="pc-table">
+                                <thead>
+                                    <tr>
+                                        <th class="text-left">TIPO</th>
+                                        <th class="text-left">MONTO</th>
+                                        <th class="text-left">MEDIO</th>
+                                        <th class="text-left">DETALLES</th>
+                                        <th class="text-left">NOTAS</th>
+                                        <th class="text-center">OPERACIONES</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @forelse ($detailGroups as $index => $group)
+                                        @php
+                                            $isIncome = $group['type_label'] !== 'Egreso' && $group['type_label'] !== 'Deuda';
+                                            $statusClass = $isIncome ? 'pc-status income' : 'pc-status expense';
+                                            $icon = $isIncome ? 'ri-arrow-right-up-line' : 'ri-arrow-right-down-line';
+                                            
+                                            $noteStyle = match ($group['category']) {
+                                                'opening' => 'background:#fde68a;color:#78350f;',
+                                                'sale' => 'background:#c084fc;color:#ffffff;',
+                                                'income' => 'background:#38bdf8;color:#ffffff;',
+                                                'expense' => 'background:#ef4444;color:#ffffff;',
+                                                default => 'background:#e2e8f0;color:#1e293b;',
+                                            };
+                                        @endphp
+                                        <tr>
+                                            <td>
+                                                <span class="{{ $statusClass }}">
+                                                    <i class="{{ $icon }}"></i>
+                                                    {{ $isIncome ? 'Ingreso' : 'Egreso' }}
+                                                </span>
+                                            </td>
+                                            <td class="font-bold text-slate-700">S/ {{ $money($group['amount']) }}</td>
+                                            <td class="text-slate-500">{{ $group['method'] }}</td>
+                                            <td class="text-slate-500">{{ $group['detail_label'] }}</td>
+                                            <td>
+                                                <span class="px-4 py-1.5 rounded-full text-[12px] font-black leading-none" style="{{ $noteStyle }}">
+                                                    {{ $group['note'] }}
+                                                </span>
+                                            </td>
+                                            <td class="text-center">
+                                                <button type="button" @click="openDetail({{ $index }})" class="pc-eye-btn">
+                                                    <i class="ri-eye-line text-sm"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="6" class="px-6 py-12 text-center text-slate-400 font-medium">
+                                                No hay movimientos acumulados para este cierre.
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Table Footer Totals -->
+                        <div class="p-6 bg-slate-50/50 flex flex-wrap justify-between gap-8 border-t border-slate-100">
+                            <div class="text-center">
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">TOTAL DE VENTAS</p>
+                                <p class="text-lg font-black text-emerald-600">S/ {{ $money($totalSales) }}</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">TOTAL DE INGRESOS</p>
+                                <p class="text-lg font-black text-blue-600">S/ {{ $money($totalOtherIncome) }}</p>
+                            </div>
+                            <div class="text-center">
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">TOTAL DE EGRESOS</p>
+                                <p class="text-lg font-black text-rose-600">S/ {{ $money($totalExpenses) }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hidden Money Counting Inputs (Preserved for backend if necessary) -->
+                    <div class="hidden">
+                        <template x-for="(row, index) in coins" :key="row.key">
+                            <div>
+                                <input type="hidden" :name="`counting[coins][${index}][quantity]`" x-model.number="row.quantity">
+                                <input type="hidden" :name="`counting[coins][${index}][key]`" :value="row.key">
+                                <input type="hidden" :name="`counting[coins][${index}][label]`" :value="row.label">
+                                <input type="hidden" :name="`counting[coins][${index}][value]`" :value="row.value">
+                            </div>
+                        </template>
+                        <template x-for="(row, index) in bills" :key="row.key">
+                            <div>
+                                <input type="hidden" :name="`counting[bills][${index}][quantity]`" x-model.number="row.quantity">
+                                <input type="hidden" :name="`counting[bills][${index}][key]`" :value="row.key">
+                                <input type="hidden" :name="`counting[bills][${index}][label]`" :value="row.label">
+                                <input type="hidden" :name="`counting[bills][${index}][value]`" :value="row.value">
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Actions Bar -->
+                    <div class="pc-actions-bar">
+                        <a href="{{ $backUrl }}" class="pc-btn pc-btn-secondary">
+                            <i class="ri-close-line"></i> Cancelar
+                        </a>
+                        <button type="submit" class="pc-btn pc-btn-primary">
+                            <i class="ri-save-line"></i> Guardar cierre
+                        </button>
+                    </div>
                 </div>
             </div>
         </form>
 
+        <!-- Detail Modal -->
         <div x-show="detailModalOpen" x-cloak class="close-modal-shell">
             <div class="close-modal-backdrop" @click="closeDetail()"></div>
 
-            <div class="close-modal-card" @click.stop>
-                <div class="close-modal-body">
-                    <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
-                        <div>
-                            <h3 class="text-4xl font-bold text-slate-800" x-text="selectedGroup ? selectedGroup.modal_title : 'Detalle de movimientos'"></h3>
-                            <p class="mt-2 text-base text-slate-500">Detalle agrupado por concepto y medio de pago.</p>
-                        </div>
-                        <button type="button" class="inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-500" @click="closeDetail()">
-                            <i class="ri-close-line text-2xl"></i>
-                        </button>
+            <div class="close-modal-card" @click.stop x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100">
+                <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-xl font-black text-slate-800" x-text="selectedGroup ? selectedGroup.modal_title : 'Detalle de movimientos'"></h3>
+                        <p class="text-xs text-slate-400 font-medium">Desglose completo del grupo de movimientos seleccionado</p>
                     </div>
+                    <button @click="closeDetail()" class="w-10 h-10 rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all flex items-center justify-center">
+                        <i class="ri-close-line text-xl"></i>
+                    </button>
+                </div>
 
-                    <div class="overflow-x-auto px-2 py-2">
-                        <table class="close-detail-table" style="min-width: 1280px;">
-                            <thead>
-                                <tr>
-                                    <th class="text-left">Numero</th>
-                                    <th class="text-left">Tipo</th>
-                                    <th class="text-left">Concepto</th>
-                                    <th class="text-left">Total</th>
-                                    <th class="text-left">Total para el medio de pago</th>
-                                    <th class="text-left">Fecha</th>
-                                    <th class="text-left">Usuario</th>
-                                    <th class="text-left">Caja</th>
-                                    <th class="text-left">Turno</th>
-                                    <th class="text-left">Persona</th>
-                                    <th class="text-left">Metodos de pago</th>
+                <div class="p-0 max-h-[70vh] overflow-auto">
+                    <table class="pc-table">
+                        <thead class="sticky top-0 z-10">
+                            <tr>
+                                <th class="text-left">Número</th>
+                                <th class="text-left">Tipo</th>
+                                <th class="text-left">Concepto</th>
+                                <th class="text-left">Total Mov.</th>
+                                <th class="text-left">Fecha</th>
+                                <th class="text-left">Usuario</th>
+                                <th class="text-left">Persona</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="record in (selectedGroup ? selectedGroup.records : [])" :key="record.number + record.moved_at">
+                                <tr class="hover:bg-slate-50/50 transition-colors">
+                                    <td class="font-bold text-slate-900" x-text="record.number"></td>
+                                    <td>
+                                        <span class="pc-status income" x-text="record.type_label"></span>
+                                    </td>
+                                    <td>
+                                        <span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[10px] font-bold uppercase" x-text="record.concept"></span>
+                                    </td>
+                                    <td class="font-black text-slate-800" x-text="'S/ ' + formatMoney(record.movement_total)"></td>
+                                    <td class="text-xs text-slate-500" x-text="record.moved_at"></td>
+                                    <td class="text-xs text-slate-500" x-text="record.user_name"></td>
+                                    <td class="text-xs text-slate-500" x-text="record.person_name"></td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                <template x-if="!selectedGroup || !selectedGroup.records.length">
-                                    <tr>
-                                        <td colspan="11" class="px-6 py-8 text-center text-sm text-slate-500">No hay registros para este detalle.</td>
-                                    </tr>
-                                </template>
-                                <template x-for="record in (selectedGroup ? selectedGroup.records : [])" :key="record.number + record.moved_at">
-                                    <tr>
-                                        <td class="text-lg font-medium" x-text="record.number"></td>
-                                        <td>
-                                            <span class="close-pill" style="background:#14b8a6;color:#ffffff;" x-text="record.type_label"></span>
-                                        </td>
-                                        <td>
-                                            <span class="close-pill" style="background:#f59e0b;color:#ffffff;" x-text="record.concept"></span>
-                                        </td>
-                                        <td class="text-2xl font-extrabold" x-text="'S/ ' + formatMoney(record.movement_total)"></td>
-                                        <td class="text-2xl font-extrabold" x-text="'S/ ' + formatMoney(record.method_total)"></td>
-                                        <td class="text-base text-slate-700" x-text="record.moved_at"></td>
-                                        <td class="text-base text-slate-700" x-text="record.user_name"></td>
-                                        <td class="text-base text-slate-700" x-text="record.cash_register"></td>
-                                        <td class="text-base text-slate-700" x-text="record.shift"></td>
-                                        <td class="text-base text-slate-700" x-text="record.person_name"></td>
-                                        <td class="text-base text-slate-700" x-text="record.payment_label"></td>
-                                    </tr>
-                                </template>
-                            </tbody>
-                        </table>
-                    </div>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
 
-                    <div class="flex justify-end px-6 py-5">
-                        <button type="button" class="text-sm font-medium uppercase tracking-wide text-slate-600" @click="closeDetail()">Cerrar</button>
-                    </div>
+                <div class="p-6 bg-slate-50 flex justify-end">
+                    <button type="button" class="pc-btn pc-btn-secondary" @click="closeDetail()">
+                        Cerrar Detalle
+                    </button>
                 </div>
             </div>
         </div>
