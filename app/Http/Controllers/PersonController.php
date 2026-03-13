@@ -173,6 +173,56 @@ class PersonController extends Controller
         ]);
     }
 
+    public function apiRuc(Request $request)
+    {
+        $ruc = (string) $request->query('ruc', '');
+        if (!preg_match('/^\d{11}$/', $ruc)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'RUC invalido.',
+            ], 422);
+        }
+
+        $response = Http::timeout(15)->get((string) config('apireniec.ruc_url'), [
+            'document' => $ruc,
+            'key' => (string) config('apireniec.key'),
+        ]);
+
+        if (!$response->successful()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'No se pudo consultar RUC.',
+            ], 422);
+        }
+
+        $data = (array) $response->json();
+        $estado = (bool) ($data['estado'] ?? $data['status'] ?? false);
+        $resultado = (array) ($data['resultado'] ?? []);
+        $mensaje = (string) ($data['mensaje'] ?? $data['message'] ?? '');
+
+        if (!$estado || empty($resultado)) {
+            return response()->json([
+                'status' => false,
+                'message' => $mensaje !== '' ? $mensaje : 'No se encontro informacion para el RUC ingresado.',
+            ], 422);
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => $mensaje !== '' ? $mensaje : 'Encontrado',
+            'ruc' => (string) ($resultado['id'] ?? $ruc),
+            'legal_name' => trim((string) ($resultado['razon_social'] ?? ($resultado['nombre'] ?? ''))),
+            'trade_name' => trim((string) ($resultado['nombre_comercial'] ?? '')),
+            'address' => trim((string) ($resultado['direccion'] ?? '')),
+            'department' => trim((string) ($resultado['departamento'] ?? '')),
+            'province' => trim((string) ($resultado['provincia'] ?? '')),
+            'district' => trim((string) ($resultado['distrito'] ?? '')),
+            'condition' => trim((string) ($resultado['condicion'] ?? '')),
+            'taxpayer_status' => trim((string) ($resultado['estado'] ?? '')),
+            'raw' => $resultado,
+        ]);
+    }
+
     public function store(Request $request, Company $company, Branch $branch)
     {
         $branch = $this->resolveBranch($company, $branch);

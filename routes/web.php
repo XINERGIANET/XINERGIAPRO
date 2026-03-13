@@ -84,6 +84,7 @@ Route::view('/signup', 'pages.auth.signup', ['title' => 'Sign Up'])
 
 Route::middleware('auth')->group(function () {
     Route::get('api/reniec', [PersonController::class, 'apiReniec'])->name('api.reniec');
+    Route::get('api/ruc', [PersonController::class, 'apiRuc'])->name('api.ruc');
 
     Route::resource('/admin/herramientas/empresas', CompanyController::class)
         ->names('admin.companies')

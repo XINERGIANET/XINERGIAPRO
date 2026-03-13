@@ -65,6 +65,11 @@
         departmentId: JSON.parse($el.dataset.departmentId || 'null') || '',
         provinceId: JSON.parse($el.dataset.provinceId || 'null') || '',
         districtId: JSON.parse($el.dataset.districtId || 'null') || '',
+        ruc: @js(old('ruc', $branch->ruc ?? '')),
+        legalName: @js(old('legal_name', $branch->legal_name ?? '')),
+        addressText: @js(old('address', $branch->address ?? '')),
+        rucLoading: false,
+        rucError: '',
         init() {
             if (!this.provinceId && this.districtId) {
                 const district = this.districts.find(d => d.id == this.districtId);
@@ -91,25 +96,108 @@
         },
         onProvinceChange() {
             this.districtId = '';
+        },
+        normalizeText(value) {
+            return String(value || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .trim();
+        },
+        findDepartmentByName(name) {
+            const target = this.normalizeText(name);
+            return this.departments.find(item => this.normalizeText(item.name) === target) || null;
+        },
+        findProvinceByName(name, departmentId) {
+            const target = this.normalizeText(name);
+            return this.provinces.find(item =>
+                String(item.parent_location_id || '') === String(departmentId || '') &&
+                this.normalizeText(item.name) === target
+            ) || null;
+        },
+        findDistrictByName(name, provinceId) {
+            const target = this.normalizeText(name);
+            return this.districts.find(item =>
+                String(item.parent_location_id || '') === String(provinceId || '') &&
+                this.normalizeText(item.name) === target
+            ) || null;
+        },
+        applyLocationFromLookup(payload) {
+            const department = this.findDepartmentByName(payload.department);
+            if (!department) return;
+
+            this.departmentId = String(department.id);
+
+            const province = this.findProvinceByName(payload.province, department.id);
+            if (!province) {
+                this.provinceId = '';
+                this.districtId = '';
+                return;
+            }
+
+            this.provinceId = String(province.id);
+
+            const district = this.findDistrictByName(payload.district, province.id);
+            this.districtId = district ? String(district.id) : '';
+        },
+        async fetchRuc() {
+            this.rucError = '';
+            const ruc = String(this.ruc || '').trim();
+            if (!/^\d{11}$/.test(ruc)) {
+                this.rucError = 'Ingrese un RUC valido de 11 digitos.';
+                return;
+            }
+
+            this.rucLoading = true;
+            try {
+                const response = await fetch(`/api/ruc?ruc=${encodeURIComponent(ruc)}`, {
+                    headers: { 'Accept': 'application/json' }
+                });
+                const payload = await response.json();
+                if (!response.ok || !payload?.status) {
+                    throw new Error(payload?.message || 'No se encontro informacion para el RUC ingresado.');
+                }
+
+                this.ruc = payload.ruc || ruc;
+                this.legalName = payload.legal_name || this.legalName;
+                this.addressText = payload.address || this.addressText;
+                this.applyLocationFromLookup(payload);
+            } catch (error) {
+                this.rucError = error?.message || 'Error consultando RUC.';
+            } finally {
+                this.rucLoading = false;
+            }
         }
     }"
     x-init="init()"
 >
     <div class="sm:col-span-1">
         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">RUC</label>
-        <div class="relative">
-            <span class="absolute top-1/2 left-0 -translate-y-1/2 border-r border-gray-200 px-3.5 py-3 text-gray-500 dark:border-gray-800 dark:text-gray-400">
-                {!! $RucIcon !!}
-            </span>
-            <input
-                type="text"
-                name="ruc"
-                value="{{ old('ruc', $branch->ruc ?? '') }}"
-                required
-                placeholder="Ingrese RUC"
-                class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-[62px] text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
-            />
+        <div class="flex items-center gap-2">
+            <div class="relative flex-1">
+                <span class="absolute top-1/2 left-0 -translate-y-1/2 border-r border-gray-200 px-3.5 py-3 text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                    {!! $RucIcon !!}
+                </span>
+                <input
+                    type="text"
+                    name="ruc"
+                    x-model="ruc"
+                    required
+                    placeholder="Ingrese RUC"
+                    class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-[62px] text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                />
+            </div>
+            <button
+                type="button"
+                @click="fetchRuc()"
+                :disabled="rucLoading"
+                class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-[#244BB3] px-4 text-sm font-medium text-white hover:bg-[#1f3f98] disabled:opacity-60"
+            >
+                <i class="ri-search-line"></i>
+                <span class="ml-1" x-text="rucLoading ? 'Buscando...' : 'Buscar'"></span>
+            </button>
         </div>
+        <p x-show="rucError" x-cloak class="mt-1 text-xs text-error-500" x-text="rucError"></p>
         @error('ruc')
             <p class="mt-1 text-xs text-error-500">{{ $message }}</p>
         @enderror
@@ -124,7 +212,7 @@
             <input
                 type="text"
                 name="legal_name"
-                value="{{ old('legal_name', $branch->legal_name ?? '') }}"
+                x-model="legalName"
                 required
                 placeholder="Ingrese el nombre de la sucursal"
                 class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-[62px] text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
@@ -144,7 +232,7 @@
             <input
                 type="text"
                 name="address"
-                value="{{ old('address', $branch->address ?? '') }}"
+                x-model="addressText"
                 placeholder="Ingrese la direccion"
                 class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-[62px] text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
             />
@@ -153,6 +241,7 @@
             <p class="mt-1 text-xs text-error-500">{{ $message }}</p>
         @enderror
     </div>
+
     <div class="sm:col-span-1 lg:col-span-1">
         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Logo (opcional)</label>
         <div class="relative">
@@ -233,6 +322,4 @@
             <p class="mt-1 text-xs text-error-500">{{ $message }}</p>
         @enderror
     </div>
-
-   
 </div>
