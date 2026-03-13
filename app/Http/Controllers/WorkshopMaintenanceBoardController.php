@@ -456,11 +456,18 @@ class WorkshopMaintenanceBoardController extends Controller
                     ->get()
                     ->keyBy('id');
 
+                $submittedDetailIds = collect((array) $validated['quote_lines'])->pluck('detail_id')->map(fn($id) => (int) $id)->all();
+                foreach ($detailsById as $id => $detail) {
+                    if (!in_array((int) $id, $submittedDetailIds, true)) {
+                        $detail->delete();
+                    }
+                }
+
                 foreach ((array) $validated['quote_lines'] as $line) {
                     $detailId = (int) $line['detail_id'];
                     $detail = $detailsById->get($detailId);
                     if (!$detail) {
-                        throw new \RuntimeException('Uno de los servicios ya no esta disponible para cotizacion.');
+                        continue;
                     }
 
                     $this->flowService->updateDetail(
