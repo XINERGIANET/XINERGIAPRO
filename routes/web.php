@@ -373,14 +373,18 @@ Route::middleware('auth')->group(function () {
     //Caja chica
     Route::get('/caja/caja-chica', [PettyCashController::class, 'redirectBase'])
         ->name('admin.petty-cash.base');
-    Route::get('/caja/caja-chica/{cash_register_id}/{movement}', [PettyCashController::class, 'show'])->name('admin.petty-cash.show');
     Route::group(['prefix' => 'caja/caja-chica/{cash_register_id}', 'as' => 'admin.petty-cash.'], function () {
         Route::get('/', [PettyCashController::class, 'index'])->name('index');
+        Route::get('/cerrar', [PettyCashController::class, 'closePage'])->name('close');
+        Route::post('/cerrar', [PettyCashController::class, 'closeStore'])->name('close.store');
         Route::post('/', [PettyCashController::class, 'store'])->name('store');
         Route::get('/{movement}/edit', [PettyCashController::class, 'edit'])->name('edit');
         Route::put('/{movement}', [PettyCashController::class, 'update'])->name('update');
         Route::delete('/{movement}', [PettyCashController::class, 'destroy'])->name('destroy');
     });
+    Route::get('/caja/caja-chica/{cash_register_id}/{movement}', [PettyCashController::class, 'show'])
+        ->whereNumber('movement')
+        ->name('admin.petty-cash.show');
 
     //Cajas
     Route::resource('/caja/cajas', BoxController::class)

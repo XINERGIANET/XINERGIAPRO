@@ -20,12 +20,14 @@ class CashMovements extends Model
         'cash_register',
         'shift_id',
         'shift_snapshot',
+        'counting_snapshot',
         'movement_id',
         'branch_id',
     ];
 
     protected $casts = [
         'shift_snapshot' => 'array',
+        'counting_snapshot' => 'array',
     ];
 
     public function paymentConcept()
