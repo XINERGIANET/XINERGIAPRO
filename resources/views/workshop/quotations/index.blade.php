@@ -190,11 +190,9 @@
         </x-common.component-card>
 
         <!-- OS Approval Modal (Refined & Compact) -->
-        <div x-show="showModal" 
-             style="display: none;"
-             class="fixed inset-0 z-[70] overflow-y-auto" 
-             aria-labelledby="modal-title" role="dialog" aria-modal="true">
-            <div class="flex items-start justify-center min-h-screen pt-10 px-4 pb-20 text-center sm:block sm:p-0">
+        <template x-teleport="body">
+            <div x-show="showModal" class="relative z-[999999]" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                <!-- Backdrop with strong blur and darkness -->
                 <div x-show="showModal" 
                      x-transition:enter="ease-out duration-300"
                      x-transition:enter-start="opacity-0"
@@ -203,128 +201,129 @@
                      x-transition:leave-start="opacity-100"
                      x-transition:leave-end="opacity-0"
                      @click="showModal = false"
-                     class="fixed inset-0 bg-slate-900/60 backdrop-blur-xl transition-opacity" aria-hidden="true"></div>
+                     class="fixed inset-0 bg-slate-950/60 backdrop-blur-[12px] transition-opacity cursor-pointer" 
+                     style="backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);" aria-hidden="true"></div>
 
-                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-
-                <div x-show="showModal"
-                     x-transition:enter="ease-out duration-300"
-                     x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                     x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                     x-transition:leave="ease-in duration-200"
-                     x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                     x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                     class="inline-block align-middle bg-white rounded-[1.5rem] text-left overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.3)] transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full border border-slate-200">
+                <!-- Scrollable container for the modal content -->
+                <div class="fixed inset-0 overflow-hidden flex items-center justify-center pointer-events-none">
+                    <div class="flex min-h-0 w-full items-center justify-center p-4 text-center sm:p-0 pointer-events-auto">
+                        <div x-show="showModal"
+                             x-transition:enter="ease-out duration-300"
+                             x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-90"
+                             x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                             x-transition:leave="ease-in duration-200"
+                             x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                             x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-90"
+                             class="relative flex flex-col w-full bg-white rounded-[2rem] text-left shadow-[0_40px_100px_rgba(0,0,0,0.5)] transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl border border-slate-200 overflow-hidden max-h-[90vh]">
                     
-                    <form :action="selectedQuotation?.approve_url" method="POST">
-                        @csrf
-                                           <!-- Premium Header Section -->
-                        <div class="px-8 py-6 flex items-center justify-between border-b border-slate-50">
-                            <div class="flex items-center gap-4">
-                                <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100/50">
-                                    <i class="ri-file-list-3-line text-xl"></i>
+                        <form :action="selectedQuotation?.approve_url" method="POST" class="flex flex-col min-h-0">
+                            @csrf
+                            <!-- Premium Header Section (Fixed) -->
+                            <div class="px-8 py-6 flex items-center justify-between border-b border-slate-50 shrink-0">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100/50">
+                                        <i class="ri-file-list-3-line text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="text-lg font-bold text-slate-800 tracking-tight leading-none" id="modal-title">Aprobación de Cotización</h3>
+                                        <p class="text-[10px] font-medium text-slate-400 mt-1.5 flex items-center gap-1.5 uppercase tracking-[0.1em]">
+                                            ORDEN <span x-text="selectedQuotation?.number" class="font-black text-slate-600"></span>
+                                        </p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3 class="text-lg font-bold text-slate-800 tracking-tight leading-none" id="modal-title">Aprobación de Cotización</h3>
-                                    <p class="text-[10px] font-medium text-slate-400 mt-1.5 flex items-center gap-1.5 uppercase tracking-[0.1em]">
-                                        ORDEN <span x-text="selectedQuotation?.number" class="font-black text-slate-600"></span>
-                                    </p>
-                                </div>
-                            </div>
-                            <button type="button" @click="showModal = false" class="w-8 h-8 rounded-lg bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all flex items-center justify-center border border-slate-100">
-                                <i class="ri-close-line text-lg"></i>
-                            </button>
-                        </div>
-
-                        <div class="px-8 py-6">
-                            <!-- Table Container -->
-                            <div class="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm mb-6">
-                                <div class="overflow-x-auto">
-                                    <table class="w-full text-sm">
-                                        <thead>
-                                            <tr class="bg-slate-50/50 border-b border-slate-100">
-                                                <th class="px-6 py-3 text-left text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Servicio</th>
-                                                <th class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Cant</th>
-                                                <th class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Precio</th>
-                                                <th class="px-6 py-3 text-right text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Subtotal</th>
-                                                <th class="px-6 py-3 text-center text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Estado</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-slate-100/60">
-                                            <!-- Active Items -->
-                                            <template x-for="(detail, index) in selectedQuotation?.details" :key="detail.id">
-                                                <tr class="group hover:bg-slate-50/50 transition-colors">
-                                                    <td class="px-6 py-3.5">
-                                                        <p class="text-sm font-bold text-slate-700 leading-tight" x-text="detail.description"></p>
-                                                        <input type="hidden" :name="`details[${index}][id]`" :value="detail.id">
-                                                        <input type="hidden" :name="`details[${index}][description]`" :value="detail.description">
-                                                    </td>
-                                                    <td class="px-4 py-3.5 text-center">
-                                                        <input type="number" step="1" min="1" :name="`details[${index}][qty]`" 
-                                                            x-model="detail.qty" @input="calculateTotal()"
-                                                            class="h-8 w-14 rounded-lg border border-slate-200 bg-slate-50/50 px-2 text-center text-[11px] font-black text-slate-700 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/5 transition-all outline-none">
-                                                    </td>
-                                                    <td class="px-4 py-3.5 text-center">
-                                                        <input type="number" step="0.01" min="0" :name="`details[${index}][unit_price]`" 
-                                                            x-model="detail.unit_price" @input="calculateTotal()"
-                                                            class="h-8 w-20 rounded-lg border border-slate-200 bg-slate-50/50 px-2 text-center text-[11px] font-black text-slate-700 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/5 transition-all outline-none">
-                                                    </td>
-                                                    <td class="px-6 py-3.5 text-right">
-                                                        <span class="text-sm font-black text-slate-800" x-text="'S/ ' + (detail.qty * detail.unit_price).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
-                                                    </td>
-                                                    <td class="px-6 py-3.5 text-center">
-                                                        <template x-if="selectedQuotation?.status === 'awaiting_approval'">
-                                                            <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-amber-50 text-amber-600 border border-amber-100 text-[9px] font-black uppercase tracking-widest">
-                                                                Esperando
-                                                            </span>
-                                                        </template>
-                                                        <template x-if="selectedQuotation?.status !== 'awaiting_approval'">
-                                                            <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 text-[9px] font-black uppercase tracking-widest">
-                                                                Aprobado
-                                                            </span>
-                                                        </template>
-                                                    </td>
-                                                </tr>
-                                            </template>
-
-                                            <!-- Rejected History -->
-                                            <template x-for="deleted in selectedQuotation?.deleted_details" :key="'deleted-' + Math.random()">
-                                                <tr class="bg-red-50/5 opacity-60 backdrop-blur-[2px]">
-                                                    <td class="px-6 py-3.5">
-                                                        <p class="text-[12px] font-semibold text-red-900/40 line-through decoration-red-200/50 italic" x-text="deleted.description"></p>
-                                                    </td>
-                                                    <td class="px-4 py-3.5 text-center text-[10px] italic text-slate-400 font-medium" x-text="deleted.qty"></td>
-                                                    <td class="px-4 py-3.5 text-center text-[10px] italic text-slate-400 font-medium" x-text="'S/ ' + deleted.unit_price.toLocaleString(undefined, {minimumFractionDigits: 2})"></td>
-                                                    <td class="px-6 py-3.5 text-right text-[10px] opacity-40 italic line-through font-bold text-slate-900" x-text="'S/ ' + deleted.total.toLocaleString(undefined, {minimumFractionDigits: 2})"></td>
-                                                    <td class="px-6 py-3.5 text-center">
-                                                        <span class="px-2.5 py-1 rounded-lg bg-red-50 text-red-400 border border-red-100 text-[8px] font-black uppercase tracking-widest">
-                                                            Rechazado
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            </template>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                            <!-- Integrated Footer Area -->
-                            <div class="flex flex-col md:flex-row gap-5 items-stretch mb-6">
-                                <div class="flex-grow">
-                                    <textarea name="notes" placeholder="Comentarios..." class="w-full h-full min-h-[80px] p-4 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-medium text-slate-700 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 transition-all outline-none resize-none shadow-sm"></textarea>
-                                </div>
-                                <div class="w-full md:w-64 p-5 rounded-xl bg-blue-600 shadow-lg shadow-blue-600/20 flex flex-col justify-center text-center relative overflow-hidden group">
-                                    <div class="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
-                                    <p class="text-[9px] font-black text-white/50 uppercase tracking-[0.2em] mb-1">TOTAL ESTIMADO</p>
-                                    <h4 class="text-2xl font-black text-white tracking-tighter" x-text="'S/ ' + totalQuotation.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></h4>
-                                </div>
-                            </div>
-
-                            <!-- Action Buttons -->
-                            <div class="flex items-center justify-end gap-3 pt-5 border-t border-slate-100">
-                                <button type="button" @click="showModal = false" class="h-10 px-6 bg-white border border-slate-200 text-slate-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm">
-                                    <i class="ri-close-line text-lg text-slate-400"></i> Cancelar
+                                <button type="button" @click="showModal = false" class="w-8 h-8 rounded-lg bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all flex items-center justify-center border border-slate-100">
+                                    <i class="ri-close-line text-lg"></i>
                                 </button>
+                            </div>
+
+                            <!-- Scrollable Content Area -->
+                            <div class="px-8 py-6 overflow-y-auto custom-scrollbar flex-1 min-h-0">
+                                <!-- Table Container -->
+                                <div class="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm mb-6">
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full text-sm">
+                                            <thead>
+                                                <tr class="bg-slate-50/50 border-b border-slate-100">
+                                                    <th class="px-6 py-3 text-left text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Servicio</th>
+                                                    <th class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Cant</th>
+                                                    <th class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Precio</th>
+                                                    <th class="px-6 py-3 text-right text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Subtotal</th>
+                                                    <th class="px-6 py-3 text-center text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Estado</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-slate-100/60">
+                                                <!-- Active Items -->
+                                                <template x-for="(detail, index) in selectedQuotation?.details" :key="detail.id">
+                                                    <tr class="group hover:bg-slate-50/50 transition-colors">
+                                                        <td class="px-6 py-3.5">
+                                                            <p class="text-sm font-bold text-slate-700 leading-tight" x-text="detail.description"></p>
+                                                            <input type="hidden" :name="`details[${index}][id]`" :value="detail.id">
+                                                            <input type="hidden" :name="`details[${index}][description]`" :value="detail.description">
+                                                        </td>
+                                                        <td class="px-4 py-3.5 text-center">
+                                                            <input type="number" step="1" min="1" :name="`details[${index}][qty]`" 
+                                                                x-model="detail.qty" @input="calculateTotal()"
+                                                                class="h-8 w-14 rounded-lg border border-slate-200 bg-slate-50/50 px-2 text-center text-[11px] font-black text-slate-700 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/5 transition-all outline-none">
+                                                        </td>
+                                                        <td class="px-4 py-3.5 text-center">
+                                                            <input type="number" step="0.01" min="0" :name="`details[${index}][unit_price]`" 
+                                                                x-model="detail.unit_price" @input="calculateTotal()"
+                                                                class="h-8 w-20 rounded-lg border border-slate-200 bg-slate-50/50 px-2 text-center text-[11px] font-black text-slate-700 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/5 transition-all outline-none">
+                                                        </td>
+                                                        <td class="px-6 py-3.5 text-right">
+                                                            <span class="text-sm font-black text-slate-800" x-text="'S/ ' + (detail.qty * detail.unit_price).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
+                                                        </td>
+                                                        <td class="px-6 py-3.5 text-center">
+                                                            <template x-if="selectedQuotation?.status === 'awaiting_approval'">
+                                                                <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-amber-50 text-amber-600 border border-amber-100 text-[9px] font-black uppercase tracking-widest">
+                                                                    Esperando
+                                                                </span>
+                                                            </template>
+                                                            <template x-if="selectedQuotation?.status !== 'awaiting_approval'">
+                                                                <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 text-[9px] font-black uppercase tracking-widest">
+                                                                    Aprobado
+                                                                </span>
+                                                            </template>
+                                                        </td>
+                                                    </tr>
+                                                </template>
+    
+                                                <!-- Rejected History -->
+                                                <template x-for="deleted in selectedQuotation?.deleted_details" :key="'deleted-' + Math.random()">
+                                                    <tr class="bg-red-50/5 opacity-60 backdrop-blur-[2px]">
+                                                        <td class="px-6 py-3.5">
+                                                            <p class="text-[12px] font-semibold text-red-900/40 line-through decoration-red-200/50 italic" x-text="deleted.description"></p>
+                                                        </td>
+                                                        <td class="px-4 py-3.5 text-center text-[10px] italic text-slate-400 font-medium" x-text="deleted.qty"></td>
+                                                        <td class="px-4 py-3.5 text-center text-[10px] italic text-slate-400 font-medium" x-text="'S/ ' + deleted.unit_price.toLocaleString(undefined, {minimumFractionDigits: 2})"></td>
+                                                        <td class="px-6 py-3.5 text-right text-[10px] opacity-40 italic line-through font-bold text-slate-900" x-text="'S/ ' + deleted.total.toLocaleString(undefined, {minimumFractionDigits: 2})"></td>
+                                                        <td class="px-6 py-3.5 text-center">
+                                                            <span class="px-2.5 py-1 rounded-lg bg-red-50 text-red-400 border border-red-100 text-[8px] font-black uppercase tracking-widest">
+                                                                Rechazado
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                </template>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+    
+                                <!-- Integrated Footer Area -->
+                                <div class="flex flex-col md:flex-row gap-5 items-stretch mb-2">
+                                    <div class="flex-grow">
+                                        <textarea name="notes" placeholder="Comentarios..." class="w-full h-full min-h-[80px] p-4 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-medium text-slate-700 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 transition-all outline-none resize-none shadow-sm"></textarea>
+                                    </div>
+                                    <div class="w-full md:w-56 p-4 rounded-xl bg-blue-600 shadow-lg shadow-blue-600/20 flex flex-col justify-center text-center relative overflow-hidden group">
+                                        <div class="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                                        <p class="text-[8px] font-black text-white/50 uppercase tracking-[0.2em] mb-1">TOTAL ESTIMADO</p>
+                                        <h4 class="text-xl font-black text-white tracking-tighter" x-text="'S/ ' + totalQuotation.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></h4>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Action Buttons (Fixed) -->
+                            <div class="px-8 py-6 flex items-center justify-end gap-3 border-t border-slate-100 bg-white shrink-0">
                                 <button type="submit" x-show="selectedQuotation?.status === 'awaiting_approval'" class="h-10 px-8 bg-blue-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-600/20 transition-all flex items-center gap-2">
                                     <i class="ri-checkbox-circle-fill text-lg"></i> Aprobar Cotización
                                 </button>
@@ -332,11 +331,11 @@
                                     <i class="ri-eye-line text-lg"></i> Cerrar Vista
                                 </button>
                             </div>
-                        </div>
-                    </form>
+                        </form>
+                    </div>
                 </div>
             </div>
-        </div>
+        </template>
     </div>
 
     <style>
