@@ -827,11 +827,15 @@ class WorkshopMaintenanceBoardController extends Controller
         $validated = $request->validate([
             'generate_sale' => ['nullable', 'boolean'],
             'document_type_id' => ['nullable', 'integer', 'exists:document_types,id'],
+            'billing_status' => ['nullable', 'string', Rule::in(['PENDING', 'INVOICED', 'NOT_APPLICABLE'])],
+            'invoice_series' => ['nullable', 'string', 'max:20'],
+            'invoice_number' => ['nullable', 'string', 'max:50'],
             'sale_comment' => ['nullable', 'string'],
+            'payment_type' => ['required', 'string', Rule::in(['CONTADO', 'DEUDA'])],
             'cash_register_id' => ['required', 'integer', 'exists:cash_registers,id'],
-            'payment_methods' => ['required', 'array', 'min:1'],
-            'payment_methods.*.payment_method_id' => ['required', 'integer', 'exists:payment_methods,id'],
-            'payment_methods.*.amount' => ['required', 'numeric', 'min:0.01'],
+            'payment_methods' => ['nullable', 'array'],
+            'payment_methods.*.payment_method_id' => ['nullable', 'integer', 'exists:payment_methods,id'],
+            'payment_methods.*.amount' => ['nullable', 'numeric', 'min:0.01'],
             'payment_methods.*.reference' => ['nullable', 'string', 'max:100'],
             'payment_methods.*.payment_gateway_id' => ['nullable', 'integer', 'exists:payment_gateways,id'],
             'payment_methods.*.card_id' => ['nullable', 'integer', 'exists:cards,id'],
@@ -843,6 +847,19 @@ class WorkshopMaintenanceBoardController extends Controller
             'product_lines.*.qty' => ['required_with:product_lines', 'numeric', 'gt:0'],
             'product_lines.*.unit_price' => ['required_with:product_lines', 'numeric', 'gte:0'],
         ]);
+
+        $paymentType = strtoupper((string) ($validated['payment_type'] ?? 'CONTADO'));
+        $isDebtCheckout = $paymentType === 'DEUDA';
+        $validated['payment_methods'] = collect($validated['payment_methods'] ?? [])
+            ->filter(fn ($row) => !empty($row['payment_method_id']) && (float) ($row['amount'] ?? 0) > 0)
+            ->values()
+            ->all();
+
+        if (!$isDebtCheckout && empty($validated['payment_methods'])) {
+            throw ValidationException::withMessages([
+                'payment_methods' => 'Debes registrar al menos un metodo de pago cuando el cobro es al contado.',
+            ]);
+        }
 
         $methodIds = collect($validated['payment_methods'] ?? [])
             ->pluck('payment_method_id')
@@ -865,7 +882,8 @@ class WorkshopMaintenanceBoardController extends Controller
             ->groupBy('payment_method_id')
             ->map(fn ($rows) => collect($rows)->pluck('payment_gateway_id')->map(fn ($value) => (int) $value)->all());
 
-        foreach ($validated['payment_methods'] as $index => $payment) {
+        if (!$isDebtCheckout) {
+            foreach ($validated['payment_methods'] as $index => $payment) {
             $method = $methodsIndex->get((int) ($payment['payment_method_id'] ?? 0));
             $kind = $this->inferPaymentMethodKind((string) ($method?->description ?? ''));
 
@@ -906,13 +924,14 @@ class WorkshopMaintenanceBoardController extends Controller
             $validated['payment_methods'][$index]['reference'] = isset($payment['reference'])
                 ? trim((string) $payment['reference'])
                 : null;
+            }
         }
 
         $user = auth()->user();
         $branchId = (int) session('branch_id');
 
         try {
-            DB::transaction(function () use ($order, $validated, $branchId, $user) {
+            DB::transaction(function () use ($order, $validated, $branchId, $user, $paymentType, $isDebtCheckout) {
                 $lockedOrder = WorkshopMovement::query()
                     ->where('id', $order->id)
                     ->lockForUpdate()
@@ -980,11 +999,17 @@ class WorkshopMaintenanceBoardController extends Controller
                         (int) $user?->id,
                         (string) ($user?->name ?? 'Sistema'),
                         $validated['sale_comment'] ?? null,
-                        null
+                        null,
+                        $validated['billing_status'] ?? null,
+                        $validated['invoice_series'] ?? null,
+                        $validated['invoice_number'] ?? null
                     );
                 }
 
                 $freshOrder = WorkshopMovement::query()->findOrFail($lockedOrder->id);
+                $freshOrder->salesMovement?->update([
+                    'payment_type' => $isDebtCheckout ? 'CREDITO' : 'CONTADO',
+                ]);
 
                 $this->flowService->registerPayment(
                     $freshOrder,
@@ -993,7 +1018,8 @@ class WorkshopMaintenanceBoardController extends Controller
                     $branchId,
                     (int) $user?->id,
                     (string) ($user?->name ?? 'Sistema'),
-                    $validated['payment_comment'] ?? ($validated['sale_comment'] ?? null)
+                    $validated['payment_comment'] ?? ($validated['sale_comment'] ?? null),
+                    $paymentType
                 );
 
                 $afterPayment = WorkshopMovement::query()->findOrFail($lockedOrder->id);
@@ -1003,6 +1029,10 @@ class WorkshopMaintenanceBoardController extends Controller
                     'comment' => 'Entrega automatica al registrar venta y cobro desde tablero',
                 ]);
             });
+        } catch (ValidationException $e) {
+            return back()
+                ->withErrors($e->errors())
+                ->withInput();
         } catch (\Throwable $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
         }

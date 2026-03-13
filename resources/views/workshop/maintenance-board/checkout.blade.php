@@ -6,6 +6,12 @@
         pendingLines: @js($pendingLines->values()->all()),
         productsCatalog: @js(($products ?? collect())->values()->all()),
         productLines: @js(array_values(old('product_lines', []))),
+        documentTypeOptions: @js(collect($documentTypes ?? collect())->map(fn ($doc) => ['id' => (int) $doc->id, 'name' => (string) ($doc->name ?? '')])->values()->all()),
+        selectedDocumentTypeId: @js((string) old('document_type_id', optional(($documentTypes ?? collect())->first())->id)),
+        billingStatus: @js((string) old('billing_status', 'PENDING')),
+        invoiceSeries: @js((string) old('invoice_series', '001')),
+        invoiceNumber: @js((string) old('invoice_number', '')),
+        paymentType: @js((string) old('payment_type', 'CONTADO')),
         paymentMethodOptions: @js(($paymentMethodOptions ?? collect())->values()->all()),
         cardOptions: @js(($cardOptions ?? collect())->values()->all()),
         digitalWalletOptions: @js(($digitalWalletOptions ?? collect())->values()->all()),
@@ -13,11 +19,44 @@
         paymentRows: @js(array_values(old('payment_methods', []))),
         pendingOs: Number(@json($pendingOs)),
         init() {
+            this.paymentType = String(this.paymentType || 'CONTADO').toUpperCase() === 'DEUDA' ? 'DEUDA' : 'CONTADO';
             if (!Array.isArray(this.productLines)) this.productLines = [];
             if (!Array.isArray(this.paymentRows)) this.paymentRows = [];
             this.paymentRows = this.paymentRows.map((row) => this.normalizePaymentRow(row));
-            if (this.paymentRows.length === 0) this.addPaymentRow(true);
+            if (this.isDebtPaymentSelected()) this.paymentRows = [];
+            if (this.paymentRows.length === 0 && !this.isDebtPaymentSelected()) this.addPaymentRow(true);
+            this.syncInvoiceBillingFields();
             this.syncAmount();
+        },
+        currentDocumentType() {
+            return this.documentTypeOptions.find((item) => String(item.id) === String(this.selectedDocumentTypeId || '')) || null;
+        },
+        isInvoiceDocumentSelected() {
+            const name = String(this.currentDocumentType()?.name || '').toLowerCase();
+            return name.includes('factura');
+        },
+        isDebtPaymentSelected() {
+            return String(this.paymentType || 'CONTADO').toUpperCase() === 'DEUDA';
+        },
+        syncInvoiceBillingFields() {
+            if (!this.isInvoiceDocumentSelected()) {
+                this.billingStatus = 'NOT_APPLICABLE';
+                this.invoiceSeries = this.invoiceSeries || '001';
+                this.invoiceNumber = '';
+                return;
+            }
+
+            if (!['INVOICED', 'PENDING'].includes(String(this.billingStatus || ''))) {
+                this.billingStatus = 'PENDING';
+            }
+
+            if (!this.invoiceSeries) {
+                this.invoiceSeries = '001';
+            }
+
+            if (this.billingStatus === 'PENDING') {
+                this.invoiceNumber = '';
+            }
         },
         lineSubtotal(line) {
             return Number(line.qty || 0) * Number(line.unit_price || 0);
@@ -85,6 +124,16 @@
             this.paymentRows.push(this.defaultPaymentRow(useRemaining));
             this.syncAmount();
         },
+        onPaymentTypeChange() {
+            this.paymentType = this.isDebtPaymentSelected() ? 'DEUDA' : 'CONTADO';
+            if (this.isDebtPaymentSelected()) {
+                this.paymentRows = [];
+            } else if (this.paymentRows.length === 0) {
+                this.addPaymentRow(true);
+                return;
+            }
+            this.syncAmount();
+        },
         removePaymentRow(index) {
             if (this.paymentRows.length === 1) {
                 this.paymentRows[0].amount = this.chargeTotal().toFixed(2);
@@ -104,12 +153,21 @@
             return this.paymentGatewayOptionsByMethod[String(methodId)] || [];
         },
         paymentTotal() {
+            if (this.isDebtPaymentSelected()) {
+                return 0;
+            }
             return this.paymentRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
         },
         remainingAmount() {
+            if (this.isDebtPaymentSelected()) {
+                return this.chargeTotal();
+            }
             return this.chargeTotal() - this.paymentTotal();
         },
         syncAmount() {
+            if (this.isDebtPaymentSelected()) {
+                return;
+            }
             if (this.paymentRows.length === 1) {
                 this.paymentRows[0].amount = this.chargeTotal().toFixed(2);
             }
@@ -237,15 +295,22 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <div>
                     <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Documento de venta</label>
-                    <select name="document_type_id" required class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                    <select x-model="selectedDocumentTypeId" @change="syncInvoiceBillingFields()" name="document_type_id" required class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
                         @foreach(($documentTypes ?? collect()) as $doc)
-                            <option value="{{ $doc->id }}" @selected(old('document_type_id', optional(($documentTypes ?? collect())->first())->id) == $doc->id)>
+                            <option value="{{ $doc->id }}">
                                 {{ $doc->name }}
                             </option>
                         @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Condición</label>
+                    <select x-model="paymentType" @change="onPaymentTypeChange()" name="payment_type" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                        <option value="CONTADO">Contado</option>
+                        <option value="DEUDA">Deuda</option>
                     </select>
                 </div>
                 <div>
@@ -260,7 +325,45 @@
                 </div>
             </div>
 
-            <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div x-show="isDebtPaymentSelected()" x-cloak class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+                Esta venta se registrará como deuda y se enviará a cuentas por cobrar.
+            </div>
+
+            <div x-show="isInvoiceDocumentSelected()" x-cloak class="grid grid-cols-1 gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4 md:grid-cols-3">
+                <div>
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Estado de factura</label>
+                    <select x-model="billingStatus" @change="syncInvoiceBillingFields()" name="billing_status" class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm">
+                        <option value="INVOICED">Facturado</option>
+                        <option value="PENDING">Por facturar</option>
+                    </select>
+                </div>
+                <div x-show="billingStatus === 'INVOICED'" x-cloak>
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Serie</label>
+                    <input
+                        type="text"
+                        name="invoice_series"
+                        x-model="invoiceSeries"
+                        x-bind:required="isInvoiceDocumentSelected() && billingStatus === 'INVOICED'"
+                        x-bind:disabled="!isInvoiceDocumentSelected() || billingStatus !== 'INVOICED'"
+                        class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm"
+                        placeholder="001"
+                    >
+                </div>
+                <div x-show="billingStatus === 'INVOICED'" x-cloak>
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Correlativo</label>
+                    <input
+                        type="text"
+                        name="invoice_number"
+                        x-model="invoiceNumber"
+                        x-bind:required="isInvoiceDocumentSelected() && billingStatus === 'INVOICED'"
+                        x-bind:disabled="!isInvoiceDocumentSelected() || billingStatus !== 'INVOICED'"
+                        class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm"
+                        placeholder="00000001"
+                    >
+                </div>
+            </div>
+
+            <div x-show="!isDebtPaymentSelected()" x-cloak class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div class="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 md:flex-row md:items-center md:justify-between">
                     <div>
                         <p class="text-sm font-semibold text-slate-800">Desglose de cobro</p>
@@ -433,7 +536,7 @@
             </div>
 
             <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-right">
-                <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Total a cobrar ahora</p>
+                <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700" x-text="isDebtPaymentSelected() ? 'Total a registrar como deuda' : 'Total a cobrar ahora'"></p>
                 <p class="mt-1 text-2xl font-extrabold text-emerald-700" x-text="`S/ ${chargeTotal().toFixed(2)}`"></p>
             </div>
 

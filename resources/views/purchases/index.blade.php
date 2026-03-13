@@ -212,7 +212,7 @@
                                         </div>
                                         <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
                                             <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Condición</p>
-                                            <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $purchase->purchaseMovement?->payment_type ?? '-' }}</p>
+                                            <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ strtoupper((string) ($purchase->purchaseMovement?->payment_type ?? 'CONTADO')) === 'CREDITO' ? 'CREDITO' : 'CONTADO' }}</p>
                                         </div>
                                         <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
                                             <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Afecta Caja</p>
@@ -302,4 +302,3 @@
         </x-common.component-card>
     </div>
 @endsection
-

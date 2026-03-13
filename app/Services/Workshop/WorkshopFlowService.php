@@ -2,6 +2,7 @@
 
 namespace App\Services\Workshop;
 
+use App\Services\AccountReceivablePayableService;
 use App\Models\Appointment;
 use App\Models\Branch;
 use App\Models\Card;
@@ -40,6 +41,7 @@ use App\Models\WorkshopWarranty;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 class WorkshopFlowService
 {
@@ -827,9 +829,12 @@ class WorkshopFlowService
         int $userId,
         string $userName,
         ?string $comment = null,
-        ?array $detailIds = null
+        ?array $detailIds = null,
+        ?string $billingStatus = null,
+        ?string $invoiceSeries = null,
+        ?string $invoiceNumber = null
     ): SalesMovement {
-        return DB::transaction(function () use ($order, $documentTypeId, $branchId, $userId, $userName, $comment, $detailIds) {
+        return DB::transaction(function () use ($order, $documentTypeId, $branchId, $userId, $userName, $comment, $detailIds, $billingStatus, $invoiceSeries, $invoiceNumber) {
             $order = WorkshopMovement::query()->with(['details', 'client'])->lockForUpdate()->findOrFail($order->id);
             if ($order->branch_id !== $branchId) {
                 throw new \RuntimeException('La OS no pertenece a la sucursal actual.');
@@ -873,6 +878,9 @@ class WorkshopFlowService
                 throw new \RuntimeException('El tipo de documento no corresponde a ventas.');
             }
 
+            $isInvoiceDocument = $this->isInvoiceDocumentType($documentType);
+            $resolvedBillingStatus = $this->normalizeBillingStatus($billingStatus, $isInvoiceDocument);
+
             $movement = Movement::query()->create([
                 'number' => $this->generateMovementNumber($branchId, $documentTypeId),
                 'moved_at' => now(),
@@ -890,6 +898,36 @@ class WorkshopFlowService
                 'parent_movement_id' => $order->movement_id,
             ]);
 
+            $resolvedInvoiceSeries = $isInvoiceDocument
+                ? trim((string) ($invoiceSeries ?? '001'))
+                : '001';
+
+            if ($resolvedInvoiceSeries === '') {
+                $resolvedInvoiceSeries = '001';
+            }
+
+            $resolvedInvoiceNumber = null;
+            if ($isInvoiceDocument && $resolvedBillingStatus === 'INVOICED') {
+                $resolvedInvoiceNumber = trim((string) ($invoiceNumber ?? ''));
+
+                if ($resolvedInvoiceNumber === '' && $billingStatus === null) {
+                    $resolvedInvoiceNumber = trim((string) $movement->number);
+                }
+
+                if ($resolvedInvoiceNumber === '') {
+                    throw ValidationException::withMessages([
+                        'invoice_number' => 'El correlativo es obligatorio cuando la factura ya esta facturada.',
+                    ]);
+                }
+
+                $this->ensureUniqueInvoiceReference(
+                    $branchId,
+                    $documentTypeId,
+                    $resolvedInvoiceSeries,
+                    $resolvedInvoiceNumber
+                );
+            }
+
             $branchSnapshot = [
                 'id' => $branchId,
                 'company_id' => $order->company_id,
@@ -897,7 +935,9 @@ class WorkshopFlowService
 
             $sale = SalesMovement::query()->create([
                 'branch_snapshot' => $branchSnapshot,
-                'series' => '001',
+                'series' => $resolvedInvoiceSeries,
+                'billing_status' => $resolvedBillingStatus,
+                'billing_number' => $resolvedInvoiceNumber,
                 'year' => (string) now()->year,
                 'detail_type' => 'DETALLADO',
                 'consumption' => 'N',
@@ -967,6 +1007,50 @@ class WorkshopFlowService
 
             return $sale;
         });
+    }
+
+    private function isInvoiceDocumentType(?DocumentType $documentType): bool
+    {
+        $name = mb_strtolower((string) ($documentType?->name ?? ''), 'UTF-8');
+
+        return str_contains($name, 'factura');
+    }
+
+    private function normalizeBillingStatus(?string $billingStatus, bool $isInvoiceDocument): string
+    {
+        if (!$isInvoiceDocument) {
+            return 'NOT_APPLICABLE';
+        }
+
+        if ($billingStatus === null) {
+            return 'INVOICED';
+        }
+
+        return strtoupper(trim($billingStatus)) === 'PENDING' ? 'PENDING' : 'INVOICED';
+    }
+
+    private function ensureUniqueInvoiceReference(
+        int $branchId,
+        int $documentTypeId,
+        string $series,
+        string $billingNumber
+    ): void {
+        $exists = SalesMovement::query()
+            ->where('billing_status', 'INVOICED')
+            ->where('series', $series)
+            ->where('billing_number', $billingNumber)
+            ->whereHas('movement', function ($query) use ($branchId, $documentTypeId) {
+                $query
+                    ->where('branch_id', $branchId)
+                    ->where('document_type_id', $documentTypeId);
+            })
+            ->exists();
+
+        if ($exists) {
+            throw ValidationException::withMessages([
+                'invoice_number' => 'Ya existe una factura con esa serie y correlativo en esta sucursal.',
+            ]);
+        }
     }
 
     public function cancelOrder(
@@ -1110,9 +1194,10 @@ class WorkshopFlowService
         int $branchId,
         int $userId,
         string $userName,
-        ?string $comment = null
+        ?string $comment = null,
+        string $paymentType = 'CONTADO'
     ): CashMovements {
-        return DB::transaction(function () use ($order, $cashRegisterId, $paymentMethods, $branchId, $userId, $userName, $comment) {
+        return DB::transaction(function () use ($order, $cashRegisterId, $paymentMethods, $branchId, $userId, $userName, $comment, $paymentType) {
             $order = WorkshopMovement::query()->lockForUpdate()->findOrFail($order->id);
             if ($order->branch_id !== $branchId) {
                 throw new \RuntimeException('La OS no pertenece a la sucursal actual.');
@@ -1133,16 +1218,26 @@ class WorkshopFlowService
                 throw new \RuntimeException('No hay turno configurado para la sucursal.');
             }
 
-            $amount = 0;
-            foreach ($paymentMethods as $payment) {
-                $value = round((float) ($payment['amount'] ?? 0), 6);
-                if ($value <= 0) {
-                    throw new \RuntimeException('Todos los montos de pago deben ser mayores a cero.');
-                }
-                $amount += $value;
+            $normalizedPaymentType = strtoupper(trim($paymentType)) === 'DEUDA' ? 'DEUDA' : 'CONTADO';
+            $isDebtPayment = $normalizedPaymentType === 'DEUDA';
+            $currentDebt = max(0, (float) $order->total - (float) $order->paid_total);
+            if ($isDebtPayment && $currentDebt <= 0.0001) {
+                throw new \RuntimeException('La OS ya no tiene deuda pendiente para registrar.');
             }
 
-            $currentDebt = max(0, (float) $order->total - (float) $order->paid_total);
+            $amount = 0;
+            if ($isDebtPayment) {
+                $amount = round($currentDebt, 6);
+            } else {
+                foreach ($paymentMethods as $payment) {
+                    $value = round((float) ($payment['amount'] ?? 0), 6);
+                    if ($value <= 0) {
+                        throw new \RuntimeException('Todos los montos de pago deben ser mayores a cero.');
+                    }
+                    $amount += $value;
+                }
+            }
+
             if ($amount > $currentDebt + 0.0001) {
                 throw new \RuntimeException('El pago excede la deuda pendiente de la OS.');
             }
@@ -1150,6 +1245,10 @@ class WorkshopFlowService
             $cashMovement = null;
             if ($order->cash_movement_id) {
                 $cashMovement = CashMovements::query()->lockForUpdate()->find($order->cash_movement_id);
+            }
+
+            if ($isDebtPayment && $cashMovement && $cashMovement->details()->where('status', 'A')->where('type', 'DEUDA')->exists()) {
+                throw new \RuntimeException('La deuda de esta OS ya fue registrada anteriormente.');
             }
 
             if (!$cashMovement) {
@@ -1164,7 +1263,7 @@ class WorkshopFlowService
                     'person_name' => trim(($order->client?->first_name ?? '') . ' ' . ($order->client?->last_name ?? '')),
                     'responsible_id' => $userId,
                     'responsible_name' => $userName,
-                    'comment' => $comment ?: 'Cobro OS #' . $order->movement?->number,
+                    'comment' => $comment ?: ($isDebtPayment ? 'Registro de deuda OS #' : 'Cobro OS #') . $order->movement?->number,
                     'status' => '1',
                      'movement_type_id' => 4,
                     'document_type_id' => 9,
@@ -1196,42 +1295,69 @@ class WorkshopFlowService
                 ]);
             }
 
-            foreach ($paymentMethods as $payment) {
-                $method = PaymentMethod::query()->findOrFail((int) $payment['payment_method_id']);
-                $gateway = !empty($payment['payment_gateway_id'])
-                    ? PaymentGateways::query()->find((int) $payment['payment_gateway_id'])
-                    : null;
-                $card = !empty($payment['card_id'])
-                    ? Card::query()->find((int) $payment['card_id'])
-                    : null;
-                $digitalWallet = !empty($payment['digital_wallet_id'])
-                    ? \App\Models\DigitalWallet::query()->find((int) $payment['digital_wallet_id'])
-                    : null;
-
+            if ($isDebtPayment) {
+                $method = $this->resolveDebtPaymentMethod();
                 CashMovementDetail::query()->create([
                     'cash_movement_id' => $cashMovement->id,
-                    'type' => 'PAGADO',
-                    'due_at' => null,
-                    'paid_at' => now(),
+                    'type' => 'DEUDA',
+                    'due_at' => now(),
+                    'paid_at' => null,
                     'payment_method_id' => $method->id,
                     'payment_method' => $method->description ?? '',
-                    'number' => (string) ($payment['reference'] ?? ($cashMovement->movement?->number ?? '')),
-                    'card_id' => $card?->id,
-                    'card' => $card?->description ?? '',
-                    'bank_id' => $payment['bank_id'] ?? null,
+                    'number' => (string) ($cashMovement->movement?->number ?? ''),
+                    'card_id' => null,
+                    'card' => '',
+                    'bank_id' => null,
                     'bank' => '',
-                    'digital_wallet_id' => $payment['digital_wallet_id'] ?? null,
-                    'digital_wallet' => $digitalWallet?->description ?? '',
-                    'payment_gateway_id' => $gateway?->id,
-                    'payment_gateway' => $gateway?->description ?? '',
-                    'amount' => (float) $payment['amount'],
-                    'comment' => $comment ?: 'Pago OS #' . $order->movement?->number,
+                    'digital_wallet_id' => null,
+                    'digital_wallet' => '',
+                    'payment_gateway_id' => null,
+                    'payment_gateway' => '',
+                    'amount' => $amount,
+                    'comment' => $comment ?: 'Registro de deuda OS #' . $order->movement?->number,
                     'status' => 'A',
                     'branch_id' => $branchId,
                 ]);
+            } else {
+                foreach ($paymentMethods as $payment) {
+                    $method = PaymentMethod::query()->findOrFail((int) $payment['payment_method_id']);
+                    $gateway = !empty($payment['payment_gateway_id'])
+                        ? PaymentGateways::query()->find((int) $payment['payment_gateway_id'])
+                        : null;
+                    $card = !empty($payment['card_id'])
+                        ? Card::query()->find((int) $payment['card_id'])
+                        : null;
+                    $digitalWallet = !empty($payment['digital_wallet_id'])
+                        ? \App\Models\DigitalWallet::query()->find((int) $payment['digital_wallet_id'])
+                        : null;
+
+                    CashMovementDetail::query()->create([
+                        'cash_movement_id' => $cashMovement->id,
+                        'type' => 'PAGADO',
+                        'due_at' => null,
+                        'paid_at' => now(),
+                        'payment_method_id' => $method->id,
+                        'payment_method' => $method->description ?? '',
+                        'number' => (string) ($payment['reference'] ?? ($cashMovement->movement?->number ?? '')),
+                        'card_id' => $card?->id,
+                        'card' => $card?->description ?? '',
+                        'bank_id' => $payment['bank_id'] ?? null,
+                        'bank' => '',
+                        'digital_wallet_id' => $payment['digital_wallet_id'] ?? null,
+                        'digital_wallet' => $digitalWallet?->description ?? '',
+                        'payment_gateway_id' => $gateway?->id,
+                        'payment_gateway' => $gateway?->description ?? '',
+                        'amount' => (float) $payment['amount'],
+                        'comment' => $comment ?: 'Pago OS #' . $order->movement?->number,
+                        'status' => 'A',
+                        'branch_id' => $branchId,
+                    ]);
+                }
             }
 
-            $newPaidTotal = round((float) $order->paid_total + $amount, 6);
+            $newPaidTotal = $isDebtPayment
+                ? round((float) $order->paid_total, 6)
+                : round((float) $order->paid_total + $amount, 6);
             $paymentStatus = 'pending';
             if ($newPaidTotal > 0 && $newPaidTotal < (float) $order->total) {
                 $paymentStatus = 'partial';
@@ -1249,6 +1375,14 @@ class WorkshopFlowService
                 'amount' => $amount,
                 'payment_status' => $paymentStatus,
             ]);
+
+            if ($isDebtPayment || $cashMovement->accountReceivablePayable()->exists()) {
+                app(AccountReceivablePayableService::class)->syncDebtAccount(
+                    $cashMovement,
+                    AccountReceivablePayableService::TYPE_RECEIVABLE,
+                    now()
+                );
+            }
 
             return $cashMovement->fresh();
         });
@@ -1826,6 +1960,24 @@ class WorkshopFlowService
         }
 
         return (int) $typeId;
+    }
+
+    private function resolveDebtPaymentMethod(): PaymentMethod
+    {
+        $paymentMethod = PaymentMethod::query()
+            ->where('description', 'ILIKE', 'deuda')
+            ->where('status', true)
+            ->first();
+
+        if ($paymentMethod) {
+            return $paymentMethod;
+        }
+
+        return PaymentMethod::query()->create([
+            'description' => 'Deuda',
+            'order_num' => (int) (PaymentMethod::query()->max('order_num') ?? 0) + 1,
+            'status' => true,
+        ]);
     }
 
     private function resolvePaymentConceptId(): int

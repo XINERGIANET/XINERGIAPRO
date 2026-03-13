@@ -94,7 +94,14 @@
                                         </button>
                                     </td>
                                     <td class="whitespace-nowrap px-4 py-3.5 text-center">
-                                        <span class="font-medium text-gray-900 dark:text-white">{{ $sale->number }}</span>
+                                        <div class="flex flex-col items-center">
+                                            <span class="font-medium text-gray-900 dark:text-white">{{ $sale->salesDocumentCode() }}</span>
+                                            @if ($sale->isSalesInvoice())
+                                                <span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide {{ $sale->salesBillingStatus() === 'PENDING' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700' }}">
+                                                    {{ $sale->salesBillingStatusLabel() }}
+                                                </span>
+                                            @endif
+                                        </div>
                                     </td>
                                     <td
                                         class="whitespace-nowrap px-4 py-3.5 text-sm text-gray-600 dark:text-gray-400 text-center">
@@ -155,7 +162,7 @@
                                             <form method="POST"
                                                 action="{{ route('admin.sales.destroy', array_merge([$sale], $viewId ? ['view_id' => $viewId] : [])) }}"
                                                 class="relative group js-swal-delete" data-swal-title="Eliminar venta?"
-                                                data-swal-text="Se eliminara la venta {{ $sale->number }}. Esta accion no se puede deshacer."
+                                                data-swal-text="Se eliminara la venta {{ $sale->salesDocumentCode() }}. Esta accion no se puede deshacer."
                                                 data-swal-confirm="Si, eliminar" data-swal-cancel="Cancelar"
                                                 data-swal-confirm-color="#ef4444" data-swal-cancel-color="#6b7280">
                                                 @csrf
@@ -193,7 +200,7 @@
                                             </div>
                                             <div class="rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
                                                 <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Tipo de pago</p>
-                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $sale->salesMovement?->payment_type ?? '-' }}</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ in_array(strtoupper((string) ($sale->salesMovement?->payment_type ?? '')), ['CREDITO', 'CREDIT', 'DEUDA'], true) ? 'CREDITO' : 'CONTADO' }}</p>
                                             </div>
                                             <div class="rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
                                                 <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Fecha</p>
@@ -217,7 +224,7 @@
                                             </div>
                                             <div class="rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
                                                 <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Origen</p>
-                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $sale->movementType?->description ?? 'Venta' }} - {{ $sale->documentType?->name[0] ?? '' }}{{ $sale->salesMovement?->series ?? '' }} - {{ $sale->number }}</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $sale->movementType?->description ?? 'Venta' }} - {{ $sale->salesDocumentCode() }}</p>
                                             </div>
                                         </div>
                                     </td>

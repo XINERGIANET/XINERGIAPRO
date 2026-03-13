@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Comprobante {{ $sale->number }}</title>
+    <title>Comprobante {{ $sale->salesDocumentCode() }}</title>
     <style>
         body { font-family: Arial, sans-serif; color: #111827; margin: 24px; }
         .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
@@ -30,7 +30,7 @@
 <body>
 @php
     $docName = strtoupper($sale->documentType?->name ?? 'COMPROBANTE');
-    $docCode = strtoupper(substr($sale->documentType?->name ?? 'X', 0, 1)) . ($sale->salesMovement?->series ?? '001') . '-' . $sale->number;
+    $docCode = $sale->salesDocumentCode();
 @endphp
 
 <div class="head">

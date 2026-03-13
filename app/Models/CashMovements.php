@@ -52,4 +52,9 @@ class CashMovements extends Model
     {
         return $this->hasMany(CashMovementDetail::class, 'cash_movement_id');
     }
+
+    public function accountReceivablePayable()
+    {
+        return $this->hasOne(AccountReceivablePayable::class, 'cash_movement_id');
+    }
 }

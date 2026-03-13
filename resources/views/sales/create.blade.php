@@ -5,14 +5,15 @@
         $viewId = request('view_id');
         $salesIndexUrl = route('admin.sales.index', $viewId ? ['view_id' => $viewId] : []);
         $posMode = $posMode ?? 'create';
+        $invoiceMode = (bool) ($invoiceMode ?? false);
         $isEditMode = $posMode === 'edit';
-        $pageTitle = $isEditMode ? 'Editar venta' : 'Nueva venta';
+        $pageTitle = $invoiceMode && $isEditMode ? 'Facturar venta' : ($isEditMode ? 'Editar venta' : 'Nueva venta');
         $cardDescription = $isEditMode
             ? 'Actualiza la venta con la misma interfaz del punto de venta.'
             : 'Interfaz de venta rapida. Puedes seguir agregando productos aunque el stock mostrado sea 0.';
         $secondaryActionLabel = $isEditMode ? 'Cancelar' : 'Guardar';
         $secondaryActionIcon = $isEditMode ? 'ri-close-line' : 'ri-save-line';
-        $primaryActionLabel = $isEditMode ? 'Guardar cambios' : 'Cobrar';
+        $primaryActionLabel = $invoiceMode && $isEditMode ? 'Guardar factura' : ($isEditMode ? 'Guardar cambios' : 'Cobrar');
         $primaryActionIcon = $isEditMode ? 'ri-save-line' : 'ri-cash-line';
     @endphp
 
@@ -112,7 +113,7 @@
                                 <div class="border-t border-dashed border-slate-200 pt-2"></div>
                                 <div class="flex items-center justify-between"><span class="text-base font-bold text-slate-900">Total a pagar</span><span id="ticket-total" class="text-3xl font-black" style="color:#f97316;">$0.00</span></div>
                             </div>
-                            <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                            <div id="payment-methods-section" class="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
                                 <label for="sale-notes" class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Notas</label>
                                 <textarea
                                     id="sale-notes"
@@ -152,7 +153,7 @@
                                         </div>
                                     </div>
 
-                                    <div class="grid gap-3 sm:grid-cols-2">
+                                    <div class="grid gap-3 sm:grid-cols-3">
                                         <div class="space-y-2">
                                             <label for="document-type-select" class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Documento</label>
                                             <select
@@ -162,6 +163,16 @@
                                                 @foreach ($documentTypes ?? [] as $documentType)
                                                     <option value="{{ $documentType->id }}" @selected((int) ($defaultDocumentTypeId ?? 0) === (int) $documentType->id)>{{ $documentType->name }}</option>
                                                 @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="space-y-2">
+                                            <label for="payment-type-select" class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Condicion</label>
+                                            <select
+                                                id="payment-type-select"
+                                                class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+                                            >
+                                                <option value="CONTADO">Contado</option>
+                                                <option value="DEUDA">Deuda</option>
                                             </select>
                                         </div>
                                         <div class="space-y-2">
@@ -176,6 +187,45 @@
                                                     </option>
                                                 @endforeach
                                             </select>
+                                        </div>
+                                    </div>
+
+                                    <div id="sale-debt-notice" class="hidden rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+                                        Esta venta se registrara como deuda y se enviara a cuentas por cobrar.
+                                    </div>
+
+                                    <div id="invoice-billing-block" class="hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                        <div class="grid gap-3 sm:grid-cols-3">
+                                            <div class="space-y-2">
+                                                <label for="billing-status-select" class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Factura</label>
+                                                <select
+                                                    id="billing-status-select"
+                                                    class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+                                                >
+                                                    <option value="INVOICED">Facturado</option>
+                                                    <option value="PENDING">Por facturar</option>
+                                                </select>
+                                            </div>
+                                            <div id="invoice-series-group" class="space-y-2 sm:col-span-1">
+                                                <label for="invoice-series-input" class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Serie</label>
+                                                <input
+                                                    id="invoice-series-input"
+                                                    type="text"
+                                                    maxlength="20"
+                                                    placeholder="001"
+                                                    class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+                                                >
+                                            </div>
+                                            <div id="invoice-number-group" class="space-y-2 sm:col-span-1">
+                                                <label for="invoice-number-input" class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Correlativo</label>
+                                                <input
+                                                    id="invoice-number-input"
+                                                    type="text"
+                                                    maxlength="50"
+                                                    placeholder="00000001"
+                                                    class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+                                                >
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -374,10 +424,17 @@
             let currentAsideTab = 'summary';
 
             const posMode = @json($posMode ?? 'create');
+            const invoiceMode = Boolean(@json($invoiceMode ?? false));
             const isEditMode = posMode === 'edit';
             const initialSaleData = @json($initialSaleData ?? null);
             const defaultDocumentTypeId = Number(@json($defaultDocumentTypeId ?? 0)) || null;
             const defaultCashRegisterId = Number(@json($defaultCashRegisterId ?? 0)) || null;
+            const invoiceDocumentIds = new Set(
+                documentTypes
+                    .filter((documentType) => String(documentType.name || '').toLowerCase().includes('factura'))
+                    .map((documentType) => Number(documentType.id))
+                    .filter((id) => !Number.isNaN(id))
+            );
             const ACTIVE_SALE_KEY_STORAGE = 'restaurantActiveSaleKey';
             let db = {};
             let activeKey = null;
@@ -410,8 +467,12 @@
                         }))
                         : [],
                     payment_methods: Array.isArray(initialSaleData.payment_methods) ? initialSaleData.payment_methods : [],
+                    payment_type: String(initialSaleData.payment_type || 'CONTADO'),
                     document_type_id: Number(initialSaleData.document_type_id || defaultDocumentTypeId || 0) || null,
                     cash_register_id: Number(initialSaleData.cash_register_id || defaultCashRegisterId || 0) || null,
+                    billing_status: String(initialSaleData.billing_status || 'NOT_APPLICABLE'),
+                    invoice_series: String(initialSaleData.invoice_series || '001'),
+                    invoice_number: String(initialSaleData.invoice_number || ''),
                 }
                 : (db[activeKey] || {
                     id: Date.now(),
@@ -421,11 +482,19 @@
                     notes: '',
                     items: [],
                     payment_methods: [],
+                    payment_type: 'CONTADO',
                     document_type_id: defaultDocumentTypeId,
                     cash_register_id: defaultCashRegisterId,
+                    billing_status: 'NOT_APPLICABLE',
+                    invoice_series: '001',
+                    invoice_number: '',
                 });
             currentSale.document_type_id = Number(currentSale.document_type_id || defaultDocumentTypeId || 0) || null;
             currentSale.cash_register_id = Number(currentSale.cash_register_id || defaultCashRegisterId || 0) || null;
+            currentSale.payment_type = String(currentSale.payment_type || 'CONTADO').toUpperCase() === 'DEUDA' ? 'DEUDA' : 'CONTADO';
+            currentSale.billing_status = String(currentSale.billing_status || 'NOT_APPLICABLE');
+            currentSale.invoice_series = String(currentSale.invoice_series || '001');
+            currentSale.invoice_number = String(currentSale.invoice_number || '');
             paymentRows = Array.isArray(currentSale.payment_methods)
                 ? currentSale.payment_methods.map((row) => ({
                     payment_method_id: Number(row.payment_method_id || row.methodId || paymentMethods[0]?.id || 0),
@@ -441,6 +510,10 @@
                 localStorage.setItem('restaurantDB', JSON.stringify(db));
             }
 
+            if (invoiceMode && invoiceDocumentIds.has(Number(currentSale.document_type_id || 0)) && currentSale.billing_status === 'PENDING') {
+                currentSale.billing_status = 'INVOICED';
+            }
+
             const getImageUrl = (imgUrl) => imgUrl && String(imgUrl).trim() !== ''
                 ? imgUrl
                 : 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIj48cmVjdCBmaWxsPSIjZTJlOGYwIiB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiM2NDc0OGIiPlNpbiBpbWFnZW48L3RleHQ+PC9zdmc+';
@@ -449,6 +522,96 @@
                 if (isEditMode) return;
                 db[activeKey] = currentSale;
                 localStorage.setItem('restaurantDB', JSON.stringify(db));
+            };
+            const isInvoiceDocumentSelected = () => invoiceDocumentIds.has(Number(currentSale.document_type_id || 0));
+            const isDebtSaleSelected = () => String(currentSale.payment_type || 'CONTADO') === 'DEUDA';
+            const normalizeBillingState = () => {
+                if (!isInvoiceDocumentSelected()) {
+                    currentSale.billing_status = 'NOT_APPLICABLE';
+                    currentSale.invoice_number = '';
+                    if (!currentSale.invoice_series) {
+                        currentSale.invoice_series = '001';
+                    }
+                    return;
+                }
+
+                if (!['INVOICED', 'PENDING'].includes(String(currentSale.billing_status || ''))) {
+                    currentSale.billing_status = invoiceMode ? 'INVOICED' : 'PENDING';
+                }
+
+                if (!currentSale.invoice_series) {
+                    currentSale.invoice_series = '001';
+                }
+
+                if (currentSale.billing_status === 'PENDING') {
+                    currentSale.invoice_number = '';
+                }
+            };
+            const syncInvoiceBillingFields = () => {
+                normalizeBillingState();
+
+                const block = document.getElementById('invoice-billing-block');
+                const billingStatusSelect = document.getElementById('billing-status-select');
+                const invoiceSeriesGroup = document.getElementById('invoice-series-group');
+                const invoiceNumberGroup = document.getElementById('invoice-number-group');
+                const invoiceSeriesInput = document.getElementById('invoice-series-input');
+                const invoiceNumberInput = document.getElementById('invoice-number-input');
+                const isInvoice = isInvoiceDocumentSelected();
+                const isInvoiced = isInvoice && currentSale.billing_status === 'INVOICED';
+
+                if (block) {
+                    block.classList.toggle('hidden', !isInvoice);
+                }
+
+                if (billingStatusSelect) {
+                    billingStatusSelect.value = isInvoice ? currentSale.billing_status : 'PENDING';
+                }
+
+                if (invoiceSeriesInput) {
+                    invoiceSeriesInput.value = currentSale.invoice_series || '001';
+                }
+
+                if (invoiceNumberInput) {
+                    invoiceNumberInput.value = currentSale.invoice_number || '';
+                }
+
+                if (invoiceSeriesGroup) {
+                    invoiceSeriesGroup.classList.toggle('hidden', !isInvoiced);
+                }
+
+                if (invoiceNumberGroup) {
+                    invoiceNumberGroup.classList.toggle('hidden', !isInvoiced);
+                }
+            };
+            const syncPaymentTypeUI = () => {
+                const paymentTypeSelect = document.getElementById('payment-type-select');
+                const paymentMethodsSection = document.getElementById('payment-methods-section');
+                const debtNotice = document.getElementById('sale-debt-notice');
+                const isDebtSale = isDebtSaleSelected();
+
+                if (paymentTypeSelect) {
+                    paymentTypeSelect.value = isDebtSale ? 'DEUDA' : 'CONTADO';
+                }
+
+                if (paymentMethodsSection) {
+                    paymentMethodsSection.classList.toggle('hidden', isDebtSale);
+                }
+
+                if (debtNotice) {
+                    debtNotice.classList.toggle('hidden', !isDebtSale);
+                }
+            };
+            const handlePaymentTypeChange = (nextValue) => {
+                currentSale.payment_type = String(nextValue || 'CONTADO').toUpperCase() === 'DEUDA' ? 'DEUDA' : 'CONTADO';
+                if (isDebtSaleSelected()) {
+                    paymentRows = [];
+                    syncPaymentRows();
+                } else if (!paymentRows.length) {
+                    addPaymentRow(Number(getTotalFromSale().toFixed(2)));
+                }
+                syncPaymentTypeUI();
+                renderPaymentRows();
+                saveDB();
             };
             const getProductCategory = (prod) => (prod && prod.category && String(prod.category).trim() !== '') ? String(prod.category).trim() : 'Sin categoria';
             const filteredClients = () => {
@@ -665,6 +828,11 @@
             function syncPaymentAmountsWithTotal() {
                 const total = Number(getTotalFromSale().toFixed(2));
 
+                if (isDebtSaleSelected()) {
+                    updatePaymentSummary();
+                    return;
+                }
+
                 if (!currentSale.items.length) {
                     updatePaymentSummary();
                     return;
@@ -694,8 +862,10 @@
 
             function updatePaymentSummary() {
                 const total = getTotalFromSale();
-                const paid = paymentRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
-                const diff = total - paid;
+                const paid = isDebtSaleSelected()
+                    ? 0
+                    : paymentRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+                const diff = isDebtSaleSelected() ? total : (total - paid);
                 const totalEl = document.getElementById('payment-total');
                 const diffWrap = document.getElementById('payment-difference-wrap');
                 const diffLabel = document.getElementById('payment-difference-label');
@@ -1104,11 +1274,13 @@
             function clearSale() {
                 currentSale.items = [];
                 currentSale.notes = '';
+                currentSale.payment_type = 'CONTADO';
                 paymentRows = [];
                 saveDB();
                 syncPaymentRows();
                 const notesInput = document.getElementById('sale-notes');
                 if (notesInput) notesInput.value = '';
+                syncPaymentTypeUI();
                 renderPaymentRows();
                 renderTicket();
                 showNotice('La orden actual fue limpiada.');
@@ -1120,19 +1292,36 @@
                     return;
                 }
 
-                if (!paymentRows.length) {
+                if (!isDebtSaleSelected() && !paymentRows.length) {
                     showNotice('Agrega al menos un metodo de pago.');
                     return;
                 }
 
                 const total = getTotalFromSale();
                 const totalPaid = paymentRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
-                if (Math.abs(totalPaid - total) > 0.01) {
+                if (!isDebtSaleSelected() && Math.abs(totalPaid - total) > 0.01) {
                     showNotice('La suma de los pagos debe coincidir con el total.');
                     return;
                 }
 
-                const invalidCardRow = paymentRows.find((row) => {
+                normalizeBillingState();
+                if (isInvoiceDocumentSelected() && currentSale.billing_status === 'INVOICED') {
+                    if (!String(currentSale.invoice_series || '').trim()) {
+                        showNotice('Ingresa la serie de la factura.');
+                        setAsideTab('payment');
+                        document.getElementById('invoice-series-input')?.focus();
+                        return;
+                    }
+
+                    if (!String(currentSale.invoice_number || '').trim()) {
+                        showNotice('Ingresa el correlativo de la factura.');
+                        setAsideTab('payment');
+                        document.getElementById('invoice-number-input')?.focus();
+                        return;
+                    }
+                }
+
+                const invalidCardRow = isDebtSaleSelected() ? null : paymentRows.find((row) => {
                     return isCardMethod(row.payment_method_id) && (!row.payment_gateway_id || !row.card_id);
                 });
                 if (invalidCardRow) {
@@ -1147,10 +1336,14 @@
                         price: Number(item.price),
                         note: item.note || '',
                     })),
+                    payment_type: currentSale.payment_type || 'CONTADO',
                     document_type_id: Number(document.getElementById('document-type-select')?.value || 0),
                     cash_register_id: Number(document.getElementById('cash-register-select')?.value || 0),
                     person_id: currentSale.clientId ? Number(currentSale.clientId) : null,
-                    payment_methods: paymentRows.map((row) => ({
+                    billing_status: isInvoiceDocumentSelected() ? currentSale.billing_status : 'NOT_APPLICABLE',
+                    invoice_series: isInvoiceDocumentSelected() ? (currentSale.invoice_series || '') : '',
+                    invoice_number: isInvoiceDocumentSelected() && currentSale.billing_status === 'INVOICED' ? (currentSale.invoice_number || '') : '',
+                    payment_methods: isDebtSaleSelected() ? [] : paymentRows.map((row) => ({
                         payment_method_id: Number(row.payment_method_id),
                         amount: Number(row.amount),
                         payment_gateway_id: row.payment_gateway_id ? Number(row.payment_gateway_id) : null,
@@ -1197,8 +1390,12 @@
                             notes: '',
                             items: [],
                             payment_methods: [],
+                            payment_type: 'CONTADO',
                             document_type_id: defaultDocumentTypeId,
                             cash_register_id: defaultCashRegisterId,
+                            billing_status: 'NOT_APPLICABLE',
+                            invoice_series: '001',
+                            invoice_number: '',
                         };
                         paymentRows = [];
                         db[activeKey] = currentSale;
@@ -1212,6 +1409,7 @@
                             clientInputEl.value = currentSale.clientName;
                             clientQuery = currentSale.clientName;
                         }
+                        syncPaymentTypeUI();
                         showNotification('Venta procesada correctamente');
                         setTimeout(() => {
                             window.location.href = @json($salesIndexUrl);
@@ -1245,7 +1443,11 @@
                     },
                     body: JSON.stringify({
                         items: currentSale.items.map((item) => ({ pId: item.pId, qty: Number(item.qty), price: Number(item.price), note: item.note || '' })),
+                        payment_type: currentSale.payment_type || 'CONTADO',
                         document_type_id: Number(document.getElementById('document-type-select')?.value || 0) || null,
+                        billing_status: isInvoiceDocumentSelected() ? currentSale.billing_status : 'NOT_APPLICABLE',
+                        invoice_series: isInvoiceDocumentSelected() ? (currentSale.invoice_series || '') : '',
+                        invoice_number: isInvoiceDocumentSelected() && currentSale.billing_status === 'INVOICED' ? (currentSale.invoice_number || '') : '',
                         notes: document.getElementById('sale-notes')?.value || 'Venta guardada como borrador - pendiente de pago'
                     })
                 }).finally(() => {
@@ -1271,10 +1473,29 @@
             });
             document.getElementById('document-type-select')?.addEventListener('change', (event) => {
                 currentSale.document_type_id = Number(event.target.value || 0) || null;
+                normalizeBillingState();
+                syncInvoiceBillingFields();
                 saveDB();
+            });
+            document.getElementById('payment-type-select')?.addEventListener('change', (event) => {
+                handlePaymentTypeChange(event.target.value);
             });
             document.getElementById('cash-register-select')?.addEventListener('change', (event) => {
                 currentSale.cash_register_id = Number(event.target.value || 0) || null;
+                saveDB();
+            });
+            document.getElementById('billing-status-select')?.addEventListener('change', (event) => {
+                currentSale.billing_status = String(event.target.value || 'PENDING');
+                normalizeBillingState();
+                syncInvoiceBillingFields();
+                saveDB();
+            });
+            document.getElementById('invoice-series-input')?.addEventListener('input', (event) => {
+                currentSale.invoice_series = String(event.target.value || '');
+                saveDB();
+            });
+            document.getElementById('invoice-number-input')?.addEventListener('input', (event) => {
+                currentSale.invoice_number = String(event.target.value || '');
                 saveDB();
             });
             document.getElementById('client-autocomplete')?.addEventListener('focus', () => {
@@ -1336,12 +1557,30 @@
             if (cashRegisterSelect && currentSale.cash_register_id) {
                 cashRegisterSelect.value = String(currentSale.cash_register_id);
             }
+            const paymentTypeSelect = document.getElementById('payment-type-select');
+            if (paymentTypeSelect) {
+                paymentTypeSelect.value = currentSale.payment_type || 'CONTADO';
+            }
+            const billingStatusSelect = document.getElementById('billing-status-select');
+            if (billingStatusSelect) {
+                billingStatusSelect.value = ['INVOICED', 'PENDING'].includes(currentSale.billing_status) ? currentSale.billing_status : 'PENDING';
+            }
+            const invoiceSeriesInput = document.getElementById('invoice-series-input');
+            if (invoiceSeriesInput) {
+                invoiceSeriesInput.value = currentSale.invoice_series || '001';
+            }
+            const invoiceNumberInput = document.getElementById('invoice-number-input');
+            if (invoiceNumberInput) {
+                invoiceNumberInput.value = currentSale.invoice_number || '';
+            }
 
             renderCategoryFilters();
             renderProducts();
-            renderPaymentRows();
             renderTicket();
-            setAsideTab('summary');
+            syncPaymentTypeUI();
+            syncInvoiceBillingFields();
+            renderPaymentRows();
+            setAsideTab(invoiceMode ? 'payment' : 'summary');
 
             window.goBack = goBack;
             window.cancelEditSale = cancelEditSale;

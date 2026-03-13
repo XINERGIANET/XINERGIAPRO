@@ -305,8 +305,11 @@
                                 </div>
                             </div>
                         <div class="grid gap-3 sm:grid-cols-2">
-                            <div><label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Tipo pago</label><select name="payment_type" x-model="paymentType" @change="onPaymentTypeChange()" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"><option value="CONTADO">CONTADO</option><option value="CREDITO">CREDITO</option></select></div>
-                            <div x-show="paymentType==='CONTADO'"><label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Caja</label><select name="cash_register_id" x-model.number="cashRegisterId" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"><template x-for="cashRegister in cashRegisters" :key="cashRegister.id"><option :value="cashRegister.id" x-text="cashRegister.status==='A' ? `${cashRegister.number} (Activa)` : cashRegister.number"></option></template></select></div>
+                            <div><label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Tipo pago</label><select name="payment_type" x-model="paymentType" @change="onPaymentTypeChange()" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"><option value="CONTADO">CONTADO</option><option value="CREDITO">CREDITO / DEUDA</option></select></div>
+                            <div><label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Caja</label><select name="cash_register_id" x-model.number="cashRegisterId" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"><template x-for="cashRegister in cashRegisters" :key="cashRegister.id"><option :value="cashRegister.id" x-text="cashRegister.status==='A' ? `${cashRegister.number} (Activa)` : cashRegister.number"></option></template></select></div>
+                        </div>
+                        <div x-show="paymentType==='CREDITO'" class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+                            Esta compra se registrara como deuda y se enviara a cuentas por pagar.
                         </div>
                     </div>
                 </div>

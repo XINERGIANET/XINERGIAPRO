@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ticket {{ $sale->number }}</title>
+    <title>Ticket {{ $sale->salesDocumentCode() }}</title>
     <style>
         * {
             font-family: Verdana, sans-serif;
@@ -170,7 +170,7 @@
 <body>
 @php
     $docName = strtoupper($sale->documentType?->name ?? 'TICKET DE VENTA');
-    $docCode = strtoupper(substr($sale->documentType?->name ?? 'T', 0, 1)) . ($sale->salesMovement?->series ?? '001') . '-' . $sale->number;
+    $docCode = $sale->salesDocumentCode();
 @endphp
 
 <div class="ticket-wrapper">

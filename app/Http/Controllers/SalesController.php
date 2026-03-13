@@ -22,6 +22,7 @@ use App\Models\Shift;
 use App\Models\TaxRate;
 use App\Models\Unit;
 use App\Models\Operation;
+use App\Services\AccountReceivablePayableService;
 use App\Services\KardexSyncService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -38,6 +39,8 @@ class SalesController extends Controller
     {
         $search = $request->input('search');
         $viewId = $request->input('view_id');
+        $billingStatus = (string) $request->input('billing_status', 'all');
+        $documentTypeId = (string) $request->input('document_type_id', 'all');
         $branchId = $request->session()->get('branch_id');
         $profileId = $request->session()->get('profile_id') ?? $request->user()?->profile_id;
         $operaciones = collect();
@@ -71,17 +74,36 @@ class SalesController extends Controller
             $perPage = 10;
         }
 
+        $saleDocumentTypes = DocumentType::query()
+            ->where('movement_type_id', 2)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $selectedDocumentTypeId = 'all';
+        if ($documentTypeId !== 'all' && $saleDocumentTypes->contains(fn ($documentType) => (string) $documentType->id === $documentTypeId)) {
+            $selectedDocumentTypeId = $documentTypeId;
+        }
+
         $sales = Movement::query()
             ->with(['branch', 'person', 'movementType', 'documentType', 'salesMovement'])
             ->where('movement_type_id', 2) //2 es venta
             ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
+            ->when($selectedDocumentTypeId !== 'all', fn ($query) => $query->where('document_type_id', (int) $selectedDocumentTypeId))
             ->when($search, function ($query) use ($search) {
                 $query->where(function ($inner) use ($search) {
                     $inner->where('number', 'ILIKE', "%{$search}%")
                         ->orWhere('person_name', 'ILIKE', "%{$search}%")
-                        ->orWhere('user_name', 'ILIKE', "%{$search}%");
+                        ->orWhere('user_name', 'ILIKE', "%{$search}%")
+                        ->orWhereHas('salesMovement', function ($salesMovementQuery) use ($search) {
+                            $salesMovementQuery
+                                ->where('series', 'ILIKE', "%{$search}%")
+                                ->orWhere('billing_number', 'ILIKE', "%{$search}%")
+                                ->orWhere('billing_status', 'ILIKE', "%{$search}%");
+                        });
                 });
             })
+            ->when($billingStatus === 'pending', fn ($query) => $query->whereHas('salesMovement', fn ($salesMovementQuery) => $salesMovementQuery->where('billing_status', 'PENDING')))
+            ->when($billingStatus === 'invoiced', fn ($query) => $query->whereHas('salesMovement', fn ($salesMovementQuery) => $salesMovementQuery->where('billing_status', 'INVOICED')))
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
@@ -89,6 +111,9 @@ class SalesController extends Controller
         return view('sales.index', [
             'sales' => $sales,
             'search' => $search,
+            'billingStatus' => $billingStatus,
+            'selectedDocumentTypeId' => $selectedDocumentTypeId,
+            'saleDocumentTypes' => $saleDocumentTypes,
             'perPage' => $perPage,
             'operaciones' => $operaciones,
         ] + $this->getFormData());
@@ -222,6 +247,7 @@ class SalesController extends Controller
             'productsBranches' => $productBranches,
             'initialSaleData' => $initialSaleData,
             'posMode' => $posMode,
+            'invoiceMode' => request()->boolean('invoice_mode'),
         ];
     }
 
@@ -229,9 +255,20 @@ class SalesController extends Controller
     {
         $sale->loadMissing(['salesMovement.details.product']);
         $cashMovement = $this->resolveCashMovementBySaleMovement((int) $sale->id);
+        $debtRegistered = $cashMovement
+            ? DB::table('cash_movement_details')
+                ->where('cash_movement_id', $cashMovement->id)
+                ->where('status', 'A')
+                ->where('type', 'DEUDA')
+                ->exists()
+            : false;
+        $rawPaymentType = strtoupper((string) ($sale->salesMovement?->payment_type ?? 'CONTADO'));
+        $paymentType = $debtRegistered || in_array($rawPaymentType, ['CREDITO', 'CREDIT', 'DEUDA'], true)
+            ? 'DEUDA'
+            : 'CONTADO';
 
         $paymentMethods = [];
-        if ($cashMovement) {
+        if ($cashMovement && $paymentType !== 'DEUDA') {
             $paymentMethods = DB::table('cash_movement_details')
                 ->where('cash_movement_id', $cashMovement->id)
                 ->where('status', 'A')
@@ -280,6 +317,10 @@ class SalesController extends Controller
             'notes' => (string) ($sale->comment ?? ''),
             'document_type_id' => (int) ($sale->document_type_id ?: $defaultDocumentTypeId),
             'cash_register_id' => (int) ($cashMovement?->cash_register_id ?: $defaultCashRegisterId),
+            'billing_status' => (string) ($sale->salesMovement?->billing_status ?: ($this->isInvoiceDocumentType($sale->documentType) ? 'INVOICED' : 'NOT_APPLICABLE')),
+            'invoice_series' => (string) ($sale->salesMovement?->series ?: '001'),
+            'invoice_number' => (string) ($sale->salesMovement?->billing_number ?: ($this->isInvoiceDocumentType($sale->documentType) ? ($sale->number ?? '') : '')),
+            'payment_type' => $paymentType,
             'items' => $items,
             'payment_methods' => $paymentMethods,
         ];
@@ -455,12 +496,16 @@ class SalesController extends Controller
                     Rule::exists('cash_registers', 'id')->where(fn ($query) => $query->where('branch_id', $branchId)),
                 ],
                 'person_id' => 'nullable|integer|exists:people,id',
-                'payment_methods' => 'required|array|min:1',
-                'payment_methods.*.payment_method_id' => 'required|integer|exists:payment_methods,id',
-                'payment_methods.*.amount' => 'required|numeric|min:0.01',
+                'payment_type' => 'required|string|in:CONTADO,DEUDA',
+                'payment_methods' => 'nullable|array',
+                'payment_methods.*.payment_method_id' => 'nullable|integer|exists:payment_methods,id',
+                'payment_methods.*.amount' => 'nullable|numeric|min:0.01',
                 'payment_methods.*.payment_gateway_id' => 'nullable|integer|exists:payment_gateways,id',
                 'payment_methods.*.card_id' => 'nullable|integer|exists:cards,id',
                 'payment_methods.*.digital_wallet_id' => 'nullable|integer|exists:digital_wallets,id',
+                'billing_status' => 'nullable|string|in:PENDING,INVOICED,NOT_APPLICABLE',
+                'invoice_series' => 'nullable|string|max:20',
+                'invoice_number' => 'nullable|string|max:50',
                 'notes' => 'nullable|string',
                 'movement_id' => 'nullable|integer|exists:movements,id', // ID del borrador a completar
             ]);
@@ -503,6 +548,30 @@ class SalesController extends Controller
             }
             
             $documentType = DocumentType::findOrFail($request->document_type_id);
+            $isInvoiceDocument = $this->isInvoiceDocumentType($documentType);
+            $billingStatus = $this->normalizeBillingStatus($validated['billing_status'] ?? null, $isInvoiceDocument);
+            $paymentType = strtoupper((string) ($validated['payment_type'] ?? 'CONTADO'));
+            $isDebtSale = $paymentType === 'DEUDA';
+            $invoiceSeries = $isInvoiceDocument
+                ? trim((string) ($validated['invoice_series'] ?? '001'))
+                : '001';
+            $invoiceNumber = $isInvoiceDocument && $billingStatus === 'INVOICED'
+                ? trim((string) ($validated['invoice_number'] ?? ''))
+                : null;
+
+            if ($isInvoiceDocument && $billingStatus === 'INVOICED') {
+                if ($invoiceSeries === '') {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'invoice_series' => 'La serie es obligatoria cuando la factura ya esta facturada.',
+                    ]);
+                }
+
+                if ($invoiceNumber === '') {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'invoice_number' => 'El correlativo es obligatorio cuando la factura ya esta facturada.',
+                    ]);
+                }
+            }
 
             $selectedPerson = null;
             if (!empty($validated['person_id'])) {
@@ -555,8 +624,19 @@ class SalesController extends Controller
             }
 
             // Validar que la suma de los métodos de pago sea igual al total
-            $totalPaymentMethods = array_sum(array_column($request->payment_methods, 'amount'));
-            if (abs($totalPaymentMethods - $total) > 0.01) {
+            $paymentRows = collect($validated['payment_methods'] ?? [])
+                ->filter(fn ($row) => !empty($row['payment_method_id']) && (float) ($row['amount'] ?? 0) > 0)
+                ->values()
+                ->all();
+
+            if (!$isDebtSale && empty($paymentRows)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'payment_methods' => 'Debes registrar al menos un metodo de pago cuando la venta es al contado.',
+                ]);
+            }
+
+            $totalPaymentMethods = array_sum(array_map(fn ($row) => (float) ($row['amount'] ?? 0), $paymentRows));
+            if (!$isDebtSale && abs($totalPaymentMethods - $total) > 0.01) {
                 throw new \Exception("La suma de los métodos de pago ({$totalPaymentMethods}) debe ser igual al total ({$total})");
             }
 
@@ -567,7 +647,7 @@ class SalesController extends Controller
             $total = $calculated['total'];
 
             // Calcular el total recibido de todos los métodos de pago
-            $amountReceived = $totalPaymentMethods;
+            $amountReceived = $isDebtSale ? 0 : $totalPaymentMethods;
 
             // Verificar si es un borrador a completar
             $isDraft = $request->has('movement_id') && $request->movement_id;
@@ -590,7 +670,7 @@ class SalesController extends Controller
 
                 // Actualizar el movimiento - siempre se completa el pago completo
                 $movement->update([
-                    'comment' => $request->notes ?? 'Venta completada desde punto de venta',
+                    'comment' => $request->notes ?? ($isDebtSale ? 'Venta registrada como deuda' : 'Venta completada desde punto de venta'),
                     'status' => 'A', // Siempre Activo (pago completo)
                     'document_type_id' => $documentType->id,
                     'person_id' => $selectedPerson?->id,
@@ -642,7 +722,7 @@ class SalesController extends Controller
                         : 'Publico General',
                     'responsible_id' => $user?->id,
                     'responsible_name' => trim((string) ($user?->name ?? 'Sistema')),
-                    'comment' => $request->notes ?? '',
+                    'comment' => $request->notes ?? ($isDebtSale ? 'Venta registrada como deuda' : ''),
                     'status' => 'A', // Siempre Activo (pago completo)
                     'movement_type_id' => $movementType->id,
                     'document_type_id' => $documentType->id,
@@ -657,12 +737,25 @@ class SalesController extends Controller
                 ]);
             } 
 
+            if ($isInvoiceDocument && $billingStatus === 'INVOICED') {
+                $this->ensureUniqueInvoiceReference(
+                    $branchId,
+                    (int) $documentType->id,
+                    $invoiceSeries,
+                    $invoiceNumber,
+                    (int) $movement->id
+                );
+            }
+
             // Crear o actualizar SalesMovement
             if ($isDraft && $movement->salesMovement) {
                 // Actualizar el SalesMovement existente
                 $salesMovement = $movement->salesMovement;
                 $salesMovement->update([
-                    'payment_type' => 'CASH', // Siempre CASH (pago completo)
+                    'series' => $invoiceSeries !== '' ? $invoiceSeries : ($salesMovement->series ?: '001'),
+                    'billing_status' => $billingStatus,
+                    'billing_number' => $invoiceNumber,
+                    'payment_type' => $isDebtSale ? 'CREDITO' : 'CONTADO',
                     'subtotal' => $subtotal,
                     'tax' => $tax,
                     'total' => $total,
@@ -674,11 +767,13 @@ class SalesController extends Controller
                         'id' => $branch->id,
                         'legal_name' => $branch->legal_name,
                     ],
-                    'series' => '001',
+                    'series' => $invoiceSeries !== '' ? $invoiceSeries : '001',
+                    'billing_status' => $billingStatus,
+                    'billing_number' => $invoiceNumber,
                     'year' => Carbon::now()->year,
                     'detail_type' => 'DETALLADO',
                     'consumption' => 'N',
-                    'payment_type' => 'CONTADO', // Siempre CASH (pago completo)
+                    'payment_type' => $isDebtSale ? 'CREDITO' : 'CONTADO',
                     'status' => 'N' ,
                     'sale_type' => 'MINORISTA',
                     'currency' => 'PEN',
@@ -792,7 +887,7 @@ class SalesController extends Controller
                         : 'Publico General',
                     'responsible_id' => $user?->id,
                     'responsible_name' => trim((string) ($user?->name ?? 'Sistema')),
-                    'comment' => 'Cobro de venta ' . $movement->number,
+                    'comment' => ($isDebtSale ? 'Registro de deuda de venta ' : 'Cobro de venta ') . $movement->number,
                     'status' => '1',
                     'movement_type_id' => 4,
                     'document_type_id' => 9,
@@ -806,7 +901,7 @@ class SalesController extends Controller
                     'person_name' => $selectedPerson
                         ? trim(($selectedPerson->first_name ?? '') . ' ' . ($selectedPerson->last_name ?? ''))
                         : 'Publico General',
-                    'comment' => 'Cobro de venta ' . $movement->number,
+                    'comment' => ($isDebtSale ? 'Registro de deuda de venta ' : 'Cobro de venta ') . $movement->number,
                     'status' => '1',
                     'movement_type_id' => 4,
                     'document_type_id' => 9,
@@ -855,7 +950,42 @@ class SalesController extends Controller
             }
 
             // Crear CashMovementDetail para cada método de pago
-            foreach ($request->payment_methods as $paymentMethodData) {
+            if ($isDebtSale) {
+                $debtPaymentMethod = $this->resolveDebtPaymentMethod();
+
+                DB::table('cash_movement_details')->insert([
+                    'cash_movement_id' => $cashMovement->id,
+                    'type' => 'DEUDA',
+                    'due_at' => $movement->moved_at ?? now(),
+                    'paid_at' => null,
+                    'payment_method_id' => $debtPaymentMethod->id,
+                    'payment_method' => $debtPaymentMethod->description ?? 'Deuda',
+                    'number' => $cashEntryMovement->number,
+                    'card_id' => null,
+                    'card' => '',
+                    'bank_id' => null,
+                    'bank' => '',
+                    'digital_wallet_id' => null,
+                    'digital_wallet' => '',
+                    'payment_gateway_id' => null,
+                    'payment_gateway' => '',
+                    'amount' => $total,
+                    'comment' => $request->notes ?? ('Venta registrada como deuda - ' . $documentType->name),
+                    'status' => 'A',
+                    'branch_id' => $branchId,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                app(AccountReceivablePayableService::class)->syncDebtAccount(
+                    $cashMovement,
+                    AccountReceivablePayableService::TYPE_RECEIVABLE,
+                    $movement->moved_at ?? now()
+                );
+            } else {
+                app(AccountReceivablePayableService::class)->removeDebtAccountByCashMovementId((int) $cashMovement->id);
+
+                foreach ($paymentRows as $paymentMethodData) {
                 $paymentMethod = PaymentMethod::findOrFail($paymentMethodData['payment_method_id']);
                 $paymentMethodDescription = mb_strtolower((string) ($paymentMethod->description ?? ''));
                 $paymentGateway = null;
@@ -904,6 +1034,7 @@ class SalesController extends Controller
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
+                }
             }
 
             DB::commit();
@@ -956,6 +1087,10 @@ class SalesController extends Controller
                 // Compatibilidad: algunos flujos pueden enviar `comment` en lugar de `note`
                 'items.*.comment' => 'nullable|string|max:65535',
                 'document_type_id' => 'nullable|integer|exists:document_types,id',
+                'payment_type' => 'nullable|string|in:CONTADO,DEUDA',
+                'billing_status' => 'nullable|string|in:PENDING,INVOICED,NOT_APPLICABLE',
+                'invoice_series' => 'nullable|string|max:20',
+                'invoice_number' => 'nullable|string|max:50',
                 'notes' => 'nullable|string',
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -1020,6 +1155,16 @@ class SalesController extends Controller
             $tax = $calculated['tax'];
             $total = $calculated['total'];
 
+            $isInvoiceDocument = $this->isInvoiceDocumentType($documentType);
+            $billingStatus = $this->normalizeBillingStatus($validated['billing_status'] ?? null, $isInvoiceDocument);
+            $paymentType = strtoupper((string) ($validated['payment_type'] ?? 'CONTADO'));
+            $invoiceSeries = $isInvoiceDocument
+                ? trim((string) ($validated['invoice_series'] ?? '001'))
+                : '001';
+            $invoiceNumber = $isInvoiceDocument && $billingStatus === 'INVOICED'
+                ? trim((string) ($validated['invoice_number'] ?? ''))
+                : null;
+
             // Generar numero de movimiento con serie/correlativo por documento y caja activa
             $activeCashRegisterId = $this->resolveActiveCashRegisterId((int) $branchId);
             $number = $this->generateSaleNumber(
@@ -1058,11 +1203,13 @@ class SalesController extends Controller
                     'id' => $branch->id,
                     'legal_name' => $branch->legal_name,
                 ],
-                'series' => '001',
+                'series' => $invoiceSeries !== '' ? $invoiceSeries : '001',
+                'billing_status' => $billingStatus,
+                'billing_number' => $invoiceNumber,
                 'year' => Carbon::now()->year,
                 'detail_type' => 'DETALLADO',
                 'consumption' => 'N',
-                'payment_type' => 'CONTADO', 
+                'payment_type' => $paymentType === 'DEUDA' ? 'CREDITO' : 'CONTADO',
                 'status' => 'N',
                 'sale_type' => 'MINORISTA',
                 'currency' => 'PEN',
@@ -1222,6 +1369,94 @@ class SalesController extends Controller
             ->with('status', 'Venta actualizada correctamente.');
     }
 
+    public function invoice(Request $request, Movement $sale)
+    {
+        $branchId = (int) ($request->session()->get('branch_id') ?? 0);
+        if ($branchId > 0 && (int) $sale->branch_id !== $branchId) {
+            abort(404);
+        }
+
+        $sale->loadMissing(['salesMovement', 'documentType', 'person']);
+
+        if (!$sale->isSalesInvoice()) {
+            return back()
+                ->withErrors(['error' => 'Solo las ventas con factura pueden usar este formulario.'])
+                ->withInput();
+        }
+
+        if ($sale->salesBillingStatus() !== 'PENDING') {
+            return back()
+                ->withErrors(['error' => 'La venta seleccionada ya fue facturada.'])
+                ->withInput();
+        }
+
+        $validator = validator($request->all(), [
+            'invoice_sale_id' => ['required', 'integer', Rule::in([(int) $sale->id])],
+            'person_id' => [
+                'required',
+                'integer',
+                Rule::exists('people', 'id')->where(function ($query) use ($branchId) {
+                    if ($branchId > 0) {
+                        $query->where('branch_id', $branchId);
+                    }
+                }),
+            ],
+            'invoice_series' => ['required', 'string', 'max:20'],
+            'invoice_number' => ['required', 'string', 'max:50'],
+        ]);
+
+        if ($validator->fails()) {
+            return back()
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        $validated = $validator->validated();
+        $person = Person::query()->findOrFail((int) $validated['person_id']);
+        $invoiceSeries = trim((string) $validated['invoice_series']);
+        $invoiceNumber = trim((string) $validated['invoice_number']);
+
+        try {
+            DB::transaction(function () use ($sale, $person, $invoiceSeries, $invoiceNumber, $branchId) {
+                $salesMovement = $sale->salesMovement;
+                if (!$salesMovement) {
+                    throw new \RuntimeException('La venta no tiene registro comercial asociado.');
+                }
+
+                $this->ensureUniqueInvoiceReference(
+                    $branchId > 0 ? $branchId : (int) $sale->branch_id,
+                    (int) $sale->document_type_id,
+                    $invoiceSeries,
+                    $invoiceNumber,
+                    (int) $sale->id
+                );
+
+                $sale->update([
+                    'person_id' => (int) $person->id,
+                    'person_name' => trim((string) ($person->first_name ?? '') . ' ' . (string) ($person->last_name ?? '')),
+                ]);
+
+                $salesMovement->update([
+                    'series' => $invoiceSeries,
+                    'billing_status' => 'INVOICED',
+                    'billing_number' => $invoiceNumber,
+                ]);
+            });
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return back()
+                ->withErrors($e->errors())
+                ->withInput();
+        } catch (\Throwable $e) {
+            return back()
+                ->withErrors(['error' => $e->getMessage()])
+                ->withInput();
+        }
+
+        return redirect()
+            ->route('admin.sales.index', $request->filled('view_id') ? ['view_id' => $request->input('view_id')] : [])
+            ->with('status', 'Factura registrada correctamente.');
+    }
+
     public function destroy(Movement $sale)
     {
         app(KardexSyncService::class)->deleteMovement($sale->id);
@@ -1250,7 +1485,12 @@ class SalesController extends Controller
     private function getFormData(?Movement $sale = null): array
     {
         $branches = Branch::query()->orderBy('legal_name')->get(['id', 'legal_name']);
-        $people = Person::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
+        $branchId = (int) (session('branch_id') ?? 0);
+        $people = Person::query()
+            ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name', 'document_number']);
         $movementTypes = MovementType::query()->orderBy('description')->get(['id', 'description']);
         $documentTypes = DocumentType::query()->orderBy('name')->get(['id', 'name']);
 
@@ -1438,7 +1678,7 @@ class SalesController extends Controller
             return view('sales.print.pdf', $printData);
         }
 
-        $docName = strtoupper(substr($sale->documentType?->name ?? 'C', 0, 1)) . ($sale->salesMovement?->series ?? '001') . '-' . $sale->number;
+        $docName = $sale->salesDocumentCode();
         return response($pdfBinary, 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="' . $docName . '.pdf"',
@@ -1469,7 +1709,7 @@ class SalesController extends Controller
             return view('sales.print.ticket', $printData);
         }
 
-        $docName = strtoupper(substr($sale->documentType?->name ?? 'T', 0, 1)) . ($sale->salesMovement?->series ?? '001') . '-' . $sale->number;
+        $docName = $sale->salesDocumentCode();
         return response($pdfBinary, 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="' . $docName . '-ticket.pdf"',
@@ -1558,6 +1798,56 @@ class SalesController extends Controller
         $firstLetter = strtoupper(substr(preg_replace('/[^a-zA-Z]/', '', $documentName) ?: 'X', 0, 1));
 
         return $firstLetter !== '' ? $firstLetter : 'X';
+    }
+
+    private function isInvoiceDocumentType(?DocumentType $documentType): bool
+    {
+        $name = mb_strtolower((string) ($documentType?->name ?? ''), 'UTF-8');
+
+        return str_contains($name, 'factura');
+    }
+
+    private function normalizeBillingStatus(?string $billingStatus, bool $isInvoiceDocument): string
+    {
+        if (!$isInvoiceDocument) {
+            return 'NOT_APPLICABLE';
+        }
+
+        $normalized = strtoupper(trim((string) $billingStatus));
+
+        return match ($normalized) {
+            'INVOICED' => 'INVOICED',
+            default => 'PENDING',
+        };
+    }
+
+    private function ensureUniqueInvoiceReference(
+        int $branchId,
+        int $documentTypeId,
+        string $series,
+        string $billingNumber,
+        ?int $currentMovementId = null
+    ): void {
+        $exists = SalesMovement::query()
+            ->where('billing_status', 'INVOICED')
+            ->where('series', $series)
+            ->where('billing_number', $billingNumber)
+            ->whereHas('movement', function ($query) use ($branchId, $documentTypeId, $currentMovementId) {
+                $query
+                    ->where('branch_id', $branchId)
+                    ->where('document_type_id', $documentTypeId);
+
+                if ($currentMovementId) {
+                    $query->where('id', '!=', $currentMovementId);
+                }
+            })
+            ->exists();
+
+        if ($exists) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'invoice_number' => 'Ya existe una factura con esa serie y correlativo en esta sucursal.',
+            ]);
+        }
     }
 
     private function resolveActiveCashRegisterId(int $branchId): int
@@ -1711,7 +2001,7 @@ class SalesController extends Controller
 
     private function resolveSalePaymentLabel(Movement $sale): string
     {
-        if (($sale->salesMovement?->payment_type ?? null) === 'CREDIT') {
+        if (in_array(strtoupper((string) ($sale->salesMovement?->payment_type ?? '')), ['CREDIT', 'CREDITO', 'DEUDA'], true)) {
             return 'Credito';
         }
 
@@ -1729,6 +2019,24 @@ class SalesController extends Controller
             ->value('pm.description');
 
         return $methodName ?: 'Mixto';
+    }
+
+    private function resolveDebtPaymentMethod(): PaymentMethod
+    {
+        $paymentMethod = PaymentMethod::query()
+            ->where('description', 'ILIKE', 'deuda')
+            ->where('status', true)
+            ->first();
+
+        if ($paymentMethod) {
+            return $paymentMethod;
+        }
+
+        return PaymentMethod::query()->create([
+            'description' => 'Deuda',
+            'order_num' => (int) (PaymentMethod::query()->max('order_num') ?? 0) + 1,
+            'status' => true,
+        ]);
     }
 
     private function renderPdfWithWkhtmltopdf(string $html, ?string $pageSize = 'A4', array $extraArgs = []): ?string
