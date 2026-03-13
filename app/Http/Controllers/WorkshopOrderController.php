@@ -10,7 +10,6 @@ use App\Http\Requests\Workshop\StoreWorkshopLineRequest;
 use App\Http\Requests\Workshop\StoreWorkshopOrderRequest;
 use App\Http\Requests\Workshop\UpdateWorkshopLineRequest;
 use App\Http\Requests\Workshop\UpdateWorkshopOrderRequest;
-use App\Models\Appointment;
 use App\Models\CashRegister;
 use App\Models\DocumentType;
 use App\Models\Movement;
@@ -19,7 +18,6 @@ use App\Models\Person;
 use App\Models\Product;
 use App\Models\ProductBranch;
 use App\Models\TaxRate;
-use App\Models\Vehicle;
 use App\Models\WorkshopMovement;
 use App\Models\WorkshopMovementDetail;
 use App\Models\WorkshopMovementTechnician;
@@ -51,11 +49,29 @@ class WorkshopOrderController extends Controller
         $companyId = (int) ($branch?->company_id ?? 0);
         $search = trim((string) $request->input('search', ''));
         $perPage = (int) $request->input('per_page', 10);
+        $availableStatuses = [
+            'all',
+            'registered',
+            'draft',
+            'diagnosis',
+            'awaiting_approval',
+            'approved',
+            'in_progress',
+            'finished',
+            'delivered',
+            'cancelled',
+            'open',
+        ];
+        $selectedStatus = (string) $request->input('status', 'all');
+        if (!in_array($selectedStatus, $availableStatuses, true)) {
+            $selectedStatus = 'all';
+        }
 
         $orders = WorkshopMovement::query()
             ->with(['movement', 'vehicle', 'client'])
             ->when($companyId > 0, fn ($query) => $query->where('company_id', $companyId))
             ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
+            ->when($selectedStatus !== 'all', fn ($query) => $query->where('status', $selectedStatus))
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($inner) use ($search) {
                     $inner->whereHas('movement', fn ($movementQuery) => $movementQuery->where('number', 'ILIKE', "%{$search}%"))
@@ -69,51 +85,12 @@ class WorkshopOrderController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
-        return view('workshop.orders.index', compact('orders', 'search', 'perPage'));
+        return view('workshop.orders.index', compact('orders', 'search', 'perPage', 'selectedStatus'));
     }
 
-    public function create()
+    public function create(Request $request): RedirectResponse
     {
-        $branchId = (int) session('branch_id');
-        $branch = $branchId > 0 ? \App\Models\Branch::query()->find($branchId) : null;
-        $companyId = (int) ($branch?->company_id ?? 0);
-
-        $vehicles = Vehicle::query()
-            ->when($companyId > 0, fn ($query) => $query->where('company_id', $companyId))
-            ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
-            ->orderBy('brand')
-            ->orderBy('model')
-            ->get();
-
-        $clients = Person::query()
-            ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
-            ->whereHas('roles', function ($query) use ($branchId) {
-                $query->where('roles.id', 3);
-                if ($branchId > 0) {
-                    $query->where('role_person.branch_id', $branchId);
-                }
-            })
-            ->orderBy('first_name')
-            ->orderBy('last_name')
-            ->get();
-
-        $appointments = Appointment::query()
-            ->where('status', '!=', 'cancelled')
-            ->whereNull('movement_id')
-            ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
-            ->orderByDesc('start_at')
-            ->get();
-
-        $previousOrders = WorkshopMovement::query()
-            ->with('movement')
-            ->when($companyId > 0, fn ($query) => $query->where('company_id', $companyId))
-            ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
-            ->whereIn('status', ['finished', 'delivered'])
-            ->orderByDesc('id')
-            ->limit(100)
-            ->get();
-
-        return view('workshop.orders.create', compact('vehicles', 'clients', 'appointments', 'previousOrders'));
+        return redirect()->route('workshop.maintenance-board.create', $request->query());
     }
 
     public function store(StoreWorkshopOrderRequest $request): RedirectResponse
@@ -684,4 +661,3 @@ class WorkshopOrderController extends Controller
         return $path;
     }
 }
-

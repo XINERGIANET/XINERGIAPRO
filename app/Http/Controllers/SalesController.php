@@ -1969,18 +1969,9 @@ class SalesController extends Controller
 
         $logoUrl = null;
         $logoFileUrl = null;
+        $logoDataUri = null;
         if ($branchForLogo?->logo) {
-            $logoUrl = str_starts_with($branchForLogo->logo, 'http')
-                ? $branchForLogo->logo
-                : asset('storage/' . ltrim((string) $branchForLogo->logo, '/'));
-
-            if (!str_starts_with((string) $branchForLogo->logo, 'http')) {
-                $localLogoPath = storage_path('app/public/' . ltrim((string) $branchForLogo->logo, '/'));
-                if (file_exists($localLogoPath)) {
-                    $normalized = str_replace('\\', '/', $localLogoPath);
-                    $logoFileUrl = 'file:///' . ltrim($normalized, '/');
-                }
-            }
+            [$logoUrl, $logoFileUrl, $logoDataUri] = $this->resolveBranchLogoSources((string) $branchForLogo->logo);
         }
 
         $details = $sale->salesMovement->details
@@ -1993,10 +1984,78 @@ class SalesController extends Controller
             'branchForLogo' => $branchForLogo,
             'logoUrl' => $logoUrl,
             'logoFileUrl' => $logoFileUrl,
+            'logoDataUri' => $logoDataUri,
             'printedAt' => now(),
             'paymentLabel' => $this->resolveSalePaymentLabel($sale),
             'viewId' => $request->input('view_id'),
         ];
+    }
+
+    private function resolveBranchLogoSources(string $storedLogo): array
+    {
+        $storedLogo = trim($storedLogo);
+        if ($storedLogo === '') {
+            return [null, null, null];
+        }
+
+        if (str_starts_with($storedLogo, 'http://') || str_starts_with($storedLogo, 'https://')) {
+            return [$storedLogo, null, null];
+        }
+
+        $relativeLogoPath = $this->normalizeBranchLogoRelativePath($storedLogo);
+        $logoUrl = $relativeLogoPath !== ''
+            ? asset('storage/' . $relativeLogoPath)
+            : null;
+
+        if ($relativeLogoPath === '') {
+            return [$logoUrl, null, null];
+        }
+
+        $localLogoPath = storage_path('app/public/' . $relativeLogoPath);
+        if (!file_exists($localLogoPath)) {
+            return [$logoUrl, null, null];
+        }
+
+        $normalized = str_replace('\\', '/', $localLogoPath);
+        $logoFileUrl = 'file:///' . ltrim($normalized, '/');
+        $logoDataUri = $this->buildImageDataUri($localLogoPath);
+
+        return [$logoUrl, $logoFileUrl, $logoDataUri];
+    }
+
+    private function normalizeBranchLogoRelativePath(string $storedLogo): string
+    {
+        $normalized = str_replace('\\', '/', trim($storedLogo));
+        $normalized = preg_replace('#^https?://[^/]+/#', '', $normalized) ?? $normalized;
+        $normalized = ltrim($normalized, '/');
+
+        if (str_starts_with($normalized, 'storage/')) {
+            $normalized = substr($normalized, strlen('storage/'));
+        }
+
+        return ltrim($normalized, '/');
+    }
+
+    private function buildImageDataUri(string $localPath): ?string
+    {
+        $content = @file_get_contents($localPath);
+        if ($content === false) {
+            return null;
+        }
+
+        $mimeType = @mime_content_type($localPath);
+        if (!is_string($mimeType) || trim($mimeType) === '') {
+            $extension = strtolower((string) pathinfo($localPath, PATHINFO_EXTENSION));
+            $mimeType = match ($extension) {
+                'jpg', 'jpeg' => 'image/jpeg',
+                'gif' => 'image/gif',
+                'webp' => 'image/webp',
+                'svg' => 'image/svg+xml',
+                default => 'image/png',
+            };
+        }
+
+        return 'data:' . $mimeType . ';base64,' . base64_encode($content);
     }
 
     private function resolveSalePaymentLabel(Movement $sale): string
@@ -2116,14 +2175,20 @@ class SalesController extends Controller
     private function resolveWkhtmltopdfBinary(): ?string
     {
         $candidates = array_filter([
+            env('WKHTML_PDF_BINARY'),
             env('WKHTMLTOPDF_BINARY'),
+            '/usr/bin/wkhtmltopdf',
+            '/usr/local/bin/wkhtmltopdf',
+            '/opt/bin/wkhtmltopdf',
+            '/opt/wkhtmltopdf/bin/wkhtmltopdf',
+            '/var/www/Snappy/wkhtmltopdf',
             base_path('wkhtmltopdf/bin/wkhtmltopdf.exe'),
             'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe',
             'C:\Snappy\wkhtmltopdf.exe',
         ]);
 
         foreach ($candidates as $candidate) {
-            if (is_string($candidate) && file_exists($candidate)) {
+            if (is_string($candidate) && file_exists($candidate) && is_executable($candidate)) {
                 return $candidate;
             }
         }

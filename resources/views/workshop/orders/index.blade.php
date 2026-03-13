@@ -1,18 +1,31 @@
 @extends('layouts.app')
 
+@php
+    $viewId = request('view_id');
+    $statusOptions = [
+        'all' => 'Todos los estados',
+        'awaiting_approval' => 'Esperando aprobacion',
+        'approved' => 'Aprobado',
+        'in_progress' => 'En reparacion',
+        'finished' => 'Termianda',
+        'delivered' => 'Entregada',
+        'cancelled' => 'Anulada',
+    ];
+@endphp
+
 @section('content')
 <div x-data="{}">
     <x-common.page-breadcrumb pageTitle="Ordenes Taller" />
 
     <x-common.component-card title="Ordenes de servicio" desc="Consulta y gestiona ordenes del taller.">
         {{-- Barra de Herramientas Premium --}}
-        <form method="GET" action="{{ route('workshop.orders.index') }}" class="mb-5 flex flex-wrap items-center gap-3">
-            @if (request('view_id'))
-                <input type="hidden" name="view_id" value="{{ request('view_id') }}">
+        <form method="GET" action="{{ route('workshop.orders.index') }}" class="mb-5 flex flex-col gap-3 xl:flex-row xl:flex-nowrap xl:items-center">
+            @if ($viewId)
+                <input type="hidden" name="view_id" value="{{ $viewId }}">
             @endif
 
             {{-- Selector de Registros --}}
-            <div class="w-32 flex-none">
+            <div class="w-full xl:w-32 xl:flex-none">
                 <select name="per_page" class="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none transition-all" onchange="this.form.submit()">
                     <option value="10" @selected(($perPage ?? 10) == 10)>10 / página</option>
                     <option value="25" @selected(($perPage ?? 10) == 25)>25 / página</option>
@@ -22,7 +35,7 @@
             </div>
 
             {{-- Buscador Principal --}}
-            <div class="relative flex-1 min-w-[200px] sm:min-w-[300px]">
+            <div class="relative w-full flex-1 xl:min-w-0">
                 <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
                     <i class="ri-search-line text-gray-400"></i>
                 </div>
@@ -34,25 +47,30 @@
                 >
             </div>
 
+            <div class="w-full xl:w-[260px] xl:flex-none">
+                <select name="status" class="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none transition-all">
+                    @foreach ($statusOptions as $statusKey => $statusLabel)
+                        <option value="{{ $statusKey }}" @selected(($selectedStatus ?? 'all') === $statusKey)>{{ $statusLabel }}</option>
+                    @endforeach
+                </select>
+            </div>
+
             {{-- Acciones --}}
-            <div class="flex items-center gap-2">
+            <div class="flex w-full items-center gap-2 xl:w-auto xl:flex-none">
                 <x-ui.button size="md" variant="primary" type="submit" class="h-11 px-5 shadow-sm active:scale-95 transition-all" style="background-color: #334155; border-color: #334155;">
                     <i class="ri-search-line"></i>
                     <span>Buscar</span>
                 </x-ui.button>
-                <x-ui.link-button size="md" variant="outline" href="{{ route('workshop.orders.index') }}" class="h-11 px-4 border-gray-200 text-gray-600 hover:bg-gray-50 transition-all active:scale-95">
+                <x-ui.link-button size="md" variant="outline" href="{{ route('workshop.orders.index', $viewId ? ['view_id' => $viewId] : []) }}" class="h-11 px-4 border-gray-200 text-gray-600 hover:bg-gray-50 transition-all active:scale-95">
                     <i class="ri-refresh-line"></i>
                     <span>Limpiar</span>
                 </x-ui.link-button>
             </div>
 
             {{-- Botones de Acción (Reportes y Nueva OS) --}}
-            <div class="ml-auto flex gap-2">
-                <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.reports.index') }}" class="h-11 rounded-xl px-5 font-bold shadow-sm transition-all hover:brightness-105 active:scale-95" style="background-color: #4F46E5; color: #FFFFFF; border-color: #4F46E5;">
-                    <i class="ri-bar-chart-2-line"></i>
-                    <span>Reportes</span>
-                </x-ui.link-button>
-                <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.orders.create') }}" class="h-11 rounded-xl px-5 font-bold shadow-sm transition-all hover:brightness-105 active:scale-95" style="background-color: #00A389; color: #FFFFFF; border-color: #00A389;">
+            <div class="flex w-full gap-2 xl:ml-auto xl:w-auto xl:flex-none">
+           
+                <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.maintenance-board.create', $viewId ? ['view_id' => $viewId] : []) }}" class="h-11 rounded-xl px-5 font-bold shadow-sm transition-all hover:brightness-105 active:scale-95" style="background-color: #00A389; color: #FFFFFF; border-color: #00A389;">
                     <i class="ri-add-line"></i>
                     <span>Nueva OS</span>
                 </x-ui.link-button>
@@ -87,14 +105,28 @@
                             <td class="px-3 py-3 text-sm text-center align-middle">
                                 @php
                                     $statusColor = match($order->status) {
+                                        'registered' => 'info',
+                                        'draft' => 'gray',
+                                        'diagnosis' => 'info',
+                                        'awaiting_approval' => 'warning',
+                                        'approved' => 'success',
+                                        'in_progress' => 'warning',
                                         'open' => 'info',
                                         'finished' => 'success',
+                                        'delivered' => 'success',
                                         'cancelled' => 'error',
                                         default => 'warning'
                                     };
                                     $statusLabel = match($order->status) {
+                                        'registered' => 'Registrada',
+                                        'draft' => 'Borrador',
+                                        'diagnosis' => 'Diagnostico',
+                                        'awaiting_approval' => 'Esperando aprobacion',
+                                        'approved' => 'Aprobado',
+                                        'in_progress' => 'En reparacion',
                                         'open' => 'Abierta',
                                         'finished' => 'Finalizada',
+                                        'delivered' => 'Entregada',
                                         'cancelled' => 'Anulada',
                                         default => $order->status
                                     };
@@ -196,5 +228,3 @@
     </x-common.component-card>
 </div>
 @endsection
-
-

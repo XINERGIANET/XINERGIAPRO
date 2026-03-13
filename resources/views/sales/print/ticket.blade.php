@@ -175,8 +175,8 @@
 
 <div class="ticket-wrapper">
     <div class="center">
-        @if(!empty($logoFileUrl) || !empty($logoUrl))
-            <img src="{{ $logoFileUrl ?: $logoUrl }}" alt="Logo sucursal" class="logo">
+        @if(!empty($logoDataUri) || !empty($logoFileUrl) || !empty($logoUrl))
+            <img src="{{ $logoDataUri ?: ($logoFileUrl ?: $logoUrl) }}" alt="Logo sucursal" class="logo">
         @endif
         <p class="without-tb bold large" style="font-size: 18px;">{{ strtoupper($branchForLogo->legal_name ?? 'SUCURSAL') }}</p>
         <p class="without-tb medium" style="font-size: 12px;">RUC: {{ $branchForLogo->ruc ?? '-' }}</p>
