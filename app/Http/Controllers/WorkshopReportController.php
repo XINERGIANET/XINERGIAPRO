@@ -365,14 +365,20 @@ class WorkshopReportController extends Controller
     private function resolveWkhtmltopdfBinary(): ?string
     {
         $candidates = array_filter([
+            env('WKHTML_PDF_BINARY'),
             env('WKHTMLTOPDF_BINARY'),
+            '/usr/bin/wkhtmltopdf',
+            '/usr/local/bin/wkhtmltopdf',
+            '/opt/bin/wkhtmltopdf',
+            '/opt/wkhtmltopdf/bin/wkhtmltopdf',
+            '/var/www/Snappy/wkhtmltopdf',
             base_path('wkhtmltopdf/bin/wkhtmltopdf.exe'),
             'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe',
             'C:\Snappy\wkhtmltopdf.exe',
         ]);
 
         foreach ($candidates as $candidate) {
-            if (is_string($candidate) && file_exists($candidate)) {
+            if (is_string($candidate) && file_exists($candidate) && is_executable($candidate)) {
                 return $candidate;
             }
         }
