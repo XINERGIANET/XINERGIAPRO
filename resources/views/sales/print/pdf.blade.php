@@ -122,6 +122,10 @@
         .items-table .center {
             text-align: center;
         }
+        .items-table .um-col {
+            white-space: nowrap;
+            font-size: 12px;
+        }
         .items-table tbody tr {
             page-break-inside: avoid;
         }
@@ -238,12 +242,12 @@
     <table class="items-table">
         <thead>
             <tr>
-                <th style="width: 8%;">Item</th>
-                <th style="width: 32%;">Descripcion</th>
-                <th style="width: 8%;" class="center">U.M.</th>
-                <th style="width: 11%;" class="num">Cantidad</th>
-                <th style="width: 11%;" class="num">V.U.</th>
-                <th style="width: 11%;" class="num">P.U.</th>
+                <th style="width: 7%;">Item</th>
+                <th style="width: 27%;">Descripcion</th>
+                <th style="width: 11%;" class="center">U.M.</th>
+                <th style="width: 10%;" class="num">Cantidad</th>
+                <th style="width: 9%;" class="num">V.U.</th>
+                <th style="width: 9%;" class="num">P.U.</th>
                 <th style="width: 10%;" class="num">Dcto.</th>
                 <th style="width: 17%;" class="num">Valor de venta</th>
             </tr>
@@ -275,7 +279,7 @@
             <tr>
                 <td>{{ $i + 1 }}</td>
                 <td>{{ $detail->description ?? $detail->product?->description ?? '-' }}</td>
-                <td class="center">{{ $detail->unit?->code ?? $detail->unit?->description ?? '-' }}</td>
+                <td class="center um-col">{{ $detail->unit?->code ?? $detail->unit?->description ?? '-' }}</td>
                 <td class="num">{{ number_format($qty, 2) }}</td>
                 <td class="num">S/ {{ number_format($unitValue, 3) }}</td>
                 <td class="num">S/ {{ number_format($unitPrice, 3) }}</td>
