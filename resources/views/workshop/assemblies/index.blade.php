@@ -3,13 +3,16 @@
 @section('content')
 <div x-data="{
     costs: @js($costTable),
+    allAssembliesData: @js($assemblies->map(fn($a) => ['id' => $a->id, 'total_cost' => $a->total_cost])->values()->all()),
     allVehicleTypes: @js($vehicleTypes),
     selectedBrand: '',
     selectedType: '',
     unitCost: 0,
     selectedAssemblies: [],
     viewMode: 'cards', // 'cards' o 'table'
-    
+    // Lifecycle
+    init() {
+    },
     // Indica si el tipo seleccionado no tiene costos configurados para NINGUNA marca
     get typeHasNoCosts() {
         if (!this.selectedType) return false;
@@ -122,9 +125,14 @@
 
             {{-- Botón para Generar Venta Masiva --}}
             <template x-if="selectedAssemblies.length > 0">
-                <x-ui.button size="md" variant="primary" type="button" style="background-color:#7C3AED;color:#fff" @click="$dispatch('open-massive-sale-modal')">
-                    <i class="ri-shopping-cart-2-line"></i><span>Generar Venta (<span x-text="selectedAssemblies.length"></span>)</span>
-                </x-ui.button>
+                <form method="GET" action="{{ route('workshop.assemblies.checkout.page') }}" class="inline-block">
+                    <template x-for="id in selectedAssemblies" :key="id">
+                        <input type="hidden" name="ids[]" :value="id">
+                    </template>
+                    <x-ui.button size="md" variant="primary" type="submit" style="background-color:#7C3AED;color:#fff">
+                        <i class="ri-shopping-cart-2-line"></i><span>Generar Venta (<span x-text="selectedAssemblies.length"></span>)</span>
+                    </x-ui.button>
+                </form>
             </template>
         </div>
 
@@ -576,83 +584,7 @@
         </div>
     </x-ui.modal>
 
-    {{-- Modal para Venta Masiva --}}
-    <x-ui.modal x-data="{ open: false }" @open-massive-sale-modal.window="open = true" :isOpen="false" :showCloseButton="false" class="max-w-4xl">
-        <div class="p-6 sm:p-8">
-            <div class="mb-6 flex items-center justify-between">
-                <div>
-                    <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Generar Venta de Armados</h3>
-                    <p class="text-sm text-gray-500">Se procesarán <span class="font-bold text-purple-600" x-text="selectedAssemblies.length"></span> registros seleccionados.</p>
-                </div>
-                <button type="button" @click="open = false" class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
-                    <i class="ri-close-line text-xl"></i>
-                </button>
-            </div>
 
-            <form method="POST" action="{{ route('workshop.assemblies.massive_sale') }}" class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                @csrf
-                {{-- Campos ocultos para IDs --}}
-                <template x-for="id in selectedAssemblies" :key="id">
-                    <input type="hidden" name="assembly_ids[]" :value="id">
-                </template>
-
-                <div class="space-y-4">
-                    <div class="rounded-2xl border border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-white/5">
-                        <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">Datos del Cliente</label>
-                        <select name="client_person_id" class="w-full h-11 rounded-xl border-gray-200 bg-white text-sm shadow-sm focus:border-purple-500 focus:ring-purple-500" required>
-                            <option value="">Seleccione un cliente...</option>
-                            @foreach($clients as $client)
-                                <option value="{{ $client->id }}">{{ $client->first_name }} {{ $client->last_name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div class="rounded-2xl border border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-white/5">
-                        <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">Documento de Venta</label>
-                        <select name="document_type_id" class="w-full h-11 rounded-xl border-gray-200 bg-white text-sm shadow-sm focus:border-purple-500 focus:ring-purple-500" required>
-                            @foreach($documentTypes as $dt)
-                                <option value="{{ $dt->id }}">{{ $dt->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                </div>
-
-                <div class="space-y-4">
-                    <div class="rounded-2xl border border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-white/5">
-                        <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">Caja y Cobro (Opcional)</label>
-                        <div class="grid grid-cols-1 gap-3">
-                            <select name="cash_register_id" class="w-full h-11 rounded-xl border-gray-200 bg-white text-sm shadow-sm focus:border-purple-500 focus:ring-purple-500">
-                                <option value="">No registrar pago (Solo venta)</option>
-                                @foreach($cashRegisters as $cr)
-                                    <option value="{{ $cr->id }}">Caja #{{ $cr->number }}</option>
-                                @endforeach
-                            </select>
-                            <select name="payment_method_id" class="w-full h-11 rounded-xl border-gray-200 bg-white text-sm shadow-sm focus:border-purple-500 focus:ring-purple-500">
-                                @foreach($paymentMethods as $pm)
-                                    <option value="{{ $pm->id }}">{{ $pm->description }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="rounded-2xl border border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-white/5">
-                        <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">Observaciones</label>
-                        <textarea name="comment" rows="2" class="w-full rounded-xl border-gray-200 bg-white text-sm shadow-sm focus:border-purple-500 focus:ring-purple-500" placeholder="Notas sobre esta venta masiva..."></textarea>
-                    </div>
-                </div>
-
-                <div class="md:col-span-2 mt-4">
-                    <button type="submit" class="flex w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 py-4 text-base font-bold text-white shadow-lg shadow-purple-200 transition-all hover:scale-[1.02] hover:shadow-xl active:scale-95 dark:shadow-none">
-                        <i class="ri-shopping-cart-fill text-xl"></i>
-                        <span>Confirmar y Procesar Venta</span>
-                    </button>
-                    <p class="mt-3 text-center text-xs text-gray-400">
-                        <i class="ri-information-line"></i> Esta acción actualizará los registros de armado y creará un nuevo movimiento de venta en el registro mensual.
-                    </p>
-                </div>
-            </form>
-        </div>
-    </x-ui.modal>
     {{-- Modal rápido para configuración de costos --}}
     <x-ui.modal 
         x-data="{ open: false }" 

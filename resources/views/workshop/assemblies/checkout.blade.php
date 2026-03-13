@@ -1,0 +1,402 @@
+@extends('layouts.app')
+
+@section('content')
+<div x-data="{
+    allAssembliesData: @js($assemblies->map(fn($a) => ['id' => $a->id, 'total_cost' => $a->total_cost])->values()->all()),
+    
+    // Payment Logic
+    documentTypeOptions: @js(collect($documentTypes ?? collect())->map(fn ($doc) => ['id' => (int) $doc->id, 'name' => (string) ($doc->name ?? '')])->values()->all()),
+    selectedDocumentTypeId: @js((string) old('document_type_id', optional(($documentTypes ?? collect())->first())->id)),
+    billingStatus: @js((string) old('billing_status', 'PENDING')),
+    invoiceSeries: @js((string) old('invoice_series', '001')),
+    invoiceNumber: @js((string) old('invoice_number', '')),
+    paymentType: @js((string) old('payment_type', 'CONTADO')),
+    paymentMethodOptions: @js(($paymentMethodOptions ?? collect())->values()->all()),
+    cardOptions: @js(($cardOptions ?? collect())->values()->all()),
+    digitalWalletOptions: @js(($digitalWalletOptions ?? collect())->values()->all()),
+    paymentGatewayOptionsByMethod: @js($paymentGatewayOptionsByMethod ?? []),
+    paymentRows: @js(array_values(old('payment_methods', []))),
+    
+    // Lifecycle
+    init() {
+        this.paymentType = String(this.paymentType || 'CONTADO').toUpperCase() === 'DEUDA' ? 'DEUDA' : 'CONTADO';
+        if (!Array.isArray(this.paymentRows)) this.paymentRows = [];
+        this.paymentRows = this.paymentRows.map((row) => this.normalizePaymentRow(row));
+        if (this.isDebtPaymentSelected()) this.paymentRows = [];
+        if (this.paymentRows.length === 0 && !this.isDebtPaymentSelected()) this.addPaymentRow(true);
+        this.syncInvoiceBillingFields();
+        this.syncAmount();
+    },
+    
+    // --- PAYMENT METHODS LOGIC ---
+    currentDocumentType() {
+        return this.documentTypeOptions.find((item) => String(item.id) === String(this.selectedDocumentTypeId || '')) || null;
+    },
+    isInvoiceDocumentSelected() {
+        const name = String(this.currentDocumentType()?.name || '').toLowerCase();
+        return name.includes('factura');
+    },
+    isDebtPaymentSelected() {
+        return String(this.paymentType || 'CONTADO').toUpperCase() === 'DEUDA';
+    },
+    syncInvoiceBillingFields() {
+        if (!this.isInvoiceDocumentSelected()) {
+            this.billingStatus = 'NOT_APPLICABLE';
+            this.invoiceSeries = this.invoiceSeries || '001';
+            this.invoiceNumber = '';
+            return;
+        }
+        if (!['INVOICED', 'PENDING'].includes(String(this.billingStatus || ''))) {
+            this.billingStatus = 'PENDING';
+        }
+        if (!this.invoiceSeries) {
+            this.invoiceSeries = '001';
+        }
+        if (this.billingStatus === 'PENDING') {
+            this.invoiceNumber = '';
+        }
+    },
+    get paymentMethodVariants() {
+        return this.paymentMethodOptions.flatMap(m => {
+            const id = Number(m.id), d = String(m.description || ''), k = m.kind || 'other';
+            if (k === 'wallet' && this.digitalWalletOptions.length) {
+                return this.digitalWalletOptions.map(w => ({
+                    key: `wallet:${id}:${Number(w.id)}`, 
+                    payment_method_id: id, 
+                    digital_wallet_id: Number(w.id), 
+                    card_id: null, 
+                    label: `${d} - ${w.description}`, 
+                    kind: k
+                }));
+            }
+            if (k === 'card' && this.cardOptions.length) {
+                return this.cardOptions.map(card => ({
+                    key: `card:${id}:${Number(card.id)}`, 
+                    payment_method_id: id, 
+                    digital_wallet_id: null, 
+                    card_id: Number(card.id), 
+                    label: `${d} - ${card.description}`, 
+                    kind: k
+                }));
+            }
+            return [{
+                key: `plain:${id}`, 
+                payment_method_id: id, 
+                digital_wallet_id: null, 
+                card_id: null, 
+                label: d, 
+                kind: k
+            }];
+        });
+    },
+    getPaymentVariantByKey(k) {
+        return this.paymentMethodVariants.find(v => v.key === k) || null;
+    },
+    getDefaultPaymentVariant() {
+        return this.paymentMethodVariants[0] || null;
+    },
+    normalizePaymentRow(row) {
+        const methodId = String(row.payment_method_id ?? '');
+        const ck = row.card_id ? `card:${Number(methodId)}:${Number(row.card_id)}` : null;
+        const wk = row.digital_wallet_id ? `wallet:${Number(methodId)}:${Number(row.digital_wallet_id)}` : null;
+        const pk = methodId ? `plain:${Number(methodId)}` : null;
+        const v = this.getPaymentVariantByKey(ck) || this.getPaymentVariantByKey(wk) || this.getPaymentVariantByKey(pk) || this.getDefaultPaymentVariant();
+        
+        return {
+            method_variant_key: v?.key || '',
+            payment_method_id: String(v?.payment_method_id || methodId),
+            card_id: v?.card_id ? String(v.card_id) : '',
+            digital_wallet_id: v?.digital_wallet_id ? String(v.digital_wallet_id) : '',
+            payment_gateway_id: row.payment_gateway_id ? String(row.payment_gateway_id) : '',
+            amount: row.amount === 0 ? '0.00' : String(row.amount ?? ''),
+            reference: String(row.reference ?? ''),
+            kind: v?.kind || 'other',
+        };
+    },
+    defaultPaymentRow(useRemaining = false) {
+        const v = this.getDefaultPaymentVariant();
+        const remaining = Math.max(this.remainingAmount(), 0);
+        const amount = useRemaining ? remaining : 0;
+        return {
+            method_variant_key: v?.key || '',
+            payment_method_id: v ? String(v.payment_method_id) : '',
+            amount: amount > 0 ? amount.toFixed(2) : '',
+            reference: '',
+            card_id: v?.card_id ? String(v.card_id) : '',
+            digital_wallet_id: v?.digital_wallet_id ? String(v.digital_wallet_id) : '',
+            payment_gateway_id: '',
+            kind: v?.kind || 'other',
+        };
+    },
+    addPaymentRow(useRemaining = false) {
+        this.paymentRows.push(this.defaultPaymentRow(useRemaining));
+        this.syncAmount();
+    },
+    onPaymentTypeChange() {
+        this.paymentType = this.isDebtPaymentSelected() ? 'DEUDA' : 'CONTADO';
+        if (this.isDebtPaymentSelected()) {
+            this.paymentRows = [];
+        } else if (this.paymentRows.length === 0) {
+            this.addPaymentRow(true);
+            return;
+        }
+        this.syncAmount();
+    },
+    removePaymentRow(index) {
+        if (this.paymentRows.length === 1) {
+            this.paymentRows[0].amount = this.chargeTotal().toFixed(2);
+            return;
+        }
+        this.paymentRows.splice(index, 1);
+        this.syncAmount();
+    },
+    applyPaymentVariant(index) {
+        const v = this.getPaymentVariantByKey(this.paymentRows[index].method_variant_key);
+        if (!v) return;
+        Object.assign(this.paymentRows[index], {
+            payment_method_id: String(v.payment_method_id),
+            card_id: v.card_id ? String(v.card_id) : '',
+            digital_wallet_id: v.digital_wallet_id ? String(v.digital_wallet_id) : '',
+            kind: v.kind
+        });
+        if (v.kind !== 'card') this.paymentRows[index].payment_gateway_id = '';
+    },
+    availableGateways(methodId) {
+        return this.paymentGatewayOptionsByMethod[String(methodId)] || [];
+    },
+    chargeTotal() {
+        return this.massTotal;
+    },
+    get massTotal() {
+         return this.allAssembliesData.reduce((sum, a) => {
+             return sum + parseFloat(a.total_cost || 0);
+         }, 0);
+    },
+    getMassTotalCalc() {
+         return this.massTotal;
+    },
+    paymentTotal() {
+        if (this.isDebtPaymentSelected()) return 0;
+        return this.paymentRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+    },
+    remainingAmount() {
+        if (this.isDebtPaymentSelected()) return this.massTotal;
+        return this.massTotal - this.paymentTotal();
+    },
+    syncAmount() {
+        if (this.isDebtPaymentSelected()) return;
+        if (this.paymentRows.length === 1) {
+            this.paymentRows[0].amount = this.massTotal.toFixed(2);
+        }
+    }
+}">
+    <x-common.page-breadcrumb pageTitle="Venta y Cobro de Armados" />
+
+    <x-common.component-card title="Venta Masiva de Armados" desc="Factura los armados seleccionados y registra sus ingresos a caja.">
+        @if (session('status'))
+            <div class="mb-4 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-700">{{ session('status') }}</div>
+        @endif
+        @if ($errors->any())
+            <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first() }}</div>
+        @endif
+
+        <div class="mb-4">
+            <x-ui.link-button size="sm" variant="outline" href="{{ route('workshop.assemblies.index') }}">
+                <i class="ri-arrow-left-line"></i><span>Volver a Armados</span>
+            </x-ui.link-button>
+        </div>
+
+        <div class="mb-4 rounded-xl border border-slate-200 bg-white p-4 overflow-x-auto">
+            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 mb-3">Armados Seleccionados</p>
+            <table class="w-full text-left text-sm whitespace-nowrap">
+                <thead>
+                    <tr class="bg-slate-50 text-slate-500">
+                        <th class="px-3 py-2 font-medium">ID</th>
+                        <th class="px-3 py-2 font-medium">Empresa/Marca</th>
+                        <th class="px-3 py-2 font-medium">Tipo</th>
+                        <th class="px-3 py-2 font-medium">Modelo</th>
+                        <th class="px-3 py-2 font-medium text-right">Costo Total</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    @foreach($assemblies as $assembly)
+                    <tr>
+                        <td class="px-3 py-2">ARM-{{ $assembly->id }}</td>
+                        <td class="px-3 py-2">{{ $assembly->brand_company }}</td>
+                        <td class="px-3 py-2">{{ $assembly->vehicle_type }}</td>
+                        <td class="px-3 py-2">{{ $assembly->model ?? '-' }}</td>
+                        <td class="px-3 py-2 text-right font-bold">S/ {{ number_format($assembly->total_cost, 2) }}</td>
+                    </tr>
+                    @endforeach
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th colspan="4" class="px-3 py-3 text-right text-slate-500">Total a Vender:</th>
+                        <th class="px-3 py-3 text-right text-lg font-black text-slate-800" x-text="`S/ ${massTotal.toFixed(2)}`"></th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <form method="POST" action="{{ route('workshop.assemblies.massive_sale') }}" class="grid grid-cols-1 gap-6 md:grid-cols-2">
+            @csrf
+            {{-- Campos ocultos para IDs --}}
+            @foreach($assemblies as $assembly)
+                <input type="hidden" name="assembly_ids[]" value="{{ $assembly->id }}">
+            @endforeach
+
+            <div class="space-y-4">
+                <div class="rounded-2xl border border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-white/5">
+                    <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">Datos del Cliente</label>
+                    <select name="client_person_id" class="w-full h-11 rounded-xl border-gray-200 bg-white text-sm shadow-sm focus:border-purple-500 focus:ring-purple-500" required>
+                        <option value="">Seleccione un cliente...</option>
+                        @foreach($clients as $client)
+                            <option value="{{ $client->id }}">{{ $client->first_name }} {{ $client->last_name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="rounded-2xl border border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-white/5">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">Documento de Venta</label>
+                            <select x-model="selectedDocumentTypeId" @change="syncInvoiceBillingFields()" name="document_type_id" class="w-full h-11 rounded-xl border-gray-200 bg-white text-sm shadow-sm focus:border-purple-500 focus:ring-purple-500" required>
+                                <template x-for="doc in documentTypeOptions" :key="doc.id">
+                                    <option :value="doc.id" x-text="doc.name"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">Condición</label>
+                            <select x-model="paymentType" @change="onPaymentTypeChange()" name="payment_type" class="w-full h-11 rounded-xl border-gray-200 bg-white text-sm shadow-sm focus:border-purple-500 focus:ring-purple-500">
+                                <option value="CONTADO">Contado</option>
+                                <option value="DEUDA">Deuda / Crédito</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div x-show="isInvoiceDocumentSelected()" x-cloak class="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div>
+                            <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">Estado Fra.</label>
+                            <select x-model="billingStatus" @change="syncInvoiceBillingFields()" name="billing_status" class="w-full h-11 rounded-xl border-gray-200 bg-white text-sm shadow-sm focus:border-amber-500 focus:ring-amber-500">
+                                <option value="INVOICED">Facturado</option>
+                                <option value="PENDING">Por facturar</option>
+                            </select>
+                        </div>
+                        <div x-show="billingStatus === 'INVOICED'" x-cloak>
+                            <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">Serie</label>
+                            <input type="text" name="invoice_series" x-model="invoiceSeries" x-bind:required="isInvoiceDocumentSelected() && billingStatus === 'INVOICED'" x-bind:disabled="!isInvoiceDocumentSelected() || billingStatus !== 'INVOICED'" class="w-full h-11 rounded-xl border-gray-200 bg-white text-sm shadow-sm focus:border-amber-500 focus:ring-amber-500" placeholder="001">
+                        </div>
+                        <div x-show="billingStatus === 'INVOICED'" x-cloak>
+                            <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">Correlativo</label>
+                            <input type="text" name="invoice_number" x-model="invoiceNumber" x-bind:required="isInvoiceDocumentSelected() && billingStatus === 'INVOICED'" x-bind:disabled="!isInvoiceDocumentSelected() || billingStatus !== 'INVOICED'" class="w-full h-11 rounded-xl border-gray-200 bg-white text-sm shadow-sm focus:border-amber-500 focus:ring-amber-500" placeholder="00000001">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <div class="rounded-2xl border border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-white/5" x-show="!isDebtPaymentSelected()" x-cloak>
+                    <div class="flex items-center justify-between mb-3 border-b border-gray-200 pb-2">
+                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-400">Registro de Pagos</label>
+                        <button type="button" @click="addPaymentRow(true)" class="rounded-lg bg-gray-200 px-3 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-300">
+                            <i class="ri-add-line"></i> Dividir pago
+                        </button>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="mb-1 block text-xs font-bold uppercase text-gray-500">Caja Destino</label>
+                        <select name="cash_register_id" class="w-full h-11 rounded-xl border-gray-200 bg-white text-sm shadow-sm focus:border-purple-500 focus:ring-purple-500">
+                            @foreach($cashRegisters as $cr)
+                                <option value="{{ $cr->id }}">Caja #{{ $cr->number }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="space-y-3">
+                        <template x-for="(row, index) in paymentRows" :key="`payment-row-${index}`">
+                            <div class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                                <div class="mb-2 flex items-center justify-between">
+                                    <span class="text-xs font-bold text-slate-500">Método <span x-text="index + 1"></span></span>
+                                    <button type="button" @click="removePaymentRow(index)" class="text-red-500 hover:text-red-700" :disabled="paymentRows.length === 1" :class="{ 'opacity-50 cursor-not-allowed': paymentRows.length === 1 }">
+                                        <i class="ri-delete-bin-line"></i>
+                                    </button>
+                                </div>
+                                <input type="hidden" :name="`payment_methods[${index}][payment_method_id]`" :value="row.payment_method_id || ''">
+                                <input type="hidden" :name="`payment_methods[${index}][card_id]`" :value="row.card_id || ''">
+                                <input type="hidden" :name="`payment_methods[${index}][digital_wallet_id]`" :value="row.digital_wallet_id || ''">
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                                    <div :class="row.kind === 'card' ? 'md:col-span-4' : 'md:col-span-5'">
+                                        <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Método</label>
+                                        <select x-model="row.method_variant_key" @change="applyPaymentVariant(index)" required class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
+                                            <template x-for="variant in paymentMethodVariants" :key="variant.key"><option :value="variant.key" x-text="variant.label"></option></template>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="md:col-span-3" x-show="row.kind === 'card'">
+                                        <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Pasarela</label>
+                                        <select :name="`payment_methods[${index}][payment_gateway_id]`" x-model="row.payment_gateway_id" x-bind:disabled="row.kind !== 'card'" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
+                                            <option value="">Seleccionar</option>
+                                            <template x-for="gateway in availableGateways(row.payment_method_id)">
+                                                <option :value="String(gateway.id)" x-text="gateway.description"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                    
+                                    <div :class="row.kind === 'card' ? 'md:col-span-2' : 'md:col-span-3'">
+                                        <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Monto</label>
+                                        <input type="number" step="0.01" min="0.01" x-model.number="row.amount" :name="`payment_methods[${index}][amount]`" @input="syncAmount()" required class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold" style="color:#059669;">
+                                    </div>
+                                    
+                                    <div :class="row.kind === 'card' ? 'md:col-span-3' : 'md:col-span-4'">
+                                        <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Ref.</label>
+                                        <input type="text" x-model="row.reference" :name="`payment_methods[${index}][reference]`" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700" placeholder="# Ref/Voucher">
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div class="mt-3 flex items-center justify-between rounded-xl bg-slate-800 p-3 text-white">
+                        <div>
+                            <p class="text-[10px] font-bold uppercase text-slate-400">Total a Pagar</p>
+                            <p class="text-sm font-black" x-text="`S/ ${massTotal.toFixed(2)}`"></p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[10px] font-bold uppercase text-slate-400">Total Distribuido</p>
+                            <p class="text-sm font-black" :class="remainingAmount() === 0 ? 'text-emerald-400' : 'text-amber-400'" x-text="`S/ ${paymentTotal().toFixed(2)}`"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div x-show="isDebtPaymentSelected()" x-cloak class="rounded-2xl border border-rose-200 bg-rose-50/80 p-5 text-center shadow-inner">
+                    <div class="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-rose-200 text-rose-600">
+                        <i class="ri-file-list-3-fill text-2xl"></i>
+                    </div>
+                    <h4 class="text-sm font-bold text-rose-800">Venta al Crédito</h4>
+                    <p class="mt-1 text-xs text-rose-600">Esta venta se enviará a Cuentas por Cobrar. No se registrará ingreso de dinero a tu caja.</p>
+                    <p class="mt-2 text-lg font-black text-rose-900" x-text="`S/ ${massTotal.toFixed(2)}`"></p>
+                </div>
+
+                <div class="rounded-2xl border border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-white/5">
+                    <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">Observaciones Venta</label>
+                    <textarea name="comment" rows="2" class="w-full rounded-xl border-gray-200 bg-white text-sm shadow-sm focus:border-purple-500 focus:ring-purple-500" placeholder="Ej: Venta masiva corporativa..."></textarea>
+                </div>
+            </div>
+
+            <div class="md:col-span-2 mt-4">
+                <button type="submit" class="flex w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 py-4 text-base font-bold text-white shadow-lg shadow-purple-200 transition-all hover:scale-[1.02] hover:shadow-xl active:scale-95 dark:shadow-none">
+                    <i class="ri-shopping-cart-fill text-xl"></i>
+                    <span>Confirmar y Procesar Venta</span>
+                </button>
+                <p class="mt-3 text-center text-xs text-gray-400">
+                    <i class="ri-information-line"></i> Esta acción actualizará los registros de armado y creará un nuevo movimiento de venta en el registro mensual.
+                </p>
+            </div>
+        </form>
+    </x-common.component-card>
+</div>
+@endsection
