@@ -8,6 +8,7 @@ use App\Models\CashMovements;
 use App\Models\CashRegister;
 use App\Models\DocumentType;
 use App\Models\DigitalWallet;
+use App\Models\Location;
 use App\Models\Movement;
 use App\Models\MovementType;
 use App\Models\PaymentConcept;
@@ -124,6 +125,99 @@ class SalesController extends Controller
         return view('sales.create', $this->getSalesPosViewData());
     }
 
+    public function storeClientQuick(Request $request)
+    {
+        $branchId = (int) session('branch_id');
+        $branch = Branch::query()->with('location.parent.parent')->findOrFail($branchId);
+        $companyId = (int) ($branch->company_id ?? 0);
+
+        $personType = strtoupper((string) $request->input('person_type', ''));
+
+        $validated = $request->validate([
+            'person_type' => ['required', 'in:DNI,RUC,CARNET DE EXTRANGERIA,PASAPORTE'],
+            'document_number' => ['required', 'string', 'max:50'],
+            'first_name' => ['required', 'string', 'max:255'],
+            'last_name' => [
+                Rule::requiredIf($personType !== 'RUC'),
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'location_id' => ['nullable', 'integer', 'exists:locations,id'],
+            'genero' => ['nullable', 'string', 'max:30'],
+            'fecha_nacimiento' => ['nullable', 'date'],
+        ]);
+
+        $branchDistrictId = (int) ($branch->location_id ?? 0);
+        if ($branchDistrictId <= 0) {
+            return response()->json([
+                'message' => 'La sucursal no tiene distrito configurado.',
+            ], 422);
+        }
+
+        $existingPerson = Person::query()
+            ->join('branches', 'branches.id', '=', 'people.branch_id')
+            ->select('people.*')
+            ->where('branches.company_id', $companyId)
+            ->where('people.document_number', (string) $validated['document_number'])
+            ->whereNull('people.deleted_at')
+            ->first();
+
+        if ($existingPerson) {
+            $existingPerson->forceFill([
+                'location_id' => (int) ($validated['location_id'] ?? $existingPerson->location_id ?? $branchDistrictId),
+            ])->save();
+
+            $existingPerson->roles()->syncWithoutDetaching([
+                3 => ['branch_id' => $branchId],
+            ]);
+
+            return response()->json([
+                'id' => (int) $existingPerson->id,
+                'person_type' => (string) $existingPerson->person_type,
+                'document_number' => (string) $existingPerson->document_number,
+                'first_name' => (string) $existingPerson->first_name,
+                'last_name' => (string) ($existingPerson->last_name ?? ''),
+                'name' => trim(((string) $existingPerson->first_name) . ' ' . ((string) $existingPerson->last_name)),
+                'label' => trim(((string) $existingPerson->first_name) . ' ' . ((string) $existingPerson->last_name)),
+                'document' => (string) ($existingPerson->document_number ?? ''),
+            ]);
+        }
+
+        $validated['last_name'] = trim((string) ($validated['last_name'] ?? ''));
+        $validated['phone'] = (string) ($validated['phone'] ?? '');
+        $validated['email'] = (string) ($validated['email'] ?? '');
+        $validated['address'] = trim((string) ($validated['address'] ?? '')) ?: '-';
+        $validated['location_id'] = (int) ($validated['location_id'] ?? $branchDistrictId);
+
+        $person = DB::transaction(function () use ($validated, $branchId) {
+            $person = Person::query()->create(array_merge(
+                $validated,
+                ['branch_id' => $branchId]
+            ));
+
+            $person->roles()->syncWithoutDetaching([
+                3 => ['branch_id' => $branchId],
+            ]);
+
+            return $person;
+        });
+
+        return response()->json([
+            'id' => (int) $person->id,
+            'person_type' => (string) $person->person_type,
+            'document_number' => (string) $person->document_number,
+            'first_name' => (string) $person->first_name,
+            'last_name' => (string) ($person->last_name ?? ''),
+            'name' => trim(((string) $person->first_name) . ' ' . ((string) $person->last_name)),
+            'label' => trim(((string) $person->first_name) . ' ' . ((string) $person->last_name)),
+            'document' => (string) ($person->document_number ?? ''),
+        ]);
+    }
+
     private function getSalesPosViewData(?Movement $sale = null): array
     {
         $user = auth()->user();
@@ -137,6 +231,12 @@ class SalesController extends Controller
             abort(403, 'La venta no pertenece a la sucursal actual.');
         }
 
+        $branch = Branch::query()->with('location.parent.parent')->findOrFail($branchId);
+        $branchDistrict = $branch->location;
+        $branchProvince = $branchDistrict?->parent;
+        $branchDepartment = $branchProvince?->parent;
+        $locationData = $this->getLocationData((int) ($branch->location_id ?? 0));
+
         $products = Product::query()
             ->where('type', 'SELLABLE')
             ->with('category')
@@ -149,6 +249,7 @@ class SalesController extends Controller
 
                 return [
                     'id' => (int) $product->id,
+                    'code' => (string) ($product->code ?? ''),
                     'name' => $product->description,
                     'img' => $imageUrl,
                     'note' => $product->note ?? null,
@@ -248,6 +349,58 @@ class SalesController extends Controller
             'initialSaleData' => $initialSaleData,
             'posMode' => $posMode,
             'invoiceMode' => request()->boolean('invoice_mode'),
+            'quickClientStoreUrl' => route('admin.sales.clients.store'),
+            'departments' => $locationData['departments'],
+            'provinces' => $locationData['provinces'],
+            'districts' => $locationData['districts'],
+            'branchDepartmentId' => $locationData['selectedDepartmentId'],
+            'branchProvinceId' => $locationData['selectedProvinceId'],
+            'branchDistrictId' => $locationData['selectedDistrictId'],
+            'branchDepartmentName' => $branchDepartment?->description,
+            'branchProvinceName' => $branchProvince?->description,
+            'branchDistrictName' => $branchDistrict?->description,
+        ];
+    }
+
+    private function getLocationData(?int $defaultLocationId = null): array
+    {
+        $departments = Location::query()
+            ->where('type', 'department')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $provinces = Location::query()
+            ->where('type', 'province')
+            ->orderBy('name')
+            ->get(['id', 'name', 'parent_location_id']);
+
+        $districts = Location::query()
+            ->where('type', 'district')
+            ->orderBy('name')
+            ->get(['id', 'name', 'parent_location_id']);
+
+        $selectedDistrictId = $defaultLocationId ?: null;
+        $selectedProvinceId = null;
+        $selectedDepartmentId = null;
+
+        if ($selectedDistrictId) {
+            $district = Location::query()->find($selectedDistrictId);
+            if ($district) {
+                $selectedProvinceId = $district->parent_location_id;
+                if ($selectedProvinceId) {
+                    $province = Location::query()->find($selectedProvinceId);
+                    $selectedDepartmentId = $province?->parent_location_id;
+                }
+            }
+        }
+
+        return [
+            'departments' => $departments->values(),
+            'provinces' => $provinces->values(),
+            'districts' => $districts->values(),
+            'selectedDepartmentId' => $selectedDepartmentId,
+            'selectedProvinceId' => $selectedProvinceId,
+            'selectedDistrictId' => $selectedDistrictId,
         ];
     }
 
@@ -297,17 +450,46 @@ class SalesController extends Controller
             ->values()
             ->map(function (SalesMovementDetail $detail) {
                 $quantity = (float) ($detail->quantity ?: 1);
-                $amountWithTax = (float) ($detail->amount ?? 0);
+                $discountPct = (float) ($detail->discount_percentage ?? 0);
+                $discountFactor = max(0.0, 1 - ($discountPct / 100));
+                $taxRatePct = (float) data_get($detail->tax_rate_snapshot, 'tax_rate', 0);
+                $taxRateFactor = $taxRatePct > 0 ? ($taxRatePct / 100) : 0;
+                $baseNetLineTotal = (float) ($detail->original_amount ?? 0);
+
+                if ($baseNetLineTotal <= 0) {
+                    $discountedGrossLineTotal = (float) ($detail->amount ?? 0);
+                    $baseGrossLineTotal = $discountFactor > 0
+                        ? ($discountedGrossLineTotal / $discountFactor)
+                        : $discountedGrossLineTotal;
+                    $baseNetLineTotal = $taxRateFactor > 0
+                        ? ($baseGrossLineTotal / (1 + $taxRateFactor))
+                        : $baseGrossLineTotal;
+                }
+
+                $baseGrossLineTotal = $taxRateFactor > 0
+                    ? ($baseNetLineTotal * (1 + $taxRateFactor))
+                    : $baseNetLineTotal;
 
                 return [
                     'pId' => (int) ($detail->product_id ?? 0),
                     'name' => $detail->product->description ?? $detail->description ?? ('Producto #' . $detail->product_id),
                     'qty' => $quantity,
-                    'price' => $quantity > 0 ? ($amountWithTax / $quantity) : 0,
+                    'price' => $quantity > 0 ? ($baseGrossLineTotal / $quantity) : 0,
                     'note' => (string) ($detail->comment ?? ''),
                 ];
             })
             ->all();
+
+        $grossTotalBeforeDiscount = collect($items)->sum(function (array $item) {
+            return ((float) ($item['qty'] ?? 0)) * ((float) ($item['price'] ?? 0));
+        });
+        $discountPercentage = collect($sale->salesMovement?->details ?? [])
+            ->map(fn (SalesMovementDetail $detail) => (float) ($detail->discount_percentage ?? 0))
+            ->first(fn (float $value) => $value > 0, 0.0);
+        $discountAmount = max(
+            0,
+            $grossTotalBeforeDiscount - (float) ($sale->salesMovement?->total ?? 0)
+        );
 
         return [
             'id' => (int) $sale->id,
@@ -321,6 +503,9 @@ class SalesController extends Controller
             'invoice_series' => (string) ($sale->salesMovement?->series ?: '001'),
             'invoice_number' => (string) ($sale->salesMovement?->billing_number ?: ($this->isInvoiceDocumentType($sale->documentType) ? ($sale->number ?? '') : '')),
             'payment_type' => $paymentType,
+            'discount_type' => $discountPercentage > 0 ? 'PERCENTAGE' : 'NONE',
+            'discount_value' => $discountPercentage > 0 ? round($discountPercentage, 6) : 0,
+            'discount_amount' => round($discountAmount, 2),
             'items' => $items,
             'payment_methods' => $paymentMethods,
         ];
@@ -506,6 +691,8 @@ class SalesController extends Controller
                 'billing_status' => 'nullable|string|in:PENDING,INVOICED,NOT_APPLICABLE',
                 'invoice_series' => 'nullable|string|max:20',
                 'invoice_number' => 'nullable|string|max:50',
+                'discount_type' => 'nullable|string|in:NONE,PERCENTAGE,AMOUNT',
+                'discount_value' => 'nullable|numeric|min:0',
                 'notes' => 'nullable|string',
                 'movement_id' => 'nullable|integer|exists:movements,id', // ID del borrador a completar
             ]);
@@ -552,6 +739,8 @@ class SalesController extends Controller
             $billingStatus = $this->normalizeBillingStatus($validated['billing_status'] ?? null, $isInvoiceDocument);
             $paymentType = strtoupper((string) ($validated['payment_type'] ?? 'CONTADO'));
             $isDebtSale = $paymentType === 'DEUDA';
+            $discountType = strtoupper((string) ($validated['discount_type'] ?? 'NONE'));
+            $discountValue = (float) ($validated['discount_value'] ?? 0);
             $invoiceSeries = $isInvoiceDocument
                 ? trim((string) ($validated['invoice_series'] ?? '001'))
                 : '001';
@@ -609,7 +798,7 @@ class SalesController extends Controller
             }
 
             // Los precios del front ya incluyen IGV. Calcular subtotal e IGV por producto según su tasa.
-            $calculated = $this->calculateSubtotalAndTaxFromItems($request->items, $branchId);
+            $calculated = $this->calculateSubtotalAndTaxFromItems($validated['items'], $branchId, $discountType, $discountValue);
             $subtotal = $calculated['subtotal'];
             $tax = $calculated['tax'];
             $total = $calculated['total'];
@@ -629,7 +818,7 @@ class SalesController extends Controller
                 ->values()
                 ->all();
 
-            if (!$isDebtSale && empty($paymentRows)) {
+            if (!$isDebtSale && $total > 0.009 && empty($paymentRows)) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'payment_methods' => 'Debes registrar al menos un metodo de pago cuando la venta es al contado.',
                 ]);
@@ -641,7 +830,7 @@ class SalesController extends Controller
             }
 
             // Recalcular con la misma regla (precio final con IGV incluido)
-            $calculated = $this->calculateSubtotalAndTaxFromItems($request->items, $branchId);
+            $calculated = $this->calculateSubtotalAndTaxFromItems($validated['items'], $branchId, $discountType, $discountValue);
             $subtotal = $calculated['subtotal'];
             $tax = $calculated['tax'];
             $total = $calculated['total'];
@@ -787,7 +976,7 @@ class SalesController extends Controller
             }
 
             // Crear SalesMovementDetails y actualizar stock (nota por producto en comment)
-            foreach ($validated['items'] as $item) {
+            foreach (array_values($validated['items']) as $index => $item) {
                 $product = Product::with('baseUnit')->findOrFail($item['pId']);
                 
                 // Bloquear el registro para evitar condiciones de carrera
@@ -818,12 +1007,10 @@ class SalesController extends Controller
                 }
 
                 $taxRate = $productBranch->taxRate;
-                $taxRateValue = $taxRate ? ($taxRate->tax_rate / 100) : $this->getDefaultTaxRateValue();
-
-                // Precio de venta incluye impuesto.
-                $itemTotal = (float) $item['qty'] * (float) $item['price'];
-                $itemSubtotal = $taxRateValue > 0 ? ($itemTotal / (1 + $taxRateValue)) : $itemTotal;
-                $itemTax = $itemTotal - $itemSubtotal;
+                $lineCalculated = $calculated['lines'][$index] ?? null;
+                if (!$lineCalculated) {
+                    throw new \Exception("No se pudo calcular el descuento del producto {$product->description}");
+                }
 
                 // Nota por producto (compatibilidad note/comment) y normalización
                 $detailNoteRaw = data_get($item, 'note', data_get($item, 'comment'));
@@ -848,9 +1035,9 @@ class SalesController extends Controller
                         'tax_rate' => $taxRate->tax_rate,
                     ] : null,
                     'quantity' => $item['qty'],
-                    'amount' => $itemTotal,
-                    'discount_percentage' => 0.000000,
-                    'original_amount' => $itemSubtotal,
+                    'amount' => $lineCalculated['discounted_gross_total'],
+                    'discount_percentage' => $calculated['discount_percentage'],
+                    'original_amount' => $lineCalculated['net_total'],
                     'comment' => $detailNote,
                     'parent_detail_id' => null,
                     'complements' => [],
@@ -1091,6 +1278,8 @@ class SalesController extends Controller
                 'billing_status' => 'nullable|string|in:PENDING,INVOICED,NOT_APPLICABLE',
                 'invoice_series' => 'nullable|string|max:20',
                 'invoice_number' => 'nullable|string|max:50',
+                'discount_type' => 'nullable|string|in:NONE,PERCENTAGE,AMOUNT',
+                'discount_value' => 'nullable|numeric|min:0',
                 'notes' => 'nullable|string',
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -1150,7 +1339,9 @@ class SalesController extends Controller
             }
 
             // Los precios del front ya incluyen IGV. Calcular subtotal e IGV por producto según su tasa.
-            $calculated = $this->calculateSubtotalAndTaxFromItems($request->items, $branchId);
+            $discountType = strtoupper((string) ($validated['discount_type'] ?? 'NONE'));
+            $discountValue = (float) ($validated['discount_value'] ?? 0);
+            $calculated = $this->calculateSubtotalAndTaxFromItems($validated['items'], $branchId, $discountType, $discountValue);
             $subtotal = $calculated['subtotal'];
             $tax = $calculated['tax'];
             $total = $calculated['total'];
@@ -1222,7 +1413,7 @@ class SalesController extends Controller
             ]);
 
             // Crear SalesMovementDetails (sin restar stock porque es borrador; nota por producto en comment)
-            foreach ($validated['items'] as $item) {
+            foreach (array_values($validated['items']) as $index => $item) {
                 $product = Product::with('baseUnit')->findOrFail($item['pId']);
                 $productBranch = ProductBranch::with('taxRate')
                     ->where('product_id', $item['pId'])
@@ -1239,12 +1430,10 @@ class SalesController extends Controller
                 }
 
                 $taxRate = $productBranch->taxRate;
-                $taxRateValue = $taxRate ? ($taxRate->tax_rate / 100) : $this->getDefaultTaxRateValue();
-
-                // Precio de venta incluye impuesto.
-                $itemTotal = (float) $item['qty'] * (float) $item['price'];
-                $itemSubtotal = $taxRateValue > 0 ? ($itemTotal / (1 + $taxRateValue)) : $itemTotal;
-                $itemTax = $itemTotal - $itemSubtotal;
+                $lineCalculated = $calculated['lines'][$index] ?? null;
+                if (!$lineCalculated) {
+                    throw new \Exception("No se pudo calcular el descuento del producto {$product->description}");
+                }
 
                 // Nota por producto (compatibilidad note/comment) y normalización
                 $detailNoteRaw = data_get($item, 'note', data_get($item, 'comment'));
@@ -1270,9 +1459,9 @@ class SalesController extends Controller
                         'tax_rate' => $taxRate->tax_rate,
                     ] : null,
                     'quantity' => $item['qty'],
-                    'amount' => $itemTotal,
-                    'discount_percentage' => 0.000000,
-                    'original_amount' => $itemSubtotal,
+                    'amount' => $lineCalculated['discounted_gross_total'],
+                    'discount_percentage' => $calculated['discount_percentage'],
+                    'original_amount' => $lineCalculated['net_total'],
                     'comment' => $detailNote,
                     'parent_detail_id' => null,
                     'complements' => [],
@@ -1564,14 +1753,13 @@ class SalesController extends Controller
      * Calcula subtotal, IGV y total desde los ítems usando la tasa de impuesto de cada producto.
      * Usa la tasa configurada en ProductBranch->TaxRate; si no tiene, usa la tasa por defecto del sistema.
      */
-    private function calculateSubtotalAndTaxFromItems(array $items, int $branchId): array
+    private function calculateSubtotalAndTaxFromItems(array $items, int $branchId, string $discountType = 'NONE', float $discountValue = 0.0): array
     {
         $defaultTaxPct = $this->getDefaultTaxRateValue();
-        $subtotal = 0.0;
-        $tax = 0.0;
-        $total = 0.0;
+        $preparedItems = [];
+        $grossTotal = 0.0;
 
-        foreach ($items as $item) {
+        foreach ($items as $index => $item) {
             $productBranch = ProductBranch::with('taxRate')
                 ->where('product_id', $item['pId'])
                 ->where('branch_id', $branchId)
@@ -1580,19 +1768,78 @@ class SalesController extends Controller
             $taxRate = $productBranch?->taxRate;
             $taxRateValue = $taxRate ? ($taxRate->tax_rate / 100) : $defaultTaxPct;
 
-            $itemTotal = (float) ($item['qty'] ?? 0) * (float) ($item['price'] ?? 0);
-            $itemSubtotal = $taxRateValue > 0 ? ($itemTotal / (1 + $taxRateValue)) : $itemTotal;
-            $itemTax = $itemTotal - $itemSubtotal;
+            $itemGrossTotal = max(0, (float) ($item['qty'] ?? 0) * (float) ($item['price'] ?? 0));
+            $itemNetTotal = $taxRateValue > 0 ? ($itemGrossTotal / (1 + $taxRateValue)) : $itemGrossTotal;
 
-            $subtotal += $itemSubtotal;
-            $tax += $itemTax;
-            $total += $itemTotal;
+            $preparedItems[$index] = [
+                'gross_total' => $itemGrossTotal,
+                'net_total' => $itemNetTotal,
+                'tax_rate_value' => $taxRateValue,
+            ];
+            $grossTotal += $itemGrossTotal;
+        }
+
+        $normalizedDiscountType = strtoupper($discountType);
+        if (!in_array($normalizedDiscountType, ['NONE', 'PERCENTAGE', 'AMOUNT'], true)) {
+            $normalizedDiscountType = 'NONE';
+        }
+
+        $normalizedDiscountValue = max(0, (float) $discountValue);
+        $effectiveDiscountPercentage = 0.0;
+        $discountAmount = 0.0;
+
+        if ($grossTotal > 0) {
+            if ($normalizedDiscountType === 'PERCENTAGE') {
+                $effectiveDiscountPercentage = min(100, $normalizedDiscountValue);
+                $discountAmount = $grossTotal * ($effectiveDiscountPercentage / 100);
+            } elseif ($normalizedDiscountType === 'AMOUNT') {
+                $discountAmount = min($normalizedDiscountValue, $grossTotal);
+                $effectiveDiscountPercentage = ($discountAmount / $grossTotal) * 100;
+            }
+        }
+
+        $discountFactor = $grossTotal > 0
+            ? max(0.0, 1 - ($discountAmount / $grossTotal))
+            : 1.0;
+
+        $subtotal = 0.0;
+        $tax = 0.0;
+        $total = 0.0;
+        $lines = [];
+
+        foreach ($preparedItems as $index => $preparedItem) {
+            $discountedGrossTotal = $preparedItem['gross_total'] * $discountFactor;
+            $discountedNetTotal = $preparedItem['tax_rate_value'] > 0
+                ? ($discountedGrossTotal / (1 + $preparedItem['tax_rate_value']))
+                : $discountedGrossTotal;
+            $discountedTaxTotal = $discountedGrossTotal - $discountedNetTotal;
+
+            $subtotal += $discountedNetTotal;
+            $tax += $discountedTaxTotal;
+            $total += $discountedGrossTotal;
+
+            $lines[$index] = [
+                'gross_total' => round($preparedItem['gross_total'], 6),
+                'net_total' => round($preparedItem['net_total'], 6),
+                'discounted_gross_total' => round($discountedGrossTotal, 6),
+                'discounted_net_total' => round($discountedNetTotal, 6),
+                'discounted_tax_total' => round($discountedTaxTotal, 6),
+                'tax_rate_value' => $preparedItem['tax_rate_value'],
+            ];
         }
 
         return [
             'subtotal' => round($subtotal, 2),
             'tax' => round($tax, 2),
             'total' => round($total, 2),
+            'gross_total' => round($grossTotal, 2),
+            'discount_amount' => round($discountAmount, 2),
+            'discount_percentage' => round($effectiveDiscountPercentage, 6),
+            'discount_type' => $discountAmount > 0 ? $normalizedDiscountType : 'NONE',
+            'discount_value' => $discountAmount > 0
+                ? ($normalizedDiscountType === 'AMOUNT' ? round($discountAmount, 6) : round($effectiveDiscountPercentage, 6))
+                : 0.0,
+            'lines' => $lines,
         ];
     }
 

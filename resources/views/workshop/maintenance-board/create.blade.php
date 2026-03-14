@@ -419,6 +419,8 @@
             const parsed = this.splitName(payload.name);
             this.quickClient.first_name = parsed.first_name;
             this.quickClient.last_name = parsed.last_name;
+            this.quickClient.fecha_nacimiento = payload?.fecha_nacimiento || '';
+            this.quickClient.genero = payload?.genero || '';
         } catch (error) {
             this.quickClientError = error?.message || 'Error consultando RENIEC.';
         } finally {

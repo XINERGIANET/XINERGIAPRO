@@ -21,7 +21,6 @@
     data-profiles='@json($profiles ?? [], JSON_HEX_APOS | JSON_HEX_QUOT)'
     data-selected-profile='@json($selectedProfileId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT)'
     x-data="{
-        
         departments: JSON.parse($el.dataset.departments || '[]'),
         provinces: JSON.parse($el.dataset.provinces || '[]'),
         districts: JSON.parse($el.dataset.districts || '[]'),
@@ -36,10 +35,16 @@
         documentNumber: @js(old('document_number', $person->document_number ?? '')),
         firstName: @js(old('first_name', $person->first_name ?? '')),
         lastName: @js(old('last_name', $person->last_name ?? '')),
-        reniecLoading: false,
-        reniecError: '',
+        fechaNacimiento: @js(old('fecha_nacimiento', $person->fecha_nacimiento ?? '')),
+        genero: @js(old('genero', $person->genero ?? '')),
+        phone: @js(old('phone', $person->phone ?? '')),
+        email: @js(old('email', $person->email ?? '')),
+        addressText: @js(old('address', $person->address ?? '')),
+        lookupLoading: false,
+        lookupError: '',
+        rucLookupMeta: null,
         roleToAdd: '',
-        userRoleId: 1,
+        userRoleId: '1',
         init() {
             if (!this.provinceId && this.districtId) {
                 const district = this.districts.find(d => d.id == this.districtId);
@@ -53,6 +58,24 @@
                     this.departmentId = province.parent_location_id ?? '';
                 }
             }
+
+            if (String(this.personType).toUpperCase() === 'RUC') {
+                this.lastName = '';
+                this.genero = '';
+            }
+
+            this.$watch('personType', (value) => {
+                this.lookupError = '';
+                if (String(value).toUpperCase() === 'RUC') {
+                    this.lastName = '';
+                    this.genero = '';
+                } else {
+                    this.rucLookupMeta = null;
+                }
+            });
+        },
+        isRucPerson() {
+            return String(this.personType || '').toUpperCase() === 'RUC';
         },
         addRole() {
             const roleId = parseInt(this.roleToAdd || 0, 10);
@@ -70,7 +93,7 @@
             }
         },
         hasUserRole() {
-            return this.selectedRoleIds.includes(this.userRoleId);
+            return this.selectedRoleIds.map(id => String(id)).includes(String(this.userRoleId));
         },
         get filteredProvinces() {
             return this.provinces.filter(p => p.parent_location_id == this.departmentId);
@@ -92,34 +115,123 @@
             if (parts.length === 3) return { first_name: parts[0], last_name: parts.slice(1).join(' ') };
             return { first_name: parts.slice(0, 2).join(' '), last_name: parts.slice(2).join(' ') };
         },
-        async fetchReniec() {
-            this.reniecError = '';
-            if (String(this.personType).toUpperCase() !== 'DNI') {
-                this.reniecError = 'La busqueda RENIEC solo aplica para DNI.';
+        normalizeText(value) {
+            return String(value || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .trim();
+        },
+        findDepartmentByName(name) {
+            const target = this.normalizeText(name);
+            return this.departments.find(item => this.normalizeText(item.name) === target) || null;
+        },
+        findProvinceByName(name, departmentId) {
+            const target = this.normalizeText(name);
+            return this.provinces.find(item =>
+                String(item.parent_location_id || '') === String(departmentId || '') &&
+                this.normalizeText(item.name) === target
+            ) || null;
+        },
+        findDistrictByName(name, provinceId) {
+            const target = this.normalizeText(name);
+            return this.districts.find(item =>
+                String(item.parent_location_id || '') === String(provinceId || '') &&
+                this.normalizeText(item.name) === target
+            ) || null;
+        },
+        applyLocationFromLookup(payload) {
+            const department = this.findDepartmentByName(payload.department);
+            if (!department) return;
+
+            this.departmentId = String(department.id);
+
+            const province = this.findProvinceByName(payload.province, department.id);
+            if (!province) {
+                this.provinceId = '';
+                this.districtId = '';
                 return;
             }
-            const dni = String(this.documentNumber || '').trim();
-            if (!/^\d{8}$/.test(dni)) {
-                this.reniecError = 'Ingrese un DNI valido de 8 digitos.';
-                return;
-            }
-            this.reniecLoading = true;
-            try {
-                const response = await fetch(`/api/reniec?dni=${encodeURIComponent(dni)}`, {
-                    headers: { 'Accept': 'application/json' }
-                });
-                const payload = await response.json();
-                if (!response.ok || !payload?.status || !payload?.name) {
-                    throw new Error(payload?.message || 'No se encontro informacion en RENIEC.');
+
+            this.provinceId = String(province.id);
+
+            const district = this.findDistrictByName(payload.district, province.id);
+            this.districtId = district ? String(district.id) : '';
+        },
+        normalizeApiDate(value) {
+            const raw = String(value || '').trim();
+            if (!raw) return '';
+            const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+            return match ? match[1] : '';
+        },
+        async fetchDocumentData() {
+            this.lookupError = '';
+            const type = String(this.personType || '').toUpperCase();
+
+            if (type === 'DNI') {
+                const dni = String(this.documentNumber || '').trim();
+                if (!/^\d{8}$/.test(dni)) {
+                    this.lookupError = 'Ingrese un DNI valido de 8 digitos.';
+                    return;
                 }
-                const parsed = this.splitName(payload.name);
-                this.firstName = parsed.first_name;
-                this.lastName = parsed.last_name;
-            } catch (error) {
-                this.reniecError = error?.message || 'Error consultando RENIEC.';
-            } finally {
-                this.reniecLoading = false;
+                this.lookupLoading = true;
+                try {
+                    const response = await fetch(`/api/reniec?dni=${encodeURIComponent(dni)}`, {
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    const payload = await response.json();
+                    if (!response.ok || !payload?.status || !payload?.name) {
+                        throw new Error(payload?.message || 'No se encontro informacion en RENIEC.');
+                    }
+                    const parsed = this.splitName(payload.name);
+                    this.firstName = parsed.first_name;
+                    this.lastName = parsed.last_name;
+                    this.fechaNacimiento = payload?.fecha_nacimiento || this.fechaNacimiento;
+                    this.genero = payload?.genero || '';
+                } catch (error) {
+                    this.lookupError = error?.message || 'Error consultando RENIEC.';
+                } finally {
+                    this.lookupLoading = false;
+                }
+                return;
             }
+
+            if (type === 'RUC') {
+                const ruc = String(this.documentNumber || '').trim();
+                if (!/^\d{11}$/.test(ruc)) {
+                    this.lookupError = 'Ingrese un RUC valido de 11 digitos.';
+                    return;
+                }
+                this.lookupLoading = true;
+                try {
+                    const response = await fetch(`/api/ruc?ruc=${encodeURIComponent(ruc)}`, {
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    const payload = await response.json();
+                    if (!response.ok || !payload?.status) {
+                        throw new Error(payload?.message || 'No se encontro informacion para el RUC ingresado.');
+                    }
+                    this.documentNumber = payload.ruc || ruc;
+                    this.firstName = payload.legal_name || this.firstName;
+                    this.lastName = '';
+                    this.addressText = payload.address || this.addressText;
+                    this.fechaNacimiento = this.normalizeApiDate(payload?.raw?.fecha_inscripcion || '');
+                    this.genero = '';
+                    this.applyLocationFromLookup(payload);
+                    this.rucLookupMeta = {
+                        trade_name: payload.trade_name || '',
+                        condition: payload.condition || '',
+                        taxpayer_status: payload.taxpayer_status || '',
+                    };
+                } catch (error) {
+                    this.lookupError = error?.message || 'Error consultando RUC.';
+                } finally {
+                    this.lookupLoading = false;
+                }
+                return;
+            }
+
+            this.lookupError = 'La busqueda automatica solo aplica para DNI o RUC.';
         }
     }"
     x-init="init()"
@@ -150,32 +262,33 @@
                 name="document_number"
                 x-model="documentNumber"
                 required
-                placeholder="Ingrese el documento"
+                :placeholder="isRucPerson() ? 'Ingrese el RUC' : 'Ingrese el documento'"
                 class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
             />
             <button
                 type="button"
-                @click="fetchReniec()"
-                :disabled="reniecLoading"
+                @click="fetchDocumentData()"
+                :disabled="lookupLoading"
                 class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-[#244BB3] px-4 text-sm font-medium text-white hover:bg-[#1f3f98] disabled:opacity-60"
             >
                 <i class="ri-search-line"></i>
-                <span class="ml-1" x-text="reniecLoading ? 'Buscando...' : 'Buscar'"></span>
+                <span class="ml-1" x-text="lookupLoading ? 'Buscando...' : 'Buscar'"></span>
             </button>
         </div>
-        <p x-show="reniecError" x-cloak class="mt-1 text-xs text-red-600" x-text="reniecError"></p>
+        <p x-show="lookupError" x-cloak class="mt-1 text-xs text-red-600" x-text="lookupError"></p>
         @error('document_number')
             <p class="mt-1 text-xs text-error-500">{{ $message }}</p>
         @enderror
     </div>
+
     <div>
-        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Nombres</label>
+        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400" x-text="isRucPerson() ? 'Razon social' : 'Nombres'"></label>
         <input
             type="text"
             name="first_name"
             x-model="firstName"
             required
-            placeholder="Ingrese los nombres"
+            :placeholder="isRucPerson() ? 'Ingrese la razon social' : 'Ingrese los nombres'"
             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
         />
         @error('first_name')
@@ -183,14 +296,13 @@
         @enderror
     </div>
 
-
-    <div>
+    <div x-show="!isRucPerson()" x-cloak>
         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Apellidos</label>
         <input
             type="text"
             name="last_name"
             x-model="lastName"
-            required
+            :required="!isRucPerson()"
             placeholder="Ingrese los apellidos"
             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
         />
@@ -198,13 +310,12 @@
             <p class="mt-1 text-xs text-error-500">{{ $message }}</p>
         @enderror
     </div>
-
     <div>
-        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Fecha de nacimiento</label>
+        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400" x-text="isRucPerson() ? 'Fecha de inscripcion' : 'Fecha de nacimiento'"></label>
         <input
             type="date"
             name="fecha_nacimiento"
-            value="{{ old('fecha_nacimiento', $person->fecha_nacimiento ?? '') }}"
+            x-model="fechaNacimiento"
             onclick="this.showPicker && this.showPicker()"
             onfocus="this.showPicker && this.showPicker()"
             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
@@ -214,10 +325,11 @@
         @enderror
     </div>
 
-    <div>
+    <div x-show="!isRucPerson()" x-cloak>
         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Genero</label>
         <select
             name="genero"
+            x-model="genero"
             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
         >
             <option value="">Seleccione genero</option>
@@ -230,15 +342,12 @@
         @enderror
     </div>
 
-
-
-
     <div>
         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Telefono</label>
         <input
             type="text"
             name="phone"
-            value="{{ old('phone', $person->phone ?? '') }}"
+            x-model="phone"
             placeholder="Ingrese el telefono"
             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
         />
@@ -252,7 +361,7 @@
         <input
             type="email"
             name="email"
-            value="{{ old('email', $person->email ?? '') }}"
+            x-model="email"
             placeholder="Ingrese el email"
             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
         />
@@ -261,12 +370,12 @@
         @enderror
     </div>
 
-    <div class="sm:col-span-1 ">
+    <div class="sm:col-span-1">
         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Direccion</label>
         <input
             type="text"
             name="address"
-            value="{{ old('address', $person->address ?? '') }}"
+            x-model="addressText"
             required
             placeholder="Ingrese la direccion"
             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
@@ -324,73 +433,100 @@
         @enderror
     </div>
 
-    <div class="sm:col-span-2 lg:col-span-3 xl:col-span-4">
-        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Roles</label>
-        <div class="flex items-center gap-4 flex-nowrap">
-            <template x-for="role in roles" :key="role.id">
-                <label class="inline-flex items-center gap-3 whitespace-nowrap text-base font-medium text-gray-700 dark:text-gray-200 cursor-pointer">
-                    <input
-                        type="checkbox"
-                        name="roles[]"
-                        :value="role.id"
-                        :checked="selectedRoleIds.includes(role.id)"
-                        @change="toggleRole(role.id)"
-                        class="h-5 w-5 rounded border-gray-300 text-brand-500 focus:ring-brand-500/10 transition-all"
-                    />
-                    <span x-text="role.name"></span>
-                </label>
-            </template>
-        </div>
-    </div>
-
-    <template x-if="hasUserRole()">
-        <div class="sm:col-span-2 lg:col-span-3 xl:col-span-4">
-            <div class="rounded-2xl border border-brand-100 bg-brand-50/40 p-4 dark:border-brand-500/20 dark:bg-brand-500/5">
-               
-                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <div>
-                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Usuario</label>
-                        <input
-                            type="text"
-                            name="user_name"
-                            value="{{ $userName }}"
-                            placeholder="Ingrese el usuario"
-                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                        />
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Contraseña</label>
-                        <input
-                            type="password"
-                            name="password"
-                            placeholder="Ingrese la contraseña"
-                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                        />
-                    </div>
-                    <div>
-                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Confirmar contraseña</label>
-                        <input
-                            type="password"
-                            name="password_confirmation"
-                            placeholder="Confirme la contraseña"
-                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                        />
-                    </div>
-                    <div class="sm:col-span-2 lg:col-span-1">
-                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Perfil</label>
-                        <select
-                            name="profile_id"
-                            x-model="selectedProfileId"
-                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                        >
-                            <option value="">Seleccione perfil</option>
-                            <template x-for="profile in profiles" :key="profile.id">
-                                <option :value="profile.id" :selected="profile.id == selectedProfileId" x-text="profile.name"></option>
-                            </template>
-                        </select>
-                    </div>
-                </div>
+    <template x-if="isRucPerson() && rucLookupMeta">
+        <div class="col-span-4 grid gap-4 rounded-xl border border-amber-200 bg-amber-50 p-4 sm:grid-cols-3">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Nombre comercial</p>
+                <p class="mt-1 text-sm text-slate-700" x-text="rucLookupMeta.trade_name || '-'"></p>
+            </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Condicion</p>
+                <p class="mt-1 text-sm text-slate-700" x-text="rucLookupMeta.condition || '-'"></p>
+            </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Estado</p>
+                <p class="mt-1 text-sm text-slate-700" x-text="rucLookupMeta.taxpayer_status || '-'"></p>
             </div>
         </div>
     </template>
+
+    <div class="col-span-4">
+        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Roles</label>
+        <div class="flex flex-wrap gap-x-6 gap-y-3">
+            @foreach(($roles ?? []) as $role)
+                <label class="inline-flex items-center gap-2">
+                    <input
+                        type="checkbox"
+                        name="roles[]"
+                        value="{{ $role->id }}"
+                        x-model="selectedRoleIds"
+                        class="h-5 w-5 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                    >
+                    <span class="text-sm text-gray-700 dark:text-gray-300">{{ $role->name }}</span>
+                </label>
+            @endforeach
+        </div>
+        @error('roles')
+            <p class="mt-1 text-xs text-error-500">{{ $message }}</p>
+        @enderror
+        @error('roles.*')
+            <p class="mt-1 text-xs text-error-500">{{ $message }}</p>
+        @enderror
+    </div>
+
+    <div class="col-span-4 grid gap-5" x-show="hasUserRole()" x-cloak style="grid-template-columns: repeat(3, minmax(0, 1fr));">
+        <div>
+            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Usuario</label>
+            <input
+                type="text"
+                name="user_name"
+                value="{{ old('user_name', $userName ?? '') }}"
+                placeholder="Ingrese el usuario"
+                class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+            />
+            @error('user_name')
+                <p class="mt-1 text-xs text-error-500">{{ $message }}</p>
+            @enderror
+        </div>
+
+        <div>
+            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Perfil</label>
+            <select
+                name="profile_id"
+                x-model="selectedProfileId"
+                class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+            >
+                <option value="">Seleccione perfil</option>
+                <template x-for="profile in profiles" :key="profile.id">
+                    <option :value="profile.id" x-text="profile.name"></option>
+                </template>
+            </select>
+            @error('profile_id')
+                <p class="mt-1 text-xs text-error-500">{{ $message }}</p>
+            @enderror
+        </div>
+
+        <div>
+            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Password</label>
+            <input
+                type="password"
+                name="password"
+                placeholder="Ingrese la password"
+                class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+            />
+            @error('password')
+                <p class="mt-1 text-xs text-error-500">{{ $message }}</p>
+            @enderror
+        </div>
+
+        <div>
+            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Confirmar password</label>
+            <input
+                type="password"
+                name="password_confirmation"
+                placeholder="Confirme la password"
+                class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+            />
+        </div>
+    </div>
 </div>

@@ -51,7 +51,7 @@
                     </div>
                 </div>
                 <div class="w-64 hidden md:block relative">
-                    <input type="text" id="search-products" placeholder="Buscar productos..." 
+                    <input type="text" id="search-products" placeholder="Buscar por codigo de barras o producto..." 
                         class="w-full pl-9 pr-4 py-2 bg-gray-100 border-transparent focus:bg-white focus:border-blue-500 focus:ring-0 rounded-lg text-sm transition-all">
                     <i class="fas fa-search absolute left-3 top-2.5 text-gray-400 text-xs"></i>
                 </div>
@@ -64,7 +64,7 @@
             </div>
         </main>
 
-        <aside class="w-[400px] bg-white border-l border-gray-300 flex flex-col shadow-2xl z-20 shrink-0 sticky top-0 h-screen">
+        <aside class="w-[440px] bg-white border-l border-gray-300 flex flex-col shadow-2xl z-20 shrink-0 sticky top-0 h-screen">
             <div class="h-16 px-6 border-b border-gray-200 bg-white flex justify-between items-center shrink-0">
                 <h3 class="text-xl font-bold text-slate-800">Productos a Sacar</h3>
                 <span class="px-3 py-1 bg-orange-50 text-orange-700 rounded-full text-xs font-bold border border-orange-100">Salida</span>
@@ -142,6 +142,7 @@
         const branchId = @json($branchId ?? null);
         let selectedProducts = [];
         let filteredProducts = productsData;
+        let productSearchTimer = null;
 
         function isTransferMode() {
             return !!document.getElementById('is-transfer')?.checked;
@@ -159,6 +160,37 @@
         function getImageUrl(imgUrl) {
             if (imgUrl && imgUrl.trim() !== '') return imgUrl;
             return 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIj48cmVjdCBmaWxsPSIjZTdlOWViIiB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM5Y2EzYWYiPlNpbiBpbWFnZW48L3RleHQ+PC9zdmc+';
+        }
+
+        function normalizeProductCode(value) {
+            return String(value || '').trim().toLowerCase();
+        }
+
+        function clearSearchProductsField() {
+            filteredProducts = productsData;
+            const searchInput = document.getElementById('search-products');
+            if (searchInput) {
+                searchInput.value = '';
+                searchInput.focus();
+            }
+        }
+
+        function findUniqueProductByCode(searchTerm) {
+            const needle = normalizeProductCode(searchTerm);
+            if (!needle) return null;
+
+            const matches = productsData.filter((product) => normalizeProductCode(product.code) === needle);
+            return matches.length === 1 ? matches[0] : null;
+        }
+
+        function tryAutoAddProductByCode(searchTerm) {
+            const matchedProduct = findUniqueProductByCode(searchTerm);
+            if (!matchedProduct || Number(matchedProduct.currentStock || 0) <= 0) return false;
+
+            addProduct(matchedProduct.id);
+            clearSearchProductsField();
+            renderProducts();
+            return true;
         }
 
         function renderProducts() {
@@ -187,7 +219,7 @@
                         <h4 class="font-semibold text-sm text-gray-800 line-clamp-2 mb-1">${safeName}</h4>
                         <p class="text-xs text-gray-500 mb-2">Código: ${safeCode}</p>
                         <div class="flex items-center justify-between">
-                            <span class="text-xs text-gray-600">
+                            <span class="text-sm font-semibold text-slate-700">
                                 <i class="ri-stack-line"></i> Stock: <strong>${prod.currentStock || 0}</strong>
                             </span>
                             <span class="text-xs font-medium text-orange-600">${safeUnit}</span>
@@ -372,12 +404,24 @@
         }
 
         document.getElementById('search-products')?.addEventListener('input', function(e) {
-            const search = e.target.value.toLowerCase();
+            const rawValue = String(e.target.value || '');
+            const search = rawValue.toLowerCase();
             filteredProducts = productsData.filter(p => 
                 (p.name && p.name.toLowerCase().includes(search)) || 
                 (p.code && p.code.toLowerCase().includes(search))
             );
             renderProducts();
+            window.clearTimeout(productSearchTimer);
+            if (search.trim() === '') return;
+            productSearchTimer = window.setTimeout(() => {
+                tryAutoAddProductByCode(rawValue);
+            }, 180);
+        });
+        document.getElementById('search-products')?.addEventListener('keydown', function(e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            window.clearTimeout(productSearchTimer);
+            tryAutoAddProductByCode(e.target.value || '');
         });
 
         document.addEventListener('DOMContentLoaded', function() {

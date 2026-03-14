@@ -20,32 +20,28 @@
     <div id="sales-create-view">
         <x-common.page-breadcrumb :pageTitle="$pageTitle" />
 
-        <x-common.component-card
-            title="Punto de Venta"
-            desc="Interfaz de venta rápida. Puedes seguir agregando productos aunque el stock mostrado sea 0."
-        >
+        <x-common.component-card title="Punto de Venta"
+            desc="Interfaz de venta rápida. Puedes seguir agregando productos aunque el stock mostrado sea 0.">
             <div class="flex items-start gap-6" style="display:flex; align-items:flex-start; gap:1.5rem;">
-                <section class="min-w-0 space-y-5" style="flex: 0 0 68%; max-width: 68%; width: 68%;">
-                  
+                <section class="min-w-0 space-y-5" style="flex: 0 0 60%; max-width: 60%; width: 60%;">
+
                     <div class="hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                             <div class="relative flex-1">
                                 <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
                                     <i class="ri-search-line text-lg"></i>
                                 </span>
-                                <input
-                                    id="product-search-legacy"
-                                    type="text"
-                                    placeholder="Buscar por nombre o categoría"
-                                    class="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-12 pr-4 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
-                                >
+                                <input id="product-search-legacy" type="text" placeholder="Buscar por nombre o categoría"
+                                    class="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-12 pr-4 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100">
                             </div>
                             <div class="flex flex-wrap gap-2">
-                                <a href="{{ $salesIndexUrl }}" class="inline-flex h-12 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                                <a href="{{ $salesIndexUrl }}"
+                                    class="inline-flex h-12 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                                     <i class="ri-arrow-left-line"></i>
                                     <span>Volver</span>
                                 </a>
-                                <button type="button" id="clear-sale-button-legacy" class="inline-flex h-12 items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-5 text-sm font-semibold text-rose-700 hover:bg-rose-100">
+                                <button type="button" id="clear-sale-button-legacy"
+                                    class="inline-flex h-12 items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-5 text-sm font-semibold text-rose-700 hover:bg-rose-100">
                                     <i class="ri-delete-bin-6-line"></i>
                                     <span>Limpiar orden</span>
                                 </button>
@@ -54,11 +50,13 @@
                     </div>
 
                     <div class="flex flex-wrap items-center justify-end gap-2">
-                        <a href="{{ $salesIndexUrl }}" class="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                        <a href="{{ $salesIndexUrl }}"
+                            class="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                             <i class="ri-arrow-left-line"></i>
                             <span>Volver</span>
                         </a>
-                        <button type="button" id="clear-sale-button" class="inline-flex h-10 items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 hover:bg-rose-100">
+                        <button type="button" id="clear-sale-button"
+                            class="inline-flex h-10 items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 hover:bg-rose-100">
                             <i class="ri-delete-bin-6-line"></i>
                             <span>Limpiar orden</span>
                         </button>
@@ -76,111 +74,123 @@
                             <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-800">
                                 <i class="ri-search-line text-[22px]"></i>
                             </span>
-                            <input
-                                id="product-search"
-                                type="text"
-                                placeholder="Buscar por nombre o categoria"
-                                class="h-14 w-full rounded-[22px] border border-slate-200 bg-slate-50 pl-14 pr-4 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
-                            >
+                            <input id="product-search" type="text"
+                                placeholder="Buscar por codigo de barras, nombre o categoria"
+                                class="h-14 w-full rounded-[22px] border border-slate-200 bg-slate-50 pl-14 pr-4 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100">
                         </div>
                         <div id="products-grid" class="mt-5 grid gap-4"></div>
                     </div>
                 </section>
 
-                <aside class="min-w-0" style="flex: 0 0 32%; max-width: 32%; width: 32%;">
+                <aside class="min-w-0 xl:pr-5" style="flex: 0 0 40%; max-width: 40%; width: 40%;">
                     <div class="sticky top-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
-                        <div class="border-b border-slate-800 bg-slate-900 px-4 py-3 text-white" style="background-color: #334155">
+                        <div class="border-b border-slate-800 bg-slate-900 px-4 py-3 text-white"
+                            style="background-color: #334155">
                             <div class="grid grid-cols-2 gap-1.5 rounded-xl bg-slate-800/90 p-1">
-                                <button type="button" id="summary-tab-button" class="inline-flex h-9 items-center justify-center rounded-lg text-sm font-bold text-white shadow-theme-xs" style="background:linear-gradient(90deg,#ff7a00,#ff4d00); color:#fff; box-shadow:0 8px 18px rgba(249,115,22,0.24);">
+                                <button type="button" id="summary-tab-button"
+                                    class="inline-flex h-9 items-center justify-center rounded-lg text-sm font-bold text-white shadow-theme-xs"
+                                    style="background:linear-gradient(90deg,#ff7a00,#ff4d00); color:#fff; box-shadow:0 8px 18px rgba(249,115,22,0.24);">
                                     Resumen
                                 </button>
-                                <button type="button" id="payment-tab-button" class="inline-flex h-9 items-center justify-center rounded-lg text-sm font-bold text-slate-300 transition-colors hover:text-white">
+                                <button type="button" id="payment-tab-button"
+                                    class="inline-flex h-9 items-center justify-center rounded-lg text-sm font-bold text-slate-300 transition-colors hover:text-white">
                                     Cobro
                                 </button>
                             </div>
                         </div>
 
-             
+
 
                         <div id="summary-tab-panel">
 
-                        <div id="cart-container" class="max-h-[52vh] overflow-y-auto p-4"></div>
+                            <div id="cart-container" class="max-h-[52vh] overflow-y-auto p-4"></div>
 
-                        <div class="border-t border-slate-200 bg-slate-50 p-5">
-                            <div class="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
-                                <div class="flex justify-between text-sm text-slate-500"><span>Subtotal</span><span id="ticket-subtotal" class="font-semibold">$0.00</span></div>
-                                <div class="flex justify-between text-sm text-slate-500"><span>IGV</span><span id="ticket-tax" class="font-semibold" >$0.00</span></div>
-                                <div class="border-t border-dashed border-slate-200 pt-2"></div>
-                                <div class="flex items-center justify-between"><span class="text-base font-bold text-slate-900">Total a pagar</span><span id="ticket-total" class="text-3xl font-black" style="color:#f97316;">$0.00</span></div>
+                            <div class="border-t border-slate-200 bg-slate-50 p-5">
+                                <div class="mb-3 flex items-center justify-end">
+                                    <button type="button" id="open-discount-modal-button"
+                                        class="inline-flex h-9 items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-3 text-xs font-bold text-orange-700 transition hover:bg-orange-100">
+                                        <i class="ri-percent-line"></i>
+                                        <span>Aplicar descuento</span>
+                                    </button>
+                                </div>
+                                <div class="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
+                                    <div class="flex justify-between text-sm text-slate-500"><span>Subtotal</span><span
+                                            id="ticket-subtotal" class="font-semibold">$0.00</span></div>
+                                    <div class="flex justify-between text-sm text-slate-500"><span>IGV</span><span
+                                            id="ticket-tax" class="font-semibold">$0.00</span></div>
+                                    <div class="flex justify-between text-sm text-rose-500"><span>Descuento</span><span
+                                            id="ticket-discount" class="font-semibold">S/ 0.00</span></div>
+                                    <div class="border-t border-dashed border-slate-200 pt-2"></div>
+                                    <div class="flex items-center justify-between"><span
+                                            class="text-base font-bold text-slate-900">Total a pagar</span><span
+                                            id="ticket-total" class="text-3xl font-black"
+                                            style="color:#f97316;">$0.00</span></div>
+                                </div>
+                                <div id="payment-methods-section"
+                                    class="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                                    <label for="sale-notes"
+                                        class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Notas</label>
+                                    <textarea id="sale-notes" rows="2" placeholder="Detalle adicional de la venta"
+                                        class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"></textarea>
+                                </div>
                             </div>
-                            <div id="payment-methods-section" class="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-                                <label for="sale-notes" class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Notas</label>
-                                <textarea
-                                    id="sale-notes"
-                                    rows="2"
-                                    placeholder="Detalle adicional de la venta"
-                                    class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
-                                ></textarea>
-                            </div>
-                        </div>
                         </div>
 
                         <div id="payment-tab-panel" class="hidden bg-slate-50 p-5">
                             <div class="rounded-2xl border border-slate-200 bg-white p-4">
                                 <div class="space-y-4">
                                     <div class="space-y-2">
-                                        <label class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Cliente</label>
-                                        <div class="relative" id="client-selector">
-                                            <input
-                                                id="client-autocomplete"
-                                                type="text"
-                                                placeholder="Buscar cliente por nombre o documento"
-                                                autocomplete="off"
-                                                class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 pr-10 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
-                                            >
-                                            <button
-                                                type="button"
-                                                id="client-clear-button"
-                                                class="absolute right-3 top-1/2 hidden -translate-y-1/2 text-slate-400 hover:text-slate-700"
-                                                title="Limpiar cliente"
-                                            >
-                                                <i class="ri-close-line"></i>
+                                        <label
+                                            class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Cliente</label>
+                                        <div class="flex items-start gap-2">
+                                            <div class="relative flex-1" id="client-selector">
+                                                <input id="client-autocomplete" type="text"
+                                                    placeholder="Buscar cliente por nombre o documento" autocomplete="off"
+                                                    class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 pr-10 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                                <button type="button" id="client-clear-button"
+                                                    class="absolute right-3 top-1/2 hidden -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                                                    title="Limpiar cliente">
+                                                    <i class="ri-close-line"></i>
+                                                </button>
+                                                <div id="client-options"
+                                                    class="absolute z-50 mt-1 hidden max-h-56 w-full overflow-auto rounded-2xl border border-slate-200 bg-white shadow-xl">
+                                                </div>
+                                            </div>
+                                            <button type="button" id="open-quick-client-modal-button"
+                                                class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white shadow-theme-xs"
+                                                style="background:linear-gradient(90deg,#ff7a00,#ff4d00); color:#fff; box-shadow:0 12px 24px rgba(249,115,22,0.24);"
+                                                title="Agregar cliente">
+                                                <i class="ri-add-line text-lg"></i>
                                             </button>
-                                            <div
-                                                id="client-options"
-                                                class="absolute z-50 mt-1 hidden max-h-56 w-full overflow-auto rounded-2xl border border-slate-200 bg-white shadow-xl"
-                                            ></div>
                                         </div>
                                     </div>
 
                                     <div class="grid gap-3 sm:grid-cols-3">
                                         <div class="space-y-2">
-                                            <label for="document-type-select" class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Documento</label>
-                                            <select
-                                                id="document-type-select"
-                                                class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
-                                            >
+                                            <label for="document-type-select"
+                                                class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Documento</label>
+                                            <select id="document-type-select"
+                                                class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                                                 @foreach ($documentTypes ?? [] as $documentType)
-                                                    <option value="{{ $documentType->id }}" @selected((int) ($defaultDocumentTypeId ?? 0) === (int) $documentType->id)>{{ $documentType->name }}</option>
+                                                    <option value="{{ $documentType->id }}" @selected((int) ($defaultDocumentTypeId ?? 0) === (int) $documentType->id)>
+                                                        {{ $documentType->name }}</option>
                                                 @endforeach
                                             </select>
                                         </div>
                                         <div class="space-y-2">
-                                            <label for="payment-type-select" class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Condicion</label>
-                                            <select
-                                                id="payment-type-select"
-                                                class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
-                                            >
+                                            <label for="payment-type-select"
+                                                class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Condicion</label>
+                                            <select id="payment-type-select"
+                                                class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                                                 <option value="CONTADO">Contado</option>
                                                 <option value="DEUDA">Deuda</option>
                                             </select>
                                         </div>
                                         <div class="space-y-2">
-                                            <label for="cash-register-select" class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Caja</label>
-                                            <select
-                                                id="cash-register-select"
-                                                class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
-                                            >
+                                            <label for="cash-register-select"
+                                                class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Caja</label>
+                                            <select id="cash-register-select"
+                                                class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                                                 @foreach ($cashRegisters ?? [] as $cashRegister)
                                                     <option value="{{ $cashRegister->id }}" @selected((int) ($defaultCashRegisterId ?? 0) === (int) $cashRegister->id)>
                                                         {{ $cashRegister->number }}{{ $cashRegister->status === 'A' ? ' (Activa)' : '' }}
@@ -190,41 +200,36 @@
                                         </div>
                                     </div>
 
-                                    <div id="sale-debt-notice" class="hidden rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+                                    <div id="sale-debt-notice"
+                                        class="hidden rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
                                         Esta venta se registrara como deuda y se enviara a cuentas por cobrar.
                                     </div>
 
-                                    <div id="invoice-billing-block" class="hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                    <div id="invoice-billing-block"
+                                        class="hidden rounded-2xl border border-slate-200 bg-slate-50 p-4">
                                         <div class="grid gap-3 sm:grid-cols-3">
                                             <div class="space-y-2">
-                                                <label for="billing-status-select" class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Factura</label>
-                                                <select
-                                                    id="billing-status-select"
-                                                    class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
-                                                >
+                                                <label for="billing-status-select"
+                                                    class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Factura</label>
+                                                <select id="billing-status-select"
+                                                    class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                                                     <option value="INVOICED">Facturado</option>
                                                     <option value="PENDING">Por facturar</option>
                                                 </select>
                                             </div>
                                             <div id="invoice-series-group" class="space-y-2 sm:col-span-1">
-                                                <label for="invoice-series-input" class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Serie</label>
-                                                <input
-                                                    id="invoice-series-input"
-                                                    type="text"
-                                                    maxlength="20"
+                                                <label for="invoice-series-input"
+                                                    class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Serie</label>
+                                                <input id="invoice-series-input" type="text" maxlength="20"
                                                     placeholder="001"
-                                                    class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
-                                                >
+                                                    class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                                             </div>
                                             <div id="invoice-number-group" class="space-y-2 sm:col-span-1">
-                                                <label for="invoice-number-input" class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Correlativo</label>
-                                                <input
-                                                    id="invoice-number-input"
-                                                    type="text"
-                                                    maxlength="50"
+                                                <label for="invoice-number-input"
+                                                    class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Correlativo</label>
+                                                <input id="invoice-number-input" type="text" maxlength="50"
                                                     placeholder="00000001"
-                                                    class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
-                                                >
+                                                    class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                                             </div>
                                         </div>
                                     </div>
@@ -236,7 +241,9 @@
                                     <div>
                                         <p class="mt-1 text-sm font-bold text-slate-900">Métodos de pago</p>
                                     </div>
-                                    <button type="button" id="add-payment-row-button" class="inline-flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-bold text-white shadow-theme-xs" style="background:linear-gradient(90deg,#ff7a00,#ff4d00); color:#fff; box-shadow:0 10px 20px rgba(249,115,22,0.18);">
+                                    <button type="button" id="add-payment-row-button"
+                                        class="inline-flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-bold text-white shadow-theme-xs"
+                                        style="background:linear-gradient(90deg,#ff7a00,#ff4d00); color:#fff; box-shadow:0 10px 20px rgba(249,115,22,0.18);">
                                         <i class="ri-add-line"></i>
                                         <span>Agregar</span>
                                     </button>
@@ -245,20 +252,24 @@
                                 <div class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
                                     <div class="flex items-center justify-between">
                                         <span class="font-semibold text-slate-500">Total pagado</span>
-                                        <span id="payment-total" class="font-black" >$0.00</span>
+                                        <span id="payment-total" class="font-black">$0.00</span>
                                     </div>
-                                    <div id="payment-difference-wrap" class="mt-2 hidden flex items-center justify-between border-t border-dashed border-slate-200 pt-2">
-                                        <span id="payment-difference-label" class="font-semibold" >Falta pagar</span>
+                                    <div id="payment-difference-wrap"
+                                        class="mt-2 hidden flex items-center justify-between border-t border-dashed border-slate-200 pt-2">
+                                        <span id="payment-difference-label" class="font-semibold">Falta pagar</span>
                                         <span id="payment-difference" class="font-black" style="color:#ea580c;">$0.00</span>
                                     </div>
                                 </div>
                             </div>
-                         
+
                             <div class="mt-4 grid grid-cols-2 gap-3">
-                                <button type="button" onclick="{{ $isEditMode ? 'cancelEditSale()' : 'goBack()' }}" class="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                                <button type="button" onclick="{{ $isEditMode ? 'cancelEditSale()' : 'goBack()' }}"
+                                    class="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-100">
                                     <i class="{{ $secondaryActionIcon }}"></i><span>{{ $secondaryActionLabel }}</span>
                                 </button>
-                                <button type="button" onclick="processSaleNow()" class="inline-flex h-12 items-center justify-center gap-2 rounded-2xl text-sm font-semibold text-white shadow-theme-xs" style="background:linear-gradient(90deg,#ff7a00,#ff4d00); color:#fff; box-shadow:0 12px 24px rgba(249,115,22,0.24);">
+                                <button type="button" onclick="processSaleNow()"
+                                    class="inline-flex h-12 items-center justify-center gap-2 rounded-2xl text-sm font-semibold text-white shadow-theme-xs"
+                                    style="background:linear-gradient(90deg,#ff7a00,#ff4d00); color:#fff; box-shadow:0 12px 24px rgba(249,115,22,0.24);">
                                     <i class="{{ $primaryActionIcon }}"></i><span>{{ $primaryActionLabel }}</span>
                                 </button>
                             </div>
@@ -269,30 +280,229 @@
         </x-common.component-card>
     </div>
 
-    <div id="stock-error-notification" class="pointer-events-none fixed right-6 top-24 z-50 translate-x-[140%] opacity-0 transition-all duration-300">
-        <div class="flex min-w-[320px] items-start gap-3 rounded-2xl border border-orange-200 bg-white px-4 py-4 shadow-2xl">
-            <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-100 text-orange-700"><i class="ri-alert-line text-lg"></i></div>
+    <div id="quick-client-modal" class="fixed inset-0 z-[100000] hidden overflow-hidden p-3 sm:p-6">
+        <div id="quick-client-modal-backdrop" class="fixed inset-0 h-full w-full bg-gray-400/30 backdrop-blur-[32px]"></div>
+        <div class="relative flex min-h-full items-center justify-center">
+            <div class="w-full max-w-4xl rounded-[28px] bg-white shadow-2xl">
+                <div class="flex items-center justify-between border-b border-slate-200 px-6 py-5 sm:px-8">
+                    <h3 class="text-lg font-semibold text-gray-800">Registrar cliente</h3>
+                    <button type="button" id="quick-client-close-button"
+                        class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
+                        <i class="ri-close-line text-xl"></i>
+                    </button>
+                </div>
+
+                <div class="p-6 sm:p-8">
+                    <div id="quick-client-error"
+                        class="mb-3 hidden rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700"></div>
+
+                    <form id="quick-client-form" class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Tipo de persona</label>
+                            <select id="quick-client-person-type"
+                                class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                                <option value="DNI">DNI</option>
+                                <option value="RUC">RUC</option>
+                                <option value="CARNET DE EXTRANGERIA">CARNET DE EXTRANGERIA</option>
+                                <option value="PASAPORTE">PASAPORTE</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Documento</label>
+                            <div class="flex items-center gap-2">
+                                <input id="quick-client-document-number"
+                                    class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                                    placeholder="Documento" required>
+                                <button type="button" id="quick-client-search-button"
+                                    class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-[#334155] px-4 text-sm font-medium text-white hover:bg-[#1f3f98] disabled:opacity-60">
+                                    <i class="ri-search-line"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label id="quick-client-first-name-label"
+                                class="mb-1.5 block text-sm font-medium text-gray-700">Nombres</label>
+                            <input id="quick-client-first-name"
+                                class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                                placeholder="Nombres / Razon social" required>
+                        </div>
+                        <div id="quick-client-last-name-wrap">
+                            <label id="quick-client-last-name-label"
+                                class="mb-1.5 block text-sm font-medium text-gray-700">Apellidos</label>
+                            <input id="quick-client-last-name"
+                                class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Apellidos">
+                        </div>
+
+                        <div>
+                            <label id="quick-client-date-label" class="mb-1.5 block text-sm font-medium text-gray-700">Fecha
+                                de nacimiento</label>
+                            <input id="quick-client-date" type="date" onclick="this.showPicker && this.showPicker()"
+                                onfocus="this.showPicker && this.showPicker()"
+                                class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                        </div>
+                        <div id="quick-client-gender-wrap">
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Genero</label>
+                            <select id="quick-client-gender"
+                                class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                                <option value="">Seleccione genero</option>
+                                <option value="MASCULINO">MASCULINO</option>
+                                <option value="FEMENINO">FEMENINO</option>
+                                <option value="OTRO">OTRO</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Telefono</label>
+                            <input id="quick-client-phone"
+                                class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                                placeholder="Ingrese el telefono">
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Email</label>
+                            <input id="quick-client-email" type="email"
+                                class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                                placeholder="Ingrese el email">
+                        </div>
+
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Direccion</label>
+                            <input id="quick-client-address"
+                                class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                                placeholder="Direccion (opcional)">
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Departamento</label>
+                            <select id="quick-client-department"
+                                class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                                <option value="">Seleccione departamento</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Provincia</label>
+                            <select id="quick-client-province"
+                                class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                                <option value="">Seleccione provincia</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Distrito</label>
+                            <select id="quick-client-district"
+                                class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                                <option value="">Seleccione distrito</option>
+                            </select>
+                        </div>
+
+                        <div class="md:col-span-4">
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Roles</label>
+                            <div
+                                class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                                <input type="checkbox" checked disabled
+                                    class="h-4 w-4 rounded border-gray-300 text-brand-500">
+                                <span>Cliente</span>
+                            </div>
+                        </div>
+
+                        <div class="md:col-span-4 mt-2 flex gap-2">
+                            <button id="quick-client-save-button" type="submit"
+                                class="inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-white"
+                                style="background-color:#00A389;color:#fff;">
+                                <i class="ri-save-line"></i>
+                                <span id="quick-client-save-label">Guardar cliente</span>
+                            </button>
+                            <button id="quick-client-cancel-button" type="button"
+                                class="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                                <i class="ri-close-line"></i>
+                                <span>Cancelar</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="sale-discount-modal" class="fixed inset-0 z-[100000] hidden overflow-hidden p-3 sm:p-6">
+        <div id="sale-discount-backdrop" class="fixed inset-0 h-full w-full bg-gray-400/30 backdrop-blur-[32px]"></div>
+        <div class="relative flex min-h-full items-center justify-center">
+            <div class="w-full max-w-3xl rounded-[28px] bg-white shadow-2xl">
+                <div class="flex items-center justify-between border-b border-slate-200 px-6 py-5 sm:px-8">
+                    <h3 class="text-lg font-semibold text-gray-800">Aplicar descuento total</h3>
+                    <button type="button" id="sale-discount-close-button"
+                        class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
+                        <i class="ri-close-line text-xl"></i>
+                    </button>
+                </div>
+                <div class="p-6 sm:p-8">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Total actual</label>
+                            <input id="sale-discount-current-total" type="text" readonly
+                                class="h-11 w-full rounded-lg border border-gray-300 bg-gray-50 px-3 text-sm font-semibold text-slate-700">
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Dcto. (%)</label>
+                            <input id="sale-discount-percentage" type="number" min="0" max="100" step="0.01"
+                                placeholder="0.00" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Dcto. (por monto)</label>
+                            <input id="sale-discount-amount" type="number" min="0" step="0.01" placeholder="0.00"
+                                class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                        </div>
+                    </div>
+                    <div class="mt-6 flex justify-end gap-2">
+                        <button id="sale-discount-cancel-button" type="button"
+                            class="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                            <i class="ri-close-line"></i>
+                            <span>Cancelar</span>
+                        </button>
+                        <button id="sale-discount-save-button" type="button"
+                            class="inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-white"
+                            style="background:linear-gradient(90deg,#ff7a00,#ff4d00); color:#fff; box-shadow:0 12px 24px rgba(249,115,22,0.24);">
+                            <i class="ri-save-line"></i>
+                            <span>Guardar descuento</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="stock-error-notification"
+        class="pointer-events-none fixed right-6 top-24 z-50 translate-x-[140%] opacity-0 transition-all duration-300">
+        <div
+            class="flex min-w-[320px] items-start gap-3 rounded-2xl border border-orange-200 bg-white px-4 py-4 shadow-2xl">
+            <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-orange-100 text-orange-700"><i
+                    class="ri-alert-line text-lg"></i></div>
             <div class="flex-1">
                 <p class="text-sm font-bold text-slate-900">Aviso</p>
                 <p id="stock-error-message" class="mt-0.5 text-xs text-slate-500">Mensaje</p>
             </div>
-            <button type="button" onclick="hideStockError()" class="text-slate-400 hover:text-slate-700"><i class="ri-close-line"></i></button>
+            <button type="button" onclick="hideStockError()" class="text-slate-400 hover:text-slate-700"><i
+                    class="ri-close-line"></i></button>
         </div>
     </div>
 
-    <div id="add-to-cart-notification" class="pointer-events-none fixed right-6 top-24 z-50 translate-x-[140%] opacity-0 transition-all duration-300">
-        <div class="flex min-w-[320px] items-start gap-3 rounded-2xl border border-emerald-200 bg-white px-4 py-4 shadow-2xl">
-            <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700"><i class="ri-check-line text-lg"></i></div>
+    <div id="add-to-cart-notification"
+        class="pointer-events-none fixed right-6 top-24 z-50 translate-x-[140%] opacity-0 transition-all duration-300">
+        <div
+            class="flex min-w-[320px] items-start gap-3 rounded-2xl border border-emerald-200 bg-white px-4 py-4 shadow-2xl">
+            <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700"><i
+                    class="ri-check-line text-lg"></i></div>
             <div class="flex-1">
                 <p class="text-sm font-bold text-slate-900">Producto agregado</p>
                 <p id="notification-product-name" class="mt-0.5 text-xs text-slate-500">Producto</p>
             </div>
-            <button type="button" onclick="hideNotification()" class="text-slate-400 hover:text-slate-700"><i class="ri-close-line"></i></button>
+            <button type="button" onclick="hideNotification()" class="text-slate-400 hover:text-slate-700"><i
+                    class="ri-close-line"></i></button>
         </div>
     </div>
 
     <style>
-        .notification-show { transform: translateX(0) !important; opacity: 1 !important; pointer-events: auto !important; }
+        .notification-show {
+            transform: translateX(0) !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
 
         #sales-create-view input:focus,
         #sales-create-view select:focus,
@@ -309,13 +519,13 @@
         }
 
         #sales-create-view #products-grid {
-            grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
             gap: 0.95rem !important;
         }
 
         @media (max-width: 1199px) {
             #sales-create-view #products-grid {
-                grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
             }
         }
 
@@ -331,8 +541,8 @@
                 gap: 1rem !important;
             }
 
-            #sales-create-view .flex.items-start.gap-6[style*="display:flex"] > section,
-            #sales-create-view .flex.items-start.gap-6[style*="display:flex"] > aside {
+            #sales-create-view .flex.items-start.gap-6[style*="display:flex"]>section,
+            #sales-create-view .flex.items-start.gap-6[style*="display:flex"]>aside {
                 flex: 0 0 100% !important;
                 max-width: 100% !important;
                 width: 100% !important;
@@ -379,7 +589,7 @@
         (function () {
             const products = Array.isArray(@json($products ?? [])) ? @json($products ?? []) : Object.values(@json($products ?? []) || {});
             const productBranches = Array.isArray(@json($productBranches ?? $productsBranches ?? [])) ? @json($productBranches ?? $productsBranches ?? []) : Object.values(@json($productBranches ?? $productsBranches ?? []) || {});
-            const people = Array.isArray(@json(($people ?? collect())->map(function ($person) {
+            let people = Array.isArray(@json(($people ?? collect())->map(function ($person) {
                 $fullName = trim(($person->first_name ?? '') . ' ' . ($person->last_name ?? ''));
                 return [
                     'id' => (int) $person->id,
@@ -387,13 +597,13 @@
                     'document' => (string) ($person->document_number ?? '')
                 ];
             })->values())) ? @json(($people ?? collect())->map(function ($person) {
-                $fullName = trim(($person->first_name ?? '') . ' ' . ($person->last_name ?? ''));
-                return [
-                    'id' => (int) $person->id,
-                    'label' => $fullName !== '' ? $fullName : ($person->document_number ?: 'Sin nombre'),
-                    'document' => (string) ($person->document_number ?? '')
-                ];
-            })->values()) : [];
+        $fullName = trim(($person->first_name ?? '') . ' ' . ($person->last_name ?? ''));
+        return [
+            'id' => (int) $person->id,
+            'label' => $fullName !== '' ? $fullName : ($person->document_number ?: 'Sin nombre'),
+            'document' => (string) ($person->document_number ?? '')
+        ];
+    })->values()) : [];
             const defaultClientId = Number(@json($defaultClientId ?? 0)) || null;
             const documentTypes = Array.isArray(@json($documentTypes ?? [])) ? @json($documentTypes ?? []) : [];
             const paymentMethods = Array.isArray(@json($paymentMethods ?? [])) ? @json($paymentMethods ?? []) : [];
@@ -417,6 +627,7 @@
 
             let selectedCategory = 'General';
             let productSearch = '';
+            let productSearchTimer = null;
             let clientQuery = '';
             let clientCursor = 0;
             let clientOpen = false;
@@ -518,6 +729,435 @@
                 ? imgUrl
                 : 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIj48cmVjdCBmaWxsPSIjZTJlOGYwIiB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiM2NDc0OGIiPlNpbiBpbWFnZW48L3RleHQ+PC9zdmc+';
             const formatMoney = (value) => `S/ ${Number(value || 0).toFixed(2)}`;
+            const quickClientStoreUrl = @json($quickClientStoreUrl ?? route('admin.sales.clients.store'));
+            const reniecApiUrl = @json(route('api.reniec'));
+            const rucApiUrl = @json(route('api.ruc'));
+            const departments = Array.isArray(@json($departments ?? [])) ? @json($departments ?? []) : [];
+            const provinces = Array.isArray(@json($provinces ?? [])) ? @json($provinces ?? []) : [];
+            const districts = Array.isArray(@json($districts ?? [])) ? @json($districts ?? []) : [];
+            const branchDepartmentId = String(@json($branchDepartmentId ?? ''));
+            const branchProvinceId = String(@json($branchProvinceId ?? ''));
+            const branchDistrictId = String(@json($branchDistrictId ?? ''));
+            let quickClientLoading = false;
+
+            const normalizeApiDate = (value) => {
+                const raw = String(value || '').trim();
+                if (!raw) return '';
+                const matchIso = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+                if (matchIso) return matchIso[1];
+                const matchSlash = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+                if (matchSlash) return `${matchSlash[3]}-${matchSlash[2]}-${matchSlash[1]}`;
+                return '';
+            };
+
+            const parseFullName = (fullName) => {
+                const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
+                if (!parts.length) {
+                    return { first_name: '', last_name: '' };
+                }
+                if (parts.length === 1) {
+                    return { first_name: parts[0], last_name: '' };
+                }
+                return {
+                    first_name: parts.slice(0, -2).join(' ') || parts[0],
+                    last_name: parts.slice(-2).join(' '),
+                };
+            };
+
+            const getQuickClientElements = () => ({
+                modal: document.getElementById('quick-client-modal'),
+                error: document.getElementById('quick-client-error'),
+                personType: document.getElementById('quick-client-person-type'),
+                documentNumber: document.getElementById('quick-client-document-number'),
+                firstName: document.getElementById('quick-client-first-name'),
+                lastName: document.getElementById('quick-client-last-name'),
+                lastNameWrap: document.getElementById('quick-client-last-name-wrap'),
+                firstNameLabel: document.getElementById('quick-client-first-name-label'),
+                lastNameLabel: document.getElementById('quick-client-last-name-label'),
+                dateLabel: document.getElementById('quick-client-date-label'),
+                date: document.getElementById('quick-client-date'),
+                gender: document.getElementById('quick-client-gender'),
+                genderWrap: document.getElementById('quick-client-gender-wrap'),
+                phone: document.getElementById('quick-client-phone'),
+                email: document.getElementById('quick-client-email'),
+                address: document.getElementById('quick-client-address'),
+                department: document.getElementById('quick-client-department'),
+                province: document.getElementById('quick-client-province'),
+                district: document.getElementById('quick-client-district'),
+                saveButton: document.getElementById('quick-client-save-button'),
+                saveLabel: document.getElementById('quick-client-save-label'),
+                searchButton: document.getElementById('quick-client-search-button'),
+            });
+
+            const normalizeLocationText = (value) => String(value || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .trim();
+
+            const renderSelectOptions = (select, items, selectedValue, placeholder) => {
+                if (!select) return;
+                select.innerHTML = `<option value="">${placeholder}</option>`;
+                items.forEach((item) => {
+                    const option = document.createElement('option');
+                    option.value = String(item.id);
+                    option.textContent = String(item.name || item.description || '');
+                    if (String(option.value) === String(selectedValue || '')) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+            };
+
+            const renderQuickClientLocationOptions = () => {
+                const { department, province, district } = getQuickClientElements();
+                const selectedDepartmentId = String(department?.value || '');
+                const selectedProvinceId = String(province?.value || '');
+                const selectedDistrictId = String(district?.value || '');
+
+                renderSelectOptions(department, departments, selectedDepartmentId, 'Seleccione departamento');
+                renderSelectOptions(
+                    province,
+                    provinces.filter((item) => String(item.parent_location_id || '') === selectedDepartmentId),
+                    selectedProvinceId,
+                    'Seleccione provincia'
+                );
+                renderSelectOptions(
+                    district,
+                    districts.filter((item) => String(item.parent_location_id || '') === selectedProvinceId),
+                    selectedDistrictId,
+                    'Seleccione distrito'
+                );
+            };
+
+            const setQuickClientLocation = (departmentId, provinceId, districtId) => {
+                const { department, province, district } = getQuickClientElements();
+                if (department) department.value = String(departmentId || '');
+                renderQuickClientLocationOptions();
+                if (province) province.value = String(provinceId || '');
+                renderQuickClientLocationOptions();
+                if (district) district.value = String(districtId || '');
+                renderQuickClientLocationOptions();
+            };
+
+            const onQuickClientDepartmentChange = () => {
+                const { province, district } = getQuickClientElements();
+                if (province) province.value = '';
+                if (district) district.value = '';
+                renderQuickClientLocationOptions();
+            };
+
+            const onQuickClientProvinceChange = () => {
+                const { district } = getQuickClientElements();
+                if (district) district.value = '';
+                renderQuickClientLocationOptions();
+            };
+
+            const findDepartmentByName = (name) => {
+                const target = normalizeLocationText(name);
+                return departments.find((item) => normalizeLocationText(item.name) === target) || null;
+            };
+
+            const findProvinceByName = (name, departmentId) => {
+                const target = normalizeLocationText(name);
+                return provinces.find((item) => (
+                    String(item.parent_location_id || '') === String(departmentId || '')
+                    && normalizeLocationText(item.name) === target
+                )) || null;
+            };
+
+            const findDistrictByName = (name, provinceId) => {
+                const target = normalizeLocationText(name);
+                return districts.find((item) => (
+                    String(item.parent_location_id || '') === String(provinceId || '')
+                    && normalizeLocationText(item.name) === target
+                )) || null;
+            };
+
+            const applyQuickClientLocationFromLookup = (payload) => {
+                const department = findDepartmentByName(payload?.department || '');
+                if (!department) return;
+
+                const province = findProvinceByName(payload?.province || '', department.id);
+                const district = province ? findDistrictByName(payload?.district || '', province.id) : null;
+
+                setQuickClientLocation(
+                    department.id,
+                    province ? province.id : '',
+                    district ? district.id : ''
+                );
+            };
+
+            const clearQuickClientError = () => {
+                const { error } = getQuickClientElements();
+                if (!error) return;
+                error.textContent = '';
+                error.classList.add('hidden');
+            };
+
+            const showQuickClientError = (message) => {
+                const { error } = getQuickClientElements();
+                if (!error) return;
+                error.textContent = message;
+                error.classList.remove('hidden');
+            };
+
+            const toggleQuickClientLoading = (loading) => {
+                quickClientLoading = loading;
+                const { saveButton, saveLabel, searchButton } = getQuickClientElements();
+                if (saveButton) saveButton.disabled = loading;
+                if (searchButton) searchButton.disabled = loading;
+                if (saveLabel) saveLabel.textContent = loading ? 'Guardando...' : 'Guardar cliente';
+            };
+
+            const syncQuickClientPersonTypeUI = () => {
+                const {
+                    personType,
+                    firstNameLabel,
+                    lastName,
+                    lastNameWrap,
+                    lastNameLabel,
+                    dateLabel,
+                    gender,
+                    genderWrap,
+                    firstName,
+                } = getQuickClientElements();
+                const type = String(personType?.value || 'DNI').toUpperCase();
+                const isRuc = type === 'RUC';
+
+                if (firstNameLabel) {
+                    firstNameLabel.textContent = isRuc ? 'Razon social' : 'Nombres';
+                }
+                if (firstName) {
+                    firstName.placeholder = isRuc ? 'Razon social' : 'Nombres / Razon social';
+                }
+                if (lastNameLabel) {
+                    lastNameLabel.textContent = 'Apellidos';
+                }
+                if (lastNameWrap) {
+                    lastNameWrap.classList.toggle('hidden', isRuc);
+                }
+                if (lastName) {
+                    lastName.required = !isRuc;
+                    if (isRuc) {
+                        lastName.value = '';
+                    }
+                }
+                if (dateLabel) {
+                    dateLabel.textContent = isRuc ? 'Fecha de inscripcion' : 'Fecha de nacimiento';
+                }
+                if (genderWrap) {
+                    genderWrap.classList.toggle('hidden', isRuc);
+                }
+                if (gender && isRuc) {
+                    gender.value = '';
+                }
+            };
+
+            const resetQuickClientForm = () => {
+                const {
+                    personType,
+                    documentNumber,
+                    firstName,
+                    lastName,
+                    date,
+                    gender,
+                    phone,
+                    email,
+                    address,
+                    department,
+                    province,
+                    district,
+                } = getQuickClientElements();
+
+                if (personType) personType.value = 'DNI';
+                if (documentNumber) documentNumber.value = '';
+                if (firstName) firstName.value = '';
+                if (lastName) lastName.value = '';
+                if (date) date.value = '';
+                if (gender) gender.value = '';
+                if (phone) phone.value = '';
+                if (email) email.value = '';
+                if (address) address.value = '';
+                clearQuickClientError();
+                syncQuickClientPersonTypeUI();
+                setQuickClientLocation(branchDepartmentId, branchProvinceId, branchDistrictId);
+            };
+
+            const openQuickClientModal = () => {
+                const { modal, documentNumber } = getQuickClientElements();
+                resetQuickClientForm();
+                if (!modal) return;
+                modal.classList.remove('hidden');
+                document.body.classList.add('overflow-hidden');
+                window.setTimeout(() => documentNumber?.focus(), 40);
+            };
+
+            const closeQuickClientModal = () => {
+                const { modal } = getQuickClientElements();
+                if (!modal) return;
+                modal.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+                clearQuickClientError();
+                toggleQuickClientLoading(false);
+            };
+
+            const getQuickClientPayload = () => {
+                const {
+                    personType,
+                    documentNumber,
+                    firstName,
+                    lastName,
+                    date,
+                    gender,
+                    phone,
+                    email,
+                    address,
+                    district,
+                } = getQuickClientElements();
+
+                return {
+                    person_type: String(personType?.value || 'DNI').trim(),
+                    document_number: String(documentNumber?.value || '').trim(),
+                    first_name: String(firstName?.value || '').trim(),
+                    last_name: String(lastName?.value || '').trim(),
+                    fecha_nacimiento: String(date?.value || '').trim(),
+                    genero: String(gender?.value || '').trim(),
+                    phone: String(phone?.value || '').trim(),
+                    email: String(email?.value || '').trim(),
+                    address: String(address?.value || '').trim(),
+                    location_id: String(district?.value || '').trim(),
+                };
+            };
+
+            const upsertClientInList = (payload) => {
+                const client = {
+                    id: Number(payload.id || 0),
+                    label: String(payload.label || payload.name || `${payload.first_name || ''} ${payload.last_name || ''}`).trim() || String(payload.document || 'Sin nombre'),
+                    document: String(payload.document || payload.document_number || '').trim(),
+                };
+
+                const existingIndex = people.findIndex((person) => Number(person.id) === client.id);
+                if (existingIndex >= 0) {
+                    people[existingIndex] = client;
+                } else {
+                    people.unshift(client);
+                }
+
+                return client;
+            };
+
+            const fetchQuickClientDocumentData = async () => {
+                clearQuickClientError();
+                const {
+                    personType,
+                    documentNumber,
+                    firstName,
+                    lastName,
+                    date,
+                    gender,
+                    address,
+                } = getQuickClientElements();
+                const type = String(personType?.value || 'DNI').toUpperCase();
+                const documentValue = String(documentNumber?.value || '').trim();
+
+                if (type === 'DNI') {
+                    if (!/^\d{8}$/.test(documentValue)) {
+                        showQuickClientError('Ingrese un DNI valido de 8 digitos.');
+                        return;
+                    }
+
+                    try {
+                        toggleQuickClientLoading(true);
+                        const response = await fetch(`${reniecApiUrl}?dni=${encodeURIComponent(documentValue)}`, {
+                            headers: { Accept: 'application/json' },
+                        });
+                        const payload = await response.json();
+                        if (!response.ok || payload?.status === false) {
+                            throw new Error(payload?.message || 'Error consultando RENIEC.');
+                        }
+
+                        const parsed = parseFullName(payload?.name || payload?.nombre_completo || '');
+                        if (firstName) firstName.value = String(payload?.nombres || parsed.first_name || '').trim();
+                        if (lastName) lastName.value = String([payload?.apellido_paterno || '', payload?.apellido_materno || ''].filter(Boolean).join(' ') || parsed.last_name || '').trim();
+                        if (date) date.value = normalizeApiDate(payload?.fecha_nacimiento || '');
+                        if (gender) gender.value = String(payload?.genero || '').trim();
+                    } catch (error) {
+                        showQuickClientError(error?.message || 'Error consultando RENIEC.');
+                    } finally {
+                        toggleQuickClientLoading(false);
+                    }
+                    return;
+                }
+
+                if (type === 'RUC') {
+                    if (!/^\d{11}$/.test(documentValue)) {
+                        showQuickClientError('Ingrese un RUC valido de 11 digitos.');
+                        return;
+                    }
+
+                    try {
+                        toggleQuickClientLoading(true);
+                        const response = await fetch(`${rucApiUrl}?ruc=${encodeURIComponent(documentValue)}`, {
+                            headers: { Accept: 'application/json' },
+                        });
+                        const payload = await response.json();
+                        if (!response.ok || payload?.status === false) {
+                            throw new Error(payload?.message || 'Error consultando RUC.');
+                        }
+
+                        if (firstName) firstName.value = String(payload?.legal_name || '').trim();
+                        if (lastName) lastName.value = '';
+                        if (address) address.value = String(payload?.address || '').trim();
+                        if (date) date.value = normalizeApiDate(payload?.raw?.fecha_inscripcion || payload?.raw?.fechaInscripcion || '');
+                        applyQuickClientLocationFromLookup(payload);
+                    } catch (error) {
+                        showQuickClientError(error?.message || 'Error consultando RUC.');
+                    } finally {
+                        toggleQuickClientLoading(false);
+                    }
+                    return;
+                }
+
+                showQuickClientError('La busqueda automatica solo aplica para DNI o RUC.');
+            };
+
+            const saveQuickClient = async () => {
+                clearQuickClientError();
+                const payload = getQuickClientPayload();
+
+                if (!payload.document_number || !payload.first_name || (!payload.last_name && payload.person_type !== 'RUC')) {
+                    showQuickClientError('Completa los campos obligatorios del cliente.');
+                    return;
+                }
+
+                try {
+                    toggleQuickClientLoading(true);
+                    const response = await fetch(String(quickClientStoreUrl || ''), {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name=\"csrf-token\"]')?.getAttribute('content') || '',
+                        },
+                        body: JSON.stringify(payload),
+                    });
+
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        throw new Error(result?.message || 'Error registrando cliente.');
+                    }
+
+                    const client = upsertClientInList(result);
+                    selectClient(client);
+                    closeQuickClientModal();
+                } catch (error) {
+                    showQuickClientError(error?.message || 'Error registrando cliente.');
+                } finally {
+                    toggleQuickClientLoading(false);
+                }
+            };
+
             const saveDB = () => {
                 if (isEditMode) return;
                 db[activeKey] = currentSale;
@@ -627,9 +1267,17 @@
                 if (clientCursor >= list.length) clientCursor = 0;
                 return list.slice(0, 40);
             };
-            const getTotalFromSale = () => currentSale.items.reduce((sum, item) => {
-                return sum + ((Number(item.price) || 0) * (Number(item.qty) || 0));
-            }, 0);
+            const getTotalFromSale = () => {
+
+    const itemsTotal = currentSale.items.reduce((sum, item) => {
+        return sum + ((Number(item.price) || 0) * (Number(item.qty) || 0));
+    }, 0);
+
+    const discount = currentSale.discount?.amount || 0;
+
+    return itemsTotal - discount;
+
+};
             const inferPaymentMethodKind = (description) => {
                 const normalized = String(description || '').toLowerCase();
                 if (normalized.includes('tarjeta') || normalized.includes('card')) return 'card';
@@ -691,6 +1339,45 @@
                 return ['General', ...Array.from(unique).sort((a, b) => a.localeCompare(b))];
             }
 
+            function normalizeProductCode(value) {
+                return String(value || '').trim().toLowerCase();
+            }
+
+            function clearProductSearchField() {
+                productSearch = '';
+                const searchInput = document.getElementById('product-search');
+                if (searchInput) {
+                    searchInput.value = '';
+                    searchInput.focus();
+                }
+            }
+
+            function findUniqueProductByCode(searchTerm) {
+                const needle = normalizeProductCode(searchTerm);
+                if (!needle) return null;
+
+                const matches = products.filter((prod) => {
+                    const productId = Number(prod.id);
+                    return normalizeProductCode(prod.code) === needle
+                        && typeof priceByProductId.get(productId) !== 'undefined';
+                });
+
+                return matches.length === 1 ? matches[0] : null;
+            }
+
+            function tryAutoAddProductByCode(searchTerm) {
+                const matchedProduct = findUniqueProductByCode(searchTerm);
+                if (!matchedProduct) return false;
+
+                const price = priceByProductId.get(Number(matchedProduct.id));
+                if (typeof price === 'undefined') return false;
+
+                addToCart(matchedProduct, price);
+                clearProductSearchField();
+                renderProducts();
+                return true;
+            }
+
             function showNotice(message) {
                 const notification = document.getElementById('stock-error-notification');
                 const msgEl = document.getElementById('stock-error-message');
@@ -749,9 +1436,9 @@
                         button.classList.add('bg-slate-100');
                     }
                     button.innerHTML = `
-                        <span class="font-medium text-slate-800">${client.label || 'SIN NOMBRE'}</span>
-                        <span class="text-xs text-slate-500">${client.document || ''}</span>
-                    `;
+                            <span class="font-medium text-slate-800">${client.label || 'SIN NOMBRE'}</span>
+                            <span class="text-xs text-slate-500">${client.document || ''}</span>
+                        `;
                     button.addEventListener('mouseenter', () => {
                         clientCursor = index;
                     });
@@ -950,42 +1637,42 @@
                         ? 'display:grid; gap:0.75rem; grid-template-columns:minmax(0,1.7fr) minmax(0,0.9fr) minmax(0,1fr) auto;'
                         : 'display:grid; gap:0.75rem; grid-template-columns:minmax(0,1.8fr) minmax(0,1fr) auto;';
                     const gatewayOptions = paymentGateways.map((gateway) => `
-                        <option value="${gateway.id}" ${Number(row.payment_gateway_id) === Number(gateway.id) ? 'selected' : ''}>${gateway.description}</option>
-                    `).join('');
+                            <option value="${gateway.id}" ${Number(row.payment_gateway_id) === Number(gateway.id) ? 'selected' : ''}>${gateway.description}</option>
+                        `).join('');
                     const methodOptions = paymentMethodVariants.map((variant) => `
-                        <option value="${variant.key}" ${selectedVariantKey === variant.key ? 'selected' : ''}>${variant.label}</option>
-                    `).join('');
+                            <option value="${variant.key}" ${selectedVariantKey === variant.key ? 'selected' : ''}>${variant.label}</option>
+                        `).join('');
 
                     return `
-                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                            <div style="${layoutStyle}">
-                                <div class="space-y-1">
-                                    <label class="block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Metodo</label>
-                                    <select data-role="method" data-index="${index}" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                                        ${methodOptions}
-                                    </select>
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Monto</label>
-                                    <input data-role="amount" data-index="${index}" type="number" min="0" step="0.01" value="${(Number(row.amount) || 0).toFixed(2)}" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                                </div>
-                                ${showCardFields ? `
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                                <div style="${layoutStyle}">
                                     <div class="space-y-1">
-                                        <label class="block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Pasarela</label>
-                                        <select data-role="gateway" data-index="${index}" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                                            <option value="">Seleccionar</option>
-                                            ${gatewayOptions}
+                                        <label class="block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Metodo</label>
+                                        <select data-role="method" data-index="${index}" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                            ${methodOptions}
                                         </select>
                                     </div>
-                                ` : ''}
-                                <div class="flex items-end">
-                                    <button type="button" data-role="remove-payment" data-index="${index}" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 hover:bg-rose-50" title="Eliminar">
-                                        <i class="ri-delete-bin-line"></i>
-                                    </button>
+                                    <div class="space-y-1">
+                                        <label class="block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Monto</label>
+                                        <input data-role="amount" data-index="${index}" type="number" min="0" step="0.01" value="${(Number(row.amount) || 0).toFixed(2)}" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                    </div>
+                                    ${showCardFields ? `
+                                        <div class="space-y-1">
+                                            <label class="block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Pasarela</label>
+                                            <select data-role="gateway" data-index="${index}" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                                <option value="">Seleccionar</option>
+                                                ${gatewayOptions}
+                                            </select>
+                                        </div>
+                                    ` : ''}
+                                    <div class="flex items-end">
+                                        <button type="button" data-role="remove-payment" data-index="${index}" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 hover:bg-rose-50" title="Eliminar">
+                                            <i class="ri-delete-bin-line"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    `;
+                        `;
                 }).join('');
 
                 container.querySelectorAll('[data-role="method"]').forEach((element) => {
@@ -1078,7 +1765,7 @@
                     const category = getProductCategory(prod);
                     const stock = stockByProductId.get(productId) ?? 0;
                     const hasImage = !!(prod.img && String(prod.img).trim() !== '');
-                    const searchNeedle = `${prod.name || ''} ${category}`.toLowerCase();
+                    const searchNeedle = `${prod.code || ''} ${prod.name || ''} ${category}`.toLowerCase();
 
                     if (typeof price === 'undefined') return;
                     if (selectedCategory !== 'General' && category !== selectedCategory) return;
@@ -1120,25 +1807,25 @@
                     });
 
                     card.innerHTML = `
-                        <div class="relative flex h-full w-full flex-col items-center px-3 pb-4 pt-4">
-                            <div class="absolute right-3 top-4 z-20 inline-flex min-w-[62px] items-center justify-center rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-center text-[10px] font-bold leading-none text-orange-600" style="box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);">
-                                Stock: ${Number(stock).toFixed(0)}
-                            </div>
-                            <div class="flex h-[102px] w-full items-center justify-center pt-2">
-                                <div data-role="product-orb" class="mx-auto flex h-[92px] w-[92px] items-center justify-center overflow-hidden rounded-full bg-white transition-transform duration-200" style="box-shadow: 0 12px 24px rgba(249, 115, 22, 0.08), 0 6px 14px rgba(15, 23, 42, 0.04);">
-                                    ${hasImage
-                                        ? `<img src="${getImageUrl(prod.img)}" alt="${prod.name || 'Producto'}" class="h-16 w-16 object-contain" onerror="this.onerror=null; this.src='${getImageUrl(null)}'">`
-                                        : `<i class="ri-shopping-bag-3-line text-[30px] text-orange-500"></i>`}
+                            <div class="relative flex h-full w-full flex-col items-center px-3 pb-4 pt-4">
+                                <div class="absolute right-3 top-4 z-20 inline-flex min-w-[78px] items-center justify-center rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-center text-[12px] font-bold leading-none text-orange-600" style="box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);">
+                                    Stock: ${Number(stock).toFixed(0)}
+                                </div>
+                                <div class="flex h-[102px] w-full items-center justify-center pt-2">
+                                    <div data-role="product-orb" class="mx-auto flex h-[92px] w-[92px] items-center justify-center overflow-hidden rounded-full bg-white transition-transform duration-200" style="box-shadow: 0 12px 24px rgba(249, 115, 22, 0.08), 0 6px 14px rgba(15, 23, 42, 0.04);">
+                                        ${hasImage
+                            ? `<img src="${getImageUrl(prod.img)}" alt="${prod.name || 'Producto'}" class="h-16 w-16 object-contain" onerror="this.onerror=null; this.src='${getImageUrl(null)}'">`
+                            : `<i class="ri-shopping-bag-3-line text-[30px] text-orange-500"></i>`}
+                                    </div>
+                                </div>
+                                <div class="mt-2 flex h-[50px] w-full items-start justify-center px-1">
+                                    <h4 class="line-clamp-2 block w-full text-center text-[12px] font-black leading-[1.28] text-slate-900">${prod.name || 'Sin nombre'}</h4>
+                                </div>
+                                <div class="mt-1 flex h-[24px] w-full items-center justify-center">
+                                    <p class="text-[0.95rem] font-black leading-none tracking-tight transition-colors duration-200 group-hover:text-orange-600" style="color:#f97316;">${formatMoney(price)}</p>
                                 </div>
                             </div>
-                            <div class="mt-2 flex h-[50px] w-full items-start justify-center px-1">
-                                <h4 class="line-clamp-2 block w-full text-center text-[12px] font-black leading-[1.28] text-slate-900">${prod.name || 'Sin nombre'}</h4>
-                            </div>
-                            <div class="mt-1 flex h-[24px] w-full items-center justify-center">
-                                <p class="text-[0.95rem] font-black leading-none tracking-tight transition-colors duration-200 group-hover:text-orange-600" style="color:#f97316;">${formatMoney(price)}</p>
-                            </div>
-                        </div>
-                    `;
+                        `;
 
                     grid.appendChild(card);
                     rendered++;
@@ -1192,6 +1879,27 @@
                 renderTicket();
             }
 
+            function sanitizeLineMoney(value) {
+                const parsed = Number(value);
+                return Number.isFinite(parsed) && parsed >= 0 ? Number(parsed.toFixed(6)) : 0;
+            }
+
+            function setItemUnitPrice(index, value) {
+                if (!currentSale.items[index]) return;
+                currentSale.items[index].price = sanitizeLineMoney(value);
+                saveDB();
+                renderTicket();
+            }
+
+            function setItemLineTotal(index, value) {
+                if (!currentSale.items[index]) return;
+                const qty = Number(currentSale.items[index].qty) || 0;
+                const total = sanitizeLineMoney(value);
+                currentSale.items[index].price = qty > 0 ? Number((total / qty).toFixed(6)) : 0;
+                saveDB();
+                renderTicket();
+            }
+
             function renderTicket() {
                 const container = document.getElementById('cart-container');
                 if (!container) return;
@@ -1222,16 +1930,11 @@
                         const row = document.createElement('div');
                         row.className = 'mb-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm';
                         row.innerHTML = `
-                            <div class="flex items-center gap-3 p-2.5">
-                                <img src="${getImageUrl(prod.img)}" alt="${prod.name || 'Producto'}" class="h-12 w-12 shrink-0 rounded-xl object-cover bg-slate-100" onerror="this.onerror=null; this.src='${getImageUrl(null)}'">
-                                <div class="min-w-0 flex-1">
-                                    <div class="flex items-center justify-between gap-3">
+                                <div class="p-3">
+                                    <div class="flex items-start justify-between gap-3">
                                         <div class="min-w-0 flex-1">
-                                            <div class="flex items-center justify-between gap-2">
-                                                <h5 class="truncate text-sm font-bold text-slate-900">${prod.name || 'Producto'}</h5>
-                                                <span class="shrink-0 text-sm font-black" style="color:#f97316;">${formatMoney(itemTotal)}</span>
-                                            </div>
-                                            <p class="mt-0.5 text-xs font-semibold">${formatMoney(item.price)} c/u</p>
+                                            <h5 class="truncate text-sm font-bold text-slate-900">${prod.name || 'Producto'}</h5>
+                                            <p class="mt-1 text-[11px] font-medium text-slate-500">Cantidad x precio de venta</p>
                                         </div>
                                         <div class="inline-flex shrink-0 items-center rounded-xl border border-slate-200 bg-slate-50">
                                             <button type="button" onclick="updateQty(${index}, -1)" class="flex h-8 w-8 items-center justify-center text-slate-700 hover:text-rose-600"><i class="ri-subtract-line"></i></button>
@@ -1246,16 +1949,50 @@
                                             <button type="button" onclick="updateQty(${index}, 1)" class="flex h-8 w-8 items-center justify-center text-slate-700 hover:text-orange-600"><i class="ri-add-line"></i></button>
                                         </div>
                                     </div>
+                                    <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                                        <label class="block">
+                                            <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">C/U</span>
+                                            <input
+                                                data-role="unit-price"
+                                                data-index="${index}"
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value="${(Number(item.price) || 0).toFixed(2)}"
+                                                class="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+                                            >
+                                        </label>
+                                        <label class="block">
+                                            <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Total</span>
+                                            <input
+                                                data-role="line-total"
+                                                data-index="${index}"
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value="${itemTotal.toFixed(2)}"
+                                                class="h-10 w-full rounded-xl border border-orange-200 bg-orange-50 px-3 text-sm font-black outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+                                                style="color:#f97316;"
+                                            >
+                                        </label>
+                                    </div>
                                 </div>
-                            </div>
-                        `;
+                            `;
+                        row.querySelector('[data-role="unit-price"]')?.addEventListener('change', (event) => {
+                            setItemUnitPrice(index, event.currentTarget.value);
+                        });
+                        row.querySelector('[data-role="line-total"]')?.addEventListener('change', (event) => {
+                            setItemLineTotal(index, event.currentTarget.value);
+                        });
                         container.appendChild(row);
                     });
                 }
 
-                const total = subtotalBase + tax;
+                const discount = currentSale.discount?.amount || 0;
+const total = subtotalBase + tax - discount;
                 document.getElementById('ticket-subtotal').innerText = formatMoney(subtotalBase);
                 document.getElementById('ticket-tax').innerText = formatMoney(tax);
+                document.getElementById('ticket-discount').innerText = formatMoney(discount);
                 document.getElementById('ticket-total').innerText = formatMoney(total);
                 const subtotalSecondary = document.getElementById('ticket-subtotal-secondary');
                 const taxSecondary = document.getElementById('ticket-tax-secondary');
@@ -1330,28 +2067,31 @@
                 }
 
                 const payload = {
-                    items: currentSale.items.map((item) => ({
-                        pId: Number(item.pId),
-                        qty: Number(item.qty),
-                        price: Number(item.price),
-                        note: item.note || '',
-                    })),
-                    payment_type: currentSale.payment_type || 'CONTADO',
-                    document_type_id: Number(document.getElementById('document-type-select')?.value || 0),
-                    cash_register_id: Number(document.getElementById('cash-register-select')?.value || 0),
-                    person_id: currentSale.clientId ? Number(currentSale.clientId) : null,
-                    billing_status: isInvoiceDocumentSelected() ? currentSale.billing_status : 'NOT_APPLICABLE',
-                    invoice_series: isInvoiceDocumentSelected() ? (currentSale.invoice_series || '') : '',
-                    invoice_number: isInvoiceDocumentSelected() && currentSale.billing_status === 'INVOICED' ? (currentSale.invoice_number || '') : '',
-                    payment_methods: isDebtSaleSelected() ? [] : paymentRows.map((row) => ({
-                        payment_method_id: Number(row.payment_method_id),
-                        amount: Number(row.amount),
-                        payment_gateway_id: row.payment_gateway_id ? Number(row.payment_gateway_id) : null,
-                        card_id: row.card_id ? Number(row.card_id) : null,
-                        digital_wallet_id: row.digital_wallet_id ? Number(row.digital_wallet_id) : null,
-                    })),
-                    notes: document.getElementById('sale-notes')?.value || '',
-                };
+    items: currentSale.items.map((item) => ({
+        pId: Number(item.pId),
+        qty: Number(item.qty),
+        price: Number(item.price),
+        note: item.note || '',
+    })),
+
+    discount_type: currentSale.discount?.percent ? 'PERCENTAGE' : 'AMOUNT',
+    discount_value: currentSale.discount?.percent || currentSale.discount?.amount || 0,
+
+    payment_type: currentSale.payment_type || 'CONTADO',
+    document_type_id: Number(document.getElementById('document-type-select')?.value || 0),
+    cash_register_id: Number(document.getElementById('cash-register-select')?.value || 0),
+    person_id: currentSale.clientId ? Number(currentSale.clientId) : null,
+
+    payment_methods: isDebtSaleSelected() ? [] : paymentRows.map((row) => ({
+        payment_method_id: Number(row.payment_method_id),
+        amount: Number(row.amount),
+        payment_gateway_id: row.payment_gateway_id ? Number(row.payment_gateway_id) : null,
+        card_id: row.card_id ? Number(row.card_id) : null,
+        digital_wallet_id: row.digital_wallet_id ? Number(row.digital_wallet_id) : null,
+    })),
+
+    notes: document.getElementById('sale-notes')?.value || '',
+};
                 if (isEditMode && currentSale.id) {
                     payload.movement_id = Number(currentSale.id);
                 }
@@ -1460,8 +2200,20 @@
             }
 
             document.getElementById('product-search')?.addEventListener('input', (event) => {
-                productSearch = String(event.target.value || '').trim().toLowerCase();
+                const rawValue = String(event.target.value || '');
+                productSearch = rawValue.trim().toLowerCase();
                 renderProducts();
+                window.clearTimeout(productSearchTimer);
+                if (productSearch === '') return;
+                productSearchTimer = window.setTimeout(() => {
+                    tryAutoAddProductByCode(rawValue);
+                }, 180);
+            });
+            document.getElementById('product-search')?.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter') return;
+                event.preventDefault();
+                window.clearTimeout(productSearchTimer);
+                tryAutoAddProductByCode(event.target.value || '');
             });
             document.getElementById('clear-sale-button')?.addEventListener('click', clearSale);
             document.getElementById('add-payment-row-button')?.addEventListener('click', () => addPaymentRow());
@@ -1531,12 +2283,108 @@
                 }
             });
             document.getElementById('client-clear-button')?.addEventListener('click', clearClient);
+            document.getElementById('open-quick-client-modal-button')?.addEventListener('click', openQuickClientModal);
+            document.getElementById('quick-client-close-button')?.addEventListener('click', closeQuickClientModal);
+            document.getElementById('quick-client-cancel-button')?.addEventListener('click', closeQuickClientModal);
+            document.getElementById('quick-client-modal-backdrop')?.addEventListener('click', closeQuickClientModal);
+            document.getElementById('quick-client-search-button')?.addEventListener('click', fetchQuickClientDocumentData);
+            document.getElementById('quick-client-person-type')?.addEventListener('change', syncQuickClientPersonTypeUI);
+            document.getElementById('quick-client-department')?.addEventListener('change', onQuickClientDepartmentChange);
+            document.getElementById('quick-client-province')?.addEventListener('change', onQuickClientProvinceChange);
+            document.getElementById('quick-client-form')?.addEventListener('submit', (event) => {
+                event.preventDefault();
+                saveQuickClient();
+            });
+            // abrir modal descuento
+            document.getElementById('open-discount-modal-button')?.addEventListener('click', () => {
 
+                const total = getTotalFromSale();
+
+                document.getElementById('sale-discount-current-total').value = formatMoney(total);
+
+                document.getElementById('sale-discount-percentage').value = '';
+                document.getElementById('sale-discount-amount').value = '';
+
+                document.getElementById('sale-discount-modal')?.classList.remove('hidden');
+            });
+            // sincronizar descuento porcentaje <-> monto
+const discountPercentInput = document.getElementById('sale-discount-percentage');
+const discountAmountInput = document.getElementById('sale-discount-amount');
+const discountTotalInput = document.getElementById('sale-discount-current-total');
+
+function getDiscountBaseTotal() {
+    const raw = discountTotalInput.value.replace('S/', '').trim();
+    return Number(raw) || 0;
+}
+
+// si cambia porcentaje
+discountPercentInput?.addEventListener('input', () => {
+
+    const percent = Number(discountPercentInput.value) || 0;
+    const total = getDiscountBaseTotal();
+
+    const amount = (total * percent) / 100;
+
+    discountAmountInput.value = amount.toFixed(2);
+
+});
+
+// si cambia monto
+discountAmountInput?.addEventListener('input', () => {
+
+    const amount = Number(discountAmountInput.value) || 0;
+    const total = getDiscountBaseTotal();
+
+    if (total === 0) return;
+
+    const percent = (amount / total) * 100;
+
+    discountPercentInput.value = percent.toFixed(2);
+
+});
+
+            // cerrar modal
+            document.getElementById('sale-discount-close-button')?.addEventListener('click', () => {
+                document.getElementById('sale-discount-modal')?.classList.add('hidden');
+            });
+
+            document.getElementById('sale-discount-cancel-button')?.addEventListener('click', () => {
+                document.getElementById('sale-discount-modal')?.classList.add('hidden');
+            });
+
+            document.getElementById('sale-discount-backdrop')?.addEventListener('click', () => {
+                document.getElementById('sale-discount-modal')?.classList.add('hidden');
+            });
+            // guardar descuento
+document.getElementById('sale-discount-save-button')?.addEventListener('click', () => {
+
+    const percent = Number(document.getElementById('sale-discount-percentage').value) || 0;
+    const amount = Number(document.getElementById('sale-discount-amount').value) || 0;
+
+    // guardar descuento en la venta
+    currentSale.discount = {
+        percent: percent,
+        amount: amount
+    };
+
+    saveDB();
+
+    renderTicket();
+    updatePaymentSummary(); // 🔴 IMPORTANTE
+
+    document.getElementById('sale-discount-modal')?.classList.add('hidden');
+
+});
             document.addEventListener('click', (event) => {
                 const wrapper = document.getElementById('client-selector');
                 if (!wrapper) return;
                 if (!wrapper.contains(event.target)) {
                     closeClientDropdown();
+                }
+            });
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    closeQuickClientModal();
                 }
             });
 
@@ -1574,6 +2422,8 @@
                 invoiceNumberInput.value = currentSale.invoice_number || '';
             }
 
+            syncQuickClientPersonTypeUI();
+            setQuickClientLocation(branchDepartmentId, branchProvinceId, branchDistrictId);
             renderCategoryFilters();
             renderProducts();
             renderTicket();

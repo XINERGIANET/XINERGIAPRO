@@ -136,6 +136,8 @@ Route::middleware('auth')->group(function () {
         ->names('admin.sales')
         ->parameters(['ventas' => 'sale'])
         ->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
+    Route::post('/admin/ventas/clientes', [SalesController::class, 'storeClientQuick'])
+        ->name('admin.sales.clients.store');
     Route::post('/admin/ventas/{sale}/facturar', [SalesController::class, 'invoice'])
         ->name('admin.sales.invoice');
     Route::resource('/admin/compras', PurchaseController::class)

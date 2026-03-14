@@ -28,7 +28,7 @@
             @endphp
 
             <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <form method="GET" class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+                <form method="GET" class="flex flex-1 flex-col gap-3 xl:flex-row xl:items-center">
                     @if ($viewId)
                         <input type="hidden" name="view_id" value="{{ $viewId }}">
                     @endif
@@ -54,6 +54,40 @@
                             placeholder="Buscar por número, proveedor o usuario"
                             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-12 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                         />
+                    </div>
+                    <div class="w-full sm:w-44 xl:w-40 flex-none">
+                        <x-form.date-picker
+                            id="purchases-date-from"
+                            name="date_from"
+                            placeholder="dd/mm/aaaa"
+                            :defaultDate="$dateFrom"
+                            dateFormat="Y-m-d"
+                            :altInput="true"
+                            altFormat="d/m/Y"
+                            locale="es"
+                        />
+                    </div>
+                    <div class="w-full sm:w-44 xl:w-40 flex-none">
+                        <x-form.date-picker
+                            id="purchases-date-to"
+                            name="date_to"
+                            placeholder="dd/mm/aaaa"
+                            :defaultDate="$dateTo"
+                            dateFormat="Y-m-d"
+                            :altInput="true"
+                            altFormat="d/m/Y"
+                            locale="es"
+                        />
+                    </div>
+                    <div class="w-full sm:w-48 xl:w-44 flex-none">
+                        <select
+                            name="payment_type"
+                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        >
+                            <option value="" @selected(($paymentType ?? '') === '')>Tipo pago: Todos</option>
+                            <option value="CONTADO" @selected(($paymentType ?? '') === 'CONTADO')>Contado</option>
+                            <option value="CREDITO" @selected(($paymentType ?? '') === 'CREDITO')>Credito</option>
+                        </select>
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 px-6 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #334155; border-color: #334155;">

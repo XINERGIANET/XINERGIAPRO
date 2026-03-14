@@ -66,7 +66,6 @@
                                 class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-[#334155] px-4 text-sm font-medium text-white hover:bg-[#1f3f98] disabled:opacity-60"
                             >
                                 <i class="ri-search-line"></i>
-                                <span class="ml-1">Buscar</span>
                             </button>
                         </div>
                     </div>
@@ -106,16 +105,35 @@
                         <input x-model="quickProvider.address" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Direccion (opcional)">
                     </div>
                     <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700">Dias de credito</label>
+                        <input type="number" min="0" step="1" x-model.number="quickProvider.credit_days" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="0">
+                    </div>
+                    <div>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700">Departamento</label>
-                        <input type="text" :value="branchDepartmentName || '-'" readonly class="h-11 w-full rounded-lg border border-gray-300 bg-gray-100 px-3 text-sm text-gray-700">
+                        <select x-model="quickProvider.department_id" @change="onQuickProviderDepartmentChange()" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                            <option value="">Seleccione departamento</option>
+                            <template x-for="department in departments" :key="`quick-provider-department-${department.id}`">
+                                <option :value="String(department.id)" :selected="String(department.id) === String(quickProvider.department_id)" x-text="department.name"></option>
+                            </template>
+                        </select>
                     </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700">Provincia</label>
-                        <input type="text" :value="branchProvinceName || '-'" readonly class="h-11 w-full rounded-lg border border-gray-300 bg-gray-100 px-3 text-sm text-gray-700">
+                        <select x-model="quickProvider.province_id" @change="onQuickProviderProvinceChange()" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                            <option value="">Seleccione provincia</option>
+                            <template x-for="province in filteredQuickProviderProvinces" :key="`quick-provider-province-${province.id}`">
+                                <option :value="String(province.id)" :selected="String(province.id) === String(quickProvider.province_id)" x-text="province.name"></option>
+                            </template>
+                        </select>
                     </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700">Distrito</label>
-                        <input type="text" :value="branchDistrictName || '-'" readonly class="h-11 w-full rounded-lg border border-gray-300 bg-gray-100 px-3 text-sm text-gray-700">
+                        <select x-model="quickProvider.location_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                            <option value="">Seleccione distrito</option>
+                            <template x-for="district in filteredQuickProviderDistricts" :key="`quick-provider-district-${district.id}`">
+                                <option :value="String(district.id)" :selected="String(district.id) === String(quickProvider.location_id)" x-text="district.name"></option>
+                            </template>
+                        </select>
                     </div>
 
                     <div class="md:col-span-4">
@@ -137,4 +155,3 @@
         </x-ui.modal>
     </div>
 @endsection
-

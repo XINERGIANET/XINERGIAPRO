@@ -1,56 +1,893 @@
 <script>
-function purchaseCreateForm(c){return{
-products:c.products||[],units:c.units||[],providers:c.providers||[],documentTypes:c.documentTypes||[],cashRegisters:c.cashRegisters||[],paymentMethods:c.paymentMethods||[],paymentGateways:c.paymentGateways||[],cards:c.cards||[],digitalWallets:c.digitalWallets||[],
-selectedProviderId:'',providerQuery:'',providerOpen:false,providerCursor:0,asideTab:'summary',productSearch:'',selectedCategory:'General',detailType:c.initialDetailType||'DETALLADO',
-creatingProviderLoading:false,quickProviderError:'',branchDepartmentName:c.branchDepartmentName||'',branchProvinceName:c.branchProvinceName||'',branchDistrictName:c.branchDistrictName||'',
-quickProvider:{person_type:'DNI',document_number:'',first_name:'',last_name:'',phone:'',email:'',address:'-',genero:'',fecha_nacimiento:''},
-documentTypeId:Number(c.initialDocumentTypeId||0),paymentType:c.initialPaymentType||'CONTADO',cashRegisterId:Number(c.initialCashRegisterId||0),taxRate:Number(c.initialTaxRate||18),includesTax:c.initialIncludesTax||'N',currency:c.initialCurrency||'PEN',exchangeRate:Number(c.initialExchangeRate||3.5),items:[],paymentRows:[],
-init(){this.items=(c.initialItems||[]).length?(c.initialItems||[]).map(i=>({product_id:Number(i.product_id||0),unit_id:Number(i.unit_id||0),description:i.description||'',quantity:Number(i.quantity||1),amount:Number(i.amount||0),comment:i.comment||'',product_query:'',product_open:false,product_cursor:0})):[];if(Number(c.initialProviderId||0)>0){const p=this.providers.find(x=>Number(x.id)===Number(c.initialProviderId));if(p){this.selectedProviderId=String(p.id);this.providerQuery=p.document?`${p.label} - ${p.document}`:p.label;}}this.items.forEach((item,idx)=>{if(Number(item.product_id||0)>0)this.setProductMeta(idx)});if(!this.items.length&&this.detailType==='GLOSA')this.addGlosaItem();this.paymentRows=(c.initialRows||[]).length?(c.initialRows||[]).map(r=>this.makePaymentRowFromExisting(r)):[];if(this.paymentType==='CONTADO'&&!this.paymentRows.length)this.addPaymentRow();this.syncPaymentAmounts()},
-activeTabStyle(){return'background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff;box-shadow:0 8px 18px rgba(249,115,22,.24);'},
-setAsideTab(t){this.asideTab=t==='payment'?'payment':'summary'},
-get summary(){const line=this.items.reduce((s,i)=>s+((Number(i.quantity)||0)*(Number(i.amount)||0)),0),r=(Number(this.taxRate)||0)/100;if(this.includesTax==='S'){const subtotal=r>0?(line/(1+r)):line;return{subtotal,tax:line-subtotal,total:line}}const subtotal=line,tax=subtotal*r;return{subtotal,tax,total:subtotal+tax}},
-get totalPaid(){return this.paymentRows.reduce((s,r)=>s+(Number(r.amount)||0),0)},
-get paymentDifference(){return this.summary.total-this.totalPaid},
-get filteredProviders(){const term=(this.providerQuery||'').toLowerCase().trim(),list=term===''?this.providers:this.providers.filter(p=>String(p.label||'').toLowerCase().includes(term)||String(p.document||'').toLowerCase().includes(term));if(this.providerCursor>=list.length)this.providerCursor=0;return list.slice(0,40)},
-selectProvider(p){this.selectedProviderId=String(p.id);this.providerQuery=p.document?`${p.label} - ${p.document}`:p.label;this.providerOpen=false},
-clearProvider(){this.selectedProviderId='';this.providerQuery='';this.providerOpen=true;this.providerCursor=0},
-resetQuickProvider(){this.quickProvider={person_type:'DNI',document_number:'',first_name:'',last_name:'',phone:'',email:'',address:'-',genero:'',fecha_nacimiento:''};this.quickProviderError='';},
-moveProviderCursor(step){const list=this.filteredProviders;if(!list.length)return;const max=list.length-1,next=this.providerCursor+step;this.providerCursor=next<0?max:next>max?0:next},
-selectProviderByCursor(){const list=this.filteredProviders;if(list.length)this.selectProvider(list[this.providerCursor]||list[0])},
-splitName(fullName){const parts=String(fullName||'').trim().split(/\s+/).filter(Boolean);if(parts.length<=1)return{first_name:parts[0]||'',last_name:''};if(parts.length===2)return{first_name:parts[0],last_name:parts[1]};if(parts.length===3)return{first_name:parts[0],last_name:parts.slice(1).join(' ')};return{first_name:parts.slice(0,2).join(' '),last_name:parts.slice(2).join(' ')}},
-async fetchReniecQuickProvider(){this.quickProviderError='';if(String(this.quickProvider.person_type).toUpperCase()!=='DNI'){this.quickProviderError='La busqueda RENIEC solo aplica para DNI.';return;}const dni=String(this.quickProvider.document_number||'').trim();if(!/^\d{8}$/.test(dni)){this.quickProviderError='Ingrese un DNI valido de 8 digitos.';return;}this.creatingProviderLoading=true;try{const response=await fetch(`/api/reniec?dni=${encodeURIComponent(dni)}`,{headers:{'Accept':'application/json'}});const payload=await response.json();if(!response.ok||!payload?.status||!payload?.name)throw new Error(payload?.message||'No se encontro informacion en RENIEC.');const parsed=this.splitName(payload.name);this.quickProvider.first_name=parsed.first_name;this.quickProvider.last_name=parsed.last_name;}catch(error){this.quickProviderError=error?.message||'Error consultando RENIEC.';}finally{this.creatingProviderLoading=false}},
-async saveQuickProvider(){this.quickProviderError='';this.creatingProviderLoading=true;try{const response=await fetch(String(c.quickProviderStoreUrl||''),{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':document.querySelector('meta[name=\"csrf-token\"]')?.getAttribute('content')||''},body:JSON.stringify(this.quickProvider)});const payload=await response.json();if(!response.ok){const message=payload?.message||'No se pudo registrar el proveedor.';const firstError=payload?.errors?Object.values(payload.errors)[0]?.[0]:null;throw new Error(firstError||message);}this.providers.unshift({id:Number(payload.id),label:String(payload.label||payload.name||''),document:String(payload.document||payload.document_number||'')});this.selectedProviderId=String(payload.id);this.providerQuery=payload.document?`${payload.label} - ${payload.document}`:payload.label;this.providerOpen=false;this.resetQuickProvider();this.$dispatch('close-provider-modal');}catch(error){this.quickProviderError=error?.message||'Error registrando proveedor.';}finally{this.creatingProviderLoading=false}},
-newItem(){return{product_id:0,unit_id:0,description:'',quantity:1,amount:0,comment:'',product_query:'',product_open:false,product_cursor:0}},
-productLabel(p){return String(p.name||p.description||'Sin nombre')},
-productAmount(p){return Number(p.cost||p.price||0)},
-get catalogCategories(){const unique=new Set();this.products.forEach(p=>unique.add(String(p.category||'Sin categoria').trim()||'Sin categoria'));return['General',...Array.from(unique).sort((a,b)=>a.localeCompare(b))]},
-get filteredCatalogProducts(){const term=String(this.productSearch||'').toLowerCase().trim();const list=this.products.filter(p=>{const category=String(p.category||'Sin categoria').trim()||'Sin categoria';const searchNeedle=`${String(p.code||'')} ${this.productLabel(p)} ${String(p.unit_name||'')} ${category}`.toLowerCase();if(this.selectedCategory!=='General'&&category!==this.selectedCategory)return false;if(term&& !searchNeedle.includes(term))return false;return true});return list.slice(0,60)},
-changeDetailType(v){this.detailType=v==='GLOSA'?'GLOSA':'DETALLADO';this.items=[];if(this.detailType==='GLOSA')this.addGlosaItem();this.syncPaymentAmounts()},
-addItem(){this.items.push(this.newItem());this.syncPaymentAmounts()},
-newGlosaItem(){const defaultUnitId=Number(this.units?.[0]?.id||0);return{product_id:0,unit_id:defaultUnitId,description:'',quantity:1,amount:0,comment:'',product_query:'',product_open:false,product_cursor:0}},
-addGlosaItem(){this.items.push(this.newGlosaItem());this.syncPaymentAmounts()},
-addProductCard(p){const productId=Number(p.id||0);if(!productId)return;const existing=this.items.find(i=>Number(i.product_id)===productId);if(existing){existing.quantity=Number(existing.quantity||0)+1;this.syncPaymentAmounts();return;}const nextItem={product_id:productId,unit_id:Number(p.unit_id||p.unit_sale||0),description:this.productLabel(p),quantity:1,amount:this.productAmount(p),comment:'',product_query:`${p.code||'SIN'} - ${this.productLabel(p)}`,product_open:false,product_cursor:0};const placeholderIndex=this.items.findIndex(i=>Number(i.product_id||0)===0&&!String(i.description||'').trim());if(placeholderIndex>=0)this.items.splice(placeholderIndex,1,nextItem);else this.items.push(nextItem);this.syncPaymentAmounts()},
-removeItem(i){this.items.splice(i,1);this.syncPaymentAmounts()},
-updateItemQuantity(i,delta){if(!this.items[i])return;this.items[i].quantity=Number(this.items[i].quantity||0)+Number(delta||0);if(this.items[i].quantity<=0){this.removeItem(i);return;}this.syncPaymentAmounts()},
-setItemQuantity(i,value){if(!this.items[i])return;const parsed=Math.floor(Number(value));if(!Number.isFinite(parsed)||parsed<=0){this.removeItem(i);return;}this.items[i].quantity=parsed;this.syncPaymentAmounts()},
-productById(id){return this.products.find(p=>Number(p.id)===Number(id))||null},
-productImage(item){const product=this.productById(item.product_id);return product?.img||''},
-filteredProducts(item){const term=String(item.product_query||'').toLowerCase().trim(),list=term===''?this.products:this.products.filter(p=>String(p.code||'').toLowerCase().includes(term)||this.productLabel(p).toLowerCase().includes(term)||String(p.unit_name||'').toLowerCase().includes(term));if(item.product_cursor>=list.length)item.product_cursor=0;return list.slice(0,40)},
-selectProduct(i,p){this.items[i].product_id=Number(p.id);this.items[i].product_query=`${p.code||'SIN'} - ${this.productLabel(p)}`;this.items[i].description=this.productLabel(p);this.items[i].product_open=false;this.setProductMeta(i);this.syncPaymentAmounts()},
-clearProduct(i){Object.assign(this.items[i],{product_id:0,product_query:'',description:'',unit_id:0,amount:0,product_open:true,product_cursor:0});this.syncPaymentAmounts()},
-moveProductCursor(i,step){const item=this.items[i],list=this.filteredProducts(item);if(!list.length)return;const max=list.length-1,next=item.product_cursor+step;item.product_cursor=next<0?max:next>max?0:next},
-selectProductByCursor(i){const item=this.items[i],list=this.filteredProducts(item);if(list.length)this.selectProduct(i,list[item.product_cursor]||list[0])},
-setProductMeta(i){const p=this.products.find(x=>Number(x.id)===Number(this.items[i].product_id));if(!p)return;if(!this.items[i].product_query)this.items[i].product_query=`${p.code||'SIN'} - ${this.productLabel(p)}`;this.items[i].description=this.productLabel(p);if(!this.items[i].unit_id&&(p.unit_id||p.unit_sale))this.items[i].unit_id=Number(p.unit_id||p.unit_sale);if(!this.items[i].amount&&(p.cost||p.price))this.items[i].amount=Number(p.cost||p.price)},
-inferKind(d){const n=String(d||'').toLowerCase();if(n.includes('tarjeta')||n.includes('card'))return'card';if(n.includes('billetera')||n.includes('wallet'))return'wallet';return'plain'},
-get paymentMethodVariants(){return this.paymentMethods.flatMap(m=>{const id=Number(m.id),d=String(m.description||''),k=this.inferKind(d);if(k==='wallet'&&this.digitalWallets.length)return this.digitalWallets.map(w=>({key:`wallet:${id}:${Number(w.id)}`,payment_method_id:id,digital_wallet_id:Number(w.id),card_id:null,label:`${d} - ${w.description}`,kind:k}));if(k==='card'&&this.cards.length)return this.cards.map(card=>({key:`card:${id}:${Number(card.id)}`,payment_method_id:id,digital_wallet_id:null,card_id:Number(card.id),label:`${d} - ${card.description}`,kind:k}));return[{key:`plain:${id}`,payment_method_id:id,digital_wallet_id:null,card_id:null,label:d,kind:k}]})},
-getPaymentVariantByKey(k){return this.paymentMethodVariants.find(v=>v.key===k)||null},
-getDefaultPaymentVariant(){return this.paymentMethodVariants[0]||null},
-makePaymentRowFromExisting(r){const ck=r.card_id?`card:${Number(r.payment_method_id)}:${Number(r.card_id)}`:null,wk=r.digital_wallet_id?`wallet:${Number(r.payment_method_id)}:${Number(r.digital_wallet_id)}`:null,pk=`plain:${Number(r.payment_method_id)}`,v=this.getPaymentVariantByKey(ck)||this.getPaymentVariantByKey(wk)||this.getPaymentVariantByKey(pk)||this.getDefaultPaymentVariant();return{method_variant_key:v?.key||'',payment_method_id:Number(v?.payment_method_id||r.payment_method_id||0),card_id:Number(v?.card_id||r.card_id||0)||null,digital_wallet_id:Number(v?.digital_wallet_id||r.digital_wallet_id||0)||null,payment_gateway_id:Number(r.payment_gateway_id||0)||null,amount:Number(r.amount||0),kind:v?.kind||'plain'}},
-addPaymentRow(){const v=this.getDefaultPaymentVariant();if(!v)return;this.paymentRows.push({method_variant_key:v.key,payment_method_id:v.payment_method_id,card_id:v.card_id,digital_wallet_id:v.digital_wallet_id,payment_gateway_id:null,amount:0,kind:v.kind});this.syncPaymentAmounts()},
-applyPaymentVariant(i){const v=this.getPaymentVariantByKey(this.paymentRows[i].method_variant_key);if(!v)return;Object.assign(this.paymentRows[i],{payment_method_id:Number(v.payment_method_id),card_id:v.card_id?Number(v.card_id):null,digital_wallet_id:v.digital_wallet_id?Number(v.digital_wallet_id):null,kind:v.kind});if(v.kind!=='card')this.paymentRows[i].payment_gateway_id=null},
-removePaymentRow(i){this.paymentRows.splice(i,1);if(this.paymentType==='CONTADO'&&!this.paymentRows.length)this.addPaymentRow();this.syncPaymentAmounts()},
-onPaymentTypeChange(){if(this.paymentType==='CONTADO'){if(!this.paymentRows.length)this.addPaymentRow();this.syncPaymentAmounts()}else this.paymentRows=[]},
-syncPaymentAmounts(){if(this.paymentType!=='CONTADO'||!this.paymentRows.length)return;const total=Number(this.summary.total||0);if(this.paymentRows.length===1){this.paymentRows[0].amount=Number(total.toFixed(2));return}const fixed=this.paymentRows.slice(0,-1).reduce((s,r)=>s+(Number(r.amount)||0),0);this.paymentRows[this.paymentRows.length-1].amount=Math.max(0,Number((total-fixed).toFixed(2)))},
-money(v){return`S/ ${Number(v||0).toFixed(2)}`}
-}}
+function purchaseCreateForm(c) {
+    return {
+        products: c.products || [],
+        units: c.units || [],
+        providers: c.providers || [],
+        documentTypes: c.documentTypes || [],
+        cashRegisters: c.cashRegisters || [],
+        paymentMethods: c.paymentMethods || [],
+        paymentGateways: c.paymentGateways || [],
+        cards: c.cards || [],
+        digitalWallets: c.digitalWallets || [],
+        selectedProviderId: '',
+        providerQuery: '',
+        providerOpen: false,
+        providerCursor: 0,
+        asideTab: 'summary',
+        productSearch: '',
+        productSearchTimer: null,
+        selectedCategory: 'General',
+        detailType: c.initialDetailType || 'DETALLADO',
+        creatingProviderLoading: false,
+        quickProviderError: '',
+        departments: c.departments || [],
+        provinces: c.provinces || [],
+        districts: c.districts || [],
+        branchDepartmentId: String(c.branchDepartmentId || ''),
+        branchProvinceId: String(c.branchProvinceId || ''),
+        branchDistrictId: String(c.branchDistrictId || ''),
+        branchDepartmentName: c.branchDepartmentName || '',
+        branchProvinceName: c.branchProvinceName || '',
+        branchDistrictName: c.branchDistrictName || '',
+        quickProvider: {
+            person_type: 'DNI',
+            document_number: '',
+            first_name: '',
+            last_name: '',
+            phone: '',
+            email: '',
+            address: '-',
+            genero: '',
+            fecha_nacimiento: '',
+            credit_days: 0,
+            department_id: String(c.branchDepartmentId || ''),
+            province_id: String(c.branchProvinceId || ''),
+            location_id: String(c.branchDistrictId || ''),
+        },
+        documentTypeId: Number(c.initialDocumentTypeId || 0),
+        paymentType: c.initialPaymentType || 'CONTADO',
+        dueDate: c.initialDueDate || '',
+        cashRegisterId: Number(c.initialCashRegisterId || 0),
+        taxRate: Number(c.initialTaxRate || 18),
+        includesTax: c.initialIncludesTax || 'N',
+        currency: c.initialCurrency || 'PEN',
+        exchangeRate: Number(c.initialExchangeRate || 3.5),
+        items: [],
+        paymentRows: [],
+        movedAtListenerBound: false,
+
+        init() {
+            this.items = (c.initialItems || []).length
+                ? (c.initialItems || []).map((i) => ({
+                    product_id: Number(i.product_id || 0),
+                    unit_id: Number(i.unit_id || 0),
+                    description: i.description || '',
+                    quantity: Number(i.quantity || 1),
+                    amount: Number(i.amount || 0),
+                    comment: i.comment || '',
+                    product_query: '',
+                    product_open: false,
+                    product_cursor: 0,
+                }))
+                : [];
+
+            if (Number(c.initialProviderId || 0) > 0) {
+                const provider = this.providers.find((item) => Number(item.id) === Number(c.initialProviderId));
+                if (provider) {
+                    this.selectedProviderId = String(provider.id);
+                    this.providerQuery = provider.document
+                        ? `${provider.label} - ${provider.document}`
+                        : provider.label;
+                }
+            }
+
+            this.items.forEach((item, idx) => {
+                if (Number(item.product_id || 0) > 0) {
+                    this.setProductMeta(idx);
+                }
+            });
+
+            if (!this.items.length && this.detailType === 'GLOSA') {
+                this.addGlosaItem();
+            }
+
+            this.paymentRows = (c.initialRows || []).length
+                ? (c.initialRows || []).map((row) => this.makePaymentRowFromExisting(row))
+                : [];
+
+            if (this.paymentType === 'CONTADO' && !this.paymentRows.length) {
+                this.addPaymentRow();
+            }
+
+            this.syncPaymentAmounts();
+
+            this.$nextTick(() => {
+                this.bindMovedAtInput();
+                this.syncCreditDueDate(false);
+            });
+        },
+
+        activeTabStyle() {
+            return 'background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff;box-shadow:0 8px 18px rgba(249,115,22,.24);';
+        },
+
+        setAsideTab(tab) {
+            this.asideTab = tab === 'payment' ? 'payment' : 'summary';
+        },
+
+        get summary() {
+            const lineTotal = this.items.reduce((sum, item) => {
+                return sum + ((Number(item.quantity) || 0) * (Number(item.amount) || 0));
+            }, 0);
+            const rate = (Number(this.taxRate) || 0) / 100;
+
+            if (this.includesTax === 'S') {
+                const subtotal = rate > 0 ? (lineTotal / (1 + rate)) : lineTotal;
+                return {
+                    subtotal,
+                    tax: lineTotal - subtotal,
+                    total: lineTotal,
+                };
+            }
+
+            const subtotal = lineTotal;
+            const tax = subtotal * rate;
+
+            return {
+                subtotal,
+                tax,
+                total: subtotal + tax,
+            };
+        },
+
+        get totalPaid() {
+            return this.paymentRows.reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+        },
+
+        get paymentDifference() {
+            return this.summary.total - this.totalPaid;
+        },
+
+        get selectedProvider() {
+            return this.providers.find((provider) => Number(provider.id) === Number(this.selectedProviderId || 0)) || null;
+        },
+
+        get selectedProviderCreditDays() {
+            return Number(this.selectedProvider?.credit_days || 0);
+        },
+
+        get filteredProviders() {
+            const term = (this.providerQuery || '').toLowerCase().trim();
+            const list = term === ''
+                ? this.providers
+                : this.providers.filter((provider) => (
+                    String(provider.label || '').toLowerCase().includes(term)
+                    || String(provider.document || '').toLowerCase().includes(term)
+                ));
+
+            if (this.providerCursor >= list.length) {
+                this.providerCursor = 0;
+            }
+
+            return list.slice(0, 40);
+        },
+
+        get filteredQuickProviderProvinces() {
+            return this.provinces.filter((province) => (
+                String(province.parent_location_id || '') === String(this.quickProvider.department_id || '')
+            ));
+        },
+
+        get filteredQuickProviderDistricts() {
+            return this.districts.filter((district) => (
+                String(district.parent_location_id || '') === String(this.quickProvider.province_id || '')
+            ));
+        },
+
+        selectProvider(provider) {
+            this.selectedProviderId = String(provider.id);
+            this.providerQuery = provider.document
+                ? `${provider.label} - ${provider.document}`
+                : provider.label;
+            this.providerOpen = false;
+            this.syncCreditDueDate(true);
+        },
+
+        clearProvider() {
+            this.selectedProviderId = '';
+            this.providerQuery = '';
+            this.providerOpen = true;
+            this.providerCursor = 0;
+            this.syncCreditDueDate(true);
+        },
+
+        resetQuickProvider() {
+            this.quickProvider = {
+                person_type: 'DNI',
+                document_number: '',
+                first_name: '',
+                last_name: '',
+                phone: '',
+                email: '',
+                address: '-',
+                genero: '',
+                fecha_nacimiento: '',
+                credit_days: 0,
+                department_id: String(this.branchDepartmentId || ''),
+                province_id: String(this.branchProvinceId || ''),
+                location_id: String(this.branchDistrictId || ''),
+            };
+            this.quickProviderError = '';
+        },
+
+        onQuickProviderDepartmentChange() {
+            this.quickProvider.province_id = '';
+            this.quickProvider.location_id = '';
+        },
+
+        onQuickProviderProvinceChange() {
+            this.quickProvider.location_id = '';
+        },
+
+        moveProviderCursor(step) {
+            const list = this.filteredProviders;
+            if (!list.length) {
+                return;
+            }
+
+            const max = list.length - 1;
+            const next = this.providerCursor + step;
+            this.providerCursor = next < 0 ? max : (next > max ? 0 : next);
+        },
+
+        selectProviderByCursor() {
+            const list = this.filteredProviders;
+            if (list.length) {
+                this.selectProvider(list[this.providerCursor] || list[0]);
+            }
+        },
+
+        splitName(fullName) {
+            const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
+
+            if (parts.length <= 1) {
+                return { first_name: parts[0] || '', last_name: '' };
+            }
+
+            if (parts.length === 2) {
+                return { first_name: parts[0], last_name: parts[1] };
+            }
+
+            if (parts.length === 3) {
+                return { first_name: parts[0], last_name: parts.slice(1).join(' ') };
+            }
+
+            return {
+                first_name: parts.slice(0, 2).join(' '),
+                last_name: parts.slice(2).join(' '),
+            };
+        },
+
+        async fetchReniecQuickProvider() {
+            this.quickProviderError = '';
+
+            if (String(this.quickProvider.person_type).toUpperCase() !== 'DNI') {
+                this.quickProviderError = 'La busqueda RENIEC solo aplica para DNI.';
+                return;
+            }
+
+            const dni = String(this.quickProvider.document_number || '').trim();
+            if (!/^\d{8}$/.test(dni)) {
+                this.quickProviderError = 'Ingrese un DNI valido de 8 digitos.';
+                return;
+            }
+
+            this.creatingProviderLoading = true;
+
+            try {
+                const response = await fetch(`/api/reniec?dni=${encodeURIComponent(dni)}`, {
+                    headers: { Accept: 'application/json' },
+                });
+                const payload = await response.json();
+
+                if (!response.ok || !payload?.status || !payload?.name) {
+                    throw new Error(payload?.message || 'No se encontro informacion en RENIEC.');
+                }
+
+                const parsed = this.splitName(payload.name);
+                this.quickProvider.first_name = parsed.first_name;
+                this.quickProvider.last_name = parsed.last_name;
+                this.quickProvider.fecha_nacimiento = payload?.fecha_nacimiento || '';
+                this.quickProvider.genero = payload?.genero || '';
+            } catch (error) {
+                this.quickProviderError = error?.message || 'Error consultando RENIEC.';
+            } finally {
+                this.creatingProviderLoading = false;
+            }
+        },
+
+        async saveQuickProvider() {
+            this.quickProviderError = '';
+            this.creatingProviderLoading = true;
+
+            try {
+                const response = await fetch(String(c.quickProviderStoreUrl || ''), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    },
+                    body: JSON.stringify(this.quickProvider),
+                });
+
+                const payload = await response.json();
+
+                if (!response.ok) {
+                    const message = payload?.message || 'No se pudo registrar el proveedor.';
+                    const firstError = payload?.errors ? Object.values(payload.errors)[0]?.[0] : null;
+                    throw new Error(firstError || message);
+                }
+
+                this.providers.unshift({
+                    id: Number(payload.id),
+                    label: String(payload.label || payload.name || ''),
+                    document: String(payload.document || payload.document_number || ''),
+                    credit_days: Number(payload.credit_days || 0),
+                });
+
+                this.selectedProviderId = String(payload.id);
+                this.providerQuery = payload.document
+                    ? `${payload.label} - ${payload.document}`
+                    : payload.label;
+                this.providerOpen = false;
+                this.syncCreditDueDate(true);
+                this.resetQuickProvider();
+                this.$dispatch('close-provider-modal');
+            } catch (error) {
+                this.quickProviderError = error?.message || 'Error registrando proveedor.';
+            } finally {
+                this.creatingProviderLoading = false;
+            }
+        },
+
+        bindMovedAtInput() {
+            if (this.movedAtListenerBound) {
+                return;
+            }
+
+            const input = document.querySelector('[name="moved_at"]');
+            if (!input) {
+                return;
+            }
+
+            const resync = () => this.syncCreditDueDate(true);
+            input.addEventListener('change', resync);
+            input.addEventListener('input', resync);
+            this.movedAtListenerBound = true;
+        },
+
+        readMovedAtValue() {
+            const input = document.querySelector('[name="moved_at"]');
+            return String(input?.value || c.initialMovedAt || '').trim();
+        },
+
+        parseDateTimeValue(value) {
+            const raw = String(value || '').trim();
+            if (!raw) {
+                return null;
+            }
+
+            const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
+            const parsed = new Date(normalized);
+
+            return Number.isNaN(parsed.getTime()) ? null : parsed;
+        },
+
+        formatDateOnly(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        },
+
+        syncCreditDueDate(force = false) {
+            if (this.paymentType !== 'CREDITO') {
+                return;
+            }
+
+            if (this.dueDate && !force) {
+                return;
+            }
+
+            const baseDate = this.parseDateTimeValue(this.readMovedAtValue()) || new Date();
+            const nextDate = new Date(baseDate.getTime());
+            nextDate.setDate(nextDate.getDate() + this.selectedProviderCreditDays);
+            this.dueDate = this.formatDateOnly(nextDate);
+        },
+
+        setDueDate(value) {
+            this.dueDate = String(value || '').trim();
+        },
+
+        newItem() {
+            return {
+                product_id: 0,
+                unit_id: 0,
+                description: '',
+                quantity: 1,
+                amount: 0,
+                comment: '',
+                product_query: '',
+                product_open: false,
+                product_cursor: 0,
+            };
+        },
+
+        productLabel(product) {
+            return String(product.name || product.description || 'Sin nombre');
+        },
+
+        productAmount(product) {
+            return Number(product.cost || product.price || 0);
+        },
+
+        normalizeCode(value) {
+            return String(value || '').trim().toLowerCase();
+        },
+
+        clearCatalogSearch() {
+            this.productSearch = '';
+            this.$nextTick(() => document.getElementById('purchase-product-search')?.focus());
+        },
+
+        findUniqueCatalogProductByCode(term) {
+            const needle = this.normalizeCode(term);
+            if (!needle) {
+                return null;
+            }
+
+            const matches = this.products.filter((product) => this.normalizeCode(product.code) === needle);
+            return matches.length === 1 ? matches[0] : null;
+        },
+
+        tryAutoAddCatalogProduct(term) {
+            if (this.detailType !== 'DETALLADO') {
+                return false;
+            }
+
+            const product = this.findUniqueCatalogProductByCode(term);
+            if (!product) {
+                return false;
+            }
+
+            this.addProductCard(product);
+            this.clearCatalogSearch();
+            return true;
+        },
+
+        queueCatalogCodeAutoAdd(term) {
+            window.clearTimeout(this.productSearchTimer);
+            if (!String(term || '').trim()) {
+                return;
+            }
+
+            this.productSearchTimer = window.setTimeout(() => {
+                this.tryAutoAddCatalogProduct(term);
+            }, 180);
+        },
+
+        flushCatalogCodeAutoAdd(term) {
+            window.clearTimeout(this.productSearchTimer);
+            this.tryAutoAddCatalogProduct(term);
+        },
+
+        get catalogCategories() {
+            const unique = new Set();
+            this.products.forEach((product) => {
+                unique.add(String(product.category || 'Sin categoria').trim() || 'Sin categoria');
+            });
+
+            return ['General', ...Array.from(unique).sort((a, b) => a.localeCompare(b))];
+        },
+
+        get filteredCatalogProducts() {
+            const term = String(this.productSearch || '').toLowerCase().trim();
+            const list = this.products.filter((product) => {
+                const category = String(product.category || 'Sin categoria').trim() || 'Sin categoria';
+                const searchNeedle = `${String(product.code || '')} ${this.productLabel(product)} ${String(product.unit_name || '')} ${category}`.toLowerCase();
+
+                if (this.selectedCategory !== 'General' && category !== this.selectedCategory) {
+                    return false;
+                }
+
+                if (term && !searchNeedle.includes(term)) {
+                    return false;
+                }
+
+                return true;
+            });
+
+            return list.slice(0, 60);
+        },
+
+        changeDetailType(value) {
+            this.detailType = value === 'GLOSA' ? 'GLOSA' : 'DETALLADO';
+            this.items = [];
+
+            if (this.detailType === 'GLOSA') {
+                this.addGlosaItem();
+            }
+
+            this.syncPaymentAmounts();
+        },
+
+        addItem() {
+            this.items.push(this.newItem());
+            this.syncPaymentAmounts();
+        },
+
+        newGlosaItem() {
+            const defaultUnitId = Number(this.units?.[0]?.id || 0);
+            return {
+                product_id: 0,
+                unit_id: defaultUnitId,
+                description: '',
+                quantity: 1,
+                amount: 0,
+                comment: '',
+                product_query: '',
+                product_open: false,
+                product_cursor: 0,
+            };
+        },
+
+        addGlosaItem() {
+            this.items.push(this.newGlosaItem());
+            this.syncPaymentAmounts();
+        },
+
+        addProductCard(product) {
+            const productId = Number(product.id || 0);
+            if (!productId) {
+                return;
+            }
+
+            const existing = this.items.find((item) => Number(item.product_id) === productId);
+            if (existing) {
+                existing.quantity = Number(existing.quantity || 0) + 1;
+                this.syncPaymentAmounts();
+                return;
+            }
+
+            const nextItem = {
+                product_id: productId,
+                unit_id: Number(product.unit_id || product.unit_sale || 0),
+                description: this.productLabel(product),
+                quantity: 1,
+                amount: this.productAmount(product),
+                comment: '',
+                product_query: `${product.code || 'SIN'} - ${this.productLabel(product)}`,
+                product_open: false,
+                product_cursor: 0,
+            };
+
+            const placeholderIndex = this.items.findIndex((item) => Number(item.product_id || 0) === 0 && !String(item.description || '').trim());
+
+            if (placeholderIndex >= 0) {
+                this.items.splice(placeholderIndex, 1, nextItem);
+            } else {
+                this.items.push(nextItem);
+            }
+
+            this.syncPaymentAmounts();
+        },
+
+        removeItem(index) {
+            this.items.splice(index, 1);
+            this.syncPaymentAmounts();
+        },
+
+        updateItemQuantity(index, delta) {
+            if (!this.items[index]) {
+                return;
+            }
+
+            this.items[index].quantity = Number(this.items[index].quantity || 0) + Number(delta || 0);
+            if (this.items[index].quantity <= 0) {
+                this.removeItem(index);
+                return;
+            }
+
+            this.syncPaymentAmounts();
+        },
+
+        setItemQuantity(index, value) {
+            if (!this.items[index]) {
+                return;
+            }
+
+            const parsed = Math.floor(Number(value));
+            if (!Number.isFinite(parsed) || parsed <= 0) {
+                this.removeItem(index);
+                return;
+            }
+
+            this.items[index].quantity = parsed;
+            this.syncPaymentAmounts();
+        },
+
+        sanitizeMoney(value) {
+            const parsed = Number(value);
+            return Number.isFinite(parsed) && parsed >= 0 ? Number(parsed.toFixed(6)) : 0;
+        },
+
+        setItemAmount(index, value) {
+            if (!this.items[index]) {
+                return;
+            }
+
+            this.items[index].amount = this.sanitizeMoney(value);
+            this.syncPaymentAmounts();
+        },
+
+        setItemLineTotal(index, value) {
+            if (!this.items[index]) {
+                return;
+            }
+
+            const qty = Number(this.items[index].quantity || 0);
+            const total = this.sanitizeMoney(value);
+            this.items[index].amount = qty > 0 ? Number((total / qty).toFixed(6)) : 0;
+            this.syncPaymentAmounts();
+        },
+
+        productById(id) {
+            return this.products.find((product) => Number(product.id) === Number(id)) || null;
+        },
+
+        productImage(item) {
+            const product = this.productById(item.product_id);
+            return product?.img || '';
+        },
+
+        filteredProducts(item) {
+            const term = String(item.product_query || '').toLowerCase().trim();
+            const list = term === ''
+                ? this.products
+                : this.products.filter((product) => (
+                    String(product.code || '').toLowerCase().includes(term)
+                    || this.productLabel(product).toLowerCase().includes(term)
+                    || String(product.unit_name || '').toLowerCase().includes(term)
+                ));
+
+            if (item.product_cursor >= list.length) {
+                item.product_cursor = 0;
+            }
+
+            return list.slice(0, 40);
+        },
+
+        selectProduct(index, product) {
+            this.items[index].product_id = Number(product.id);
+            this.items[index].product_query = `${product.code || 'SIN'} - ${this.productLabel(product)}`;
+            this.items[index].description = this.productLabel(product);
+            this.items[index].product_open = false;
+            this.setProductMeta(index);
+            this.syncPaymentAmounts();
+        },
+
+        clearProduct(index) {
+            Object.assign(this.items[index], {
+                product_id: 0,
+                product_query: '',
+                description: '',
+                unit_id: 0,
+                amount: 0,
+                product_open: true,
+                product_cursor: 0,
+            });
+            this.syncPaymentAmounts();
+        },
+
+        moveProductCursor(index, step) {
+            const item = this.items[index];
+            const list = this.filteredProducts(item);
+            if (!list.length) {
+                return;
+            }
+
+            const max = list.length - 1;
+            const next = item.product_cursor + step;
+            item.product_cursor = next < 0 ? max : (next > max ? 0 : next);
+        },
+
+        selectProductByCursor(index) {
+            const item = this.items[index];
+            const list = this.filteredProducts(item);
+            if (list.length) {
+                this.selectProduct(index, list[item.product_cursor] || list[0]);
+            }
+        },
+
+        setProductMeta(index) {
+            const product = this.products.find((item) => Number(item.id) === Number(this.items[index].product_id));
+            if (!product) {
+                return;
+            }
+
+            if (!this.items[index].product_query) {
+                this.items[index].product_query = `${product.code || 'SIN'} - ${this.productLabel(product)}`;
+            }
+
+            this.items[index].description = this.productLabel(product);
+
+            if (!this.items[index].unit_id && (product.unit_id || product.unit_sale)) {
+                this.items[index].unit_id = Number(product.unit_id || product.unit_sale);
+            }
+
+            if (!this.items[index].amount && (product.cost || product.price)) {
+                this.items[index].amount = Number(product.cost || product.price);
+            }
+        },
+
+        inferKind(description) {
+            const normalized = String(description || '').toLowerCase();
+            if (normalized.includes('tarjeta') || normalized.includes('card')) {
+                return 'card';
+            }
+
+            if (normalized.includes('billetera') || normalized.includes('wallet')) {
+                return 'wallet';
+            }
+
+            return 'plain';
+        },
+
+        get paymentMethodVariants() {
+            return this.paymentMethods.flatMap((method) => {
+                const methodId = Number(method.id);
+                const description = String(method.description || '');
+                const kind = this.inferKind(description);
+
+                if (kind === 'wallet' && this.digitalWallets.length) {
+                    return this.digitalWallets.map((wallet) => ({
+                        key: `wallet:${methodId}:${Number(wallet.id)}`,
+                        payment_method_id: methodId,
+                        digital_wallet_id: Number(wallet.id),
+                        card_id: null,
+                        label: `${description} - ${wallet.description}`,
+                        kind,
+                    }));
+                }
+
+                if (kind === 'card' && this.cards.length) {
+                    return this.cards.map((card) => ({
+                        key: `card:${methodId}:${Number(card.id)}`,
+                        payment_method_id: methodId,
+                        digital_wallet_id: null,
+                        card_id: Number(card.id),
+                        label: `${description} - ${card.description}`,
+                        kind,
+                    }));
+                }
+
+                return [{
+                    key: `plain:${methodId}`,
+                    payment_method_id: methodId,
+                    digital_wallet_id: null,
+                    card_id: null,
+                    label: description,
+                    kind,
+                }];
+            });
+        },
+
+        getPaymentVariantByKey(key) {
+            return this.paymentMethodVariants.find((variant) => variant.key === key) || null;
+        },
+
+        getDefaultPaymentVariant() {
+            return this.paymentMethodVariants[0] || null;
+        },
+
+        makePaymentRowFromExisting(row) {
+            const cardKey = row.card_id ? `card:${Number(row.payment_method_id)}:${Number(row.card_id)}` : null;
+            const walletKey = row.digital_wallet_id ? `wallet:${Number(row.payment_method_id)}:${Number(row.digital_wallet_id)}` : null;
+            const plainKey = `plain:${Number(row.payment_method_id)}`;
+            const variant = this.getPaymentVariantByKey(cardKey)
+                || this.getPaymentVariantByKey(walletKey)
+                || this.getPaymentVariantByKey(plainKey)
+                || this.getDefaultPaymentVariant();
+
+            return {
+                method_variant_key: variant?.key || '',
+                payment_method_id: Number(variant?.payment_method_id || row.payment_method_id || 0),
+                card_id: Number(variant?.card_id || row.card_id || 0) || null,
+                digital_wallet_id: Number(variant?.digital_wallet_id || row.digital_wallet_id || 0) || null,
+                payment_gateway_id: Number(row.payment_gateway_id || 0) || null,
+                amount: Number(row.amount || 0),
+                kind: variant?.kind || 'plain',
+            };
+        },
+
+        addPaymentRow() {
+            const variant = this.getDefaultPaymentVariant();
+            if (!variant) {
+                return;
+            }
+
+            this.paymentRows.push({
+                method_variant_key: variant.key,
+                payment_method_id: variant.payment_method_id,
+                card_id: variant.card_id,
+                digital_wallet_id: variant.digital_wallet_id,
+                payment_gateway_id: null,
+                amount: 0,
+                kind: variant.kind,
+            });
+
+            this.syncPaymentAmounts();
+        },
+
+        applyPaymentVariant(index) {
+            const variant = this.getPaymentVariantByKey(this.paymentRows[index].method_variant_key);
+            if (!variant) {
+                return;
+            }
+
+            Object.assign(this.paymentRows[index], {
+                payment_method_id: Number(variant.payment_method_id),
+                card_id: variant.card_id ? Number(variant.card_id) : null,
+                digital_wallet_id: variant.digital_wallet_id ? Number(variant.digital_wallet_id) : null,
+                kind: variant.kind,
+            });
+
+            if (variant.kind !== 'card') {
+                this.paymentRows[index].payment_gateway_id = null;
+            }
+        },
+
+        removePaymentRow(index) {
+            this.paymentRows.splice(index, 1);
+            if (this.paymentType === 'CONTADO' && !this.paymentRows.length) {
+                this.addPaymentRow();
+            }
+            this.syncPaymentAmounts();
+        },
+
+        onPaymentTypeChange() {
+            if (this.paymentType === 'CONTADO') {
+                if (!this.paymentRows.length) {
+                    this.addPaymentRow();
+                }
+                this.syncPaymentAmounts();
+                return;
+            }
+
+            this.paymentRows = [];
+            this.syncCreditDueDate(true);
+        },
+
+        syncPaymentAmounts() {
+            if (this.paymentType !== 'CONTADO' || !this.paymentRows.length) {
+                return;
+            }
+
+            const total = Number(this.summary.total || 0);
+            if (this.paymentRows.length === 1) {
+                this.paymentRows[0].amount = Number(total.toFixed(2));
+                return;
+            }
+
+            const fixed = this.paymentRows.slice(0, -1).reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+            this.paymentRows[this.paymentRows.length - 1].amount = Math.max(0, Number((total - fixed).toFixed(2)));
+        },
+
+        money(value) {
+            return `S/ ${Number(value || 0).toFixed(2)}`;
+        },
+    };
+}
 </script>

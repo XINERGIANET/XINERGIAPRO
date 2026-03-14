@@ -128,6 +128,8 @@ class PersonController extends Controller
         $apellidoPaterno = trim((string) ($resultado['apellido_paterno'] ?? ($resultado['apellidoPaterno'] ?? '')));
         $apellidoMaterno = trim((string) ($resultado['apellido_materno'] ?? ($resultado['apellidoMaterno'] ?? '')));
         $codigoVerificacion = trim((string) ($resultado['codigo_verificacion'] ?? ($resultado['codigoVerificacion'] ?? '')));
+        $fechaNacimiento = $this->normalizeReniecDate((string) ($resultado['fecha_nacimiento'] ?? ($resultado['fechaNacimiento'] ?? '')));
+        $genero = $this->normalizeReniecGender((string) ($resultado['genero'] ?? ($resultado['sexo'] ?? '')));
 
         // Si el proveedor no separa nombres/apellidos, separamos desde "name".
         if ($nombres === '' && $apellidoPaterno === '' && $apellidoMaterno === '') {
@@ -161,6 +163,7 @@ class PersonController extends Controller
 
         return response()->json([
             'status' => true,
+            'message' => $mensaje !== '' ? $mensaje : 'Encontrado',
             // Formato solicitado
             'id' => $id,
             'nombres' => $nombres,
@@ -168,9 +171,38 @@ class PersonController extends Controller
             'apellido_materno' => $apellidoMaterno,
             'nombre_completo' => (string) ($resultado['nombre_completo'] ?? $nombreCompleto),
             'codigo_verificacion' => $codigoVerificacion,
+            'fecha_nacimiento' => $fechaNacimiento,
+            'genero' => $genero,
             // Compatibilidad con frontend actual
             'name' => $nombreCompleto,
         ]);
+    }
+
+    private function normalizeReniecDate(string $value): string
+    {
+        $raw = trim($value);
+        if ($raw === '') {
+            return '';
+        }
+
+        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $raw, $matches)) {
+            return sprintf('%s-%s-%s', $matches[3], $matches[2], $matches[1]);
+        }
+
+        if (preg_match('/^(\d{4}-\d{2}-\d{2})/', $raw, $matches)) {
+            return $matches[1];
+        }
+
+        return '';
+    }
+
+    private function normalizeReniecGender(string $value): string
+    {
+        return match (strtoupper(trim($value))) {
+            'M', 'MASCULINO', 'HOMBRE', 'MALE' => 'MASCULINO',
+            'F', 'FEMENINO', 'MUJER', 'FEMALE' => 'FEMENINO',
+            default => '',
+        };
     }
 
     public function apiRuc(Request $request)
@@ -384,7 +416,16 @@ class PersonController extends Controller
     {
         return $request->validate([
             'first_name' => ['required', 'string', 'max:255'],
-            'last_name' => ['required', 'string', 'max:255'],
+            'last_name' => [
+                'nullable',
+                'string',
+                'max:255',
+                function ($attribute, $value, $fail) use ($request) {
+                    if (strtoupper((string) $request->input('person_type')) !== 'RUC' && trim((string) $value) === '') {
+                        $fail('El campo apellidos es obligatorio.');
+                    }
+                },
+            ],
             'fecha_nacimiento' => ['nullable', 'date'],
             'genero' => ['nullable', 'string', 'max:30'],
             'person_type' => ['required', 'string', 'max:100'],

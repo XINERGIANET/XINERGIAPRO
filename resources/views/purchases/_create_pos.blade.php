@@ -14,7 +14,7 @@
 </div>
 
 <div class="flex items-start gap-6" style="display:flex;align-items:flex-start;gap:1.5rem;">
-    <section class="min-w-0 space-y-5" style="flex:0 0 68%;max-width:68%;width:68%;">
+    <section class="min-w-0 space-y-5" style="flex:0 0 60%;max-width:60%;width:60%;">
         <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" x-show="detailType === 'DETALLADO'">
             <div class="grid grid-cols-1 gap-3 xl:grid-cols-12">
                 <div class="xl:col-span-4">
@@ -74,9 +74,12 @@
                     <i class="ri-search-line text-[22px]"></i>
                 </span>
                 <input
+                    id="purchase-product-search"
                     type="text"
                     x-model="productSearch"
-                    placeholder="Buscar por nombre o categoría"
+                    x-on:input="queueCatalogCodeAutoAdd($event.target.value)"
+                    x-on:keydown.enter.prevent="flushCatalogCodeAutoAdd($event.target.value)"
+                    placeholder="Buscar por codigo de barras, nombre o categoria"
                     class="h-14 w-full rounded-[22px] border border-slate-200 bg-slate-50 pl-14 pr-4 text-sm font-medium text-slate-700"
                 >
             </div>
@@ -92,7 +95,7 @@
                         @mouseleave="$el.style.transform='';$el.style.borderColor='#e4e9f1';$el.style.boxShadow='0 10px 24px rgba(15,23,42,.05)';$el.style.backgroundColor='#ffffff';const orb=$el.querySelector('[data-role=product-orb]'); if(orb){orb.style.transform='';orb.style.boxShadow='0 12px 24px rgba(249,115,22,.08), 0 6px 14px rgba(15,23,42,.04)';}"
                     >
                         <div class="relative flex h-full w-full flex-col items-center px-3 pb-4 pt-4">
-                            <div class="absolute right-3 top-4 z-20 inline-flex min-w-[62px] items-center justify-center rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-center text-[10px] font-bold leading-none text-orange-600" style="box-shadow:0 6px 14px rgba(15,23,42,.08);">
+                            <div class="absolute right-3 top-4 z-20 inline-flex min-w-[78px] items-center justify-center rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-center text-[12px] font-bold leading-none text-orange-600" style="box-shadow:0 6px 14px rgba(15,23,42,.08);">
                                 Stock: <span x-text="Number(product.stock || 0).toFixed(0)"></span>
                             </div>
                             <div class="flex h-[102px] w-full items-center justify-center pt-2">
@@ -192,7 +195,7 @@
         </div>
     </section>
 
-    <aside class="min-w-0" style="flex:0 0 32%;max-width:32%;width:32%;">
+    <aside class="min-w-0" style="flex:0 0 40%;max-width:40%;width:40%;">
         <div class="sticky top-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
             <div class="border-b border-slate-800 bg-slate-900 px-4 py-3 text-white" style="background-color:#334155;">
                 <div class="grid grid-cols-2 gap-1.5 rounded-xl bg-slate-800/90 p-1">
@@ -216,47 +219,58 @@
                     <template x-if="!items.length"><div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-xs font-medium text-slate-500">Agrega items para ver el resumen.</div></template>
                     <template x-for="(item, idx) in items" :key="`summary-${idx}`">
                         <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                            <div class="flex items-center gap-3 p-2.5">
-                                <div class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-100">
-                                    <template x-if="productImage(item)">
-                                        <img :src="productImage(item)" :alt="item.description || 'Producto'" class="h-12 w-12 object-cover">
-                                    </template>
-                                    <template x-if="!productImage(item) && detailType !== 'GLOSA'">
-                                        <i class="ri-shopping-bag-3-line text-xl text-slate-400"></i>
-                                    </template>
-                                    <template x-if="!productImage(item) && detailType === 'GLOSA'">
-                                        <i class="ri-file-text-line text-xl text-slate-400"></i>
-                                    </template>
-                                </div>
-                                <div class="min-w-0 flex-1">
-                                    <div class="flex items-center justify-between gap-3">
-                                        <div class="min-w-0 flex-1">
-                                            <div class="flex items-center justify-between gap-2">
-                                                <h5 class="truncate text-sm font-bold text-slate-900" x-text="item.description || 'Producto'"></h5>
-                                                <span class="shrink-0 text-sm font-black" style="color:#f97316;" x-text="money((item.quantity || 0) * (item.amount || 0))"></span>
-                                            </div>
-                                            <p class="mt-0.5 text-xs font-semibold" style="color:#fb923c;" x-text="`${money(item.amount || 0)} c/u`"></p>
-                                        </div>
-                                        <div class="inline-flex shrink-0 items-center rounded-xl border border-slate-200 bg-slate-50">
-                                            <button type="button" @click="updateItemQuantity(idx, -1)" class="flex h-8 w-8 items-center justify-center text-slate-700 hover:text-rose-600">
-                                                <i class="ri-subtract-line"></i>
-                                            </button>
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                step="1"
-                                                :value="Math.max(1, Math.floor(Number(item.quantity) || 1))"
-                                                @change="setItemQuantity(idx, $event.target.value)"
-                                                class="h-8 w-12 border-x border-slate-200 bg-white text-center text-sm font-bold text-slate-900 outline-none"
-                                            >
-                                            <button type="button" @click="updateItemQuantity(idx, 1)" class="flex h-8 w-8 items-center justify-center text-slate-700 hover:text-orange-600">
-                                                <i class="ri-add-line"></i>
-                                            </button>
-                                        </div>
-                                        <button type="button" @click="removeItem(idx)" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 hover:bg-rose-50" title="Eliminar">
-                                            <i class="ri-delete-bin-line"></i>
+                            <div class="p-3">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0 flex-1">
+                                        <h5 class="truncate text-sm font-bold text-slate-900" x-text="item.description || 'Producto'"></h5>
+                                        <p class="mt-1 text-[11px] font-medium text-slate-500">
+                                            <span x-text="item.unit_id ? 'Cantidad x costo' : 'Cantidad x monto'"></span>
+                                        </p>
+                                    </div>
+                                    <div class="inline-flex shrink-0 items-center rounded-xl border border-slate-200 bg-slate-50">
+                                        <button type="button" @click="updateItemQuantity(idx, -1)" class="flex h-8 w-8 items-center justify-center text-slate-700 hover:text-rose-600">
+                                            <i class="ri-subtract-line"></i>
+                                        </button>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            step="1"
+                                            :value="Math.max(1, Math.floor(Number(item.quantity) || 1))"
+                                            @change="setItemQuantity(idx, $event.target.value)"
+                                            class="h-8 w-12 border-x border-slate-200 bg-white text-center text-sm font-bold text-slate-900 outline-none"
+                                        >
+                                        <button type="button" @click="updateItemQuantity(idx, 1)" class="flex h-8 w-8 items-center justify-center text-slate-700 hover:text-orange-600">
+                                            <i class="ri-add-line"></i>
                                         </button>
                                     </div>
+                                    <button type="button" @click="removeItem(idx)" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 hover:bg-rose-50" title="Eliminar">
+                                        <i class="ri-delete-bin-line"></i>
+                                    </button>
+                                </div>
+                                <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                                    <label class="block">
+                                        <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">C/U</span>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            :value="Number(item.amount || 0).toFixed(2)"
+                                            @change="setItemAmount(idx, $event.target.value)"
+                                            class="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none"
+                                        >
+                                    </label>
+                                    <label class="block">
+                                        <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Total</span>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            :value="Number((item.quantity || 0) * (item.amount || 0)).toFixed(2)"
+                                            @change="setItemLineTotal(idx, $event.target.value)"
+                                            class="h-10 w-full rounded-xl border border-orange-200 bg-orange-50 px-3 text-sm font-black outline-none"
+                                            style="color:#f97316;"
+                                        >
+                                    </label>
                                 </div>
                             </div>
                         </div>
@@ -308,8 +322,32 @@
                             <div><label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Tipo pago</label><select name="payment_type" x-model="paymentType" @change="onPaymentTypeChange()" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"><option value="CONTADO">CONTADO</option><option value="CREDITO">CREDITO / DEUDA</option></select></div>
                             <div><label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Caja</label><select name="cash_register_id" x-model.number="cashRegisterId" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"><template x-for="cashRegister in cashRegisters" :key="cashRegister.id"><option :value="cashRegister.id" x-text="cashRegister.status==='A' ? `${cashRegister.number} (Activa)` : cashRegister.number"></option></template></select></div>
                         </div>
-                        <div x-show="paymentType==='CREDITO'" class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-                            Esta compra se registrara como deuda y se enviara a cuentas por pagar.
+                        <div x-show="paymentType==='CREDITO'" class="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+                            <p>Esta compra se registrara como deuda y se enviara a cuentas por pagar.</p>
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <div>
+                                    <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-amber-700">Dias de credito</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="1"
+                                        :value="selectedProviderCreditDays"
+                                        readonly
+                                        class="h-11 w-full rounded-xl border border-amber-200 bg-white px-3 text-sm font-bold text-slate-700"
+                                    >
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-amber-700">Fecha vencimiento</label>
+                                    <input
+                                        type="date"
+                                        name="due_date"
+                                        x-model="dueDate"
+                                        @change="setDueDate($event.target.value)"
+                                        :disabled="paymentType !== 'CREDITO'"
+                                        class="h-11 w-full rounded-xl border border-amber-200 bg-white px-3 text-sm font-bold text-slate-700"
+                                    >
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -365,9 +403,9 @@
 <style>
     #purchases-create-view input:focus,#purchases-create-view select:focus,#purchases-create-view textarea:focus{outline:none!important;box-shadow:0 0 0 3px rgba(249,115,22,.16)!important;border-color:#f97316!important}
     #purchases-create-view input:focus-visible,#purchases-create-view select:focus-visible,#purchases-create-view textarea:focus-visible{outline:none!important}
-    #purchases-create-view #purchase-products-grid{grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:.95rem!important}
+    #purchases-create-view #purchase-products-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:.95rem!important}
     @media (max-width:1199px){
-        #purchases-create-view #purchase-products-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+        #purchases-create-view #purchase-products-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
     }
     @media (max-width:991px){
         #purchases-create-view #purchase-products-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}

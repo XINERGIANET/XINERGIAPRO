@@ -8,6 +8,7 @@ use App\Models\CashMovements;
 use App\Models\CashRegister;
 use App\Models\DocumentType;
 use App\Models\DigitalWallet;
+use App\Models\Location;
 use App\Models\Movement;
 use App\Models\MovementType;
 use App\Models\Operation;
@@ -33,11 +34,17 @@ class PurchaseController extends Controller
     public function index(Request $request)
     {
         $search = (string) $request->input('search', '');
+        $dateFrom = (string) $request->input('date_from', '');
+        $dateTo = (string) $request->input('date_to', '');
+        $paymentType = strtoupper((string) $request->input('payment_type', ''));
         $viewId = $request->input('view_id');
         $perPage = (int) $request->input('per_page', 10);
         $allowedPerPage = [10, 20, 50, 100];
         if (!in_array($perPage, $allowedPerPage, true)) {
             $perPage = 10;
+        }
+        if (!in_array($paymentType, ['', 'CONTADO', 'CREDITO'], true)) {
+            $paymentType = '';
         }
 
         $branchId = (int) session('branch_id');
@@ -62,6 +69,17 @@ class PurchaseController extends Controller
                         ->orWhere('user_name', 'ILIKE', "%{$search}%");
                 });
             })
+            ->when($dateFrom !== '', function ($query) use ($dateFrom) {
+                $query->whereDate('moved_at', '>=', $dateFrom);
+            })
+            ->when($dateTo !== '', function ($query) use ($dateTo) {
+                $query->whereDate('moved_at', '<=', $dateTo);
+            })
+            ->when($paymentType !== '', function ($query) use ($paymentType) {
+                $query->whereHas('purchaseMovement', function ($purchaseQuery) use ($paymentType) {
+                    $purchaseQuery->where('payment_type', $paymentType);
+                });
+            })
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
@@ -69,6 +87,9 @@ class PurchaseController extends Controller
         return view('purchases.index', [
             'purchases' => $purchases,
             'search' => $search,
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
+            'paymentType' => $paymentType,
             'perPage' => $perPage,
             'viewId' => $viewId,
             'operaciones' => $operaciones,
@@ -91,9 +112,11 @@ class PurchaseController extends Controller
             'document_number' => ['required', 'string', 'max:50'],
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
+            'credit_days' => ['nullable', 'integer', 'min:0', 'max:3650'],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:255'],
             'address' => ['nullable', 'string', 'max:255'],
+            'location_id' => ['nullable', 'integer', 'exists:locations,id'],
             'genero' => ['nullable', 'string', 'max:30'],
             'fecha_nacimiento' => ['nullable', 'date'],
         ]);
@@ -114,6 +137,11 @@ class PurchaseController extends Controller
             ->first();
 
         if ($existingPerson) {
+            $existingPerson->forceFill([
+                'credit_days' => (int) ($validated['credit_days'] ?? $existingPerson->credit_days ?? 0),
+                'location_id' => (int) ($validated['location_id'] ?? $existingPerson->location_id ?? $branchDistrictId),
+            ])->save();
+
             $existingPerson->roles()->syncWithoutDetaching([
                 4 => ['branch_id' => $branchId],
             ]);
@@ -127,13 +155,15 @@ class PurchaseController extends Controller
                 'name' => trim(((string) $existingPerson->first_name) . ' ' . ((string) $existingPerson->last_name)),
                 'label' => trim(((string) $existingPerson->first_name) . ' ' . ((string) $existingPerson->last_name)),
                 'document' => (string) ($existingPerson->document_number ?? ''),
+                'credit_days' => (int) ($existingPerson->credit_days ?? 0),
             ]);
         }
 
         $validated['phone'] = (string) ($validated['phone'] ?? '');
         $validated['email'] = (string) ($validated['email'] ?? '');
         $validated['address'] = trim((string) ($validated['address'] ?? '')) ?: '-';
-        $validated['location_id'] = $branchDistrictId;
+        $validated['location_id'] = (int) ($validated['location_id'] ?? $branchDistrictId);
+        $validated['credit_days'] = (int) ($validated['credit_days'] ?? 0);
 
         $person = DB::transaction(function () use ($validated, $branchId) {
             $person = Person::query()->create(array_merge(
@@ -157,6 +187,7 @@ class PurchaseController extends Controller
             'name' => trim(((string) $person->first_name) . ' ' . ((string) $person->last_name)),
             'label' => trim(((string) $person->first_name) . ' ' . ((string) $person->last_name)),
             'document' => (string) ($person->document_number ?? ''),
+            'credit_days' => (int) ($person->credit_days ?? 0),
         ]);
     }
 
@@ -168,7 +199,14 @@ class PurchaseController extends Controller
 
         DB::transaction(function () use ($validated, $branchId, $user) {
             $movementType = $this->resolvePurchaseMovementType();
-            $person = Person::query()->where('id', $validated['person_id'])->where('branch_id', $branchId)->firstOrFail();
+            $person = Person::query()
+                ->where('id', $validated['person_id'])
+                ->where('branch_id', $branchId)
+                ->whereHas('roles', function ($query) use ($branchId) {
+                    $query->where('roles.id', 4)
+                        ->where('role_person.branch_id', $branchId);
+                })
+                ->firstOrFail();
             $documentType = DocumentType::query()->findOrFail($validated['document_type_id']);
             $responsibleName = $user?->person
                 ? trim((string) (($user->person->first_name ?? '') . ' ' . ($user->person->last_name ?? '')))
@@ -248,13 +286,15 @@ class PurchaseController extends Controller
             app(KardexSyncService::class)->syncMovement($movement);
 
             if (($validated['payment_type'] ?? 'CONTADO') === 'CREDITO') {
+                $dueDate = $this->resolvePurchaseDueDate($validated, $person);
                 $this->registerPurchaseDebt(
                     movement: $movement,
                     person: $person,
                     validated: $validated,
                     total: (float) $totals['total'],
                     branchId: $branchId,
-                    user: $user
+                    user: $user,
+                    dueDate: $dueDate,
                 );
             } elseif (
                 ($validated['payment_type'] ?? 'CONTADO') === 'CONTADO'
@@ -297,7 +337,14 @@ class PurchaseController extends Controller
 
         DB::transaction(function () use ($purchase, $validated, $branchId) {
             $documentType = DocumentType::query()->findOrFail($validated['document_type_id']);
-            $person = Person::query()->where('id', $validated['person_id'])->where('branch_id', $branchId)->firstOrFail();
+            $person = Person::query()
+                ->where('id', $validated['person_id'])
+                ->where('branch_id', $branchId)
+                ->whereHas('roles', function ($query) use ($branchId) {
+                    $query->where('roles.id', 4)
+                        ->where('role_person.branch_id', $branchId);
+                })
+                ->firstOrFail();
             $user = request()->user();
             $responsibleName = $user?->person
                 ? trim((string) (($user->person->first_name ?? '') . ' ' . ($user->person->last_name ?? '')))
@@ -428,6 +475,7 @@ class PurchaseController extends Controller
             'detail_type' => ['required', Rule::in(['DETALLADO', 'GLOSA'])],
             'includes_tax' => ['required', Rule::in(['S', 'N'])],
             'payment_type' => ['required', Rule::in(['CONTADO', 'CREDITO'])],
+            'due_date' => ['nullable', 'date'],
             'affects_cash' => ['required', Rule::in(['S', 'N'])],
             'affects_kardex' => ['required', Rule::in(['S', 'N'])],
             'currency' => ['required', 'string', 'max:10'],
@@ -492,14 +540,19 @@ class PurchaseController extends Controller
 
         $people = Person::query()
             ->where('branch_id', $branchId)
+            ->whereHas('roles', function ($query) use ($branchId) {
+                $query->where('roles.id', 4)
+                    ->where('role_person.branch_id', $branchId);
+            })
             ->orderBy('first_name')
             ->orderBy('last_name')
-            ->get(['id', 'first_name', 'last_name', 'document_number']);
+            ->get(['id', 'first_name', 'last_name', 'document_number', 'credit_days']);
 
         $branch = Branch::query()->with('location.parent.parent')->find($branchId);
         $district = $branch?->location;
         $province = $district?->parent;
         $department = $province?->parent;
+        $locationData = $this->getLocationData((int) ($branch?->location_id ?? 0));
 
         $documentTypes = DocumentType::query()
             ->where('movement_type_id', $movementType->id)
@@ -581,6 +634,7 @@ class PurchaseController extends Controller
                 'id' => (int) $person->id,
                 'label' => trim(($person->first_name ?? '') . ' ' . ($person->last_name ?? '')),
                 'document' => (string) ($person->document_number ?? ''),
+                'credit_days' => (int) ($person->credit_days ?? 0),
             ])->values(),
             'documentTypes' => $documentTypes->values(),
             'cashRegisters' => $cashRegisters->values(),
@@ -591,6 +645,7 @@ class PurchaseController extends Controller
             'initialProviderId' => (int) old('person_id', 0),
             'initialItems' => old('items', []),
             'initialPaymentType' => (string) old('payment_type', 'CONTADO'),
+            'initialDueDate' => (string) old('due_date', ''),
             'initialDocumentTypeId' => (int) old('document_type_id', $documentTypes->first()->id ?? 0),
             'initialCashRegisterId' => (int) old('cash_register_id', $defaultCashRegisterId ?? 0),
             'initialRows' => old('payment_methods', []),
@@ -602,6 +657,12 @@ class PurchaseController extends Controller
             'initialMovedAt' => (string) old('moved_at', now()->format('Y-m-d H:i')),
             'purchaseNumberPreview' => (string) $purchaseNumberPreview,
             'quickProviderStoreUrl' => route('admin.purchases.providers.store'),
+            'departments' => $locationData['departments'],
+            'provinces' => $locationData['provinces'],
+            'districts' => $locationData['districts'],
+            'branchDepartmentId' => $locationData['selectedDepartmentId'],
+            'branchProvinceId' => $locationData['selectedProvinceId'],
+            'branchDistrictId' => $locationData['selectedDistrictId'],
             'branchDepartmentName' => (string) ($department->name ?? ''),
             'branchProvinceName' => (string) ($province->name ?? ''),
             'branchDistrictName' => (string) ($district->name ?? ''),
@@ -669,6 +730,48 @@ class PurchaseController extends Controller
         }
 
         return $cashRegisters->firstWhere('status', 'A')->id ?? $cashRegisters->first()->id ?? null;
+    }
+
+    private function getLocationData(?int $defaultLocationId = null): array
+    {
+        $departments = Location::query()
+            ->where('type', 'department')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $provinces = Location::query()
+            ->where('type', 'province')
+            ->orderBy('name')
+            ->get(['id', 'name', 'parent_location_id']);
+
+        $districts = Location::query()
+            ->where('type', 'district')
+            ->orderBy('name')
+            ->get(['id', 'name', 'parent_location_id']);
+
+        $selectedDistrictId = $defaultLocationId ?: null;
+        $selectedProvinceId = null;
+        $selectedDepartmentId = null;
+
+        if ($selectedDistrictId) {
+            $district = Location::query()->find($selectedDistrictId);
+            if ($district) {
+                $selectedProvinceId = $district->parent_location_id;
+                if ($selectedProvinceId) {
+                    $province = Location::query()->find($selectedProvinceId);
+                    $selectedDepartmentId = $province?->parent_location_id;
+                }
+            }
+        }
+
+        return [
+            'departments' => $departments->values(),
+            'provinces' => $provinces->values(),
+            'districts' => $districts->values(),
+            'selectedDepartmentId' => $selectedDepartmentId,
+            'selectedProvinceId' => $selectedProvinceId,
+            'selectedDistrictId' => $selectedDistrictId,
+        ];
     }
 
     private function resolveOperations($viewId, int $branchId)
@@ -915,7 +1018,8 @@ class PurchaseController extends Controller
         array $validated,
         float $total,
         int $branchId,
-        $user
+        $user,
+        \Carbon\CarbonInterface $dueDate
     ): void {
         $cashRegisterId = (int) ($validated['cash_register_id'] ?? 0);
         if ($cashRegisterId <= 0) {
@@ -980,7 +1084,7 @@ class PurchaseController extends Controller
         DB::table('cash_movement_details')->insert([
             'cash_movement_id' => $cashMovement->id,
             'type' => 'DEUDA',
-            'due_at' => $validated['moved_at'],
+            'due_at' => $dueDate,
             'paid_at' => null,
             'payment_method_id' => $debtPaymentMethod->id,
             'payment_method' => $debtPaymentMethod->description ?? 'Deuda',
@@ -1004,8 +1108,18 @@ class PurchaseController extends Controller
         app(AccountReceivablePayableService::class)->syncDebtAccount(
             $cashMovement,
             AccountReceivablePayableService::TYPE_PAYABLE,
-            \Carbon\Carbon::parse((string) $validated['moved_at'])
+            $dueDate
         );
+    }
+
+    private function resolvePurchaseDueDate(array $validated, Person $person): \Carbon\CarbonInterface
+    {
+        if (!empty($validated['due_date'])) {
+            return \Carbon\Carbon::parse((string) $validated['due_date']);
+        }
+
+        return \Carbon\Carbon::parse((string) $validated['moved_at'])
+            ->addDays((int) ($person->credit_days ?? 0));
     }
 
     private function resolveCashMovementTypeId(): int

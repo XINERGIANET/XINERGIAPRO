@@ -35,6 +35,7 @@
                 'category' => $product->category ? $product->category->description : 'General',
                 'unit' => $product->baseUnit ? $product->baseUnit->description : 'Unidad',
                 'stock' => (float) ($productBranch->stock ?? 0),
+                'unit_cost' => (float) ($productBranch->avg_cost ?? 0),
             ];
         })->values();
     @endphp
@@ -57,7 +58,7 @@
                                 <input
                                     id="product-search"
                                     type="text"
-                                    placeholder="Buscar por nombre, código o categoría"
+                                    placeholder="Buscar por codigo de barras, nombre o categoria"
                                     class="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-12 pr-4 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
                                 >
                             </div>
@@ -82,7 +83,7 @@
                             </div>
                             <div id="category-filters" class="flex flex-wrap gap-2"></div>
                         </div>
-                        <div id="products-grid" class="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"></div>
+                        <div id="products-grid" class="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4"></div>
                     </div>
                 </section>
 
@@ -185,6 +186,7 @@
             const productsGrid = document.getElementById('products-grid');
             const cartContainer = document.getElementById('entry-cart-container');
             const searchInput = document.getElementById('product-search');
+            let searchTimer = null;
 
             function getImageUrl(raw) {
                 if (raw && String(raw).trim() !== '') return raw;
@@ -211,6 +213,36 @@
                         || String(product.category || '').toLowerCase().includes(term);
                     return categoryOk && searchOk;
                 });
+            }
+
+            function normalizeProductCode(value) {
+                return String(value || '').trim().toLowerCase();
+            }
+
+            function clearSearchField() {
+                state.search = '';
+                if (searchInput) {
+                    searchInput.value = '';
+                    searchInput.focus();
+                }
+            }
+
+            function findUniqueProductByCode(searchTerm) {
+                const needle = normalizeProductCode(searchTerm);
+                if (!needle) return null;
+
+                const matches = products.filter((product) => normalizeProductCode(product.code) === needle);
+                return matches.length === 1 ? matches[0] : null;
+            }
+
+            function tryAutoAddProductByCode(searchTerm) {
+                const matchedProduct = findUniqueProductByCode(searchTerm);
+                if (!matchedProduct) return false;
+
+                addToCart(matchedProduct.id);
+                clearSearchField();
+                renderProducts();
+                return true;
             }
 
             function renderCategoryFilters() {
@@ -252,6 +284,7 @@
                         unit: String(product.unit || 'Unidad'),
                         img: product.img || null,
                         quantity: 1,
+                        unitCost: Number(product.unit_cost || 0),
                     });
                 }
                 renderCart();
@@ -274,6 +307,27 @@
 
             function removeItem(productId) {
                 state.cart = state.cart.filter((entry) => Number(entry.id) !== Number(productId));
+                renderCart();
+            }
+
+            function sanitizeMoneyValue(value) {
+                const parsed = Number(value);
+                return Number.isFinite(parsed) && parsed >= 0 ? Number(parsed.toFixed(6)) : 0;
+            }
+
+            function setUnitCost(productId, value) {
+                const item = state.cart.find((entry) => Number(entry.id) === Number(productId));
+                if (!item) return;
+                item.unitCost = sanitizeMoneyValue(value);
+                renderCart();
+            }
+
+            function setLineTotal(productId, value) {
+                const item = state.cart.find((entry) => Number(entry.id) === Number(productId));
+                if (!item) return;
+                const qty = Number(item.quantity || 0);
+                const total = sanitizeMoneyValue(value);
+                item.unitCost = qty > 0 ? Number((total / qty).toFixed(6)) : 0;
                 renderCart();
             }
 
@@ -317,7 +371,7 @@
 
                     card.innerHTML = `
                         <div class="relative px-3 pt-3">
-                            <div class="absolute right-2 top-[2.9rem] z-20 rounded-full border px-1.5 py-0.5 text-[9px] font-bold leading-none ${stock > 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-orange-200 bg-orange-50 text-orange-700'}" style="box-shadow:0 6px 14px rgba(15,23,42,.08);">
+                            <div class="absolute right-2 top-[2.9rem] z-20 inline-flex min-w-[72px] items-center justify-center rounded-full border px-2.5 py-1 text-[11px] font-bold leading-none ${stock > 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-orange-200 bg-orange-50 text-orange-700'}" style="box-shadow:0 6px 14px rgba(15,23,42,.08);">
                                 Stock: ${stock.toFixed(0)}
                             </div>
                             <div data-role="product-orb" class="mx-auto mt-2 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-gradient-to-b from-orange-400 to-orange-500 transition-transform duration-200" style="box-shadow:0 12px 24px rgba(249,115,22,.18);">
@@ -353,30 +407,36 @@
 
                 cartContainer.innerHTML = '';
                 state.cart.forEach((item) => {
+                    const lineTotal = (Number(item.quantity || 0) * Number(item.unitCost || 0));
                     const row = document.createElement('div');
                     row.className = 'mb-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm';
                     row.innerHTML = `
-                        <div class="flex items-center gap-3 p-2.5">
-                            <img src="${getImageUrl(item.img)}" alt="${item.name || 'Producto'}" class="h-12 w-12 shrink-0 rounded-xl object-cover bg-slate-100" onerror="this.onerror=null; this.src='${getImageUrl(null)}'">
-                            <div class="min-w-0 flex-1">
-                                <div class="flex items-center justify-between gap-3">
-                                    <div class="min-w-0 flex-1">
-                                        <div class="flex items-center justify-between gap-2">
-                                            <h5 class="truncate text-sm font-bold text-slate-900">${item.name || 'Producto'}</h5>
-                                        </div>
-                                        <div class="mt-1">
-                                            <span class="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 text-xs font-semibold text-slate-600">${item.unit || 'Unidad'}</span>
-                                        </div>
+                        <div class="p-3">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0 flex-1">
+                                    <h5 class="truncate text-sm font-bold text-slate-900">${item.name || 'Producto'}</h5>
+                                    <div class="mt-1">
+                                        <span class="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 text-xs font-semibold text-slate-600">${item.unit || 'Unidad'}</span>
                                     </div>
-                                    <div class="inline-flex shrink-0 items-center rounded-xl border border-slate-200 bg-slate-50">
-                                        <button type="button" class="flex h-8 w-8 items-center justify-center text-slate-700 hover:text-rose-600" data-role="minus"><i class="ri-subtract-line"></i></button>
-                                        <input type="number" min="1" step="1" value="${Math.max(1, Math.floor(Number(item.quantity) || 1))}" class="h-8 w-12 border-x border-slate-200 bg-white text-center text-sm font-bold text-slate-900 outline-none" data-role="qty">
-                                        <button type="button" class="flex h-8 w-8 items-center justify-center text-slate-700 hover:text-orange-600" data-role="plus"><i class="ri-add-line"></i></button>
-                                    </div>
-                                    <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 hover:bg-rose-50" title="Eliminar" data-role="remove">
-                                        <i class="ri-delete-bin-line"></i>
-                                    </button>
                                 </div>
+                                <div class="inline-flex shrink-0 items-center rounded-xl border border-slate-200 bg-slate-50">
+                                    <button type="button" class="flex h-8 w-8 items-center justify-center text-slate-700 hover:text-rose-600" data-role="minus"><i class="ri-subtract-line"></i></button>
+                                    <input type="number" min="1" step="1" value="${Math.max(1, Math.floor(Number(item.quantity) || 1))}" class="h-8 w-12 border-x border-slate-200 bg-white text-center text-sm font-bold text-slate-900 outline-none" data-role="qty">
+                                    <button type="button" class="flex h-8 w-8 items-center justify-center text-slate-700 hover:text-orange-600" data-role="plus"><i class="ri-add-line"></i></button>
+                                </div>
+                                <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 hover:bg-rose-50" title="Eliminar" data-role="remove">
+                                    <i class="ri-delete-bin-line"></i>
+                                </button>
+                            </div>
+                            <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                                <label class="block">
+                                    <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">C/U</span>
+                                    <input type="number" min="0" step="0.01" value="${Number(item.unitCost || 0).toFixed(2)}" class="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none" data-role="unit-cost">
+                                </label>
+                                <label class="block">
+                                    <span class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Total</span>
+                                    <input type="number" min="0" step="0.01" value="${lineTotal.toFixed(2)}" class="h-10 w-full rounded-xl border border-orange-200 bg-orange-50 px-3 text-sm font-black outline-none" style="color:#f97316;" data-role="line-total">
+                                </label>
                             </div>
                         </div>
                     `;
@@ -384,6 +444,8 @@
                     row.querySelector('[data-role=plus]')?.addEventListener('click', () => updateQuantity(item.id, 1));
                     row.querySelector('[data-role=remove]')?.addEventListener('click', () => removeItem(item.id));
                     row.querySelector('[data-role=qty]')?.addEventListener('change', (event) => setQuantity(item.id, event.target.value));
+                    row.querySelector('[data-role=unit-cost]')?.addEventListener('change', (event) => setUnitCost(item.id, event.target.value));
+                    row.querySelector('[data-role=line-total]')?.addEventListener('change', (event) => setLineTotal(item.id, event.target.value));
                     cartContainer.appendChild(row);
                 });
 
@@ -400,7 +462,7 @@
                     items: state.cart.map((item) => ({
                         product_id: Number(item.id),
                         quantity: Number(item.quantity || 0),
-                        unit_cost: 0,
+                        unit_cost: Number(item.unitCost || 0),
                         comment: '',
                     })),
                     reason: (document.getElementById('movement-reason')?.value || 'AJUSTE DE ENTRADA').trim(),
@@ -441,8 +503,20 @@
             }
 
             searchInput?.addEventListener('input', (event) => {
-                state.search = String(event.target.value || '');
+                const rawValue = String(event.target.value || '');
+                state.search = rawValue;
                 renderProducts();
+                window.clearTimeout(searchTimer);
+                if (state.search.trim() === '') return;
+                searchTimer = window.setTimeout(() => {
+                    tryAutoAddProductByCode(rawValue);
+                }, 180);
+            });
+            searchInput?.addEventListener('keydown', (event) => {
+                if (event.key !== 'Enter') return;
+                event.preventDefault();
+                window.clearTimeout(searchTimer);
+                tryAutoAddProductByCode(event.target.value || '');
             });
             document.getElementById('save-entry-button')?.addEventListener('click', saveEntry);
             document.getElementById('clear-entry-button')?.addEventListener('click', () => {
@@ -498,6 +572,12 @@
 
             #warehouse-entry-view #entry-cart-container {
                 max-height: 42vh !important;
+            }
+        }
+
+        @media (min-width: 1536px) {
+            #warehouse-entry-view #products-grid {
+                grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
             }
         }
     </style>

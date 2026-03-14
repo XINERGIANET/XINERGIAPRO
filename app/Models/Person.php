@@ -15,6 +15,7 @@ class Person extends Model
         'first_name',
         'last_name',
         'fecha_nacimiento',
+        'credit_days',
         'genero',
         'person_type',
         'phone',
