@@ -19,12 +19,16 @@ use App\Models\Unit;
 use App\Models\WorkshopAssembly;
 use App\Models\WorkshopAssemblyCost;
 use App\Models\WorkshopAssemblyLocation;
+use App\Models\DigitalWallet;
+use App\Models\Card;
+use App\Models\PaymentGateways;
 use App\Support\WorkshopAuthorization;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Services\Accounting\AccountReceivablePayableService;
 
 class WorkshopAssemblyController extends Controller
 {
@@ -79,27 +83,6 @@ class WorkshopAssemblyController extends Controller
             ->orderBy('vehicle_type')
             ->get();
 
-        $clients = Person::query()
-            ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
-            ->orderBy('first_name')
-            ->orderBy('last_name')
-            ->get();
-
-        $documentTypes = DocumentType::query()
-            ->whereHas('movementType', fn ($query) => $query->where('description', 'ILIKE', '%venta%'))
-            ->orderBy('name')
-            ->get();
-
-        $cashRegisters = CashRegister::query()
-            ->when(
-                Schema::hasColumn('cash_registers', 'branch_id') && $branchId > 0,
-                fn ($query) => $query->where('branch_id', $branchId)
-            )
-            ->orderBy('number')
-            ->get();
-
-        $paymentMethods = PaymentMethod::query()->where('status', true)->orderBy('order_num')->get();
-
         $assemblyLocations = WorkshopAssemblyLocation::query()
             ->where('company_id', $companyId)
             ->where('active', true)
@@ -130,14 +113,127 @@ class WorkshopAssemblyController extends Controller
             'month',
             'brandCompany',
             'vehicleType', 
-            'clients',
-            'documentTypes',
-            'cashRegisters',
-            'paymentMethods',
             'assemblyLocations',
             'technicians',
             'vehicleTypes'
         ));
+    }
+
+    public function checkoutPage(Request $request): \Illuminate\View\View|RedirectResponse
+    {
+        [$branchId, $companyId] = $this->resolveContext();
+
+        $assemblyIds = $request->query('ids', []);
+        
+        if (empty($assemblyIds) || !is_array($assemblyIds)) {
+            return redirect()->route('workshop.assemblies.index')
+                ->withErrors(['error' => 'No seleccionó ningún armado para el cobro.']);
+        }
+
+        $assemblies = WorkshopAssembly::query()
+            ->whereIn('id', $assemblyIds)
+            ->where('branch_id', $branchId)
+            ->where('company_id', $companyId)
+            ->whereNull('sales_movement_id')
+            ->get();
+
+        if ($assemblies->isEmpty()) {
+            return redirect()->route('workshop.assemblies.index')
+                ->withErrors(['error' => 'Los armados seleccionados no son válidos o ya han sido facturados.']);
+        }
+
+        $clients = Person::query()
+            ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get();
+
+        $documentTypes = DocumentType::query()
+            ->whereHas('movementType', fn ($query) => $query->where('description', 'ILIKE', '%venta%'))
+            ->orderBy('name')
+            ->get();
+
+        $cashRegisters = CashRegister::query()
+            ->when(
+                Schema::hasColumn('cash_registers', 'branch_id') && $branchId > 0,
+                fn ($query) => $query->where('branch_id', $branchId)
+            )
+            ->orderBy('number')
+            ->get();
+
+        $paymentMethodsRaw = PaymentMethod::query()->where('status', true)->orderBy('order_num')->get();
+
+        $paymentMethodOptions = $paymentMethodsRaw->map(function ($method) {
+            return [
+                'id' => (int) $method->id,
+                'description' => (string) ($method->description ?? ''),
+                'kind' => $this->inferPaymentMethodKind((string) ($method->description ?? '')),
+            ];
+        })->values();
+
+        $digitalWalletOptions = DigitalWallet::query()
+            ->where('status', true)
+            ->orderBy('id')
+            ->get();
+
+        $cardOptions = Card::query()
+            ->where('status', true)
+            ->orderBy('id')
+            ->get();
+
+        $paymentGatewayOptionsByMethod = collect(
+            DB::table('payment_gateway_payment_method as pgpm')
+                ->join('payment_gateways as pg', 'pg.id', '=', 'pgpm.payment_gateway_id')
+                ->whereNull('pgpm.deleted_at')
+                ->whereNull('pg.deleted_at')
+                ->where('pg.status', true)
+                ->orderBy('pg.order_num')
+                ->orderBy('pg.description')
+                ->get([
+                    'pgpm.payment_method_id',
+                    'pg.id',
+                    'pg.description',
+                ])
+        )
+            ->groupBy('payment_method_id')
+            ->map(fn ($rows) => collect($rows)->map(fn ($row) => [
+                'id' => (int) $row->id,
+                'description' => (string) ($row->description ?? ''),
+            ])->values())
+            ->all();
+
+        return view('workshop.assemblies.checkout', compact(
+            'assemblies',
+            'clients',
+            'documentTypes',
+            'cashRegisters',
+            'paymentMethodOptions',
+            'digitalWalletOptions',
+            'cardOptions',
+            'paymentGatewayOptionsByMethod'
+        ));
+    }
+
+    private function inferPaymentMethodKind(string $description): string
+    {
+        $desc = strtolower($description);
+        if (str_contains($desc, 'tarjeta') || str_contains($desc, 'niubiz') || str_contains($desc, 'visa') || str_contains($desc, 'mastercard') || str_contains($desc, 'pago link')) {
+            return 'card';
+        }
+
+        if (str_contains($desc, 'yape') || str_contains($desc, 'plin') || str_contains($desc, 'billetera')) {
+            return 'wallet';
+        }
+
+        if (str_contains($desc, 'transferencia') || str_contains($desc, 'deposito') || str_contains($desc, 'cuenta')) {
+            return 'transfer';
+        }
+
+        if (str_contains($desc, 'efectivo') || str_contains($desc, 'cash')) {
+            return 'cash';
+        }
+
+        return 'other';
     }
 
     public function store(Request $request): RedirectResponse
@@ -438,7 +534,7 @@ class WorkshopAssemblyController extends Controller
         return back()->with('status', 'Salida registrada correctamente.');
     }
 
-    public function processMassiveSale(Request $request): RedirectResponse
+    public function processMassiveSale(Request $request, AccountReceivablePayableService $arpService): RedirectResponse
     {
         [$branchId, $companyId] = $this->resolveContext();
 
@@ -446,13 +542,23 @@ class WorkshopAssemblyController extends Controller
             'assembly_ids' => ['required', 'array', 'min:1'],
             'client_person_id' => ['required', 'integer', 'exists:people,id'],
             'document_type_id' => ['required', 'integer', 'exists:document_types,id'],
+            'payment_type' => ['required', 'string', 'in:CONTADO,DEUDA'],
+            'billing_status' => ['nullable', 'string', 'in:PENDING,INVOICED,NOT_APPLICABLE'],
+            'invoice_series' => ['nullable', 'string', 'max:10'],
+            'invoice_number' => ['nullable', 'string', 'max:20'],
             'cash_register_id' => ['nullable', 'integer', 'exists:cash_registers,id'],
-            'payment_method_id' => ['nullable', 'integer', 'exists:payment_methods,id'],
+            'payment_methods' => ['nullable', 'array'],
+            'payment_methods.*.payment_method_id' => ['required_with:payment_methods', 'integer', 'exists:payment_methods,id'],
+            'payment_methods.*.amount' => ['required_with:payment_methods', 'numeric', 'min:0.01'],
+            'payment_methods.*.reference' => ['nullable', 'string', 'max:255'],
+            'payment_methods.*.card_id' => ['nullable', 'integer', 'exists:cards,id'],
+            'payment_methods.*.digital_wallet_id' => ['nullable', 'integer', 'exists:digital_wallets,id'],
+            'payment_methods.*.payment_gateway_id' => ['nullable', 'integer', 'exists:payment_gateways,id'],
             'comment' => ['nullable', 'string', 'max:255'],
         ]);
 
         try {
-            DB::transaction(function () use ($data, $branchId, $companyId) {
+            DB::transaction(function () use ($data, $branchId, $companyId, $arpService) {
                 $assemblies = WorkshopAssembly::query()
                     ->whereIn('id', $data['assembly_ids'])
                     ->where('branch_id', $branchId)
@@ -468,10 +574,24 @@ class WorkshopAssemblyController extends Controller
                 $client = Person::findOrFail($data['client_person_id']);
                 $userId = auth()->id();
                 $userName = auth()->user()->name ?? 'Sistema';
+                $documentType = DocumentType::findOrFail($data['document_type_id']);
+
+                $isInvoice = str_contains(strtolower($documentType->name), 'factura') || str_contains(strtolower($documentType->name), 'boleta');
+                $billingStatus = $data['billing_status'] ?? 'NOT_APPLICABLE';
+                $invoiceSeries = $data['invoice_series'] ?? null;
+                $invoiceNumber = $data['invoice_number'] ?? null;
+
+                if (!$isInvoice) {
+                    $billingStatus = 'NOT_APPLICABLE';
+                    $invoiceSeries = null;
+                    $invoiceNumber = null;
+                }
+
+                $paymentType = $data['payment_type'];
 
                 // 1. Crear Movimiento de Venta
                 $movement = Movement::create([
-                    'number' => $this->generateMovementNumber($branchId, $data['document_type_id']),
+                    'number' => $this->generateMovementNumber($branchId, $documentType->id),
                     'moved_at' => now(),
                     'user_id' => $userId,
                     'user_name' => $userName,
@@ -481,8 +601,8 @@ class WorkshopAssemblyController extends Controller
                     'responsible_name' => $userName,
                     'comment' => $data['comment'] ?? 'Venta masiva de armados',
                     'status' => 'A',
-                    'movement_type_id' => DocumentType::find($data['document_type_id'])->movement_type_id,
-                    'document_type_id' => $data['document_type_id'],
+                    'movement_type_id' => $documentType->movement_type_id,
+                    'document_type_id' => $documentType->id,
                     'branch_id' => $branchId,
                 ]);
 
@@ -496,10 +616,10 @@ class WorkshopAssemblyController extends Controller
                 // 2. Crear SalesMovement
                 $sale = SalesMovement::create([
                     'branch_snapshot' => ['id' => $branchId, 'company_id' => $companyId],
-                    'series' => '001',
+                    'series' => $isInvoice && $billingStatus === 'INVOICED' ? $invoiceSeries : '001',
                     'year' => (string) now()->year,
                     'detail_type' => 'DETALLADO',
-                    'payment_type' => 'CONTADO',
+                    'payment_type' => $paymentType,
                     'currency' => 'PEN',
                     'exchange_rate' => 1,
                     'subtotal' => $subtotal,
@@ -507,7 +627,10 @@ class WorkshopAssemblyController extends Controller
                     'total' => $total,
                     'movement_id' => $movement->id,
                     'branch_id' => $branchId,
-                    'status' => 'N',
+                    'status' => $billingStatus === 'INVOICED' ? 'F' : 'N', // Facturado o Pendiente
+                    'billing_status' => $billingStatus,
+                    'invoice_series' => $isInvoice ? $invoiceSeries : null,
+                    'invoice_number' => $isInvoice ? $invoiceNumber : null,
                 ]);
 
                 $unit = Unit::where('abbreviation', 'NIU')->first() ?: Unit::first();
@@ -536,23 +659,23 @@ class WorkshopAssemblyController extends Controller
                     $assembly->update(['sales_movement_id' => $sale->id]);
                 }
 
-                // 3. Registrar Pago si se proporciono caja
-                if (!empty($data['cash_register_id']) && !empty($data['payment_method_id'])) {
-                    $this->registerMassivePayment($sale, $data['cash_register_id'], $data['payment_method_id'], $branchId, $userId, $userName);
+                // 3. Registrar Pago o Cuenta por Cobrar
+                if ($paymentType === 'DEUDA') {
+                    $arpService->createFromSalesMovement($sale, session('company_id'));
+                } elseif (!empty($data['payment_methods']) && !empty($data['cash_register_id'])) {
+                    $this->registerMassiveMultiplePayments($sale, $data['cash_register_id'], $data['payment_methods'], $branchId, $userId, $userName);
                 }
             });
 
-            return back()->with('status', 'Venta masiva generada correctamente.');
+            return redirect()->route('workshop.assemblies.index')->with('status', 'Venta masiva generada correctamente.');
         } catch (\Exception $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
         }
     }
 
-    private function registerMassivePayment($sale, $cashRegisterId, $paymentMethodId, $branchId, $userId, $userName)
+    private function registerMassiveMultiplePayments($sale, $cashRegisterId, array $paymentMethodsData, $branchId, $userId, $userName)
     {
         $cashRegister = CashRegister::findOrFail($cashRegisterId);
-        $method = PaymentMethod::findOrFail($paymentMethodId);
-        
         $shift = Shift::where('branch_id', $branchId)->orderBy('id')->first();
         if (!$shift) {
             throw new \RuntimeException('No hay un turno/shift configurado para esta sucursal.');
@@ -567,8 +690,13 @@ class WorkshopAssemblyController extends Controller
             })
             ->value('id') ?: 1;
 
+        $totalProvided = collect($paymentMethodsData)->sum('amount');
+        if ($totalProvided < $sale->total) {
+            throw new \RuntimeException("El monto proporcionado (S/ {$totalProvided}) no cubre el total de la venta (S/ {$sale->total}).");
+        }
+
         $cashMovementEntity = Movement::create([
-            'number' => $this->generateMovementNumber($branchId, 9),
+            'number' => $this->generateMovementNumber($branchId, 9), // Ticket/Recibo de Caja
             'moved_at' => now(),
             'user_id' => $userId,
             'user_name' => $userName,
@@ -588,7 +716,7 @@ class WorkshopAssemblyController extends Controller
             'payment_concept_id' => $paymentConceptId,
             'currency' => 'PEN',
             'exchange_rate' => 1,
-            'total' => $sale->total,
+            'total' => $totalProvided,
             'cash_register_id' => $cashRegisterId,
             'cash_register' => $cashRegister->number,
             'shift_id' => $shift->id,
@@ -601,18 +729,26 @@ class WorkshopAssemblyController extends Controller
             'branch_id' => $branchId,
         ]);
 
-        CashMovementDetail::create([
-            'cash_movement_id' => $cashMovement->id,
-            'type' => 'PAGADO',
-            'paid_at' => now(),
-            'payment_method_id' => $paymentMethodId,
-            'payment_method' => $method->description,
-            'number' => $cashMovementEntity->number,
-            'amount' => $sale->total,
-            'comment' => 'Pago de venta masiva armados',
-            'status' => 'A',
-            'branch_id' => $branchId,
-        ]);
+        foreach ($paymentMethodsData as $pmData) {
+            $method = PaymentMethod::findOrFail($pmData['payment_method_id']);
+            
+            CashMovementDetail::create([
+                'cash_movement_id' => $cashMovement->id,
+                'type' => 'PAGADO',
+                'paid_at' => now(),
+                'payment_method_id' => $method->id,
+                'payment_method' => $method->description,
+                'number' => $cashMovementEntity->number,
+                'amount' => $pmData['amount'],
+                'reference' => $pmData['reference'] ?? null,
+                'card_id' => $pmData['card_id'] ?? null,
+                'digital_wallet_id' => $pmData['digital_wallet_id'] ?? null,
+                'payment_gateway_id' => $pmData['payment_gateway_id'] ?? null,
+                'comment' => 'Múltiples métodos de pago - Armados',
+                'status' => 'A',
+                'branch_id' => $branchId,
+            ]);
+        }
     }
 
     private function generateMovementNumber(int $branchId, int $documentTypeId): string
