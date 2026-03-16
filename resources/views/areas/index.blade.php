@@ -77,13 +77,14 @@
                         <input type="hidden" name="view_id" value="{{ $viewId }}">
                     @endif
                     <div class="w-36 flex-none">
-                        <select name="per_page"
-                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                            onchange="this.form.submit()">
-                            @foreach ([10, 20, 50, 100] as $size)
-                                <option value="{{ $size }}" @selected(($perPage ?? 10) == $size)>{{ $size }} / página</option>
-                            @endforeach
-                        </select>
+                        <x-form.select-autocomplete
+                            name="per_page"
+                            :value="$perPage ?? 10"
+                            :options="collect([10, 20, 50, 100])->map(fn($n) => ['value' => $n, 'label' => $n . ' / página'])->values()->all()"
+                            placeholder="Por página"
+                            :submit-on-change="true"
+                            inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        />
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="relative">

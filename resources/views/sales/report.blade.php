@@ -21,14 +21,14 @@
                                 dateFormat="Y-m-d" />
                         </div>
                         <div>
-                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Tipo de documento</label>
-                            <select name="document_type_id"
-                                class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
-                                <option value="">Todos</option>
-                                @foreach ($documentTypes ?? [] as $dt)
-                                    <option value="{{ $dt->id }}" @selected(($documentTypeId ?? '') == $dt->id)>{{ $dt->name }}</option>
-                                @endforeach
-                            </select>
+                            <x-form.select-autocomplete
+                                name="document_type_id"
+                                :value="$documentTypeId ?? ''"
+                                :options="collect($documentTypes ?? [])->map(fn($dt) => ['value' => $dt->id, 'label' => $dt->name])->prepend(['value' => '', 'label' => 'Todos'])->values()->all()"
+                                placeholder="Todos"
+                                label="Tipo de documento"
+                                inputClass="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                            />
                         </div>
                     </div>
                     <div class="mt-5 flex items-end gap-2">

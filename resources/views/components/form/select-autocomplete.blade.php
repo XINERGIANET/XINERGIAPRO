@@ -7,6 +7,7 @@
     'class' => '',
     'inputClass' => '',
     'submitOnChange' => false,
+    'required' => false,
 ])
 
 @php
@@ -51,7 +52,7 @@
     @if($label)
         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">{{ $label }}</label>
     @endif
-    <select x-ref="hiddenSelect" name="{{ $name }}" class="sr-only" aria-hidden="true" tabindex="-1">
+    <select x-ref="hiddenSelect" name="{{ $name }}" class="sr-only" aria-hidden="true" tabindex="-1" @if($required) required @endif>
         @foreach($options as $opt)
             <option value="{{ $opt['value'] }}" @selected($value === (string) $opt['value'])>{{ $opt['label'] }}</option>
         @endforeach

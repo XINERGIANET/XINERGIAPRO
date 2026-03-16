@@ -13,12 +13,14 @@
 
             {{-- Selector de Registros --}}
             <div class="w-32 flex-none">
-                <select name="per_page" class="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none transition-all" onchange="this.form.submit()">
-                    <option value="10" @selected(($perPage ?? 10) == 10)>10 / página</option>
-                    <option value="25" @selected(($perPage ?? 10) == 25)>25 / página</option>
-                    <option value="50" @selected(($perPage ?? 10) == 50)>50 / página</option>
-                    <option value="100" @selected(($perPage ?? 10) == 100)>100 / página</option>
-                </select>
+                <x-form.select-autocomplete
+                    name="per_page"
+                    :value="$perPage ?? 10"
+                    :options="collect([10, 25, 50, 100])->map(fn($n) => ['value' => $n, 'label' => $n . ' / página'])->values()->all()"
+                    placeholder="Por página"
+                    :submit-on-change="true"
+                    inputClass="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none transition-all"
+                />
             </div>
 
             {{-- Buscador Principal --}}
@@ -291,10 +293,14 @@
                     </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Tipo de Servicio</label>
-                        <select name="type" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" required>
-                            <option value="preventivo" @selected($service->type === 'preventivo')>Preventivo</option>
-                            <option value="correctivo" @selected($service->type === 'correctivo')>Correctivo</option>
-                        </select>
+                        <x-form.select-autocomplete
+                            name="type"
+                            :value="$service->type"
+                            :options="[['value' => 'preventivo', 'label' => 'Preventivo'], ['value' => 'correctivo', 'label' => 'Correctivo']]"
+                            placeholder="Tipo"
+                            :required="true"
+                            inputClass="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none"
+                        />
                     </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Precio Base / sin cilindrada (S/)</label>
@@ -306,10 +312,14 @@
                     </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Estado</label>
-                        <select name="active" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" required>
-                            <option value="1" @selected((int)$service->active === 1)>Activo</option>
-                            <option value="0" @selected((int)$service->active === 0)>Inactivo</option>
-                        </select>
+                        <x-form.select-autocomplete
+                            name="active"
+                            :value="(int)$service->active"
+                            :options="[['value' => 1, 'label' => 'Activo'], ['value' => 0, 'label' => 'Inactivo']]"
+                            placeholder="Estado"
+                            :required="true"
+                            inputClass="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none"
+                        />
                     </div>
                     <div class="md:col-span-3 rounded-2xl border border-gray-200 bg-gray-50/60 p-4">
                         <div class="mb-3 flex items-center justify-between gap-3">

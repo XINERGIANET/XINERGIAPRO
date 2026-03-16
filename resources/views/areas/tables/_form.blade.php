@@ -24,25 +24,25 @@
     </div>
 
     <div>
-        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Estado</label>
-        <select
+        <x-form.select-autocomplete
             name="status"
-            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-        >
-            <option value="1" @selected(old('status', $table->status ?? 1) == 1)>Activo</option>
-            <option value="0" @selected(old('status', $table->status ?? 1) == 0)>Inactivo</option>
-        </select>
+            :value="old('status', $table->status ?? 1)"
+            :options="[['value' => 1, 'label' => 'Activo'], ['value' => 0, 'label' => 'Inactivo']]"
+            placeholder="Estado"
+            label="Estado"
+            inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+        />
     </div>
 
     <div>
-        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Situacion</label>
-        <select
+        <x-form.select-autocomplete
             name="situation"
-            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-        >
-            <option value="libre" @selected(old('situation', $table->situation ?? 'libre') === 'libre')>Libre</option>
-            <option value="ocupada" @selected(old('situation', $table->situation ?? 'libre') === 'ocupada')>Ocupada</option>
-        </select>
+            :value="old('situation', $table->situation ?? 'libre')"
+            :options="[['value' => 'libre', 'label' => 'Libre'], ['value' => 'ocupada', 'label' => 'Ocupada']]"
+            placeholder="Situacion"
+            label="Situacion"
+            inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+        />
     </div>
 
     <div>

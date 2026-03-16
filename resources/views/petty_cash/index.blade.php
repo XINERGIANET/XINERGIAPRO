@@ -173,16 +173,15 @@
                     @endif
                     <div class="w-36 flex-none">
                         <label class="mb-1.5 block text-xs font-medium text-gray-500 sm:hidden">Por página</label>
-                         <select
-                             name="per_page"
-                             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                             onchange="this.form.submit()"
-                         >
-                             @foreach ([10, 20, 50, 100] as $size)
-                                 <option value="{{ $size }}" @selected(($perPage ?? 10) == $size)>{{ $size }} / página</option>
-                             @endforeach
-                         </select>
-                     </div>
+                        <x-form.select-autocomplete
+                            name="per_page"
+                            :value="$perPage ?? 10"
+                            :options="collect([10, 20, 50, 100])->map(fn($n) => ['value' => $n, 'label' => $n . ' / página'])->values()->all()"
+                            placeholder="Por página"
+                            :submit-on-change="true"
+                            inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        />
+                    </div>
                     <div class="relative flex-1">
                         <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                             {!! $SearchIcon !!}
@@ -192,49 +191,57 @@
                             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-10 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
                     </div>
 
-                    <div class="relative flex w-full sm:w-auto min-w-0 sm:min-w-[200px]">
-                        <select name="cash_register_id"
-                            onchange="
-                                const nextUrl = new URL('{{ url('/caja/caja-chica') }}/' + this.value, window.location.origin);
-                                @if ($viewId)
-                                    nextUrl.searchParams.set('view_id', '{{ $viewId }}');
-                                @endif
-                                window.location.href = nextUrl.toString();
-                            "
-                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
-                            @if (isset($cashRegisters))
-                                @foreach ($cashRegisters as $register)
-                                    <option value="{{ $register->id }}"
-                                        {{ $selectedBoxId == $register->id ? 'selected' : '' }}>
-                                        {{ $register->number }}
-                                    </option>
-                                @endforeach
-                            @endif
-                        </select>
+                    <div class="relative flex w-full sm:w-auto min-w-0 sm:min-w-[200px]" x-data="{
+                        init() {
+                            this.$nextTick(() => {
+                                const sel = this.$el.querySelector('select[name=cash_register_id]');
+                                if (sel) sel.addEventListener('change', () => {
+                                    const base = '{{ url('/caja/caja-chica') }}/';
+                                    const viewId = '{{ $viewId ?? '' }}';
+                                    let u = base + sel.value;
+                                    if (viewId) u += '?view_id=' + viewId;
+                                    window.location = u;
+                                });
+                            });
+                        }
+                    }">
+                        <label class="mb-1.5 block text-xs font-medium text-gray-500 sm:hidden">Caja</label>
+                        <x-form.select-autocomplete
+                            name="cash_register_id"
+                            :value="$selectedBoxId"
+                            :options="collect($cashRegisters ?? [])->map(fn($r) => ['value' => $r->id, 'label' => $r->number])->values()->all()"
+                            placeholder="Caja"
+                            :submit-on-change="false"
+                            inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        />
                     </div>
 
+                    @php
+                        $pettyShiftOptions = collect([['value' => 'all', 'label' => 'Todos']]);
+                        foreach ($shiftRelations ?? [] as $rel) {
+                            $boxNum = $rel->cashMovementStart->cashRegister->number ?? '';
+                            $shiftName = $rel->cashMovementStart->shift->name ?? 'Turno';
+                            $started = $rel->started_at ? \Carbon\Carbon::parse($rel->started_at)->format('Y-m-d H:i:s') : '';
+                            $ended = $rel->ended_at ? \Carbon\Carbon::parse($rel->ended_at)->format('Y-m-d H:i:s') : '';
+                            $label = $boxNum ? "{$boxNum} - {$shiftName} | {$started}" : "{$shiftName} | {$started}";
+                            if ($rel->status === '1') {
+                                $label .= ' (En curso)';
+                            } elseif ($ended) {
+                                $label .= " - {$ended}";
+                            }
+                            $pettyShiftOptions->push(['value' => $rel->id, 'label' => $label]);
+                        }
+                    @endphp
                     <div class="relative flex w-full sm:w-auto min-w-0 sm:min-w-[340px]">
                         <label class="mb-1.5 block text-xs font-medium text-gray-500 sm:hidden">Turno</label>
-                        <select name="shift_relation_id"
-                            onchange="this.form.submit()"
-                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
-                            <option value="all" {{ $selectedShiftId === 'all' ? 'selected' : '' }}>Todos</option>
-                            @foreach ($shiftRelations ?? [] as $rel)
-                                @php
-                                    $boxNum = $rel->cashMovementStart->cashRegister->number ?? '';
-                                    $shiftName = $rel->cashMovementStart->shift->name ?? 'Turno';
-                                    $started = $rel->started_at ? \Carbon\Carbon::parse($rel->started_at)->format('Y-m-d H:i:s') : '';
-                                    $ended = $rel->ended_at ? \Carbon\Carbon::parse($rel->ended_at)->format('Y-m-d H:i:s') : '';
-                                    $label = $boxNum ? "{$boxNum} - {$shiftName} | {$started}" : "{$shiftName} | {$started}";
-                                    if ($rel->status === '1') {
-                                        $label .= ' (En curso)';
-                                    } elseif ($ended) {
-                                        $label .= " - {$ended}";
-                                    }
-                                @endphp
-                                <option value="{{ $rel->id }}" {{ $selectedShiftId === $rel->id ? 'selected' : '' }}>{{ $label }}</option>
-                            @endforeach
-                        </select>
+                        <x-form.select-autocomplete
+                            name="shift_relation_id"
+                            :value="$selectedShiftId"
+                            :options="$pettyShiftOptions->values()->all()"
+                            placeholder="Todos"
+                            :submit-on-change="true"
+                            inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        />
                     </div>
 
                     <div class="flex shrink-0 items-center gap-2">

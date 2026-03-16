@@ -205,12 +205,13 @@
                 <form method="POST" action="{{ route('workshop.orders.warranty.store', $order) }}" class="rounded-xl border border-gray-200 bg-white p-4">
                     @csrf
                     <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-700">Registrar Garantia</h3>
-                    <select name="workshop_movement_detail_id" class="mb-2 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
-                        <option value="">Toda la OS</option>
-                        @foreach($order->details as $detail)
-                            <option value="{{ $detail->id }}">{{ $detail->line_type }} - {{ $detail->description }}</option>
-                        @endforeach
-                    </select>
+                    <x-form.select-autocomplete
+                        name="workshop_movement_detail_id"
+                        :value="''"
+                        :options="collect($order->details ?? [])->map(fn($d) => ['value' => $d->id, 'label' => $d->line_type . ' - ' . $d->description])->prepend(['value' => '', 'label' => 'Toda la OS'])->values()->all()"
+                        placeholder="Toda la OS"
+                        inputClass="mb-2 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                    />
                     <input type="number" min="1" max="3650" name="days" class="mb-2 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" value="30" required>
                     <input name="note" class="mb-2 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nota de garantia">
                     <button class="rounded-lg bg-indigo-700 px-3 py-2 text-xs font-semibold text-white">Registrar garantia</button>
@@ -219,18 +220,22 @@
                 <form method="POST" action="{{ route('workshop.orders.payment.refund', $order) }}" class="rounded-xl border border-gray-200 bg-white p-4">
                     @csrf
                     <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-700">Registrar Devolucion</h3>
-                    <select name="cash_register_id" class="mb-2 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
-                        <option value="">Caja</option>
-                        @foreach($cashRegisters as $cashRegister)
-                            <option value="{{ $cashRegister->id }}">{{ $cashRegister->number }}</option>
-                        @endforeach
-                    </select>
-                    <select name="payment_method_id" class="mb-2 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
-                        <option value="">Metodo</option>
-                        @foreach($paymentMethods as $method)
-                            <option value="{{ $method->id }}">{{ $method->description }}</option>
-                        @endforeach
-                    </select>
+                    <x-form.select-autocomplete
+                        name="cash_register_id"
+                        :value="''"
+                        :options="collect($cashRegisters ?? [])->map(fn($c) => ['value' => $c->id, 'label' => $c->number])->prepend(['value' => '', 'label' => 'Caja'])->values()->all()"
+                        placeholder="Caja"
+                        :required="true"
+                        inputClass="mb-2 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                    />
+                    <x-form.select-autocomplete
+                        name="payment_method_id"
+                        :value="''"
+                        :options="collect($paymentMethods ?? [])->map(fn($m) => ['value' => $m->id, 'label' => $m->description])->prepend(['value' => '', 'label' => 'Metodo'])->values()->all()"
+                        placeholder="Metodo"
+                        :required="true"
+                        inputClass="mb-2 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                    />
                     <input type="number" step="0.01" min="0.01" name="amount" class="mb-2 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Monto" required>
                     <input name="reason" class="mb-2 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Motivo" required>
                     <button class="rounded-lg bg-rose-700 px-3 py-2 text-xs font-semibold text-white">Registrar devolucion</button>
@@ -258,12 +263,13 @@
                 @csrf
                 <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-700">Checklist Rapido</h3>
                 <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
-                    <select name="type" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
-                        <option value="OS_INTAKE">OS_INTAKE</option>
-                        <option value="GP_ACTIVATION">GP_ACTIVATION</option>
-                        <option value="PDI">PDI</option>
-                        <option value="MAINTENANCE">MAINTENANCE</option>
-                    </select>
+                    <x-form.select-autocomplete
+                        name="type"
+                        :value="'OS_INTAKE'"
+                        :options="[['value' => 'OS_INTAKE', 'label' => 'OS_INTAKE'], ['value' => 'GP_ACTIVATION', 'label' => 'GP_ACTIVATION'], ['value' => 'PDI', 'label' => 'PDI'], ['value' => 'MAINTENANCE', 'label' => 'MAINTENANCE']]"
+                        placeholder="Tipo"
+                        inputClass="h-11 rounded-lg border border-gray-300 px-3 text-sm"
+                    />
                     <input name="items[0][group]" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Grupo">
                     <input name="items[0][label]" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Item" required>
                     <input name="items[0][result]" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Resultado">

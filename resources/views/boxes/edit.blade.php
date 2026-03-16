@@ -110,17 +110,13 @@
                                     <polyline points="22 4 12 14.01 9 11.01"></polyline>
                                 </svg>
                             </span>
-                            <select
+                            <x-form.select-autocomplete
                                 name="status"
-                                class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-[62px] text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                            >
-                                <option value="1" {{ old('status', $box->status) == 1 ? 'selected' : '' }}>
-                                    Activo
-                                </option>
-                                <option value="0" {{ old('status', $box->status) == 0 ? 'selected' : '' }}>
-                                    Inactivo
-                                </option>
-                            </select>
+                                :value="old('status', $box->status)"
+                                :options="[['value' => '1', 'label' => 'Activo'], ['value' => '0', 'label' => 'Inactivo']]"
+                                placeholder="Estado"
+                                inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-[62px] text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                            />
                         </div>
                         @error('status') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
                     </div>

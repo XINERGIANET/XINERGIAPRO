@@ -109,15 +109,14 @@
                         <input type="hidden" name="view_id" value="{{ $viewId }}">
                     @endif
                     <div class="w-36 flex-none">
-                        <select
+                        <x-form.select-autocomplete
                             name="per_page"
-                            class="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800"
-                            onchange="this.form.submit()"
-                        >
-                            @foreach ([10, 20, 50, 100] as $size)
-                                <option value="{{ $size }}" @selected($perPage == $size)>{{ $size }} / página</option>
-                            @endforeach
-                        </select>
+                            :value="$perPage"
+                            :options="collect([10, 20, 50, 100])->map(fn($n) => ['value' => $n, 'label' => $n . ' / página'])->values()->all()"
+                            placeholder="Por página"
+                            :submit-on-change="true"
+                            inputClass="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800"
+                        />
                     </div>
                     <div class="relative flex-1">
                         <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
@@ -132,15 +131,13 @@
                         />
                     </div>
                     <div class="w-full sm:w-44 sm:flex-none">
-                        <select
+                        <x-form.select-autocomplete
                             name="status"
-                            class="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800"
-                        >
-                            <option value="all" @selected(($statusFilter ?? 'ALL') === 'ALL')>Todos los estados</option>
-                            <option value="NUEVO" @selected(($statusFilter ?? 'ALL') === 'NUEVO')>Nuevo</option>
-                            <option value="PAGANDO" @selected(($statusFilter ?? 'ALL') === 'PAGANDO')>Pagando</option>
-                            <option value="PAGADO" @selected(($statusFilter ?? 'ALL') === 'PAGADO')>Pagado</option>
-                        </select>
+                            :value="in_array($statusFilter ?? 'ALL', ['ALL', 'all']) ? 'all' : ($statusFilter ?? 'all')"
+                            :options="[['value' => 'all', 'label' => 'Todos los estados'], ['value' => 'NUEVO', 'label' => 'Nuevo'], ['value' => 'PAGANDO', 'label' => 'Pagando'], ['value' => 'PAGADO', 'label' => 'Pagado']]"
+                            placeholder="Todos los estados"
+                            inputClass="h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800"
+                        />
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <x-ui.button size="md" variant="primary" type="submit" class="h-11 px-6" style="background-color: #334155; border-color: #334155;">

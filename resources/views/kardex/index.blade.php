@@ -85,14 +85,14 @@
                     />
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Situación</label>
-                    <select name="situation"
-                        class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
-                        <option value="all" @selected($situation === 'all')>Todos</option>
-                        <option value="E" @selected($situation === 'E')>Activado</option>
-                        <option value="I" @selected($situation === 'I')>Inactivo</option>
-                        <option value="A" @selected($situation === 'A')>Anulado</option>
-                    </select>
+                    <x-form.select-autocomplete
+                        name="situation"
+                        :value="$situation"
+                        :options="[['value' => 'all', 'label' => 'Todos'], ['value' => 'E', 'label' => 'Activado'], ['value' => 'I', 'label' => 'Inactivo'], ['value' => 'A', 'label' => 'Anulado']]"
+                        placeholder="Todos"
+                        label="Situación"
+                        inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                    />
                 </div>
                 <div class="flex flex-wrap items-end justify-end gap-2">
                     <x-ui.button type="submit" size="md" variant="primary" class="h-11 px-6" style="background-color: #334155; border-color: #334155;">

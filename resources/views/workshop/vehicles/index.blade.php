@@ -16,12 +16,14 @@
         <form method="GET" action="{{ route('workshop.vehicles.index') }}" class="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-white/[0.02]">
             {{-- Selector de Registros --}}
             <div class="flex items-center gap-2">
-                <select name="per_page" class="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500" onchange="this.form.submit()">
-                    <option value="10" @selected(($per_page ?? 10) == 10)>10 / pág</option>
-                    <option value="25" @selected(($per_page ?? 10) == 25)>25 / pág</option>
-                    <option value="50" @selected(($per_page ?? 10) == 50)>50 / pág</option>
-                    <option value="100" @selected(($per_page ?? 10) == 100)>100 / pág</option>
-                </select>
+                <x-form.select-autocomplete
+                    name="per_page"
+                    :value="$per_page ?? 10"
+                    :options="collect([10, 25, 50, 100])->map(fn($n) => ['value' => $n, 'label' => $n . ' / pág'])->values()->all()"
+                    placeholder="Por página"
+                    :submit-on-change="true"
+                    inputClass="h-11 rounded-xl border border-gray-200 bg-white px-4 text-sm font-medium text-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                />
             </div>
 
             {{-- Buscador Principal --}}
@@ -173,22 +175,25 @@
                 @csrf
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Cliente</label>
-                    <select name="client_person_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
-                        <option value="">Seleccione cliente</option>
-                        @foreach($clients as $client)
-                            <option value="{{ $client->id }}">{{ $client->first_name }} {{ $client->last_name }}</option>
-                        @endforeach
-                    </select>
+                    <x-form.select-autocomplete
+                        name="client_person_id"
+                        :value="old('client_person_id', '')"
+                        :options="collect($clients ?? [])->map(fn($c) => ['value' => $c->id, 'label' => trim($c->first_name . ' ' . $c->last_name)])->prepend(['value' => '', 'label' => 'Seleccione cliente'])->values()->all()"
+                        placeholder="Seleccione cliente"
+                        :required="true"
+                        inputClass="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                    />
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Tipo de vehiculo</label>
-                    <select name="vehicle_type_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
-                        @foreach($vehicleTypes as $vehicleType)
-                            <option value="{{ $vehicleType->id }}" @selected((int) old('vehicle_type_id', optional($vehicleTypes->firstWhere('name', 'moto lineal'))->id) === (int) $vehicleType->id)>
-                                {{ ucfirst($vehicleType->name) }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <x-form.select-autocomplete
+                        name="vehicle_type_id"
+                        :value="old('vehicle_type_id', optional($vehicleTypes->firstWhere('name', 'moto lineal'))->id ?? '')"
+                        :options="collect($vehicleTypes ?? [])->map(fn($v) => ['value' => $v->id, 'label' => ucfirst($v->name)])->values()->all()"
+                        placeholder="Tipo"
+                        :required="true"
+                        inputClass="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                    />
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Marca</label>
@@ -257,21 +262,25 @@
                     @method('PUT')
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">Cliente</label>
-                        <select name="client_person_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
-                            @foreach($clients as $client)
-                                <option value="{{ $client->id }}" @selected((int)$vehicle->client_person_id === (int)$client->id)>{{ $client->first_name }} {{ $client->last_name }}</option>
-                            @endforeach
-                        </select>
+                        <x-form.select-autocomplete
+                            name="client_person_id"
+                            :value="$vehicle->client_person_id"
+                            :options="collect($clients ?? [])->map(fn($c) => ['value' => $c->id, 'label' => trim($c->first_name . ' ' . $c->last_name)])->values()->all()"
+                            placeholder="Cliente"
+                            :required="true"
+                            inputClass="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                        />
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">Tipo de vehiculo</label>
-                        <select name="vehicle_type_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
-                            @foreach($vehicleTypes as $vehicleType)
-                                <option value="{{ $vehicleType->id }}" @selected((int) old('vehicle_type_id', $vehicle->vehicle_type_id) === (int) $vehicleType->id)>
-                                    {{ ucfirst($vehicleType->name) }}
-                                </option>
-                            @endforeach
-                        </select>
+                        <x-form.select-autocomplete
+                            name="vehicle_type_id"
+                            :value="old('vehicle_type_id', $vehicle->vehicle_type_id)"
+                            :options="collect($vehicleTypes ?? [])->map(fn($v) => ['value' => $v->id, 'label' => ucfirst($v->name)])->values()->all()"
+                            placeholder="Tipo"
+                            :required="true"
+                            inputClass="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                        />
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">Marca</label>

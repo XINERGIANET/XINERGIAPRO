@@ -251,38 +251,42 @@
                     </div>
                     <div class="w-full sm:w-40 sm:flex-none">
                         <label class="mb-1.5 block text-xs font-medium text-gray-500 sm:hidden">Caja</label>
-                        <select name="cash_register_id"
-                            onchange="this.form.submit()"
-                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
-                            <option value="">Todas</option>
-                            @foreach ($cashRegisters ?? [] as $reg)
-                                <option value="{{ $reg->id }}" {{ ($selectedBoxId ?? '') == $reg->id ? 'selected' : '' }}>{{ $reg->number }}</option>
-                            @endforeach
-                        </select>
+                        <x-form.select-autocomplete
+                            name="cash_register_id"
+                            :value="$selectedBoxId ?? ''"
+                            :options="collect([['value' => '', 'label' => 'Todas']])->merge(collect($cashRegisters ?? [])->map(fn($reg) => ['value' => $reg->id, 'label' => $reg->number]))->values()->all()"
+                            placeholder="Todas"
+                            :submit-on-change="true"
+                            inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        />
                     </div>
                     @if (($selectedBoxId ?? null) && ($shiftRelations ?? collect())->isNotEmpty())
+                        @php
+                            $shiftOptions = collect([['value' => 'all', 'label' => 'Todos']]);
+                            foreach ($shiftRelations as $rel) {
+                                $boxNum = $rel->cashMovementStart->cashRegister->number ?? '';
+                                $shiftName = $rel->cashMovementStart->shift->name ?? 'Turno';
+                                $started = $rel->started_at ? \Carbon\Carbon::parse($rel->started_at)->format('Y-m-d H:i:s') : '';
+                                $ended = $rel->ended_at ? \Carbon\Carbon::parse($rel->ended_at)->format('Y-m-d H:i:s') : '';
+                                $label = $boxNum ? " {$shiftName} | {$started}" : "{$shiftName} | {$started}";
+                                if ($rel->status === '1') {
+                                    $label .= ' (En curso)';
+                                } elseif ($ended) {
+                                    $label .= " - {$ended}";
+                                }
+                                $shiftOptions->push(['value' => $rel->id, 'label' => $label]);
+                            }
+                        @endphp
                         <div class="w-full min-w-0 flex-1 sm:min-w-[320px]">
                             <label class="mb-1.5 block text-xs font-medium text-gray-500 sm:hidden">Turno</label>
-                            <select name="shift_relation_id"
-                                onchange="this.form.submit()"
-                                class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
-                                <option value="all" {{ ($selectedShiftId ?? 'all') === 'all' ? 'selected' : '' }}>Todos</option>
-                                @foreach ($shiftRelations as $rel)
-                                    @php
-                                        $boxNum = $rel->cashMovementStart->cashRegister->number ?? '';
-                                        $shiftName = $rel->cashMovementStart->shift->name ?? 'Turno';
-                                        $started = $rel->started_at ? \Carbon\Carbon::parse($rel->started_at)->format('Y-m-d H:i:s') : '';
-                                        $ended = $rel->ended_at ? \Carbon\Carbon::parse($rel->ended_at)->format('Y-m-d H:i:s') : '';
-                                        $label = $boxNum ? " {$shiftName} | {$started}" : "{$shiftName} | {$started}";
-                                        if ($rel->status === '1') {
-                                            $label .= ' (En curso)';
-                                        } elseif ($ended) {
-                                            $label .= " - {$ended}";
-                                        }
-                                    @endphp
-                                    <option value="{{ $rel->id }}" {{ ($selectedShiftId ?? 'all') === $rel->id ? 'selected' : '' }}>{{ $label }}</option>
-                                @endforeach
-                            </select>
+                            <x-form.select-autocomplete
+                                name="shift_relation_id"
+                                :value="$selectedShiftId ?? 'all'"
+                                :options="$shiftOptions->values()->all()"
+                                placeholder="Todos"
+                                :submit-on-change="true"
+                                inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                            />
                         </div>
                     @endif
                     <div class="flex w-full flex-wrap items-center justify-between gap-2">
