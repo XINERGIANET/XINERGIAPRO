@@ -89,7 +89,7 @@ class KardexSyncService
                     ->where('product_id', (int) $detail->product_id)
                     ->first();
 
-                $unitPrice = (float) ($productBranch?->avg_cost ?? $productBranch?->price ?? 0);
+                $unitPrice = (float) ($productBranch?->avg_cost ?? $productBranch?->price ?? $productBranch?->purchase_price ?? 0);
                 $signedQuantity = $isEntry ? $quantity : -$quantity;
 
                 $this->createEntry($movement, [

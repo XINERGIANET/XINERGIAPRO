@@ -69,6 +69,7 @@
         .w-date { width: 8%; }
         .w-origin { width: 11%; }
         .w-state { width: 8%; }
+        .w-info { width: 10%; }
     </style>
 </head>
 <body>
@@ -94,6 +95,7 @@
                     <th class="w-date">Fecha</th>
                     <th class="w-origin">Origen</th>
                     <th class="w-state">Situación</th>
+                    <th class="w-info">Info. movimiento</th>
                 </tr>
             </thead>
             <tbody>
@@ -129,10 +131,16 @@
                         </td>
                         <td class="text-left">{{ $movement['origin'] ?? '-' }}</td>
                         <td class="text-center">{{ $situationLabel }}</td>
+                        <td class="text-left small">
+                            {{ $movement['number'] ?? '-' }}
+                            @if(!empty($movement['operation_label']))
+                                <br><span class="muted">({{ $movement['operation_label'] }})</span>
+                            @endif
+                        </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="12" class="text-center muted" style="padding: 16px 8px;">
+                        <td colspan="13" class="text-center muted" style="padding: 16px 8px;">
                             No hay movimientos para los filtros seleccionados.
                         </td>
                     </tr>

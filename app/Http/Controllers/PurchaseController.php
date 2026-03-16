@@ -52,7 +52,7 @@ class PurchaseController extends Controller
 
         $operaciones = $this->resolveOperations($viewId, $branchId);
 
-        $purchases = Movement::query()
+        $purchasesBaseQuery = Movement::query()
             ->with([
                 'person',
                 'movementType',
@@ -61,7 +61,7 @@ class PurchaseController extends Controller
                 'purchaseMovement.details.unit',
             ])
             ->where('movement_type_id', $movementType->id)
-            ->where('branch_id', $branchId)
+            ->where('movements.branch_id', $branchId)
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($inner) use ($search) {
                     $inner->where('number', 'ILIKE', "%{$search}%")
@@ -79,7 +79,13 @@ class PurchaseController extends Controller
                 $query->whereHas('purchaseMovement', function ($purchaseQuery) use ($paymentType) {
                     $purchaseQuery->where('payment_type', $paymentType);
                 });
-            })
+            });
+
+        $purchasesTotalAmount = (float) $purchasesBaseQuery->clone()
+            ->join('purchase_movements', 'purchase_movements.movement_id', '=', 'movements.id')
+            ->sum('purchase_movements.total');
+
+        $purchases = $purchasesBaseQuery
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
@@ -93,6 +99,7 @@ class PurchaseController extends Controller
             'perPage' => $perPage,
             'viewId' => $viewId,
             'operaciones' => $operaciones,
+            'purchasesTotalAmount' => $purchasesTotalAmount,
         ]);
     }
 

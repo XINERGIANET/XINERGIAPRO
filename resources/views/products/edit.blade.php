@@ -36,6 +36,7 @@
                     'currentBranch' => $currentBranch ?? null,
                     'taxRates' => $taxRates ?? collect(),
                     'productBranch' => $productBranch ?? null,
+                    'suppliers' => $suppliers ?? collect(),
                 ])
 
                 <div class="flex flex-wrap gap-3">

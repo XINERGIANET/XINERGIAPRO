@@ -80,6 +80,9 @@ class KardexController extends Controller
                 'unit',
                 'movement.movementType',
                 'movement.documentType',
+                'movement.warehouseMovement',
+                'movement.salesMovement',
+                'movement.purchaseMovement',
             ])
             ->when($branchId, fn ($query) => $query->where('sucursal_id', (int) $branchId))
             ->when(!$showAllProducts && $product, fn ($query) => $query->where('producto_id', (int) $product->id))
@@ -109,15 +112,32 @@ class KardexController extends Controller
             ->orderByDesc('fecha')
             ->orderByDesc('id')
             ->get()
-            ->map(function (Kardex $row) {
+            ->map(function (Kardex $row) use ($viewId) {
                 $movement = $row->movement;
                 $quantity = abs((float) $row->cantidad);
                 $unitPrice = $row->preciounitario !== null ? (float) $row->preciounitario : null;
+                $typeName = $movement?->documentType?->name ?? 'Movimiento';
+
+                $operationUrl = null;
+                $operationLabel = null;
+                if ($movement) {
+                    if ($movement->salesMovement) {
+                        $operationUrl = route('admin.sales.edit', array_merge([$movement->salesMovement->id], $viewId ? ['view_id' => $viewId] : []));
+                        $operationLabel = 'Ver venta';
+                    } elseif ($movement->purchaseMovement) {
+                        $operationUrl = route('admin.purchases.edit', array_merge([$movement->purchaseMovement->id], $viewId ? ['view_id' => $viewId] : []));
+                        $operationLabel = 'Ver compra';
+                    } elseif ($movement->warehouseMovement) {
+                        $operationUrl = route('warehouse_movements.show', array_merge(['warehouseMovement' => $movement->warehouseMovement->id], $viewId ? ['view_id' => $viewId] : []));
+                        $operationLabel = 'Ver movimiento';
+                    }
+                }
 
                 return [
+                    'id' => $row->id,
                     'date' => $row->fecha?->format('Y-m-d H:i:s'),
                     'number' => $movement?->number ?? '-',
-                    'type' => $movement?->documentType?->name ?? 'Movimiento',
+                    'type' => $typeName,
                     'entry' => (float) $row->cantidad > 0 ? (float) $row->cantidad : 0,
                     'exit' => (float) $row->cantidad < 0 ? abs((float) $row->cantidad) : 0,
                     'unit' => $row->unit?->description ?? $row->unit?->abbreviation ?? '-',
@@ -132,6 +152,8 @@ class KardexController extends Controller
                     'category' => $row->product?->category?->description ?? 'Sin categoria',
                     'situation' => (string) ($row->situacion ?? 'E'),
                     'total' => ($unitPrice ?? 0) * $quantity,
+                    'operation_url' => $operationUrl,
+                    'operation_label' => $operationLabel,
                 ];
             })
             ->values();

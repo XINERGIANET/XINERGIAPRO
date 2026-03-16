@@ -273,7 +273,8 @@
                     $discountAmount = round($netLineTotal * ($discountPct / 100), 6);
                 }
 
-                $unitValue = $qty > 0 ? ($netLineTotal / $qty) : 0;
+                $netLineTotalAfterDiscount = $netLineTotal - $discountAmount;
+                $unitValue = $qty > 0 ? ($netLineTotalAfterDiscount / $qty) : 0;
                 $unitPrice = $qty > 0 ? ($grossLineTotal / $qty) : 0;
             @endphp
             <tr>
@@ -284,7 +285,7 @@
                 <td class="num">S/ {{ number_format($unitValue, 3) }}</td>
                 <td class="num">S/ {{ number_format($unitPrice, 3) }}</td>
                 <td class="num">S/ {{ number_format($discountAmount, 2) }}</td>
-                <td class="num">S/ {{ number_format($netLineTotal, 2) }}</td>
+                <td class="num">S/ {{ number_format($netLineTotalAfterDiscount, 2) }}</td>
             </tr>
         @empty
             <tr>

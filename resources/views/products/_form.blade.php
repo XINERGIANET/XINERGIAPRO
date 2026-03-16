@@ -348,8 +348,14 @@
                     <option value="">Seleccione proveedor</option>
                     @if(isset($suppliers))
                         @foreach ($suppliers as $supplier)
+                            @php
+                                $supplierLabel = trim(($supplier->first_name ?? '') . ' ' . ($supplier->last_name ?? ''));
+                                if ($supplierLabel === '') {
+                                    $supplierLabel = $supplier->document_number ?? ('#' . $supplier->id);
+                                }
+                            @endphp
                             <option value="{{ $supplier->id }}" @selected(old('supplier_id', $productBranch->supplier_id ?? '') == $supplier->id)>
-                                {{ $supplier->description }}
+                                {{ $supplierLabel }}
                             </option>
                         @endforeach
                     @endif

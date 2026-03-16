@@ -79,12 +79,12 @@
 
         <x-common.component-card title="Listado de movimientos de almacén" desc="Gestiona los movimientos de almacén registrados en el sistema.">
             <div class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between mb-6">
-                <form method="GET" class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center min-w-0">
+                <form method="GET" class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-end min-w-0">
                     @if ($viewId)
                         <input type="hidden" name="view_id" value="{{ $viewId }}">
                     @endif
                     <div class="w-36 flex-none">
-                        <label class="mb-1.5 block text-xs font-medium text-gray-500 sm:hidden">Por página</label>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Por página</label>
                         <select name="per_page"
                             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                             onchange="this.form.submit()">
@@ -94,24 +94,49 @@
                             @endforeach
                         </select>
                     </div>
+                    <div class="flex-none min-w-[160px]">
+                        <x-form.date-picker
+                            id="wm-date-from"
+                            name="date_from"
+                            label="Fecha inicio"
+                            :defaultDate="$dateFrom ?? null"
+                            dateFormat="Y-m-d"
+                            :altInput="true"
+                            altFormat="d/m/Y"
+                            locale="es"
+                            placeholder="dd/mm/yyyy"
+                        />
+                    </div>
+                    <div class="flex-none min-w-[160px]">
+                        <x-form.date-picker
+                            id="wm-date-to"
+                            name="date_to"
+                            label="Fecha fin"
+                            :defaultDate="$dateTo ?? null"
+                            dateFormat="Y-m-d"
+                            :altInput="true"
+                            altFormat="d/m/Y"
+                            locale="es"
+                            placeholder="dd/mm/yyyy"
+                        />
+                    </div>
                     <div class="flex-1 min-w-0">
-                        <label class="mb-1.5 block text-xs font-medium text-gray-500 sm:hidden">Buscar</label>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Buscar</label>
                         <div class="relative">
                             <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
                                 <i class="ri-search-line"></i>
                             </span>
                             <input type="text" name="search" value="{{ $search }}"
-                                placeholder="Buscar por número, persona, usuario..."
+                                placeholder="Número, persona, usuario..."
                                 class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-11 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
                         </div>
                     </div>
-                    <div class="flex items-center gap-2 flex-none">
-                        <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 px-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #334155; border-color: #334155;">
+                    <div class="flex items-end gap-2 flex-none shrink-0">
+                        <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 min-h-[2.75rem] px-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #334155; border-color: #334155;">
                             <i class="ri-search-line text-gray-100"></i>
                             <span class="font-medium text-gray-100">Buscar</span>
                         </x-ui.button>
-
-                        <x-ui.link-button size="md" variant="outline" href="{{ route('warehouse_movements.index', $viewId ? ['view_id' => $viewId] : []) }}" class="flex-1 sm:flex-none h-11 px-4 border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200">
+                        <x-ui.link-button size="md" variant="outline" href="{{ route('warehouse_movements.index', $viewId ? ['view_id' => $viewId] : []) }}" class="flex-1 sm:flex-none h-11 min-h-[2.75rem] px-4 border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200">
                             <i class="ri-refresh-line"></i>
                             <span class="font-medium">Limpiar</span>
                         </x-ui.link-button>
@@ -152,11 +177,12 @@
                     </x-ui.link-button>
                 @endif
             </div>
-            <div class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+            <div x-data="{ openRow: null }" class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
                     <table class="w-full">
                         <thead style="background-color: #334155; color: #FFFFFF;">
                             <tr>
-                                <th style="background-color: #334155; color: #FFFFFF;" class="px-3 py-3 text-center first:rounded-tl-xl">
+                                <th style="background-color: #334155; color: #FFFFFF;" class="w-10 px-3 py-3 text-center first:rounded-tl-xl"></th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-3 py-3 text-center">
                                     <p class="font-bold text-gray-100 text-xs uppercase tracking-wider">Número</p>
                                 </th>
                                 <th class="px-3 py-3 text-center align-middle">
@@ -192,6 +218,14 @@
                                     $statusColor = $statusColors[$warehouseMovement->status] ?? 'info';
                                 @endphp
                                 <tr class="group/row transition hover:bg-gray-50/80 dark:hover:bg-white/5 relative hover:z-[60]">
+                                    <td class="px-3 py-3 align-middle text-center">
+                                        <button type="button"
+                                            @click="openRow === {{ $warehouseMovement->id }} ? openRow = null : openRow = {{ $warehouseMovement->id }}"
+                                            class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-white transition hover:bg-brand-600">
+                                            <i class="ri-add-line" x-show="openRow !== {{ $warehouseMovement->id }}"></i>
+                                            <i class="ri-subtract-line" x-show="openRow === {{ $warehouseMovement->id }}"></i>
+                                        </button>
+                                    </td>
                                     <td class="px-3 py-3 align-middle text-center">
                                         <div class="flex items-center justify-center gap-2">
                                             <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-500 dark:bg-brand-500/10 shrink-0">
@@ -335,9 +369,71 @@
                                         </div>
                                     </td>
                                 </tr>
+                                <tr x-show="openRow === {{ $warehouseMovement->id }}" x-cloak class="bg-gray-50/70 dark:bg-gray-800/40">
+                                    <td colspan="8" class="px-6 py-4">
+                                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6 w-full">
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Usuario</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $movement->user_name ?? '-' }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Responsable</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $movement->responsible_name ?? '-' }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Tipo mov.</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $movement->movementType?->description ?? '-' }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Doc.</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $movement->documentType?->name ?? '-' }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Sucursal</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $warehouseMovement->branch?->legal_name ?? '-' }}</p>
+                                            </div>
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Estado mov.</p>
+                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $movement->status ?? '-' }}</p>
+                                            </div>
+                                        </div>
+
+                                        <div class="mt-4 rounded-xl border border-gray-200 bg-white p-0 shadow-sm dark:border-gray-800 dark:bg-white/5 overflow-hidden">
+                                            <div class="bg-gray-50 px-4 py-2 border-b border-gray-200 dark:bg-gray-900/50 dark:border-gray-800">
+                                                <p class="text-sm font-bold text-gray-700 dark:text-gray-200">Detalle del movimiento</p>
+                                            </div>
+                                            <div class="overflow-x-auto">
+                                                <table class="w-full">
+                                                    <thead>
+                                                        <tr style="background-color: #334155;">
+                                                            <th class="px-4 py-2 text-left text-xs font-semibold uppercase text-white">Código</th>
+                                                            <th class="px-4 py-2 text-left text-xs font-semibold uppercase text-white">Descripción</th>
+                                                            <th class="px-4 py-2 text-left text-xs font-semibold uppercase text-white">Unidad</th>
+                                                            <th class="px-4 py-2 text-right text-xs font-semibold uppercase text-white">Cantidad</th>
+                                                            <th class="px-4 py-2 text-left text-xs font-semibold uppercase text-white">Comentario</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @forelse($warehouseMovement->details ?? [] as $detail)
+                                                            <tr class="border-b border-gray-100 last:border-0 dark:border-gray-800 hover:bg-gray-50/50 transition-colors">
+                                                                <td class="px-4 py-3 text-sm text-gray-800 dark:text-gray-200 font-medium">{{ $detail->product_snapshot['code'] ?? $detail->product?->code ?? '-' }}</td>
+                                                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{{ $detail->product_snapshot['description'] ?? $detail->product?->description ?? '-' }}</td>
+                                                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{{ $detail->unit?->description ?? '-' }}</td>
+                                                                <td class="px-4 py-3 text-sm text-right text-gray-800 dark:text-gray-200 font-medium">{{ number_format((float) $detail->quantity, 2) }}</td>
+                                                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{{ $detail->comment ?? '' }}</td>
+                                                            </tr>
+                                                        @empty
+                                                            <tr><td colspan="5" class="px-4 py-8 text-center text-sm text-gray-500">Sin detalle.</td></tr>
+                                                        @endforelse
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="px-6 py-16">
+                                    <td colspan="8" class="px-6 py-16">
                                         <div class="flex flex-col items-center gap-4 text-center">
                                             <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-50 text-gray-400 dark:bg-gray-800/50 dark:text-gray-600">
                                                 <i class="ri-archive-line text-3xl"></i>

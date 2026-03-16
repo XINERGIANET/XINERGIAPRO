@@ -49,41 +49,36 @@
         >
             <div class="flex items-start gap-6" style="display:flex;align-items:flex-start;gap:1.5rem;">
                 <section class="min-w-0 space-y-5" style="flex:0 0 60%;max-width:60%;width:60%;">
-                    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                            <div class="relative flex-1">
-                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-                                    <i class="ri-search-line text-lg"></i>
-                                </span>
-                                <input
-                                    id="product-search"
-                                    type="text"
-                                    placeholder="Buscar por codigo de barras, nombre o categoria"
-                                    class="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-12 pr-4 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
-                                >
+                    <div class="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                        <div class="mb-5 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                            <div>
+                                <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Catálogo</p>
+                                <h3 class="mt-1 text-lg font-bold text-slate-900">Productos</h3>
                             </div>
-                            <div class="flex flex-wrap gap-2">
-                                <a href="{{ $warehouseIndexUrl }}" class="inline-flex h-12 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                            <div class="flex flex-wrap items-center gap-3">
+                                <div id="category-filters" class="flex flex-wrap gap-3"></div>
+                                <a href="{{ $warehouseIndexUrl }}" class="inline-flex h-12 items-center gap-2 rounded-[22px] border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                                     <i class="ri-arrow-left-line"></i>
                                     <span>Volver</span>
                                 </a>
-                                <button type="button" id="clear-entry-button" class="inline-flex h-12 items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-5 text-sm font-semibold text-rose-700 hover:bg-rose-100">
+                                <button type="button" id="clear-entry-button" class="inline-flex h-12 items-center gap-2 rounded-[22px] border border-rose-200 bg-rose-50 px-5 text-sm font-semibold text-rose-700 hover:bg-rose-100">
                                     <i class="ri-delete-bin-6-line"></i>
                                     <span>Limpiar</span>
                                 </button>
                             </div>
                         </div>
-                    </div>
-
-                    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                            <div>
-                                <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Catálogo</p>
-                                <h3 class="mt-1 text-lg font-bold text-slate-900">Productos</h3>
-                            </div>
-                            <div id="category-filters" class="flex flex-wrap gap-2"></div>
+                        <div class="relative">
+                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-800">
+                                <i class="ri-search-line text-[22px]"></i>
+                            </span>
+                            <input
+                                id="product-search"
+                                type="text"
+                                placeholder="Buscar por codigo de barras, nombre o categoria"
+                                class="h-14 w-full rounded-[22px] border border-slate-200 bg-slate-50 pl-14 pr-4 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                            >
                         </div>
-                        <div id="products-grid" class="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4"></div>
+                        <div id="products-grid" class="mt-5 grid gap-4"></div>
                     </div>
                 </section>
 
@@ -180,8 +175,21 @@
             const products = Array.isArray(@json($productsMapped)) ? @json($productsMapped) : [];
             const branchId = Number(@json($branchId ?? 0)) || 0;
             const viewId = @json($viewId);
+            const editingMovement = @json($editingMovement ? ['id' => $editingMovement->id] : null);
+            const editingCartRaw = Array.isArray(@json($editingCart ?? [])) ? @json($editingCart ?? []) : [];
 
             const state = { selectedCategory: 'GENERAL', search: '', cart: [] };
+            if (editingMovement && editingCartRaw.length) {
+                state.cart = editingCartRaw.map((item) => ({
+                    id: Number(item.id),
+                    name: String(item.name || ''),
+                    code: String(item.code || ''),
+                    unit: String(item.unit || 'Unidad'),
+                    img: products.find((p) => Number(p.id) === Number(item.id))?.img ?? null,
+                    quantity: Number(item.quantity) || 1,
+                    unitCost: Number(item.unitCost) || 0,
+                }));
+            }
             const categoryFilters = document.getElementById('category-filters');
             const productsGrid = document.getElementById('products-grid');
             const cartContainer = document.getElementById('entry-cart-container');
@@ -251,7 +259,7 @@
                 categories().forEach((category) => {
                     const button = document.createElement('button');
                     button.type = 'button';
-                    button.className = 'inline-flex h-12 items-center justify-center rounded-2xl border px-5 text-sm font-bold transition-all duration-200';
+                    button.className = 'inline-flex h-12 items-center justify-center rounded-[22px] border px-6 text-sm font-bold transition';
                     const active = state.selectedCategory === category;
                     if (active) {
                         button.classList.add('border-transparent', 'text-white', 'shadow-theme-xs');
@@ -344,44 +352,58 @@
                 list.forEach((product) => {
                     const card = document.createElement('button');
                     card.type = 'button';
-                    card.className = 'group relative overflow-hidden border bg-white text-center transition-all duration-200 hover:-translate-y-1';
-                    card.style.borderRadius = '28px';
-                    card.style.borderColor = '#dbe3ef';
+                    card.className = 'group relative overflow-hidden border bg-white text-center transition-all duration-200';
+                    card.style.borderRadius = '30px';
+                    card.style.borderColor = '#e4e9f1';
                     card.style.borderWidth = '1px';
                     card.style.borderStyle = 'solid';
-                    card.style.boxShadow = '0 10px 24px rgba(15,23,42,.06)';
+                    card.style.backgroundColor = '#ffffff';
+                    card.style.boxShadow = '0 10px 24px rgba(15,23,42,.05)';
+                    card.style.height = '190px';
+                    card.style.minHeight = '190px';
                     card.addEventListener('mouseenter', () => {
                         card.style.transform = 'translateY(-4px)';
-                        card.style.borderColor = '#fdba74';
-                        card.style.boxShadow = '0 18px 34px rgba(249,115,22,.16)';
+                        card.style.borderColor = '#ffd1a4';
+                        card.style.boxShadow = '0 18px 34px rgba(249,115,22,.12)';
+                        card.style.backgroundColor = '#fffdfb';
                         const orb = card.querySelector('[data-role=product-orb]');
-                        if (orb) orb.style.transform = 'scale(1.04)';
+                        if (orb) {
+                            orb.style.transform = 'translateY(-1px) scale(1.03)';
+                            orb.style.boxShadow = '0 18px 30px rgba(249,115,22,.12), 0 8px 16px rgba(15,23,42,.06)';
+                        }
                     });
                     card.addEventListener('mouseleave', () => {
                         card.style.transform = '';
-                        card.style.borderColor = '#dbe3ef';
-                        card.style.boxShadow = '0 10px 24px rgba(15,23,42,.06)';
+                        card.style.borderColor = '#e4e9f1';
+                        card.style.boxShadow = '0 10px 24px rgba(15,23,42,.05)';
+                        card.style.backgroundColor = '#ffffff';
                         const orb = card.querySelector('[data-role=product-orb]');
-                        if (orb) orb.style.transform = '';
+                        if (orb) {
+                            orb.style.transform = '';
+                            orb.style.boxShadow = '0 12px 24px rgba(249,115,22,.08), 0 6px 14px rgba(15,23,42,.04)';
+                        }
                     });
                     card.addEventListener('click', () => addToCart(product.id));
 
                     const stock = Number(product.stock || 0);
                     const hasImage = !!product.img;
+                    const stockBadgeClass = stock > 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-orange-200 bg-orange-50 text-orange-600';
 
                     card.innerHTML = `
-                        <div class="relative px-3 pt-3">
-                            <div class="absolute right-2 top-[2.9rem] z-20 inline-flex min-w-[72px] items-center justify-center rounded-full border px-2.5 py-1 text-[11px] font-bold leading-none ${stock > 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-orange-200 bg-orange-50 text-orange-700'}" style="box-shadow:0 6px 14px rgba(15,23,42,.08);">
+                        <div class="relative flex h-full w-full flex-col items-center px-3 pb-4 pt-4">
+                            <div class="absolute right-3 top-4 z-20 inline-flex min-w-[78px] items-center justify-center rounded-full border ${stockBadgeClass} px-3 py-1.5 text-center text-[12px] font-bold leading-none" style="box-shadow:0 6px 14px rgba(15,23,42,.08);">
                                 Stock: ${stock.toFixed(0)}
                             </div>
-                            <div data-role="product-orb" class="mx-auto mt-2 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-gradient-to-b from-orange-400 to-orange-500 transition-transform duration-200" style="box-shadow:0 12px 24px rgba(249,115,22,.18);">
-                                ${hasImage
-                                    ? `<img src="${getImageUrl(product.img)}" alt="${product.name || 'Producto'}" class="h-14 w-14 object-cover" onerror="this.onerror=null; this.src='${getImageUrl(null)}'">`
-                                    : `<i class="ri-shopping-bag-3-line text-3xl text-white"></i>`}
+                            <div class="flex h-[102px] w-full items-center justify-center pt-2">
+                                <div data-role="product-orb" class="mx-auto flex h-[92px] w-[92px] items-center justify-center overflow-hidden rounded-full bg-white transition-transform duration-200" style="box-shadow:0 12px 24px rgba(249,115,22,.08), 0 6px 14px rgba(15,23,42,.04);">
+                                    ${hasImage
+                                        ? `<img src="${getImageUrl(product.img)}" alt="${(product.name || 'Producto').replace(/"/g, '&quot;')}" class="h-16 w-16 object-contain" onerror="this.onerror=null; this.src='${getImageUrl(null)}'">`
+                                        : `<i class="ri-shopping-bag-3-line text-[30px] text-orange-500"></i>`}
+                                </div>
                             </div>
-                        </div>
-                        <div class="px-3 pb-3 pt-2.5">
-                            <h4 class="line-clamp-2 min-h-[40px] text-[14px] font-bold leading-5 text-slate-900">${product.name || 'Sin nombre'}</h4>
+                            <div class="mt-2 flex h-[50px] w-full items-start justify-center px-1">
+                                <h4 class="line-clamp-2 block w-full text-center text-[12px] font-black leading-[1.28] text-slate-900">${(product.name || 'Sin nombre').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</h4>
+                            </div>
                         </div>
                     `;
 
@@ -467,9 +489,11 @@
                     })),
                     reason: (document.getElementById('movement-reason')?.value || 'AJUSTE DE ENTRADA').trim(),
                     comment: (document.getElementById('movement-comment')?.value || '').trim(),
-                    branch_id: branchId,
-                    movement_type: 'ENTRY',
                 };
+                if (!editingMovement) {
+                    payload.branch_id = branchId;
+                    payload.movement_type = 'ENTRY';
+                }
 
                 const saveButton = document.getElementById('save-entry-button');
                 if (saveButton) {
@@ -477,9 +501,14 @@
                     saveButton.classList.add('opacity-70', 'cursor-not-allowed');
                 }
 
+                const url = editingMovement
+                    ? @json(route('warehouse_movements.entry.update', ['warehouseMovement' => '__ID__'])).replace('__ID__', editingMovement.id)
+                    : @json(route('warehouse_movements.store'));
+                const method = editingMovement ? 'PUT' : 'POST';
+
                 try {
-                    const response = await fetch(@json(route('warehouse_movements.store')), {
-                        method: 'POST',
+                    const response = await fetch(url, {
+                        method: method,
                         headers: {
                             'Content-Type': 'application/json',
                             'X-CSRF-TOKEN': @json(csrf_token()),
@@ -487,13 +516,13 @@
                         body: JSON.stringify(payload),
                     });
                     const data = await response.json().catch(() => ({}));
-                    if (!response.ok || !data.success) throw new Error(data.message || 'No se pudo guardar la entrada.');
-                    sessionStorage.setItem('flash_success_message', data.message || 'Entrada guardada correctamente');
+                    if (!response.ok || !data.success) throw new Error(data.message || (editingMovement ? 'No se pudo actualizar la entrada.' : 'No se pudo guardar la entrada.'));
+                    sessionStorage.setItem('flash_success_message', data.message || (editingMovement ? 'Entrada actualizada correctamente' : 'Entrada guardada correctamente'));
                     window.location.href = viewId
                         ? `${@json(route('warehouse_movements.index'))}?view_id=${encodeURIComponent(String(viewId))}`
                         : @json(route('warehouse_movements.index'));
                 } catch (error) {
-                    alert(error.message || 'No se pudo guardar la entrada.');
+                    alert(error.message || (editingMovement ? 'No se pudo actualizar la entrada.' : 'No se pudo guardar la entrada.'));
                 } finally {
                     if (saveButton) {
                         saveButton.disabled = false;
@@ -527,6 +556,21 @@
             renderCategoryFilters();
             renderProducts();
             renderCart();
+
+            if (editingMovement) {
+                const commentEl = document.getElementById('movement-comment');
+                if (commentEl) commentEl.value = @json($editingComment ?? '');
+                const reasonEl = document.getElementById('movement-reason');
+                if (reasonEl && @json($editingReason ?? '')) {
+                    const r = @json($editingReason ?? '');
+                    if ([].some.call(reasonEl.options, (o) => o.value === r)) reasonEl.value = r;
+                }
+                const saveBtn = document.getElementById('save-entry-button');
+                if (saveBtn) {
+                    const span = saveBtn.querySelector('span');
+                    if (span) span.textContent = 'Actualizar entrada';
+                }
+            }
         })();
     </script>
 
@@ -543,6 +587,23 @@
         #warehouse-entry-view select:focus-visible,
         #warehouse-entry-view textarea:focus-visible {
             outline: none !important;
+        }
+
+        #warehouse-entry-view #products-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+            gap: 0.95rem !important;
+        }
+
+        @media (max-width: 1199px) {
+            #warehouse-entry-view #products-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            }
+        }
+
+        @media (max-width: 991px) {
+            #warehouse-entry-view #products-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            }
         }
 
         @media (max-width: 1279px) {

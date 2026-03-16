@@ -55,7 +55,7 @@
                 return $url;
             };
 
-            $resolveTextColor = fn ($operation) => str_contains($operation->action ?? '', 'product-types.create') ? '#111827' : '#FFFFFF';
+            $resolveTextColor = fn ($operation) => (str_contains($operation->action ?? '', 'product-types.create') || str_contains($operation->action ?? '', 'product_types.create')) ? '#111827' : '#FFFFFF';
         @endphp
 
         <x-common.page-breadcrumb pageTitle="Tipos de producto" />
@@ -94,17 +94,21 @@
                 <div class="flex items-center gap-2">
                     @foreach ($topOperations as $operation)
                         @php
-                            $topTextColor = $resolveTextColor($operation);
-                            $topColor = $operation->color ?: '#3B82F6';
-                            $topStyle = "background-color: {$topColor}; color: {$topTextColor};";
-                            $isCreate = str_contains($operation->action ?? '', 'product-types.create');
+                            $action = (string) ($operation->action ?? '');
+                            $isCreate = str_contains($action, 'product-types.create') || str_contains($action, 'product_types.create') || str_contains($action, 'create');
+                            $createStyle = 'background-color: #12f00e; color: #111827;';
                         @endphp
                         @if ($isCreate)
-                            <x-ui.button size="md" variant="primary" type="button" style="{{ $topStyle }}" @click="$dispatch('open-product-type-modal')">
+                            <x-ui.button size="md" variant="primary" type="button" style="{{ $createStyle }}" @click="$dispatch('open-product-type-modal')">
                                 <i class="{{ $operation->icon }}"></i>
                                 <span>{{ $operation->name }}</span>
                             </x-ui.button>
                         @else
+                            @php
+                                $topTextColor = $resolveTextColor($operation);
+                                $topColor = $operation->color ?: '#3B82F6';
+                                $topStyle = "background-color: {$topColor}; color: {$topTextColor};";
+                            @endphp
                             <x-ui.link-button size="md" variant="primary" style="{{ $topStyle }}" href="{{ $resolveActionUrl($operation->action ?? '', null, $operation) }}">
                                 <i class="{{ $operation->icon }}"></i>
                                 <span>{{ $operation->name }}</span>
@@ -163,13 +167,16 @@
                                         @if ($rowOperations->isNotEmpty())
                                             @foreach ($rowOperations as $operation)
                                                 @php
-                                                    $action = $operation->action ?? '';
+                                                    $action = (string) ($operation->action ?? '');
                                                     $isDelete = str_contains($action, 'destroy');
-                                                    $actionUrl = $resolveActionUrl($action, $productType, $operation);
+                                                    $isEdit = str_contains($action, 'edit') || str_contains($action, 'product-types.edit') || str_contains($action, 'product_types.edit');
+                                                    $updateUrl = route('product-types.update', $productType);
+                                                    $actionUrl = $isEdit ? $updateUrl : $resolveActionUrl($action, $productType, $operation);
+                                                    $editStyle = 'background-color: #FBBF24; color: #111827;';
                                                     $textColor = $resolveTextColor($operation);
                                                     $buttonColor = $operation->color ?: '#3B82F6';
                                                     $buttonStyle = "background-color: {$buttonColor}; color: {$textColor};";
-                                                    $variant = $isDelete ? 'eliminate' : (str_contains($action, 'edit') ? 'edit' : 'primary');
+                                                    $variant = $isDelete ? 'eliminate' : ($isEdit ? 'edit' : 'primary');
                                                 @endphp
                                                 @if ($isDelete)
                                                     <form method="POST" action="{{ $actionUrl }}" class="relative group js-swal-delete" data-swal-title="Eliminar tipo?" data-swal-text="Se eliminara {{ $productType->name }}. Esta accion no se puede deshacer." data-swal-confirm="Si, eliminar" data-swal-cancel="Cancelar" data-swal-confirm-color="#ef4444" data-swal-cancel-color="#6b7280">
@@ -188,9 +195,16 @@
                                                     </form>
                                                 @else
                                                     <div class="relative group">
-                                                        <x-ui.link-button size="icon" variant="{{ $variant }}" href="{{ $actionUrl }}" className="rounded-xl" style="{{ $buttonStyle }}" aria-label="{{ $operation->name }}">
-                                                            <i class="{{ $operation->icon }}"></i>
-                                                        </x-ui.link-button>
+                                                        @if ($isEdit)
+                                                            <x-ui.button size="icon" variant="edit" type="button" className="rounded-xl" style="{{ $editStyle }}" aria-label="{{ $operation->name }}"
+                                                                @click="$dispatch('open-product-type-edit-modal', {{ \Illuminate\Support\Js::from(['updateUrl' => $updateUrl, 'productType' => $productType->only(['id','name','description','behavior','status','icon'])]) }})">
+                                                                <i class="{{ $operation->icon }}"></i>
+                                                            </x-ui.button>
+                                                        @else
+                                                            <x-ui.link-button size="icon" variant="{{ $variant }}" href="{{ $actionUrl }}" className="rounded-xl" style="{{ $buttonStyle }}" aria-label="{{ $operation->name }}">
+                                                                <i class="{{ $operation->icon }}"></i>
+                                                            </x-ui.link-button>
+                                                        @endif
                                                         <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
                                                             {{ $operation->name }}
                                                             <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
@@ -200,9 +214,10 @@
                                             @endforeach
                                         @else
                                             <div class="relative group">
-                                                <x-ui.link-button size="icon" variant="edit" href="{{ route('product-types.edit', array_merge([$productType], $viewId ? ['view_id' => $viewId] : [])) }}" className="rounded-xl" style="background-color: #FBBF24; color: #111827;" aria-label="Editar">
+                                                <x-ui.button size="icon" variant="edit" type="button" className="rounded-xl" style="background-color: #FBBF24; color: #111827;" aria-label="Editar"
+                                                    @click="$dispatch('open-product-type-edit-modal', {{ \Illuminate\Support\Js::from(['updateUrl' => route('product-types.update', $productType), 'productType' => $productType->only(['id','name','description','behavior','status','icon'])]) }})">
                                                     <i class="ri-pencil-line"></i>
-                                                </x-ui.link-button>
+                                                </x-ui.button>
                                                 <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">Editar</span>
                                             </div>
                                             <form method="POST" action="{{ route('product-types.destroy', array_merge([$productType], $viewId ? ['view_id' => $viewId] : [])) }}" class="relative group js-swal-delete" data-swal-title="Eliminar tipo?" data-swal-text="Se eliminara {{ $productType->name }}. Esta accion no se puede deshacer." data-swal-confirm="Si, eliminar" data-swal-cancel="Cancelar" data-swal-confirm-color="#ef4444" data-swal-cancel-color="#6b7280">
@@ -285,6 +300,142 @@
                         </x-ui.button>
                     </div>
                 </form>
+            </div>
+        </x-ui.modal>
+
+        <x-ui.modal
+            x-data="{ open: false, editPayload: null }"
+            @open-product-type-edit-modal.window="editPayload = $event.detail; open = true"
+            @close-product-type-edit-modal.window="open = false"
+            :isOpen="false"
+            :showCloseButton="true"
+            class="w-full max-w-3xl"
+        >
+            <div class="p-6 sm:p-8">
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Editar tipo de producto</h3>
+                    <p class="mt-1 text-sm text-gray-500">Actualiza la configuración del tipo.</p>
+                </div>
+                <template x-if="editPayload">
+                    <form :action="editPayload.updateUrl" method="POST" class="space-y-6">
+                        @csrf
+                        @method('PUT')
+                        @if (!empty($viewId))
+                            <input type="hidden" name="view_id" value="{{ $viewId }}">
+                        @endif
+                        <div class="grid gap-5 sm:grid-cols-2">
+                            <div>
+                                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Nombre</label>
+                                <input type="text" name="name" x-model="editPayload.productType.name" required placeholder="Ingrese el nombre"
+                                    class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
+                            </div>
+                            <div x-data="iconPicker()" x-init="init()" :data-initial-icon="editPayload?.productType?.icon ?? ''" class="relative">
+                                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Icono</label>
+                                <div class="relative">
+                                    <span class="absolute top-1/2 left-0 -translate-y-1/2 border-r border-gray-200 px-3.5 py-3 text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                                        <i class="ri-grid-line text-lg"></i>
+                                    </span>
+                                    <input
+                                        type="text"
+                                        name="icon"
+                                        x-ref="iconInput"
+                                        x-model="search"
+                                        placeholder="Busca o escribe un icono..."
+                                        autocomplete="off"
+                                        spellcheck="false"
+                                        class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-[62px] text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                                        @focus="openDropdown()"
+                                        @input="openDropdown()"
+                                        @keydown.escape.stop="closeDropdown()"
+                                    />
+                                    <button
+                                        type="button"
+                                        class="absolute right-2 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
+                                        @click="toggleDropdown()"
+                                        aria-label="Abrir selector de iconos"
+                                    >
+                                        <i class="ri-arrow-down-s-line text-lg transition-transform" :class="open ? 'rotate-180' : ''"></i>
+                                    </button>
+                                </div>
+                                <div
+                                    x-show="open"
+                                    class="absolute left-0 top-full z-50 mt-2 w-full rounded-xl border border-gray-200 bg-white p-3 shadow-theme-lg dark:border-gray-800 dark:bg-gray-900"
+                                    @click.outside="closeDropdown()"
+                                >
+                                    <div class="mb-2 flex items-center justify-between text-xs text-gray-500">
+                                        <span x-text="loading ? 'Cargando iconos...' : `${filteredIcons.length} iconos`"></span>
+                                        <button type="button" class="text-brand-500 hover:text-brand-600" @click="clear()">Limpiar</button>
+                                    </div>
+                                    <template x-if="loading">
+                                        <div class="flex items-center gap-3 text-sm text-gray-500">
+                                            <div class="h-5 w-5 animate-spin rounded-full border-2 border-brand-500 border-t-transparent"></div>
+                                            <span>Cargando iconos...</span>
+                                        </div>
+                                    </template>
+                                    <template x-if="!loading && error">
+                                        <div class="rounded-lg border border-dashed border-gray-200 px-3 py-4 text-center text-sm text-gray-500 dark:border-gray-800">
+                                            No se pudieron cargar los iconos.
+                                        </div>
+                                    </template>
+                                    <template x-if="!loading && !error && displayedIcons.length === 0">
+                                        <div class="rounded-lg border border-dashed border-gray-200 px-3 py-4 text-center text-sm text-gray-500 dark:border-gray-800">
+                                            No se encontraron iconos.
+                                        </div>
+                                    </template>
+                                    <div class="max-h-64 overflow-y-auto custom-scrollbar" x-show="!loading && !error && displayedIcons.length">
+                                        <div class="grid gap-2 grid-cols-4 sm:grid-cols-6">
+                                            <template x-for="icon in displayedIcons" :key="icon">
+                                                <button
+                                                    type="button"
+                                                    class="flex items-center justify-center rounded-lg border border-gray-200 bg-white px-2 py-3 text-gray-600 transition hover:border-brand-300 hover:text-brand-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300"
+                                                    @click="select(icon)"
+                                                >
+                                                    <span class="text-xl"><i :class="icon"></i></span>
+                                                </button>
+                                            </template>
+                                        </div>
+                                        <div class="mt-2 text-xs text-gray-400 text-center" x-show="filteredIcons.length > displayedIcons.length">
+                                            Escribe para filtrar mas resultados.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Comportamiento</label>
+                                <select name="behavior" required
+                                    class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                                    x-model="editPayload.productType.behavior">
+                                    <option value="SELLABLE">Vendible</option>
+                                    <option value="SUPPLY">Suministro</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Estado</label>
+                                <select name="status" required
+                                    class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                                    x-model="editPayload.productType.status">
+                                    <option value="1">Activo</option>
+                                    <option value="0">Inactivo</option>
+                                </select>
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Descripción</label>
+                                <textarea name="description" rows="3" x-model="editPayload.productType.description" placeholder="Descripción opcional"
+                                    class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"></textarea>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-3">
+                            <x-ui.button type="submit" size="md" variant="primary">
+                                <i class="ri-save-line"></i>
+                                <span>Actualizar</span>
+                            </x-ui.button>
+                            <x-ui.button type="button" size="md" variant="outline" @click="open = false">
+                                <i class="ri-close-line"></i>
+                                <span>Cancelar</span>
+                            </x-ui.button>
+                        </div>
+                    </form>
+                </template>
             </div>
         </x-ui.modal>
     </div>

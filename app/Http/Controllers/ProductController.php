@@ -7,9 +7,17 @@ use App\Models\Category;
 use App\Models\Operation;
 use App\Models\Product;
 use App\Models\ProductBranch;
+use App\Models\Person;
 use App\Models\ProductType;
 use App\Models\TaxRate;
 use App\Models\Unit;
+use App\Models\Movement;
+use App\Models\MovementType;
+use App\Models\DocumentType;
+use App\Models\WarehouseMovement;
+use App\Models\WarehouseMovementDetail;
+use App\Services\KardexSyncService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -21,6 +29,8 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
+        $categoryId = (int) $request->input('category_id', 0);
+        $productTypeId = (int) $request->input('product_type_id', 0);
         $perPage = (int) $request->input('per_page', 10);
         $allowedPerPage = [10, 20, 50, 100];
         $viewId = $request->input('view_id');
@@ -77,6 +87,12 @@ class ProductController extends Controller
                         ->orWhere('abbreviation', 'ILIKE', "%{$search}%");
                 });
             })
+            ->when($categoryId > 0, function ($query) use ($categoryId) {
+                $query->where('category_id', $categoryId);
+            })
+            ->when($productTypeId > 0, function ($query) use ($productTypeId) {
+                $query->where('product_type_id', $productTypeId);
+            })
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
@@ -93,6 +109,11 @@ class ProductController extends Controller
             ->orderBy('name')
             ->get();
         $taxRates = TaxRate::query()->where('status', true)->orderBy('order_num')->get();
+        $suppliers = Person::query()
+            ->where('branch_id', $branchId)
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name', 'document_number']);
         $currentBranch = Branch::find(session('branch_id'));
         $nextProductCode = $this->nextBranchProductCode((int) $branchId);
 
@@ -105,8 +126,11 @@ class ProductController extends Controller
             'currentBranch' => $currentBranch,
             'nextProductCode' => $nextProductCode,
             'search' => $search,
+            'selectedCategoryId' => $categoryId,
+            'selectedProductTypeId' => $productTypeId,
             'perPage' => $perPage,
             'operaciones' => $operaciones,
+            'suppliers' => $suppliers,
         ]);
     }
 
@@ -186,13 +210,25 @@ class ProductController extends Controller
         $taxRates = TaxRate::query()->where('status', true)->orderBy('order_num')->get();
         ProductType::ensureDefaultsForBranch((int) $branchId);
         $productTypes = ProductType::query()
-            ->where('branch_id', $branchId)
-            ->where('status', true)
+            ->where(function ($query) use ($branchId, $product) {
+                $query->where(function ($inner) use ($branchId) {
+                    $inner->where('branch_id', $branchId)
+                        ->where('status', true);
+                });
+                if (!empty($product->product_type_id)) {
+                    $query->orWhere('id', (int) $product->product_type_id);
+                }
+            })
             ->orderBy('name')
             ->get();
         $productBranch = $product->productBranches()
             ->where('branch_id', $branchId)
             ->first();
+        $suppliers = Person::query()
+            ->where('branch_id', $branchId)
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name', 'document_number']);
 
         return view('products.edit', [
             'product' => $product,
@@ -201,7 +237,7 @@ class ProductController extends Controller
             'units' => $units,
             'productTypes' => $productTypes,
             'taxRates' => $taxRates,
-            'suppliers' => collect(), 
+            'suppliers' => $suppliers,
             'viewId' => $request->input('view_id'),
         ]);
     }
@@ -235,25 +271,137 @@ class ProductController extends Controller
             }
         }
         
-        // Actualizar producto
-        $product->update($productData);
-        
-        // Actualizar o crear ProductBranch para la sucursal actual
-        $branchId = $request->session()->get('branch_id');
-        if ($branchId) {
-            $productBranch = $product->productBranches()
+        DB::transaction(function () use ($request, $product, $productData, $branchData) {
+            // Actualizar producto
+            $product->update($productData);
+            
+            // Actualizar o crear ProductBranch para la sucursal actual
+            $branchId = $request->session()->get('branch_id');
+            if (!$branchId) {
+                return;
+            }
+            
+            $productBranch = ProductBranch::query()
+                ->where('product_id', $product->id)
                 ->where('branch_id', $branchId)
+                ->lockForUpdate()
                 ->first();
             
-            if ($productBranch) {
-                $productBranch->update($branchData);
-            } else {
+            if (!$productBranch) {
                 $branchData['product_id'] = $product->id;
                 $branchData['branch_id'] = $branchId;
-                $branchData['status'] = 'E';
-                ProductBranch::create($branchData);
+                $branchData['status'] = $branchData['status'] ?? 'A';
+                $productBranch = ProductBranch::query()->create($branchData);
+                return;
             }
-        }
+            
+            $oldStock = (float) ($productBranch->stock ?? 0);
+            $newStock = (float) ($branchData['stock'] ?? $oldStock);
+            $stockDelta = $newStock - $oldStock;
+            
+            $branchDataWithoutStock = $branchData;
+            unset($branchDataWithoutStock['stock']);
+            
+            if (!empty($branchDataWithoutStock)) {
+                $productBranch->update($branchDataWithoutStock);
+            }
+            
+            if (abs($stockDelta) < 0.000001) {
+                return;
+            }
+            
+            $movementType = MovementType::query()
+                ->where(function ($query) {
+                    $query->where('description', 'like', '%Almac%')
+                        ->orWhere('description', 'like', '%Warehouse%')
+                        ->orWhere('description', 'like', '%Inventario%');
+                })
+                ->first() ?? MovementType::query()->firstOrFail();
+            
+            $isEntry = $stockDelta > 0;
+            $documentType = $isEntry
+                ? (DocumentType::query()->find(7)
+                    ?? DocumentType::query()->where(function ($query) {
+                        $query->where('name', 'like', '%Entrada%')
+                            ->orWhere('name', 'like', '%entry%');
+                    })->first())
+                : (DocumentType::query()->find(8)
+                    ?? DocumentType::query()->where(function ($query) {
+                        $query->where('name', 'like', '%Salida%')
+                            ->orWhere('name', 'like', '%exit%')
+                            ->orWhere('name', 'like', '%output%');
+                    })->first());
+            
+            if (!$documentType) {
+                $documentType = DocumentType::query()
+                    ->where('movement_type_id', $movementType->id)
+                    ->firstOrFail();
+            }
+            
+            $prefix = $isEntry ? 'E' : 'S';
+            $date = now()->format('Ymd');
+            $lastNumber = (string) (Movement::query()
+                ->where('branch_id', (int) $branchId)
+                ->where('document_type_id', (int) $documentType->id)
+                ->where('number', 'like', $prefix . '-' . $date . '-%')
+                ->orderByDesc('id')
+                ->value('number') ?? '');
+            $seq = 0;
+            if ($lastNumber !== '' && preg_match('/^' . preg_quote($prefix, '/') . '\-' . $date . '\-(\d{1,6})$/', $lastNumber, $m)) {
+                $seq = (int) $m[1];
+            }
+            $number = $prefix . '-' . $date . '-' . str_pad((string) ($seq + 1), 4, '0', STR_PAD_LEFT);
+            
+            $user = $request->user();
+            $userName = (string) ($user?->name ?? 'Sistema');
+            
+            $movement = Movement::query()->create([
+                'number' => $number,
+                'moved_at' => now(),
+                'user_id' => $user?->id,
+                'user_name' => $userName,
+                'person_id' => $user?->person?->id,
+                'person_name' => $user?->person
+                    ? trim((string) (($user->person->first_name ?? '') . ' ' . ($user->person->last_name ?? '')))
+                    : $userName,
+                'responsible_id' => $user?->id,
+                'responsible_name' => $userName,
+                'comment' => 'AJUSTE DE STOCK POR EDICIÓN DE PRODUCTO',
+                'status' => 'A',
+                'movement_type_id' => $movementType->id,
+                'document_type_id' => $documentType->id,
+                'branch_id' => $branchId,
+                'parent_movement_id' => null,
+            ]);
+            
+            $warehouseMovement = WarehouseMovement::query()->create([
+                'status' => 'FINALIZED',
+                'movement_id' => $movement->id,
+                'branch_id' => $branchId,
+            ]);
+            
+            $product->loadMissing('baseUnit');
+            WarehouseMovementDetail::query()->create([
+                'warehouse_movement_id' => $warehouseMovement->id,
+                'product_id' => $product->id,
+                'product_snapshot' => [
+                    'id' => $product->id,
+                    'code' => $product->code,
+                    'description' => $product->description,
+                ],
+                'unit_id' => $product->baseUnit?->id ?? 1,
+                'quantity' => abs($stockDelta),
+                'comment' => $isEntry
+                    ? ('AJUSTE ENTRADA. Stock: ' . number_format($oldStock, 2, '.', '') . ' -> ' . number_format($newStock, 2, '.', ''))
+                    : ('AJUSTE SALIDA. Stock: ' . number_format($oldStock, 2, '.', '') . ' -> ' . number_format($newStock, 2, '.', '')),
+                'status' => 'A',
+                'branch_id' => $branchId,
+            ]);
+            
+            $productBranch->update(['stock' => $newStock]);
+            
+            app(KardexSyncService::class)->syncMovement($movement);
+        });
         
         $viewId = $request->input('view_id');
         

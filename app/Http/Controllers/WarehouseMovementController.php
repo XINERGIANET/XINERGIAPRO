@@ -47,11 +47,48 @@ class WarehouseMovementController extends Controller
             ->get()
             ->keyBy('product_id');
 
+        $editingMovement = null;
+        $editingCart = [];
+        $editingComment = '';
+        $editingReason = 'AJUSTE DE ENTRADA';
+        $warehouseMovementId = $request->integer('warehouse_movement_id');
+        if ($warehouseMovementId > 0) {
+            $wm = WarehouseMovement::with(['movement.documentType', 'details.product.baseUnit'])
+                ->where('id', $warehouseMovementId)
+                ->where('branch_id', $branchId)
+                ->first();
+            if ($wm) {
+                $docName = strtolower((string) ($wm->movement?->documentType?->name ?? ''));
+                $docId = (int) ($wm->movement?->document_type_id ?? 0);
+                $isEntry = $docId === 7 || str_contains($docName, 'entrada') || str_contains($docName, 'entry');
+                if ($isEntry) {
+                    $editingMovement = $wm;
+                    $editingComment = (string) ($wm->movement?->comment ?? '');
+                    $editingReason = $editingComment !== '' ? $editingComment : 'AJUSTE DE ENTRADA';
+                    foreach ($wm->details as $d) {
+                        $pb = $productBranches->get($d->product_id);
+                        $editingCart[] = [
+                            'id' => $d->product_id,
+                            'name' => $d->product_snapshot['description'] ?? $d->product?->description ?? 'Sin nombre',
+                            'code' => $d->product_snapshot['code'] ?? $d->product?->code ?? '',
+                            'unit' => $d->unit?->description ?? $d->product?->baseUnit?->description ?? 'Unidad',
+                            'quantity' => (float) $d->quantity,
+                            'unitCost' => $pb ? (float) ($pb->avg_cost ?? $pb->price ?? 0) : 0,
+                        ];
+                    }
+                }
+            }
+        }
+
         return view('warehouse_movements.entry', [
             'products' => $products,
             'productBranches' => $productBranches,
             'viewId' => $viewId,
             'title' => 'Entrada de Productos',
+            'editingMovement' => $editingMovement,
+            'editingCart' => $editingCart,
+            'editingComment' => $editingComment,
+            'editingReason' => $editingReason,
         ]);
     }
 
@@ -119,7 +156,6 @@ class WarehouseMovementController extends Controller
         $profileId = (int) (session('profile_id') ?? optional(auth()->user())->profile_id);
         $allowedBranchIds = DB::table('profile_branch')
             ->where('profile_id', $profileId)
-            ->where('status', 1)
             ->whereNull('deleted_at')
             ->pluck('branch_id')
             ->map(fn ($id) => (int) $id)
@@ -140,6 +176,46 @@ class WarehouseMovementController extends Controller
             ->orderBy('legal_name')
             ->get(['id', 'legal_name']);
 
+        $editingMovement = null;
+        $editingCart = [];
+        $editingComment = '';
+        $warehouseMovementId = $request->integer('warehouse_movement_id');
+        if ($warehouseMovementId > 0) {
+            $wm = WarehouseMovement::with(['movement.documentType', 'details.product.baseUnit'])
+                ->where('id', $warehouseMovementId)
+                ->where('branch_id', $branchId)
+                ->first();
+            if ($wm) {
+                $docName = strtolower((string) ($wm->movement?->documentType?->name ?? ''));
+                $docId = (int) ($wm->movement?->document_type_id ?? 0);
+                $isOutput = $docId === 8 || str_contains($docName, 'salida') || str_contains($docName, 'exit') || str_contains($docName, 'output');
+                if ($isOutput) {
+                    $editingMovement = $wm;
+                    $editingComment = (string) ($wm->movement?->comment ?? '');
+                    foreach ($wm->details as $d) {
+                        $pb = $productBranches->get($d->product_id);
+                        $stockNow = $pb ? (float) ($pb->stock ?? 0) : 0;
+                        $qtyInMovement = (float) $d->quantity;
+                        $editingCart[] = [
+                            'id' => $d->product_id,
+                            'name' => $d->product_snapshot['description'] ?? $d->product?->description ?? 'Sin nombre',
+                            'code' => $d->product_snapshot['code'] ?? $d->product?->code ?? '',
+                            'unit' => $d->unit?->description ?? $d->product?->baseUnit?->description ?? 'Unidad',
+                            'quantity' => $qtyInMovement,
+                            'currentStock' => (int) round($stockNow + $qtyInMovement),
+                        ];
+                    }
+                    $productsMapped = $productsMapped->map(function ($p) use ($wm) {
+                        $qtyInMovement = $wm->details->where('product_id', $p['id'])->sum('quantity');
+                        if ($qtyInMovement > 0) {
+                            $p['currentStock'] = (int) (($p['currentStock'] ?? 0) + $qtyInMovement);
+                        }
+                        return $p;
+                    })->values();
+                }
+            }
+        }
+
         return view('warehouse_movements.output', [
             'products' => $products,
             'productBranches' => $productBranches,
@@ -148,6 +224,9 @@ class WarehouseMovementController extends Controller
             'viewId' => $viewId,
             'targetBranches' => $targetBranches,
             'title' => 'Salida de Productos',
+            'editingMovement' => $editingMovement,
+            'editingCart' => $editingCart,
+            'editingComment' => $editingComment,
         ]);
     }
 
@@ -198,12 +277,7 @@ class WarehouseMovementController extends Controller
                 throw new \Exception('No se encontró un tipo de documento válido para salida.');
             }
 
-            // Generar número de movimiento (secuencia independiente por tipo de documento)
-            $todayCount = Movement::where('document_type_id', $documentType->id)
-                ->where('branch_id', $branchId)
-                ->whereDate('created_at', Carbon::today())
-                ->count();
-            $number = str_pad($todayCount + 1, 8, '0', STR_PAD_LEFT);
+            $number = $this->generateWarehouseCorrelativeNumber((int) $branchId, $documentType, now());
 
             // Validar stock antes de crear el movimiento
             foreach ($request->items as $item) {
@@ -336,7 +410,6 @@ class WarehouseMovementController extends Controller
         $canUseDestination = DB::table('profile_branch')
             ->where('profile_id', $profileId)
             ->where('branch_id', $toBranchId)
-            ->where('status', 1)
             ->whereNull('deleted_at')
             ->exists();
         if (!$canUseDestination && !$this->isAdminUser()) {
@@ -497,6 +570,8 @@ class WarehouseMovementController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
         $perPage = (int) $request->input('per_page', 10);
         $allowedPerPage = [10, 20, 50, 100];
         $viewId = $request->input('view_id');
@@ -535,12 +610,22 @@ class WarehouseMovementController extends Controller
 
         $warehouseMovements = WarehouseMovement::query()
             ->where('branch_id', $branchId)
-            ->with(['movement.movementType', 'movement.documentType', 'branch'])
+            ->with(['movement.movementType', 'movement.documentType', 'branch', 'details.unit', 'details.product'])
             ->when($search, function ($query) use ($search) {
                 $query->whereHas('movement', function ($q) use ($search) {
                     $q->where('number', 'ILIKE', "%{$search}%")
                         ->orWhere('person_name', 'ILIKE', "%{$search}%")
                         ->orWhere('user_name', 'ILIKE', "%{$search}%");
+                });
+            })
+            ->when($dateFrom, function ($query) use ($dateFrom) {
+                $query->whereHas('movement', function ($q) use ($dateFrom) {
+                    $q->whereDate('moved_at', '>=', $dateFrom);
+                });
+            })
+            ->when($dateTo, function ($query) use ($dateTo) {
+                $query->whereHas('movement', function ($q) use ($dateTo) {
+                    $q->whereDate('moved_at', '<=', $dateTo);
                 });
             })
             ->orderByDesc('id')
@@ -550,6 +635,8 @@ class WarehouseMovementController extends Controller
         return view('warehouse_movements.index', [
             'warehouseMovements' => $warehouseMovements,
             'search' => $search,
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
             'perPage' => $perPage,
             'operaciones' => $operaciones,
             'title' => 'Movimientos de Almacén',
@@ -616,12 +703,7 @@ class WarehouseMovementController extends Controller
                 throw new \Exception('No se encontró un tipo de documento válido para entrada.');
             }
 
-            // Generar número de movimiento (secuencia independiente por tipo de documento)
-            $todayCount = Movement::where('document_type_id', $documentType->id)
-                ->where('branch_id', $branchId)
-                ->whereDate('created_at', Carbon::today())
-                ->count();
-            $number = str_pad($todayCount + 1, 8, '0', STR_PAD_LEFT);
+            $number = $this->generateWarehouseCorrelativeNumber((int) $branchId, $documentType, now());
 
             // Crear Movement
             $movement = Movement::create([
@@ -722,12 +804,224 @@ class WarehouseMovementController extends Controller
         }
     }
 
+    public function updateEntry(Request $request, $warehouseMovement)
+    {
+        $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|numeric|min:0.01',
+            'items.*.unit_cost' => 'nullable|numeric|min:0',
+            'reason' => 'nullable|string|max:255',
+            'comment' => 'nullable|string|max:500',
+        ]);
+
+        $branchId = (int) session('branch_id');
+        $wm = WarehouseMovement::with(['movement.documentType', 'details'])
+            ->where('id', $warehouseMovement->id ?? $warehouseMovement)
+            ->where('branch_id', $branchId)
+            ->firstOrFail();
+
+        $docName = strtolower((string) ($wm->movement?->documentType?->name ?? ''));
+        $docId = (int) ($wm->movement?->document_type_id ?? 0);
+        if ($docId !== 7 && !str_contains($docName, 'entrada') && !str_contains($docName, 'entry')) {
+            return response()->json(['success' => false, 'message' => 'El movimiento no es de tipo entrada.'], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            foreach ($wm->details as $d) {
+                $pb = ProductBranch::where('branch_id', $branchId)->where('product_id', $d->product_id)->lockForUpdate()->first();
+                if ($pb) {
+                    $newStock = (float) $pb->stock - (float) $d->quantity;
+                    $pb->update(['stock' => max(0, $newStock)]);
+                }
+            }
+
+            app(KardexSyncService::class)->deleteMovement($wm->movement_id);
+            $wm->details()->delete();
+
+            $movement = $wm->movement;
+            $movement->update([
+                'comment' => $request->input('comment') ?: trim((string) $request->input('reason', $movement->comment)),
+            ]);
+
+            foreach ($request->items as $item) {
+                $product = Product::with('baseUnit')->findOrFail($item['product_id']);
+                $productBranch = ProductBranch::where('product_id', $item['product_id'])
+                    ->where('branch_id', $branchId)
+                    ->lockForUpdate()
+                    ->first();
+                if (!$productBranch) {
+                    $productBranch = ProductBranch::create([
+                        'product_id' => $product->id,
+                        'branch_id' => $branchId,
+                        'stock' => 0,
+                        'price' => 0,
+                        'avg_cost' => 0,
+                        'status' => 'A',
+                        'supplier_id' => null,
+                    ]);
+                }
+
+                WarehouseMovementDetail::create([
+                    'warehouse_movement_id' => $wm->id,
+                    'product_id' => $product->id,
+                    'product_snapshot' => ['id' => $product->id, 'code' => $product->code, 'description' => $product->description],
+                    'unit_id' => $product->baseUnit->id ?? 1,
+                    'quantity' => (float) $item['quantity'],
+                    'comment' => $item['comment'] ?? '',
+                    'status' => 'A',
+                    'branch_id' => $branchId,
+                ]);
+
+                $quantity = (float) $item['quantity'];
+                $unitCost = round((float) ($item['unit_cost'] ?? 0), 6);
+                $currentStock = (float) ($productBranch->stock ?? 0);
+                $currentCost = (float) ($productBranch->avg_cost ?? 0);
+                if ($currentCost <= 0) {
+                    $currentCost = (float) ($productBranch->price ?? 0);
+                }
+                $newStock = $currentStock + $quantity;
+                $newAvgCost = $currentCost;
+                if ($unitCost > 0 && $newStock > 0) {
+                    $newAvgCost = round((($currentStock * $currentCost) + ($quantity * $unitCost)) / $newStock, 6);
+                }
+                $productBranch->update(['stock' => $newStock, 'avg_cost' => $newAvgCost]);
+            }
+
+            $movement->loadMissing(['warehouseMovement.details.unit']);
+            app(KardexSyncService::class)->syncMovement($movement);
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Entrada actualizada correctamente',
+                'movement_id' => $movement->id,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al actualizar la entrada: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function updateOutput(Request $request, $warehouseMovement)
+    {
+        $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|numeric|min:0.01',
+            'comment' => 'nullable|string|max:500',
+        ]);
+
+        $branchId = (int) session('branch_id');
+        $wm = WarehouseMovement::with(['movement.documentType', 'details'])
+            ->where('id', $warehouseMovement->id ?? $warehouseMovement)
+            ->where('branch_id', $branchId)
+            ->firstOrFail();
+
+        $docName = strtolower((string) ($wm->movement?->documentType?->name ?? ''));
+        $docId = (int) ($wm->movement?->document_type_id ?? 0);
+        if ($docId !== 8 && !str_contains($docName, 'salida') && !str_contains($docName, 'exit') && !str_contains($docName, 'output')) {
+            return response()->json(['success' => false, 'message' => 'El movimiento no es de tipo salida.'], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            foreach ($wm->details as $d) {
+                $pb = ProductBranch::where('branch_id', $branchId)->where('product_id', $d->product_id)->lockForUpdate()->first();
+                if ($pb) {
+                    $newStock = (float) $pb->stock + (float) $d->quantity;
+                    $pb->update(['stock' => $newStock]);
+                }
+            }
+
+            app(KardexSyncService::class)->deleteMovement($wm->movement_id);
+            $wm->details()->delete();
+
+            $wm->movement->update([
+                'comment' => $request->input('comment') ?: $wm->movement->comment,
+            ]);
+
+            foreach ($request->items as $item) {
+                $product = Product::with('baseUnit')->findOrFail($item['product_id']);
+                $productBranch = ProductBranch::where('product_id', $item['product_id'])
+                    ->where('branch_id', $branchId)
+                    ->lockForUpdate()
+                    ->first();
+                if (!$productBranch) {
+                    throw new \Exception('Producto sin registro en esta sucursal (product_id: ' . $item['product_id'] . ').');
+                }
+                $currentStock = (float) ($productBranch->stock ?? 0);
+                if ($currentStock < (float) $item['quantity']) {
+                    throw new \Exception('Stock insuficiente para ' . ($product->description ?? $product->id) . '. Disponible: ' . $currentStock);
+                }
+
+                WarehouseMovementDetail::create([
+                    'warehouse_movement_id' => $wm->id,
+                    'product_id' => $product->id,
+                    'product_snapshot' => ['id' => $product->id, 'code' => $product->code, 'description' => $product->description],
+                    'unit_id' => $product->baseUnit->id ?? 1,
+                    'quantity' => (float) $item['quantity'],
+                    'comment' => $item['comment'] ?? '',
+                    'status' => 'A',
+                    'branch_id' => $branchId,
+                ]);
+
+                $newStock = $currentStock - (float) $item['quantity'];
+                $productBranch->update(['stock' => $newStock]);
+            }
+
+            $wm->movement->loadMissing(['warehouseMovement.details.unit']);
+            app(KardexSyncService::class)->syncMovement($wm->movement);
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Salida actualizada correctamente',
+                'movement_id' => $wm->movement_id,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al actualizar la salida: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
     private function isAdminUser(): bool
     {
         $user = auth()->user();
         $profileName = strtoupper((string) ($user?->profile?->name ?? ''));
 
         return (int) ($user?->profile_id ?? 0) === 1 || str_contains($profileName, 'ADMIN');
+    }
+
+    private function generateWarehouseCorrelativeNumber(int $branchId, DocumentType $documentType, \Carbon\CarbonInterface $when): string
+    {
+        $stockType = (string) ($documentType->stock ?? '');
+        $prefix = $stockType === 'add' ? 'E' : ($stockType === 'subtract' ? 'S' : 'M');
+        $date = $when->format('Ymd');
+
+        $lastNumber = (string) (Movement::query()
+            ->where('branch_id', $branchId)
+            ->where('document_type_id', (int) $documentType->id)
+            ->where('number', 'like', $prefix . '-' . $date . '-%')
+            ->orderByDesc('id')
+            ->value('number') ?? '');
+
+        $seq = 0;
+        if ($lastNumber !== '' && preg_match('/^' . preg_quote($prefix, '/') . '\-' . $date . '\-(\d{1,6})$/', $lastNumber, $m)) {
+            $seq = (int) $m[1];
+        }
+
+        $next = $seq + 1;
+        return $prefix . '-' . $date . '-' . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }
 
     public function show($warehouseMovement)
@@ -747,7 +1041,7 @@ class WarehouseMovementController extends Controller
     }
     public function edit($warehouseMovement)
     {
-        $branchId = session('branch_id');
+        $viewId = request('view_id');
         $warehouseMovement = WarehouseMovement::with([
             'movement.movementType',
             'movement.documentType',
@@ -756,11 +1050,21 @@ class WarehouseMovementController extends Controller
             'details.unit',
             'details.product',
         ])->findOrFail($warehouseMovement->id ?? $warehouseMovement);
-        return view('warehouse_movements.edit', [
-            'warehouseMovement' => $warehouseMovement,
-            'branchId' => $branchId,
-            'title' => 'Editar Movimiento de Almacén',
-        ]);
+
+        $docType = $warehouseMovement->movement?->documentType;
+        $docName = strtolower((string) ($docType->name ?? ''));
+        $docId = (int) ($docType->id ?? 0);
+        $isEntry = $docId === 7
+            || str_contains($docName, 'entrada')
+            || str_contains($docName, 'entry');
+
+        $params = $viewId ? ['view_id' => $viewId] : [];
+        $params['warehouse_movement_id'] = $warehouseMovement->id;
+
+        if ($isEntry) {
+            return redirect()->route('warehouse_movements.input', $params);
+        }
+        return redirect()->route('warehouse_movements.output', $params);
     }
     public function update($warehouseMovement, Request $request)
     {
@@ -770,5 +1074,23 @@ class WarehouseMovementController extends Controller
         $warehouseMovement = WarehouseMovement::with(['movement.movementType', 'movement.documentType', 'branch'])->findOrFail($warehouseMovement->id);
         $warehouseMovement->update($request->all());
         return redirect()->route('warehouse_movements.show', ['warehouseMovement' => $warehouseMovement->id])->with('success', 'Movimiento de Almacén actualizado correctamente');
+    }
+
+    public function destroy($warehouseMovement)
+    {
+        $warehouseMovement = WarehouseMovement::with(['movement', 'details'])->findOrFail($warehouseMovement->id ?? $warehouseMovement);
+        $movement = $warehouseMovement->movement;
+        $viewId = request('view_id');
+
+        DB::transaction(function () use ($warehouseMovement, $movement) {
+            $warehouseMovement->details()->delete();
+            $warehouseMovement->delete();
+            if ($movement) {
+                $movement->delete();
+            }
+        });
+
+        $redirectUrl = route('warehouse_movements.index', $viewId ? ['view_id' => $viewId] : []);
+        return redirect($redirectUrl)->with('success', 'Movimiento de almacén eliminado correctamente.');
     }
 }

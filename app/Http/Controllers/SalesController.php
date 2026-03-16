@@ -85,10 +85,10 @@ class SalesController extends Controller
             $selectedDocumentTypeId = $documentTypeId;
         }
 
-        $sales = Movement::query()
+        $salesBaseQuery = Movement::query()
             ->with(['branch', 'person', 'movementType', 'documentType', 'salesMovement'])
             ->where('movement_type_id', 2) //2 es venta
-            ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
+            ->when($branchId, fn ($query) => $query->where('movements.branch_id', $branchId))
             ->when($selectedDocumentTypeId !== 'all', fn ($query) => $query->where('document_type_id', (int) $selectedDocumentTypeId))
             ->when($search, function ($query) use ($search) {
                 $query->where(function ($inner) use ($search) {
@@ -104,7 +104,13 @@ class SalesController extends Controller
                 });
             })
             ->when($billingStatus === 'pending', fn ($query) => $query->whereHas('salesMovement', fn ($salesMovementQuery) => $salesMovementQuery->where('billing_status', 'PENDING')))
-            ->when($billingStatus === 'invoiced', fn ($query) => $query->whereHas('salesMovement', fn ($salesMovementQuery) => $salesMovementQuery->where('billing_status', 'INVOICED')))
+            ->when($billingStatus === 'invoiced', fn ($query) => $query->whereHas('salesMovement', fn ($salesMovementQuery) => $salesMovementQuery->where('billing_status', 'INVOICED')));
+
+        $salesTotalAmount = (float) $salesBaseQuery->clone()
+            ->join('sales_movements', 'sales_movements.movement_id', '=', 'movements.id')
+            ->sum('sales_movements.total');
+
+        $sales = $salesBaseQuery
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
@@ -117,6 +123,7 @@ class SalesController extends Controller
             'saleDocumentTypes' => $saleDocumentTypes,
             'perPage' => $perPage,
             'operaciones' => $operaciones,
+            'salesTotalAmount' => $salesTotalAmount,
         ] + $this->getFormData());
     }
 
@@ -1048,7 +1055,7 @@ class SalesController extends Controller
                 // Restar el stock del producto en la sucursal
                 $newStock = $currentStock - $quantityToSell;
                 $productBranch->update([
-                    'stock' => max(0, $newStock) // Asegurar que no sea negativo
+                    'stock' => $newStock
                 ]);
             }
             

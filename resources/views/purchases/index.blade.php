@@ -329,6 +329,10 @@
                     de
                     <span class="font-semibold text-gray-700 dark:text-gray-200">{{ $purchases->total() }}</span>
                 </div>
+                <div class="text-sm text-gray-700 dark:text-gray-200">
+                    Total filtrado:
+                    <span class="font-semibold text-emerald-700 dark:text-emerald-400">S/ {{ number_format((float) ($purchasesTotalAmount ?? 0), 2) }}</span>
+                </div>
                 <div class="flex-none pagination-simple">
                     {{ $purchases->links('vendor.pagination.forced') }}
                 </div>

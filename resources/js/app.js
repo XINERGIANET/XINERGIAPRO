@@ -66,20 +66,30 @@ const loadRemixIconList = () => {
     return remixIconCatalog.promise;
 };
 
-window.iconPicker = function () {
+window.iconPicker = function (initialValue) {
+    const initialFromParam = initialValue != null && initialValue !== '' ? String(initialValue) : '';
     return {
         open: false,
-        search: '',
+        search: initialFromParam,
         icons: [],
         loading: false,
         error: false,
         maxVisible: 180,
-        selected: '',
+        selected: initialFromParam,
         init() {
+            const fromDataAttr = this.$el?.dataset?.initialIcon ?? '';
+            const initial = initialFromParam || fromDataAttr || '';
+            if (initial) {
+                this.search = initial;
+                this.selected = initial;
+            }
             if (this.$refs?.iconInput) {
-                const current = this.$refs.iconInput.value || '';
+                const current = initial || this.$refs.iconInput.value || '';
                 this.search = current;
                 this.selected = current;
+                if (current) {
+                    this.$refs.iconInput.value = current;
+                }
             }
         },
         loadIcons() {

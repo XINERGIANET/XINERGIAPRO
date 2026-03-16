@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('content')
     <script>
@@ -130,6 +130,24 @@
                             placeholder="Buscar por codigo o descripcion"
                             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-12 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
                     </div>
+                    <div class="w-full sm:w-48 flex-none">
+                        <select name="category_id"
+                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
+                            <option value="0">Todas las categorias</option>
+                            @foreach ($categories as $category)
+                                <option value="{{ $category->id }}" @selected(($selectedCategoryId ?? 0) == $category->id)>{{ $category->description }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="w-full sm:w-48 flex-none">
+                        <select name="product_type_id"
+                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
+                            <option value="0">Todos los tipos</option>
+                            @foreach ($productTypes as $productType)
+                                <option value="{{ $productType->id }}" @selected(($selectedProductTypeId ?? 0) == $productType->id)>{{ $productType->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                     <div class="flex flex-wrap gap-2">
                         <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 px-6 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #334155; border-color: #334155;">
                             <i class="ri-search-line text-gray-100"></i>
@@ -193,6 +211,9 @@
                             <th style="background-color: #334155; color: #FFFFFF;" class="hidden xl:table-cell w-40 px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Tipo</p>
                             </th>
+                            <th style="background-color: #334155; color: #FFFFFF;" class="hidden xl:table-cell w-32 px-5 py-3 text-center sm:px-6">
+                                <p class="font-semibold text-white text-theme-xs uppercase">Stock</p>
+                            </th>
                             <th style="background-color: #334155; color: #FFFFFF;" class="w-40 px-5 py-3 text-center sm:px-6 last:rounded-tr-xl">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Acciones</p>
                             </th>
@@ -228,6 +249,15 @@
                                 </td>
                                 <td class="hidden xl:table-cell px-5 py-4 text-center sm:px-6">
                                     <p class="text-gray-500 text-theme-sm dark:text-gray-400">{{ $product->productType?->name ?? '-' }}</p>
+                                </td>
+                                <td class="hidden xl:table-cell px-5 py-4 text-center sm:px-6">
+                                    @php
+                                        $branchId = session('branch_id');
+                                        $rowProductBranch = $product->productBranches->where('branch_id', $branchId)->first();
+                                    @endphp
+                                    <p class="text-gray-500 text-theme-sm dark:text-gray-400">
+                                        {{ $rowProductBranch ? number_format((float) $rowProductBranch->stock, 2) : '0.00' }}
+                                    </p>
                                 </td>
                                 <td class="px-5 py-4 text-center sm:px-6">
                                     <div class="flex items-center justify-center gap-2">
@@ -297,7 +327,7 @@
                                 </td>
                             </tr>
                             <tr x-show="openRow === {{ $product->id }}" x-cloak class="bg-gray-50/70 dark:bg-gray-800/40 border-b border-gray-100 dark:border-gray-800">
-                                <td colspan="7" class="px-6 py-4">
+                                <td colspan="8" class="px-6 py-4">
                                     @php
                                         $branchId = session('branch_id');
                                         $productBranch = $product->productBranches->where('branch_id', $branchId)->first();
@@ -306,7 +336,7 @@
                                         }
                                     @endphp
                                     @if($productBranch)
-                                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 max-w-4xl">
+                                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6 w-full">
                                             <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
                                                 <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Código</p>
                                                 <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $product->code ?: '-' }}</p>
@@ -415,8 +445,8 @@
                                             </div>
                                           
                                         </div>
-                                        <div class="mt-3 grid gap-3 lg:grid-cols-3">
-                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-900/50 lg:col-span-2">
+                                        <div class="mt-3 grid gap-3 lg:grid-cols-4">
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-900/50 lg:col-span-3">
                                                 <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Características</p>
                                                 <p class="mt-1 text-sm font-medium leading-6 text-gray-800 dark:text-gray-200">{{ $product->features ?: 'Sin características registradas.' }}</p>
                                             </div>
@@ -441,7 +471,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="px-6 py-12">
+                                <td colspan="8" class="px-6 py-12">
                                     <div class="flex flex-col items-center gap-3 text-center text-sm text-gray-500">
                                         <div
                                             class="rounded-full bg-gray-100 p-3 text-gray-400 dark:bg-gray-800 dark:text-gray-300">
@@ -720,6 +750,7 @@
                         'currentBranch' => $currentBranch ?? null,
                         'taxRates' => $taxRates ?? collect(),
                         'productBranch' => null,
+                        'suppliers' => $suppliers ?? collect(),
                     ])
 
                     <div class="flex flex-wrap gap-3">

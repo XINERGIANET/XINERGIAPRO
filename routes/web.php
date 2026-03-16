@@ -413,7 +413,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('/admin/herramientas/movimientos_almacen', WarehouseMovementController::class)
         ->names('warehouse_movements')
         ->parameters(['movimientos_almacen' => 'warehouseMovement'])
-        ->only(['index', 'store', 'show', 'edit', 'update']); // Solo incluir los métodos que existen
+        ->only(['index', 'store', 'show', 'edit', 'update', 'destroy']);
 
     Route::get('/admin/herramientas/movimientos-almacen/entrada', [WarehouseMovementController::class, 'input'])
         ->name('warehouse_movements.input');
@@ -430,6 +430,10 @@ Route::middleware('auth')->group(function () {
         ->name('warehouse_movements.edit');
     Route::put('/admin/herramientas/movimientos-almacen/{warehouseMovement}', [WarehouseMovementController::class, 'update'])
         ->name('warehouse_movements.update');
+    Route::put('/admin/herramientas/movimientos-almacen/{warehouseMovement}/entry-update', [WarehouseMovementController::class, 'updateEntry'])
+        ->name('warehouse_movements.entry.update');
+    Route::put('/admin/herramientas/movimientos-almacen/{warehouseMovement}/output-update', [WarehouseMovementController::class, 'updateOutput'])
+        ->name('warehouse_movements.output.update');
 
     //Recetario
     Route::resource('/cocina/recetario', RecipeBookController::class)
