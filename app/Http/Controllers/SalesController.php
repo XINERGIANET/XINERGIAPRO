@@ -6,6 +6,7 @@ use App\Models\Branch;
 use App\Models\Card;
 use App\Models\CashMovements;
 use App\Models\CashRegister;
+use App\Models\CashShiftRelation;
 use App\Models\DocumentType;
 use App\Models\DigitalWallet;
 use App\Models\Location;
@@ -75,6 +76,56 @@ class SalesController extends Controller
             $perPage = 10;
         }
 
+        $cashRegisters = collect();
+        $selectedBoxId = $request->input('cash_register_id');
+        if ($branchId) {
+            $cashRegisters = CashRegister::query()
+                ->where('branch_id', $branchId)
+                ->where('status', '1')
+                ->orderBy('number')
+                ->get(['id', 'number']);
+            if ($selectedBoxId && !$cashRegisters->contains('id', (int) $selectedBoxId)) {
+                $selectedBoxId = null;
+            }
+            if (!$selectedBoxId && $cashRegisters->isNotEmpty()) {
+                $selectedBoxId = $this->getBranchConfiguredCashRegisterId((int) $branchId, $cashRegisters, 'caja ventas');
+            }
+        }
+
+        $shiftRelations = collect();
+        $currentShiftRelationId = null;
+        if ($selectedBoxId) {
+            $shiftRelations = CashShiftRelation::query()
+                ->with([
+                    'cashMovementStart:id,cash_register_id,shift_id,movement_id',
+                    'cashMovementStart.shift:id,name',
+                    'cashMovementStart.cashRegister:id,number',
+                ])
+                ->where('branch_id', $branchId)
+                ->whereHas('cashMovementStart', function ($query) use ($selectedBoxId) {
+                    $query->where('cash_register_id', $selectedBoxId);
+                })
+                ->orderByDesc('started_at')
+                ->get();
+            $currentRelation = $shiftRelations->firstWhere('status', '1');
+            $currentShiftRelationId = $currentRelation ? (int) $currentRelation->id : null;
+        }
+        $selectedShiftId = $request->input('shift_relation_id');
+        if ($selectedShiftId !== null && $selectedShiftId !== '') {
+            $selectedShiftId = $selectedShiftId === 'all' ? 'all' : (int) $selectedShiftId;
+        } else {
+            $selectedShiftId = $currentShiftRelationId !== null ? $currentShiftRelationId : 'all';
+        }
+
+        $selectedShiftRelation = null;
+        if (is_int($selectedShiftId) && $selectedShiftId > 0 && $selectedBoxId) {
+            $selectedShiftRelation = CashShiftRelation::query()
+                ->where('id', $selectedShiftId)
+                ->where('branch_id', $branchId)
+                ->whereHas('cashMovementStart', fn ($q) => $q->where('cash_register_id', $selectedBoxId))
+                ->first();
+        }
+
         $saleDocumentTypes = DocumentType::query()
             ->where('movement_type_id', 2)
             ->orderBy('name')
@@ -86,9 +137,15 @@ class SalesController extends Controller
         }
 
         $salesBaseQuery = Movement::query()
-            ->with(['branch', 'person', 'movementType', 'documentType', 'salesMovement'])
+            ->with(['branch', 'person', 'movementType', 'documentType', 'salesMovement.details.unit'])
             ->where('movement_type_id', 2) //2 es venta
             ->when($branchId, fn ($query) => $query->where('movements.branch_id', $branchId))
+            ->when($selectedShiftRelation, function ($query) use ($selectedShiftRelation) {
+                $query->where('moved_at', '>=', $selectedShiftRelation->started_at);
+                if ($selectedShiftRelation->ended_at !== null) {
+                    $query->where('moved_at', '<=', $selectedShiftRelation->ended_at);
+                }
+            })
             ->when($selectedDocumentTypeId !== 'all', fn ($query) => $query->where('document_type_id', (int) $selectedDocumentTypeId))
             ->when($search, function ($query) use ($search) {
                 $query->where(function ($inner) use ($search) {
@@ -124,6 +181,11 @@ class SalesController extends Controller
             'perPage' => $perPage,
             'operaciones' => $operaciones,
             'salesTotalAmount' => $salesTotalAmount,
+            'cashRegisters' => $cashRegisters,
+            'selectedBoxId' => $selectedBoxId,
+            'shiftRelations' => $shiftRelations,
+            'selectedShiftId' => $selectedShiftId,
+            'currentShiftRelationId' => $currentShiftRelationId,
         ] + $this->getFormData());
     }
 
