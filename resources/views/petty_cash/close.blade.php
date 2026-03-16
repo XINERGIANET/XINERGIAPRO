@@ -327,7 +327,7 @@
         .close-modal-shell {
             position: fixed;
             inset: 0;
-            z-index: 100;
+            z-index: 999999;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -622,7 +622,8 @@
         </form>
 
         <!-- Detail Modal -->
-        <div x-show="detailModalOpen" x-cloak class="close-modal-shell">
+        <template x-teleport="body">
+            <div x-show="detailModalOpen" x-cloak class="close-modal-shell">
             <div class="close-modal-backdrop" @click="closeDetail()"></div>
 
             <div class="close-modal-card" @click.stop x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100">
@@ -636,33 +637,33 @@
                     </button>
                 </div>
 
-                <div class="p-0 max-h-[70vh] overflow-auto">
-                    <table class="pc-table">
-                        <thead class="sticky top-0 z-10">
+                <div class="p-0 max-h-[70vh] overflow-auto rounded-b-2xl">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
                             <tr>
-                                <th class="text-left">Número</th>
-                                <th class="text-left">Tipo</th>
-                                <th class="text-left">Concepto</th>
-                                <th class="text-left">Total Mov.</th>
-                                <th class="text-left">Fecha</th>
-                                <th class="text-left">Usuario</th>
-                                <th class="text-left">Persona</th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-3 py-3 text-xs uppercase tracking-wider font-bold">N°</th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-3 py-3 text-xs uppercase tracking-wider font-bold">Tipo</th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-3 py-3 text-xs uppercase tracking-wider font-bold">Concepto</th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-3 py-3 text-xs uppercase tracking-wider font-bold">Total Mov.</th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-3 py-3 text-xs uppercase tracking-wider font-bold">Fecha</th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-3 py-3 text-xs uppercase tracking-wider font-bold">Usuario</th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-3 py-3 text-xs uppercase tracking-wider font-bold">Persona</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody class="divide-y divide-gray-100">
                             <template x-for="record in (selectedGroup ? selectedGroup.records : [])" :key="record.number + record.moved_at">
                                 <tr class="hover:bg-slate-50/50 transition-colors">
-                                    <td class="font-bold text-slate-900" x-text="record.number"></td>
-                                    <td>
-                                        <span class="pc-status income" x-text="record.type_label"></span>
+                                    <td class="px-3 py-3 font-bold text-slate-900 text-sm" x-text="record.number || '-'"></td>
+                                    <td class="px-3 py-3">
+                                        <span :class="record.type_label === 'Ingreso' ? 'pc-status income' : 'pc-status expense'" x-text="record.type_label"></span>
                                     </td>
-                                    <td>
-                                        <span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[10px] font-bold uppercase" x-text="record.concept"></span>
+                                    <td class="px-3 py-3">
+                                        <span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[10px] font-bold uppercase whitespace-nowrap" x-text="record.concept"></span>
                                     </td>
-                                    <td class="font-black text-slate-800" x-text="'S/ ' + formatMoney(record.movement_total)"></td>
-                                    <td class="text-xs text-slate-500" x-text="record.moved_at"></td>
-                                    <td class="text-xs text-slate-500" x-text="record.user_name"></td>
-                                    <td class="text-xs text-slate-500" x-text="record.person_name"></td>
+                                    <td class="px-3 py-3 font-black text-slate-800 text-sm whitespace-nowrap" x-text="'S/ ' + formatMoney(record.movement_total)"></td>
+                                    <td class="px-3 py-3 text-xs text-slate-500 whitespace-nowrap" x-text="record.moved_at"></td>
+                                    <td class="px-3 py-3 text-xs text-slate-500" x-text="record.user_name || '-'"></td>
+                                    <td class="px-3 py-3 text-xs text-slate-500" x-text="record.person_name || '-'"></td>
                                 </tr>
                             </template>
                         </tbody>
@@ -676,6 +677,7 @@
                 </div>
             </div>
         </div>
+        </template>
     </div>
 
     <script>

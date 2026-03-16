@@ -192,6 +192,9 @@
                                     <p class="font-bold text-gray-100 text-xs uppercase tracking-wider">Persona</p>
                                 </th>
                                 <th class="px-3 py-3 text-center align-middle">
+                                    <p class="font-bold text-gray-100 text-xs uppercase tracking-wider">Motivo / Destino</p>
+                                </th>
+                                <th class="px-3 py-3 text-center align-middle">
                                     <p class="font-bold text-gray-100 text-xs uppercase tracking-wider">Comentario</p>
                                 </th>
                                 <th class="px-3 py-3 text-center align-middle">
@@ -252,8 +255,49 @@
                                         </p>
                                     </td>
                                     <td class="px-3 py-3 align-middle text-center">
-                                        <p class="text-gray-600 text-theme-sm dark:text-gray-400 truncate max-w-[150px] mx-auto" title="{{ $movement->comment ?? '-' }}">
-                                            {{ $movement->comment ?? '-' }}
+                                        @php
+                                            $motivoDestino = '-';
+                                            $displayComment = $movement->comment ?? '-';
+
+                                            if ($stockType === 'add') {
+                                                if (!empty($movement->reason)) {
+                                                    $motivoDestino = $movement->reason;
+                                                } else {
+                                                    // Manejo para datos históricos donde reason era null
+                                                    $defaultReasons = [
+                                                        'AJUSTE DE ENTRADA',
+                                                        'DEVOLUCION INTERNA',
+                                                        'REGULARIZACION DE STOCK',
+                                                        'TRASLADO INTERNO',
+                                                        'OTRO'
+                                                    ];
+                                                    $upperComment = strtoupper(trim((string) $movement->comment));
+                                                    
+                                                    if (in_array($upperComment, $defaultReasons)) {
+                                                        $motivoDestino = $movement->comment;
+                                                        $displayComment = '-'; // Si era de los predefinidos, no es un comentario real
+                                                    } else {
+                                                        // Si ingresaron un comentario personalizado en el pasado, el motivo se perdía
+                                                        $motivoDestino = 'AJUSTE DE ENTRADA';
+                                                    }
+                                                }
+                                            } elseif ($stockType === 'subtract') {
+                                                // Sucursal destino si es transferencia
+                                                $childMovement = \App\Models\Movement::with('branch')->where('parent_movement_id', $movement->id)->first();
+                                                if ($childMovement && $childMovement->branch) {
+                                                    $motivoDestino = $childMovement->branch->legal_name;
+                                                } else {
+                                                    $motivoDestino = 'Salida General';
+                                                }
+                                            }
+                                        @endphp
+                                        <p class="text-gray-600 text-theme-sm dark:text-gray-400 truncate max-w-[150px] mx-auto font-medium" title="{{ $motivoDestino }}">
+                                            {{ $motivoDestino }}
+                                        </p>
+                                    </td>
+                                    <td class="px-3 py-3 align-middle text-center">
+                                        <p class="text-gray-600 text-theme-sm dark:text-gray-400 truncate max-w-[150px] mx-auto" title="{{ $displayComment }}">
+                                            {{ $displayComment }}
                                         </p>
                                     </td>
                                     <td class="px-3 py-3 text-center align-middle">
@@ -370,7 +414,7 @@
                                     </td>
                                 </tr>
                                 <tr x-show="openRow === {{ $warehouseMovement->id }}" x-cloak class="bg-gray-50/70 dark:bg-gray-800/40">
-                                    <td colspan="8" class="px-6 py-4">
+                                    <td colspan="9" class="px-6 py-4">
                                         <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6 w-full">
                                             <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
                                                 <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Usuario</p>
@@ -433,7 +477,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="px-6 py-16">
+                                    <td colspan="9" class="px-6 py-16">
                                         <div class="flex flex-col items-center gap-4 text-center">
                                             <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-50 text-gray-400 dark:bg-gray-800/50 dark:text-gray-600">
                                                 <i class="ri-archive-line text-3xl"></i>

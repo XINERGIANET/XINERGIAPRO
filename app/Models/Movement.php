@@ -21,6 +21,7 @@ class Movement extends Model
         'responsible_id',
         'responsible_name',
         'comment',
+        'reason',
         'status',
         'movement_type_id',
         'document_type_id',
