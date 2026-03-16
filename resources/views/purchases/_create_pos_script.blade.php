@@ -48,6 +48,7 @@ function purchaseCreateForm(c) {
         documentTypeId: Number(c.initialDocumentTypeId || 0),
         paymentType: c.initialPaymentType || 'CONTADO',
         dueDate: c.initialDueDate || '',
+        manualCreditDays: null,
         cashRegisterId: Number(c.initialCashRegisterId || 0),
         taxRate: Number(c.initialTaxRate || 18),
         includesTax: c.initialIncludesTax || 'N',
@@ -154,7 +155,10 @@ function purchaseCreateForm(c) {
         },
 
         get selectedProviderCreditDays() {
-            return Number(this.selectedProvider?.credit_days || 0);
+            if (this.selectedProvider != null) {
+                return Number(this.selectedProvider.credit_days || 0);
+            }
+            return Number(this.manualCreditDays ?? 0);
         },
 
         get filteredProviders() {
@@ -191,6 +195,7 @@ function purchaseCreateForm(c) {
                 ? `${provider.label} - ${provider.document}`
                 : provider.label;
             this.providerOpen = false;
+            this.manualCreditDays = null;
             this.syncCreditDueDate(true);
         },
 
@@ -199,6 +204,7 @@ function purchaseCreateForm(c) {
             this.providerQuery = '';
             this.providerOpen = true;
             this.providerCursor = 0;
+            this.manualCreditDays = null;
             this.syncCreditDueDate(true);
         },
 
@@ -409,6 +415,16 @@ function purchaseCreateForm(c) {
 
         setDueDate(value) {
             this.dueDate = String(value || '').trim();
+        },
+
+        applyCreditDaysFromInput(value) {
+            const days = Math.max(0, parseInt(value, 10) || 0);
+            if (this.selectedProvider) {
+                this.selectedProvider.credit_days = days;
+            } else {
+                this.manualCreditDays = days;
+            }
+            this.syncCreditDueDate(true);
         },
 
         newItem() {
