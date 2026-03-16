@@ -64,7 +64,7 @@ class WarehouseMovementController extends Controller
                 if ($isEntry) {
                     $editingMovement = $wm;
                     $editingComment = (string) ($wm->movement?->comment ?? '');
-                    $editingReason = $editingComment !== '' ? $editingComment : 'AJUSTE DE ENTRADA';
+                    $editingReason = (string) ($wm->movement?->reason ?? 'AJUSTE DE ENTRADA');
                     foreach ($wm->details as $d) {
                         $pb = $productBranches->get($d->product_id);
                         $editingCart[] = [
@@ -715,7 +715,8 @@ class WarehouseMovementController extends Controller
                 'person_name' => $personName,
                 'responsible_id' => $userId,
                 'responsible_name' => $userName,
-                'comment' => $request->comment ?: $reason,
+                'comment' => $request->comment,
+                'reason' => $reason,
                 'status' => 'A',
                 'movement_type_id' => $movementType->id,
                 'document_type_id' => $documentType->id,
@@ -843,7 +844,8 @@ class WarehouseMovementController extends Controller
 
             $movement = $wm->movement;
             $movement->update([
-                'comment' => $request->input('comment') ?: trim((string) $request->input('reason', $movement->comment)),
+                'comment' => $request->input('comment'),
+                'reason' => trim((string) $request->input('reason', $movement->reason)),
             ]);
 
             foreach ($request->items as $item) {
