@@ -332,7 +332,7 @@
                                         min="0"
                                         step="1"
                                         :value="selectedProviderCreditDays"
-                                        readonly
+                                        @input="applyCreditDaysFromInput($event.target.value)"
                                         class="h-11 w-full rounded-xl border border-amber-200 bg-white px-3 text-sm font-bold text-slate-700"
                                     >
                                 </div>
