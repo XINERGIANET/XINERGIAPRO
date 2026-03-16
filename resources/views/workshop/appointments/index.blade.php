@@ -6,8 +6,8 @@
     vehicles: {{ \Illuminate\Support\Js::from($vehicles->map(function ($v) {
         $clientName = trim(((string) ($v->client->first_name ?? '')) . ' ' . ((string) ($v->client->last_name ?? '')));
         return [
-            'id' => $v->id,
-            'client_person_id' => $v->client_person_id,
+            'id' => (string) $v->id,
+            'client_person_id' => (string) $v->client_person_id,
             'client_name' => $clientName,
             'label' => trim($v->brand . ' ' . $v->model . ' ' . ($v->plate ? ('- ' . $v->plate) : '')),
             'display_label' => trim($v->brand . ' ' . $v->model . ' ' . ($v->plate ? ('- ' . $v->plate) : '')) . ($clientName !== '' ? ' (Cliente: ' . $clientName . ')' : ''),
@@ -329,11 +329,19 @@
                 .slice(0, 30);
         },
         selectVehicle(vehicle) {
-            this.selectedVehicleId = String(vehicle.id);
-            this.vehicleSearch = vehicle.display_label || vehicle.label || '';
+            this.selectedVehicleId = vehicle.id;
+            this.vehicleSearch = vehicle.label || '';
             this.vehicleDropdownOpen = false;
-            if (this.vehicleClientMap[this.selectedVehicleId]) {
-                this.selectedClient = this.vehicleClientMap[this.selectedVehicleId];
+            if (vehicle.client_person_id) {
+                if (this.$refs && this.$refs.clientSelect) {
+                    let exists = Array.from(this.$refs.clientSelect.options).some(opt => opt.value === vehicle.client_person_id);
+                    if (!exists && vehicle.client_name) {
+                        this.$refs.clientSelect.add(new Option(vehicle.client_name, vehicle.client_person_id));
+                    }
+                }
+                this.selectedClient = vehicle.client_person_id;
+            } else {
+                this.selectedClient = '';
             }
         },
         onVehicleSearchInput() {
@@ -395,7 +403,7 @@
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Cliente</label>
-                    <select name="client_person_id" x-model="selectedClient" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                    <select x-ref="clientSelect" name="client_person_id" x-model="selectedClient" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm flex-1 dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" required>
                         <option value="">Seleccione cliente</option>
                         @foreach($clients as $client)
                             <option value="{{ $client->id }}">{{ $client->first_name }} {{ $client->last_name }}</option>
@@ -464,11 +472,19 @@
                     .slice(0, 30);
             },
             selectVehicle(vehicle) {
-                this.selectedVehicleId = String(vehicle.id);
-                this.vehicleSearch = vehicle.display_label || vehicle.label || '';
+                this.selectedVehicleId = vehicle.id;
+                this.vehicleSearch = vehicle.label || '';
                 this.vehicleDropdownOpen = false;
-                if (this.vehicleClientMap[this.selectedVehicleId]) {
-                    this.selectedClient = this.vehicleClientMap[this.selectedVehicleId];
+                if (vehicle.client_person_id) {
+                    if (this.$refs && this.$refs.clientSelect) {
+                        let exists = Array.from(this.$refs.clientSelect.options).some(opt => opt.value === vehicle.client_person_id);
+                        if (!exists && vehicle.client_name) {
+                            this.$refs.clientSelect.add(new Option(vehicle.client_name, vehicle.client_person_id));
+                        }
+                    }
+                    this.selectedClient = vehicle.client_person_id;
+                } else {
+                    this.selectedClient = '';
                 }
             },
             onVehicleSearchInput() {
@@ -531,9 +547,9 @@
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">Cliente</label>
-                        <select name="client_person_id" x-model="selectedClient" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                        <select x-ref="clientSelect" name="client_person_id" x-model="selectedClient" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm flex-1 dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" required>
                             @foreach($clients as $client)
-                                <option value="{{ $client->id }}" @selected((int)$appointment->client_person_id === (int)$client->id)>{{ $client->first_name }} {{ $client->last_name }}</option>
+                                <option value="{{ $client->id }}">{{ $client->first_name }} {{ $client->last_name }}</option>
                             @endforeach
                         </select>
                     </div>
