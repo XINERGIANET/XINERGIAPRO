@@ -101,6 +101,32 @@ class PettyCashController extends Controller
             $selectedBoxId = $cashRegisters->first()->id;
         }
 
+        // Turnos por caja: relaciones de turno para la caja seleccionada
+        $shiftRelations = collect();
+        $currentShiftRelationId = null;
+        if ($selectedBoxId) {
+            $shiftRelations = CashShiftRelation::query()
+                ->with([
+                    'cashMovementStart:id,cash_register_id,shift_id,movement_id',
+                    'cashMovementStart.shift:id,name',
+                    'cashMovementStart.cashRegister:id,number',
+                ])
+                ->where('branch_id', $branchId)
+                ->whereHas('cashMovementStart', function ($query) use ($selectedBoxId) {
+                    $query->where('cash_register_id', $selectedBoxId);
+                })
+                ->orderByDesc('started_at')
+                ->get();
+            $currentRelation = $shiftRelations->firstWhere('status', '1');
+            $currentShiftRelationId = $currentRelation ? (int) $currentRelation->id : null;
+        }
+        $selectedShiftId = $request->input('shift_relation_id');
+        if ($selectedShiftId !== null && $selectedShiftId !== '') {
+            $selectedShiftId = $selectedShiftId === 'all' ? 'all' : (int) $selectedShiftId;
+        } else {
+            $selectedShiftId = $currentShiftRelationId !== null ? $currentShiftRelationId : 'all';
+        }
+
         // --- LÓGICA DE ESTADO DE CAJA (MODIFICADO) ---
         $hasOpening = CashShiftRelation::query()
             ->where('branch_id', $branchId)
@@ -135,6 +161,15 @@ class PettyCashController extends Controller
             })
             ->get();
 
+        $selectedShiftRelation = null;
+        if (is_int($selectedShiftId) && $selectedShiftId > 0) {
+            $selectedShiftRelation = CashShiftRelation::query()
+                ->where('id', $selectedShiftId)
+                ->where('branch_id', $branchId)
+                ->whereHas('cashMovementStart', fn ($q) => $q->where('cash_register_id', $selectedBoxId))
+                ->first();
+        }
+
         $movements = Movement::query()
             ->with([
                 'documentType',
@@ -146,6 +181,12 @@ class PettyCashController extends Controller
             ])
             ->whereHas('cashMovement', function ($query) use ($selectedBoxId) {
                 $query->where('cash_register_id', $selectedBoxId);
+            })
+            ->when($selectedShiftRelation, function ($query) use ($selectedShiftRelation) {
+                $query->where('moved_at', '>=', $selectedShiftRelation->started_at);
+                if ($selectedShiftRelation->ended_at !== null) {
+                    $query->where('moved_at', '<=', $selectedShiftRelation->ended_at);
+                }
             })
             ->when($search, function ($query, $search) {
                 $needle = mb_strtolower((string) $search, 'UTF-8');
@@ -209,6 +250,9 @@ class PettyCashController extends Controller
             'conceptsEgreso'  => $conceptsEgreso,
             'selectedBoxId'   => $selectedBoxId,
             'shifts'          => $shifts,
+            'shiftRelations'   => $shiftRelations,
+            'selectedShiftId' => $selectedShiftId,
+            'currentShiftRelationId' => $currentShiftRelationId,
 
             'paymentMethods'  => $paymentMethods,
             'paymentGateways' => $paymentGateways,

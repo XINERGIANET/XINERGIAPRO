@@ -372,6 +372,8 @@
             @csrf
             <input type="hidden" name="cash_register_id" value="{{ $cashRegisterId }}">
             <input type="hidden" name="shift_id" value="{{ $shiftId }}">
+            <input type="hidden" name="real_closing_amount" :value="montoRealManual !== '' && montoRealManual !== null ? parseFloat(montoRealManual) : ''">
+            <input type="hidden" name="closing_discrepancy" :value="montoRealManual !== '' && montoRealManual !== null ? descuadre : ''">
 
             <div class="pc-container">
                 <!-- Sidebar (Left) -->
@@ -418,13 +420,31 @@
                     </div>
 
                     <div class="mt-8 space-y-3">
-                        <div class="pc-tile green">
-                            <span class="pc-tile-label">Total Contado</span>
-                            <span class="pc-tile-value" x-text="'S/ ' + formatMoney(realCashTotal)"></span>
-                        </div>
                         <div class="pc-tile gray">
-                            <span class="pc-tile-label">Saldo Pasado</span>
+                            <span class="pc-tile-label">Total según sistema</span>
                             <span class="pc-tile-value">S/ {{ $money($systemCash) }}</span>
+                        </div>
+                        <div class="pc-sidebar-field">
+                            <span class="pc-sidebar-label">Monto real de cierre (manual)</span>
+                            <input type="number"
+                                step="0.01"
+                                min="0"
+                                x-model="montoRealManual"
+                                placeholder="0.00"
+                                class="mt-1 block w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-800 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                            >
+                        </div>
+                        <div class="pc-sidebar-field" x-show="String(montoRealManual || '').trim() !== ''">
+                            <span class="pc-sidebar-label">Descuadre</span>
+                            <div class="mt-1 flex items-center gap-2 rounded-xl border px-4 py-3 font-bold"
+                                :class="descuadre > 0 ? 'border-rose-200 bg-rose-50 text-rose-700' : (descuadre < 0 ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600')">
+                                <span x-text="'S/ ' + formatMoney(Math.abs(descuadre))"></span>
+                                <span x-text="descuadre > 0 ? '(Faltante)' : (descuadre < 0 ? '(Sobrante)' : '(Cuadrado)')"></span>
+                            </div>
+                        </div>
+                        <div class="pc-tile green">
+                            <span class="pc-tile-label">Total Contado (billetes/monedas)</span>
+                            <span class="pc-tile-value" x-text="'S/ ' + formatMoney(realCashTotal)"></span>
                         </div>
                     </div>
 
@@ -666,12 +686,18 @@
                 detailGroups: {{ Js::from($detailGroups) }},
                 detailModalOpen: false,
                 selectedGroup: null,
+                systemCash: {{ Js::from((float) ($systemCash ?? 0)) }},
+                montoRealManual: '',
                 get realCashTotal() {
                     return [...this.coins, ...this.bills].reduce((total, row) => {
                         const quantity = Number(row.quantity || 0);
                         const value = Number(row.value || 0);
                         return total + (quantity * value);
                     }, 0);
+                },
+                get descuadre() {
+                    const real = parseFloat(this.montoRealManual) || 0;
+                    return Math.round((this.systemCash - real) * 100) / 100;
                 },
                 formatMoney(value) {
                     return new Intl.NumberFormat('es-PE', {

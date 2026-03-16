@@ -204,21 +204,20 @@
                 </div>
             @endif
 
-            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <form method="GET" class="flex flex-1 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <div class="flex flex-col gap-4 xl:flex-row xl:flex-wrap xl:items-center xl:justify-between">
+                <form method="GET" class="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center xl:min-w-full">
                     @if ($viewId)
                         <input type="hidden" name="view_id" value="{{ $viewId }}">
                     @endif
                     <div class="w-36 flex-none">
-                        <select
+                        <x-form.select-autocomplete
                             name="per_page"
-                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                            onchange="this.form.submit()"
-                        >
-                            @foreach ([10, 20, 50, 100] as $size)
-                                <option value="{{ $size }}" @selected($perPage == $size)>{{ $size }} / página</option>
-                            @endforeach
-                        </select>
+                            :value="$perPage"
+                            :options="collect([10, 20, 50, 100])->map(fn($n) => ['value' => $n, 'label' => $n . ' / página'])->values()->all()"
+                            placeholder="Por página"
+                            :submit-on-change="true"
+                            inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        />
                     </div>
                     <div class="relative flex-1">
                         <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
@@ -233,61 +232,93 @@
                         />
                     </div>
                     <div class="w-full sm:w-44 sm:flex-none">
-                        <select
+                        <x-form.select-autocomplete
                             name="document_type_id"
-                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                        >
-                            <option value="all" @selected(($selectedDocumentTypeId ?? 'all') === 'all')>Todos los docs.</option>
-                            @foreach(($saleDocumentTypes ?? collect()) as $documentType)
-                                <option value="{{ $documentType->id }}" @selected((string) ($selectedDocumentTypeId ?? 'all') === (string) $documentType->id)>
-                                    {{ $documentType->name }}
-                                </option>
+                            :value="$selectedDocumentTypeId ?? 'all'"
+                            :options="collect($saleDocumentTypes ?? [])->map(fn($d) => ['value' => $d->id, 'label' => $d->name])->prepend(['value' => 'all', 'label' => 'Todos los docs.'])->values()->all()"
+                            placeholder="Todos los docs."
+                            inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        />
+                    </div>
+                    <div class="w-full sm:w-40 sm:flex-none">
+                        <x-form.select-autocomplete
+                            name="billing_status"
+                            :value="$billingStatus ?? 'all'"
+                            :options="[['value' => 'all', 'label' => 'Todas'], ['value' => 'pending', 'label' => 'Por facturar'], ['value' => 'invoiced', 'label' => 'Facturadas']]"
+                            placeholder="Todas"
+                            inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        />
+                    </div>
+                    <div class="w-full sm:w-40 sm:flex-none">
+                        <label class="mb-1.5 block text-xs font-medium text-gray-500 sm:hidden">Caja</label>
+                        <select name="cash_register_id"
+                            onchange="this.form.submit()"
+                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
+                            <option value="">Todas</option>
+                            @foreach ($cashRegisters ?? [] as $reg)
+                                <option value="{{ $reg->id }}" {{ ($selectedBoxId ?? '') == $reg->id ? 'selected' : '' }}>{{ $reg->number }}</option>
                             @endforeach
                         </select>
                     </div>
-                    <div class="w-full sm:w-40 sm:flex-none">
-                        <select
-                            name="billing_status"
-                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                        >
-                            <option value="all" @selected(($billingStatus ?? 'all') === 'all')>Todas</option>
-                            <option value="pending" @selected(($billingStatus ?? 'all') === 'pending')>Por facturar</option>
-                            <option value="invoiced" @selected(($billingStatus ?? 'all') === 'invoiced')>Facturadas</option>
-                        </select>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                        <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 px-6 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #334155; border-color: #334155;">
-                            <i class="ri-search-line text-gray-100"></i>
-                            <span class="font-medium text-gray-100">Buscar</span>
-                        </x-ui.button>
-                        <x-ui.link-button size="md" variant="outline" href="{{ route('admin.sales.index', $viewId ? ['view_id' => $viewId] : []) }}" class="flex-1 sm:flex-none h-11 px-6 border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200">
-                            <i class="ri-refresh-line"></i>
-                            <span class="font-medium">Limpiar</span>
-                        </x-ui.link-button>
+                    @if (($selectedBoxId ?? null) && ($shiftRelations ?? collect())->isNotEmpty())
+                        <div class="w-full min-w-0 flex-1 sm:min-w-[320px]">
+                            <label class="mb-1.5 block text-xs font-medium text-gray-500 sm:hidden">Turno</label>
+                            <select name="shift_relation_id"
+                                onchange="this.form.submit()"
+                                class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
+                                <option value="all" {{ ($selectedShiftId ?? 'all') === 'all' ? 'selected' : '' }}>Todos</option>
+                                @foreach ($shiftRelations as $rel)
+                                    @php
+                                        $boxNum = $rel->cashMovementStart->cashRegister->number ?? '';
+                                        $shiftName = $rel->cashMovementStart->shift->name ?? 'Turno';
+                                        $started = $rel->started_at ? \Carbon\Carbon::parse($rel->started_at)->format('Y-m-d H:i:s') : '';
+                                        $ended = $rel->ended_at ? \Carbon\Carbon::parse($rel->ended_at)->format('Y-m-d H:i:s') : '';
+                                        $label = $boxNum ? " {$shiftName} | {$started}" : "{$shiftName} | {$started}";
+                                        if ($rel->status === '1') {
+                                            $label .= ' (En curso)';
+                                        } elseif ($ended) {
+                                            $label .= " - {$ended}";
+                                        }
+                                    @endphp
+                                    <option value="{{ $rel->id }}" {{ ($selectedShiftId ?? 'all') === $rel->id ? 'selected' : '' }}>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endif
+                    <div class="flex w-full flex-wrap items-center justify-between gap-2">
+                        <div class="flex flex-wrap gap-2">
+                            <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 px-6 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #334155; border-color: #334155;">
+                                <i class="ri-search-line text-gray-100"></i>
+                                <span class="font-medium text-gray-100">Buscar</span>
+                            </x-ui.button>
+                            <x-ui.link-button size="md" variant="outline" href="{{ route('admin.sales.index', $viewId ? ['view_id' => $viewId] : []) }}" class="flex-1 sm:flex-none h-11 px-6 border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200">
+                                <i class="ri-refresh-line"></i>
+                                <span class="font-medium">Limpiar</span>
+                            </x-ui.link-button>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            @if ($topOperations->isNotEmpty())
+                                @foreach ($topOperations as $operation)
+                                    @php
+                                        $topColor = $operation->color ?: '#3B82F6';
+                                        $topTextColor = str_contains($operation->action ?? '', 'sales.create') ? '#111827' : '#FFFFFF';
+                                        $topStyle = "background-color: {$topColor}; color: {$topTextColor};";
+                                        $topActionUrl = $resolveActionUrl($operation->action ?? '', null, $operation);
+                                    @endphp
+                                    <x-ui.link-button size="md" variant="primary" style="{{ $topStyle }}" href="{{ $topActionUrl }}">
+                                        <i class="{{ $operation->icon }}"></i>
+                                        <span>{{ $operation->name }}</span>
+                                    </x-ui.link-button>
+                                @endforeach
+                            @else
+                                <x-ui.link-button size="md" variant="primary" style="background-color: #12f00e; color: #111827;" href="{{ route('admin.sales.create', $viewId ? ['view_id' => $viewId] : []) }}">
+                                    <i class="ri-add-line"></i>
+                                    <span>Nueva venta</span>
+                                </x-ui.link-button>
+                            @endif
+                        </div>
                     </div>
                 </form>
-
-                <div class="flex flex-wrap items-center gap-2">
-                    @if ($topOperations->isNotEmpty())
-                        @foreach ($topOperations as $operation)
-                            @php
-                                $topColor = $operation->color ?: '#3B82F6';
-                                $topTextColor = str_contains($operation->action ?? '', 'sales.create') ? '#111827' : '#FFFFFF';
-                                $topStyle = "background-color: {$topColor}; color: {$topTextColor};";
-                                $topActionUrl = $resolveActionUrl($operation->action ?? '', null, $operation);
-                            @endphp
-                            <x-ui.link-button size="md" variant="primary" style="{{ $topStyle }}" href="{{ $topActionUrl }}">
-                                <i class="{{ $operation->icon }}"></i>
-                                <span>{{ $operation->name }}</span>
-                            </x-ui.link-button>
-                        @endforeach
-                    @else
-                        <x-ui.link-button size="md" variant="primary" style="background-color: #12f00e; color: #111827;" href="{{ route('admin.sales.create', $viewId ? ['view_id' => $viewId] : []) }}">
-                            <i class="ri-add-line"></i>
-                            <span>Nueva venta</span>
-                        </x-ui.link-button>
-                    @endif
-                </div>
             </div>
 
             <div class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
@@ -699,6 +730,42 @@
                                             <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $sale->movementType?->description ?? 'Venta' }} - {{ $sale->salesDocumentCode() }}</p>
                                         </div>
                                     </div>
+                                    @if ($sale->salesMovement?->details?->isNotEmpty())
+                                        <div class="mt-4">
+                                            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Detalle vendido</p>
+                                            <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                                                <table class="w-full min-w-[400px] text-sm">
+                                                    <thead>
+                                                        <tr class="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/60">
+                                                            <th class="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-300">Ítem</th>
+                                                            <th class="px-3 py-2 text-right font-semibold text-gray-700 dark:text-gray-300">Cant.</th>
+                                                            <th class="px-3 py-2 text-center font-semibold text-gray-700 dark:text-gray-300">Unidad</th>
+                                                            <th class="px-3 py-2 text-right font-semibold text-gray-700 dark:text-gray-300">P. unit.</th>
+                                                            <th class="px-3 py-2 text-right font-semibold text-gray-700 dark:text-gray-300">Subtotal</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach ($sale->salesMovement->details as $d)
+                                                            @php
+                                                                $qty = (float) ($d->quantity ?? 0);
+                                                                $lineTotal = (float) ($d->amount ?? 0);
+                                                                $unitPrice = $qty > 0 ? ($lineTotal / $qty) : 0;
+                                                            @endphp
+                                                            <tr class="border-b border-gray-100 dark:border-gray-700/50 last:border-0">
+                                                                <td class="px-3 py-2 text-gray-800 dark:text-gray-200">
+                                                                    {{ $d->code ? $d->code . ' - ' : '' }}{{ $d->description ?? '-' }}
+                                                                </td>
+                                                                <td class="px-3 py-2 text-right tabular-nums text-gray-800 dark:text-gray-200">{{ number_format($qty, 2) }}</td>
+                                                                <td class="px-3 py-2 text-center text-gray-600 dark:text-gray-400">{{ $d->unit?->abbreviation ?? $d->unit?->description ?? '-' }}</td>
+                                                                <td class="px-3 py-2 text-right tabular-nums text-gray-800 dark:text-gray-200">S/ {{ number_format($unitPrice, 2) }}</td>
+                                                                <td class="px-3 py-2 text-right tabular-nums font-medium text-gray-800 dark:text-gray-200">S/ {{ number_format($lineTotal, 2) }}</td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    @endif
                                 </td>
                             </tr>
                         @empty
