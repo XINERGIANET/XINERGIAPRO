@@ -27,8 +27,8 @@
                 });
             @endphp
 
-            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <form method="GET" class="flex flex-1 flex-col gap-3 xl:flex-row xl:items-center">
+            <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                <form method="GET" class="flex flex-1 flex-wrap gap-3 items-center">
                     @if ($viewId)
                         <input type="hidden" name="view_id" value="{{ $viewId }}">
                     @endif
@@ -42,7 +42,7 @@
                             inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                         />
                     </div>
-                    <div class="relative flex-1">
+                    <div class="relative flex-1 min-w-[320px] w-full sm:w-auto">
                         <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
                             <i class="ri-search-line"></i>
                         </span>
@@ -99,7 +99,7 @@
                     </div>
                 </form>
 
-                <div class="flex flex-wrap items-center gap-2">
+                <div class="flex flex-wrap items-start gap-2">
                     <x-ui.link-button size="md" variant="primary" style="background-color: #12f00e; color: #111827;" href="{{ route('admin.purchases.create', $viewId ? ['view_id' => $viewId] : []) }}">
                         <i class="ri-add-line"></i>
                         <span>Nueva compra</span>
