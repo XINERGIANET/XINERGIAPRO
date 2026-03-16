@@ -127,6 +127,41 @@ class PettyCashController extends Controller
             $selectedShiftId = $currentShiftRelationId !== null ? $currentShiftRelationId : 'all';
         }
 
+        $selectedTipoMovimiento = $request->input('tipo_movimiento', 'all');
+        if (!in_array($selectedTipoMovimiento, ['all', 'ingreso', 'egreso'], true)) {
+            $selectedTipoMovimiento = 'all';
+        }
+
+        $selectedPaymentConceptId = $request->input('payment_concept_id');
+        if ($selectedPaymentConceptId !== null && $selectedPaymentConceptId !== '' && $selectedPaymentConceptId !== 'all') {
+            $selectedPaymentConceptId = (int) $selectedPaymentConceptId;
+        } else {
+            $selectedPaymentConceptId = null;
+        }
+        $paymentConceptsForFilter = PaymentConcept::query()
+            ->orderBy('type')
+            ->orderBy('description')
+            ->get(['id', 'description', 'type']);
+
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
+        $dateFromCarbon = null;
+        $dateToCarbon = null;
+        if ($dateFrom) {
+            try {
+                $dateFromCarbon = Carbon::parse($dateFrom)->startOfDay();
+            } catch (\Exception $e) {
+                $dateFrom = null;
+            }
+        }
+        if ($dateTo) {
+            try {
+                $dateToCarbon = Carbon::parse($dateTo)->endOfDay();
+            } catch (\Exception $e) {
+                $dateTo = null;
+            }
+        }
+
         // --- LÓGICA DE ESTADO DE CAJA (MODIFICADO) ---
         $hasOpening = CashShiftRelation::query()
             ->where('branch_id', $branchId)
@@ -197,6 +232,13 @@ class PettyCashController extends Controller
                         ->orWhereRaw('LOWER(COALESCE(number, \'\')) LIKE ?', ["%{$needle}%"]);
                 });
             })
+            ->when($selectedTipoMovimiento === 'ingreso' && $ingresoDocId !== '', fn ($query) => $query->where('document_type_id', $ingresoDocId))
+            ->when($selectedTipoMovimiento === 'egreso' && $egresoDocId !== '', fn ($query) => $query->where('document_type_id', $egresoDocId))
+            ->when($selectedPaymentConceptId !== null, function ($query) use ($selectedPaymentConceptId) {
+                $query->whereHas('cashMovement', fn ($q) => $q->where('payment_concept_id', $selectedPaymentConceptId));
+            })
+            ->when($dateFromCarbon !== null, fn ($query) => $query->where('moved_at', '>=', $dateFromCarbon))
+            ->when($dateToCarbon !== null, fn ($query) => $query->where('moved_at', '<=', $dateToCarbon))
             ->orderBy('moved_at', 'desc')
             ->paginate($perPage)
             ->withQueryString();
@@ -253,6 +295,11 @@ class PettyCashController extends Controller
             'shiftRelations'   => $shiftRelations,
             'selectedShiftId' => $selectedShiftId,
             'currentShiftRelationId' => $currentShiftRelationId,
+            'selectedTipoMovimiento' => $selectedTipoMovimiento,
+            'paymentConceptsForFilter' => $paymentConceptsForFilter,
+            'selectedPaymentConceptId' => $selectedPaymentConceptId,
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
 
             'paymentMethods'  => $paymentMethods,
             'paymentGateways' => $paymentGateways,

@@ -166,56 +166,11 @@
         <x-common.component-card title="Gestión de Movimientos" desc="Control de ingresos, egresos y traslados de fondos.">
 
             <div class="flex flex-col gap-5">
-                {{-- FILTROS --}}
-                <form method="GET" class="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
+                {{-- FILTROS (misma estructura que kardex: grid en 2 filas) --}}
+                <form method="GET" action="{{ route('admin.petty-cash.index', ['cash_register_id' => $selectedBoxId]) }}" class="mb-6 space-y-5">
                     @if ($viewId)
                         <input type="hidden" name="view_id" value="{{ $viewId }}">
                     @endif
-                    <div class="w-36 flex-none">
-                        <label class="mb-1.5 block text-xs font-medium text-gray-500 sm:hidden">Por página</label>
-                        <x-form.select-autocomplete
-                            name="per_page"
-                            :value="$perPage ?? 10"
-                            :options="collect([10, 20, 50, 100])->map(fn($n) => ['value' => $n, 'label' => $n . ' / página'])->values()->all()"
-                            placeholder="Por página"
-                            :submit-on-change="true"
-                            inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                        />
-                    </div>
-                    <div class="relative flex-1">
-                        <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                            {!! $SearchIcon !!}
-                        </span>
-                        <input type="text" name="search" value="{{ request('search') }}"
-                            placeholder="Buscar movimiento..."
-                            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-10 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
-                    </div>
-
-                    <div class="relative flex w-full sm:w-auto min-w-0 sm:min-w-[200px]" x-data="{
-                        init() {
-                            this.$nextTick(() => {
-                                const sel = this.$el.querySelector('select[name=cash_register_id]');
-                                if (sel) sel.addEventListener('change', () => {
-                                    const base = '{{ url('/caja/caja-chica') }}/';
-                                    const viewId = '{{ $viewId ?? '' }}';
-                                    let u = base + sel.value;
-                                    if (viewId) u += '?view_id=' + viewId;
-                                    window.location = u;
-                                });
-                            });
-                        }
-                    }">
-                        <label class="mb-1.5 block text-xs font-medium text-gray-500 sm:hidden">Caja</label>
-                        <x-form.select-autocomplete
-                            name="cash_register_id"
-                            :value="$selectedBoxId"
-                            :options="collect($cashRegisters ?? [])->map(fn($r) => ['value' => $r->id, 'label' => $r->number])->values()->all()"
-                            placeholder="Caja"
-                            :submit-on-change="false"
-                            inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                        />
-                    </div>
-
                     @php
                         $pettyShiftOptions = collect([['value' => 'all', 'label' => 'Todos']]);
                         foreach ($shiftRelations ?? [] as $rel) {
@@ -223,7 +178,7 @@
                             $shiftName = $rel->cashMovementStart->shift->name ?? 'Turno';
                             $started = $rel->started_at ? \Carbon\Carbon::parse($rel->started_at)->format('Y-m-d H:i:s') : '';
                             $ended = $rel->ended_at ? \Carbon\Carbon::parse($rel->ended_at)->format('Y-m-d H:i:s') : '';
-                            $label = $boxNum ? "{$boxNum} - {$shiftName} | {$started}" : "{$shiftName} | {$started}";
+                            $label = $boxNum ? "{$shiftName} | {$started}" : "{$shiftName} | {$started}";
                             if ($rel->status === '1') {
                                 $label .= ' (En curso)';
                             } elseif ($ended) {
@@ -231,30 +186,126 @@
                             }
                             $pettyShiftOptions->push(['value' => $rel->id, 'label' => $label]);
                         }
+                        $conceptOptions = collect([['value' => '', 'label' => 'Todos']])->merge(
+                            collect($paymentConceptsForFilter ?? [])->map(fn($c) => ['value' => (string)$c->id, 'label' => $c->description])
+                        )->values()->all();
                     @endphp
-                    <div class="relative flex w-full sm:w-auto min-w-0 sm:min-w-[340px]">
-                        <label class="mb-1.5 block text-xs font-medium text-gray-500 sm:hidden">Turno</label>
-                        <x-form.select-autocomplete
-                            name="shift_relation_id"
-                            :value="$selectedShiftId"
-                            :options="$pettyShiftOptions->values()->all()"
-                            placeholder="Todos"
-                            :submit-on-change="true"
-                            inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-                        />
+                    {{-- Fila 1: Por página, Buscar (crece), Caja, Turno (crece) --}}
+                    <div class="flex flex-wrap items-end gap-3 xl:flex-nowrap">
+                        <div class="w-full sm:w-[140px] sm:flex-shrink-0">
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Por página</label>
+                            <x-form.select-autocomplete
+                                name="per_page"
+                                :value="$perPage ?? 10"
+                                :options="collect([10, 20, 50, 100])->map(fn($n) => ['value' => $n, 'label' => $n . ' / página'])->values()->all()"
+                                placeholder="Por página"
+                                :submit-on-change="true"
+                                inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                            />
+                        </div>
+                        <div class="flex-1 min-w-0 xl:min-w-[180px]">
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Buscar</label>
+                            <div class="relative">
+                                <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                    {!! $SearchIcon !!}
+                                </span>
+                                <input type="text" name="search" value="{{ request('search') }}"
+                                    placeholder="Buscar movimiento..."
+                                    class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-10 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
+                            </div>
+                        </div>
+                        <div class="w-full sm:w-[120px] sm:flex-shrink-0" x-data="{
+                            init() {
+                                this.$nextTick(() => {
+                                    const sel = this.$el.querySelector('select[name=cash_register_id]');
+                                    if (sel) sel.addEventListener('change', () => {
+                                        const base = '{{ url('/caja/caja-chica') }}/';
+                                        const viewId = '{{ $viewId ?? '' }}';
+                                        let u = base + sel.value;
+                                        if (viewId) u += '?view_id=' + viewId;
+                                        window.location = u;
+                                    });
+                                });
+                            }
+                        }">
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Caja</label>
+                            <x-form.select-autocomplete
+                                name="cash_register_id"
+                                :value="$selectedBoxId"
+                                :options="collect($cashRegisters ?? [])->map(fn($r) => ['value' => $r->id, 'label' => $r->number])->values()->all()"
+                                placeholder="Caja"
+                                :submit-on-change="false"
+                                inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                            />
+                        </div>
+                        <div class="flex-1 min-w-0 xl:min-w-[180px]">
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Turno</label>
+                            <x-form.select-autocomplete
+                                name="shift_relation_id"
+                                :value="$selectedShiftId"
+                                :options="$pettyShiftOptions->values()->all()"
+                                placeholder="Todos"
+                                :submit-on-change="true"
+                                inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                            />
+                        </div>
                     </div>
-
-                    <div class="flex shrink-0 items-center gap-2">
-                        <x-ui.button size="md" variant="primary" type="submit" class="flex-1 sm:flex-none h-11 px-4 shadow-sm hover:shadow-md transition-all duration-200 active:scale-95" style="background-color: #334155; border-color: #334155;">
-                            <i class="ri-search-line text-gray-100"></i>
-                            <span class="font-medium text-gray-100">Buscar</span>
-                        </x-ui.button>
-                        <x-ui.link-button size="md" variant="outline"
-                            href="{{ route('admin.petty-cash.index', array_merge(['cash_register_id' => $selectedBoxId], $viewId ? ['view_id' => $viewId] : [])) }}"
-                            class="flex-1 sm:flex-none h-11 px-4 border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-all duration-200">
-                            <i class="ri-refresh-line"></i>
-                            <span class="font-medium">Limpiar</span>
-                        </x-ui.link-button>
+                    {{-- Fila 2: Tipo, Concepto (crece), Desde, Hasta, Botones --}}
+                    <div class="flex flex-wrap items-end gap-3 xl:flex-nowrap">
+                        <div class="w-full sm:w-[140px] sm:flex-shrink-0">
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Tipo</label>
+                            <x-form.select-autocomplete
+                                name="tipo_movimiento"
+                                :value="$selectedTipoMovimiento ?? 'all'"
+                                :options="[['value' => 'all', 'label' => 'Todos'], ['value' => 'ingreso', 'label' => 'Ingreso'], ['value' => 'egreso', 'label' => 'Egreso']]"
+                                placeholder="Todos"
+                                :submit-on-change="true"
+                                inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                            />
+                        </div>
+                        <div class="w-full sm:w-[200px] sm:flex-shrink-0">
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Concepto</label>
+                            <x-form.select-autocomplete
+                                name="payment_concept_id"
+                                :value="$selectedPaymentConceptId ?? ''"
+                                :options="$conceptOptions"
+                                placeholder="Todos"
+                                :submit-on-change="true"
+                                inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                            />
+                        </div>
+                        <div class="flex-1 min-w-0 xl:min-w-[150px]">
+                            <x-form.date-picker
+                                id="petty-date-from"
+                                name="date_from"
+                                label="Desde"
+                                :defaultDate="$dateFrom ?? null"
+                                dateFormat="Y-m-d"
+                                placeholder="dd/mm/yyyy"
+                            />
+                        </div>
+                        <div class="flex-1 min-w-0 xl:min-w-[150px]">
+                            <x-form.date-picker
+                                id="petty-date-to"
+                                name="date_to"
+                                label="Hasta"
+                                :defaultDate="$dateTo ?? null"
+                                dateFormat="Y-m-d"
+                                placeholder="dd/mm/yyyy"
+                            />
+                        </div>
+                        <div class="flex flex-shrink-0 items-end gap-2">
+                            <x-ui.button type="submit" size="md" variant="primary" class="h-11 px-5" style="background-color: #334155; border-color: #334155;">
+                                <i class="ri-search-line text-gray-100"></i>
+                                <span class="font-medium text-gray-100">Buscar</span>
+                            </x-ui.button>
+                            <x-ui.link-button size="md" variant="outline"
+                                href="{{ route('admin.petty-cash.index', array_merge(['cash_register_id' => $selectedBoxId], $viewId ? ['view_id' => $viewId] : [])) }}"
+                                class="h-11 px-5 border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900">
+                                <i class="ri-refresh-line"></i>
+                                <span class="font-medium">Limpiar</span>
+                            </x-ui.link-button>
+                        </div>
                     </div>
                 </form>
 
