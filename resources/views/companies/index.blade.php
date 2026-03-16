@@ -93,7 +93,6 @@
                             :value="$perPage"
                             :options="collect([10, 20, 50, 100])->map(fn($n) => ['value' => $n, 'label' => $n . ' / página'])->values()->all()"
                             placeholder="Por página"
-                            label="Por página"
                             :submit-on-change="true"
                             inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                         />
