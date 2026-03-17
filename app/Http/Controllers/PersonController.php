@@ -444,9 +444,9 @@ class PersonController extends Controller
                         ->when($currentPerson, fn ($query) => $query->where('people.id', '!=', $currentPerson->id))
                         ->exists();
 
-                    if ($exists) {
-                        $fail('El documento ya existe en otra persona de la misma empresa.');
-                    }
+                    // if ($exists) {
+                    //     $fail('El documento ya existe en otra persona de la misma empresa.');
+                    // }
                 },
             ],
             'address' => ['required', 'string', 'max:255'],
@@ -476,9 +476,9 @@ class PersonController extends Controller
         ];
 
         if ($person && $person->user) {
-            $rules['password'] = ['nullable', 'string', 'min:8', 'confirmed'];
+            $rules['password'] = ['nullable', 'string', 'confirmed'];
         } else {
-            $rules['password'] = ['required', 'string', 'min:8', 'confirmed'];
+            $rules['password'] = ['required', 'string', 'confirmed'];
         }
 
         return $request->validate($rules);
