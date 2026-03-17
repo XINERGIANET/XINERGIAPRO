@@ -92,10 +92,13 @@
                             @endphp
                             <a
                                 href="{{ $quickUrl }}"
-                                class="relative flex items-center justify-center text-white transition-all bg-white/5 border border-white/10 rounded-full hover:text-white h-11 w-11 hover:bg-white/10 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
+                                class="group relative flex items-center justify-center text-white transition-all bg-white/5 border border-white/10 rounded-full hover:text-white h-11 w-11 hover:bg-white/10 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
                                 aria-label="{{ $option->name }}"
                             >
                                 <i class="{{ $option->icon }} text-lg"></i>
+                                <span class="pointer-events-none absolute left-1/2 top-full z-50 mt-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-black/80 px-2 py-1 text-[11px] font-semibold text-white shadow-lg group-hover:block">
+                                    {{ $option->name }}
+                                </span>
                             </a>
                         @endforeach
                     </div>
