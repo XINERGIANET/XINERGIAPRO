@@ -129,9 +129,7 @@
                             <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Persona</p>
                             </th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">
-                                <p class="font-semibold text-white text-theme-xs uppercase">Moneda</p>
-                            </th>
+
                             <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Fecha</p>
                             </th>
@@ -174,7 +172,7 @@
                                 <td class="px-5 py-4 sm:px-6 text-gray-800 text-theme-sm text-center">S/ {{ number_format((float) ($purchase->purchaseMovement?->tax ?? 0), 2) }}</td>
                                 <td class="px-5 py-4 sm:px-6 text-center"><p class="font-bold text-brand-600 text-theme-sm">S/ {{ number_format((float) ($purchase->purchaseMovement?->total ?? 0), 2) }}</p></td>
                                 <td class="px-5 py-4 sm:px-6 text-gray-800 text-theme-sm text-center truncate max-w-[150px]" title="{{ $purchase->person_name ?: '-' }}">{{ $purchase->person_name ?: '-' }}</td>
-                                <td class="px-5 py-4 sm:px-6 text-gray-800 text-theme-sm text-center">{{ $purchase->purchaseMovement?->currency ?? 'PEN' }}</td>
+
                                 <td class="px-5 py-4 sm:px-6 text-gray-800 text-theme-sm text-center">{{ $purchase->moved_at ? $purchase->moved_at->format('Y-m-d H:i') : '-' }}</td>
                                 <td class="px-5 py-4 sm:px-6 text-center">
                                     <div class="flex items-center justify-center gap-2">
@@ -215,7 +213,7 @@
 
                             <tr x-show="openRow === {{ $purchase->id }}" x-cloak class="bg-gray-50/70 dark:bg-gray-800/40 border-b border-gray-100 dark:border-gray-800">
 
-                                <td colspan="11" class="px-6 py-4">
+                                <td colspan="10" class="px-6 py-4">
                                     <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6 mb-4">
 
                                         <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
@@ -297,7 +295,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="11" class="px-6 py-12">
+                                <td colspan="10" class="px-6 py-12">
                                     <div class="flex flex-col items-center gap-3 text-center text-sm text-gray-500">
                                         <div class="rounded-full bg-gray-100 p-3 text-gray-400 dark:bg-gray-800 dark:text-gray-300">
                                             <i class="ri-shopping-bag-3-line"></i>

@@ -188,8 +188,8 @@
                 @endforeach
             </div>
 
-                <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-                    <table class="w-full min-w-max">
+                <div class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+                    <table class="w-full xl:min-w-0 min-w-max">
                         <thead>
                         <tr class="text-white">
                             <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6 first:rounded-tl-xl sticky-left-header">
@@ -231,14 +231,14 @@
                                 </td>
                                 <td class="px-5 py-4 sm:px-6">
                                     <div class="space-y-1">
-                                        <p class="font-medium text-gray-800 text-theme-sm dark:text-white/90">{{ $branch->legal_name }}</p>
+                                        <p class="font-medium text-gray-800 text-theme-sm dark:text-white/90 max-w-[200px] whitespace-normal break-words">{{ $branch->legal_name }}</p>
                                     </div>
                                 </td>
                                 <td class="px-5 py-4 sm:px-6">
                                     <p class="font-medium text-gray-700 text-theme-sm dark:text-gray-200">{{ $branch->ruc }}</p>
                                 </td>
                                 <td class="px-5 py-4 sm:px-6">
-                                    <p class="text-gray-500 text-theme-sm dark:text-gray-400">{{ $branch->address ?? '-' }}</p>
+                                    <p class="text-gray-500 text-theme-sm dark:text-gray-400 max-w-[300px] whitespace-normal break-words">{{ $branch->address ?? '-' }}</p>
                                 </td>
                                 <td class="px-5 py-4 sm:px-6">
                                     <p class="text-gray-500 text-theme-sm dark:text-gray-400">{{ $branch->location?->name ?? '-' }}</p>
