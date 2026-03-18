@@ -118,63 +118,11 @@ class WorkshopVehicleTypeController extends Controller
     {
         $this->assertVehicleTypeScope($vehicleType);
 
-        $defaultItems = [
-            'ESPEJOS' => 'Espejos',
-            'FARO_DELANTERO' => 'Faro delantero',
-            'DIRECCIONALES' => 'Direccionales',
-            'TAPON_GASOLINA' => 'Tapon de gasolina',
-            'PEDALES' => 'Pedales',
-            'CLAXON' => 'Claxon',
-            'ASIENTOS' => 'Asientos',
-            'LUZ_STOP_TRASERA' => 'Luz stop trasera',
-            'CUBIERTAS_COMPLETAS' => 'Cubiertas completas',
-            'TACOMETROS' => 'Tacometros',
-            'STEREO' => 'Stereo',
-            'PARABRISAS' => 'Parabrisas',
-            'TAPON_RADIADORES' => 'Tapon de radiadores',
-            'FILTRO_AIRE' => 'Filtro de aire',
-            'BATERIA' => 'Bateria',
-            'LLAVES' => 'Llaves',
-        ];
-
         $items = WorkshopVehicleIntakeInventoryItem::query()
+            ->withTrashed()
             ->where('vehicle_type_id', $vehicleType->id)
             ->orderBy('order_num')
-            ->get(['item_key', 'label', 'order_num']);
-
-        if ($items->isEmpty()) {
-            $orderNum = 0;
-            foreach ($defaultItems as $itemKey => $label) {
-                $orderNum++;
-                $existing = WorkshopVehicleIntakeInventoryItem::query()
-                    ->withTrashed()
-                    ->where('vehicle_type_id', $vehicleType->id)
-                    ->where('item_key', $itemKey)
-                    ->first();
-
-                if ($existing) {
-                    $existing->label = $label;
-                    $existing->order_num = $orderNum;
-                    if ($existing->trashed()) {
-                        $existing->restore();
-                    }
-                    $existing->save();
-                    continue;
-                }
-
-                WorkshopVehicleIntakeInventoryItem::query()->create([
-                    'vehicle_type_id' => $vehicleType->id,
-                    'item_key' => $itemKey,
-                    'label' => $label,
-                    'order_num' => $orderNum,
-                ]);
-            }
-
-            $items = WorkshopVehicleIntakeInventoryItem::query()
-                ->where('vehicle_type_id', $vehicleType->id)
-                ->orderBy('order_num')
-                ->get(['item_key', 'label', 'order_num']);
-        }
+            ->get(['item_key', 'label', 'order_num', 'deleted_at']);
 
         return view('workshop.vehicle-types.inventory', [
             'vehicleType' => $vehicleType,
@@ -190,6 +138,8 @@ class WorkshopVehicleTypeController extends Controller
             'new_item_label' => ['nullable', 'string', 'max:255'],
             'active_keys' => ['nullable', 'array'],
             'active_keys.*' => ['nullable', 'string', 'max:80'],
+            'delete_keys' => ['nullable', 'array'],
+            'delete_keys.*' => ['nullable', 'string', 'max:80'],
             'labels' => ['nullable', 'array'],
             'labels.*' => ['nullable', 'string', 'max:255'],
             'orders' => ['nullable', 'array'],
@@ -197,6 +147,7 @@ class WorkshopVehicleTypeController extends Controller
         ]);
 
         $activeKeys = array_map(fn ($k) => (string) $k, (array) ($validated['active_keys'] ?? []));
+        $deleteKeys = array_map(fn ($k) => (string) $k, (array) ($validated['delete_keys'] ?? []));
         $labels = (array) ($validated['labels'] ?? []);
         $orders = (array) ($validated['orders'] ?? []);
 
@@ -206,11 +157,35 @@ class WorkshopVehicleTypeController extends Controller
             ->get(['item_key', 'label', 'order_num', 'deleted_at'])
             ->keyBy('item_key');
 
+        // Elimina definitivamente (hard delete) los items marcados.
+        foreach ($deleteKeys as $deleteKey) {
+            $deleteKey = (string) $deleteKey;
+            if (trim($deleteKey) === '') {
+                continue;
+            }
+
+            $existing = WorkshopVehicleIntakeInventoryItem::query()
+                ->withTrashed()
+                ->where('vehicle_type_id', $vehicleType->id)
+                ->where('item_key', $deleteKey)
+                ->first();
+
+            if ($existing) {
+                $existing->forceDelete();
+                $existingItems->forget($deleteKey);
+            }
+        }
+
         $submittedKeys = array_unique(array_merge(array_keys($labels), array_keys($orders)));
 
         foreach ($submittedKeys as $itemKey) {
             $itemKey = (string) $itemKey;
             if (trim($itemKey) === '') {
+                continue;
+            }
+
+            // Si el item fue eliminado con el boton, no lo vuelvas a procesar en este request.
+            if (in_array($itemKey, $deleteKeys, true)) {
                 continue;
             }
 
@@ -243,10 +218,18 @@ class WorkshopVehicleTypeController extends Controller
                     ]);
                 }
             } else {
-                if ($existing && !$existing->trashed()) {
-                    $existing->delete();
-                } elseif ($existing && $existing->trashed() === false) {
-                    $existing->delete();
+                if ($existing) {
+                    // Actualiza nombre/orden incluso si esta desactivado.
+                    if ($label !== null && $label !== '') {
+                        $existing->label = $label;
+                    }
+                    $existing->order_num = $orderNum;
+                    $existing->save();
+
+                    // Y asegura que quede desactivado.
+                    if (!$existing->trashed()) {
+                        $existing->delete();
+                    }
                 }
             }
         }

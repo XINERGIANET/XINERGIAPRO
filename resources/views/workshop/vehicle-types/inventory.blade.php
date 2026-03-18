@@ -29,6 +29,7 @@
                                 <th class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider">Nombre del item</th>
                                 <th class="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider">Orden</th>
                                 <th class="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider">Clave</th>
+                                <th class="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider">Eliminar</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
@@ -36,7 +37,7 @@
                                 <tr>
                                     <td class="px-3 py-2">
                                         <label class="inline-flex items-center gap-2">
-                                            <input type="checkbox" name="active_keys[]" value="{{ $item->item_key }}" checked class="h-4 w-4 rounded border-gray-300">
+                                            <input type="checkbox" name="active_keys[]" value="{{ $item->item_key }}" @checked(!$item->trashed()) class="h-4 w-4 rounded border-gray-300">
                                         </label>
                                     </td>
                                     <td class="px-3 py-2">
@@ -62,10 +63,20 @@
                                             {{ $item->item_key }}
                                         </span>
                                     </td>
+                                    <td class="px-3 py-2 text-center">
+                                        <button
+                                            type="submit"
+                                            name="delete_keys[]"
+                                            value="{{ $item->item_key }}"
+                                            class="inline-flex items-center justify-center rounded-lg bg-error-500 px-3 py-2 text-white hover:bg-error-600"
+                                        >
+                                            <i class="ri-delete-bin-line"></i>
+                                        </button>
+                                    </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="4" class="px-3 py-8 text-center text-sm text-gray-400 italic">No hay items configurados para este tipo.</td>
+                                    <td colspan="5" class="px-3 py-8 text-center text-sm text-gray-400 italic">No hay items configurados para este tipo.</td>
                                 </tr>
                             @endforelse
                         </tbody>
