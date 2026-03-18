@@ -3,7 +3,7 @@
 @section('content')
     <x-common.page-breadcrumb pageTitle="Inventario por tipo de vehiculo" />
 
-    <x-common.component-card title="Inventario por tipo de vehiculo" desc="Selecciona que items de inventario se mostraran al iniciar un servicio para este tipo.">
+    <x-common.component-card title="Inventario por tipo de vehiculo" desc="Gestiona los items de inventario por tipo de vehiculo. Puedes agregar, editar y activar/desactivar.">
         @if (session('status'))
             <div class="mb-4 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-700">{{ session('status') }}</div>
         @endif
@@ -18,22 +18,68 @@
             <div class="rounded-xl border border-slate-200 bg-white p-4">
                 <div class="mb-3">
                     <p class="text-sm font-bold text-slate-900">Tipo: {{ $vehicleType->name }}</p>
-                    <p class="text-xs text-slate-500">Marca/desmarca los items que aplican para este tipo.</p>
+                    <p class="text-xs text-slate-500">Los items activos seran los que se mostraran al iniciar un servicio.</p>
                 </div>
 
-                <div class="grid grid-cols-2 gap-2 md:grid-cols-4">
-                    @foreach ($inventoryDefinitions as $itemKey => $label)
-                        <label class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700">
-                            <input
-                                type="checkbox"
-                                name="items[{{ $itemKey }}]"
-                                value="1"
-                                @checked(in_array($itemKey, $enabledItemKeys, true))
-                                class="h-4 w-4 rounded border-gray-300"
-                            >
-                            <span>{{ $label }}</span>
-                        </label>
-                    @endforeach
+                <div class="overflow-hidden rounded-xl border border-gray-100 bg-white">
+                    <table class="w-full">
+                        <thead class="bg-[#334155] text-white">
+                            <tr>
+                                <th class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider">Activo</th>
+                                <th class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider">Nombre del item</th>
+                                <th class="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider">Orden</th>
+                                <th class="px-3 py-3 text-center text-xs font-bold uppercase tracking-wider">Clave</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @forelse($items as $item)
+                                <tr>
+                                    <td class="px-3 py-2">
+                                        <label class="inline-flex items-center gap-2">
+                                            <input type="checkbox" name="active_keys[]" value="{{ $item->item_key }}" checked class="h-4 w-4 rounded border-gray-300">
+                                        </label>
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        <input
+                                            type="text"
+                                            name="labels[{{ $item->item_key }}]"
+                                            value="{{ $item->label }}"
+                                            class="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm"
+                                            required
+                                        >
+                                    </td>
+                                    <td class="px-3 py-2 text-center">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            name="orders[{{ $item->item_key }}]"
+                                            value="{{ $item->order_num }}"
+                                            class="h-10 w-24 rounded-lg border border-gray-200 px-3 text-sm text-center"
+                                        >
+                                    </td>
+                                    <td class="px-3 py-2 text-center">
+                                        <span class="inline-flex rounded-lg bg-gray-50 px-2 py-1 text-[11px] font-semibold text-gray-500">
+                                            {{ $item->item_key }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="4" class="px-3 py-8 text-center text-sm text-gray-400 italic">No hay items configurados para este tipo.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <div class="md:col-span-2">
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Nuevo item</label>
+                        <input type="text" name="new_item_label" class="h-11 w-full rounded-xl border border-gray-200 px-4 text-sm" placeholder="Ej: Direccionales (LED)">
+                    </div>
+                    <div class="flex items-end">
+                        <p class="text-xs text-gray-500">Si lo agregas, se creara como item activo.</p>
+                    </div>
                 </div>
             </div>
 

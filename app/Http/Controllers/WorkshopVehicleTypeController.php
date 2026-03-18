@@ -118,7 +118,7 @@ class WorkshopVehicleTypeController extends Controller
     {
         $this->assertVehicleTypeScope($vehicleType);
 
-        $inventoryDefinitions = [
+        $defaultItems = [
             'ESPEJOS' => 'Espejos',
             'FARO_DELANTERO' => 'Faro delantero',
             'DIRECCIONALES' => 'Direccionales',
@@ -137,62 +137,21 @@ class WorkshopVehicleTypeController extends Controller
             'LLAVES' => 'Llaves',
         ];
 
-        $enabledItemKeys = WorkshopVehicleIntakeInventoryItem::query()
+        $items = WorkshopVehicleIntakeInventoryItem::query()
             ->where('vehicle_type_id', $vehicleType->id)
-            ->pluck('item_key')
-            ->map(fn ($k) => (string) $k)
-            ->values()
-            ->all();
+            ->orderBy('order_num')
+            ->get(['item_key', 'label', 'order_num']);
 
-        return view('workshop.vehicle-types.inventory', [
-            'vehicleType' => $vehicleType,
-            'inventoryDefinitions' => $inventoryDefinitions,
-            'enabledItemKeys' => $enabledItemKeys,
-        ]);
-    }
+        if ($items->isEmpty()) {
+            $orderNum = 0;
+            foreach ($defaultItems as $itemKey => $label) {
+                $orderNum++;
+                $existing = WorkshopVehicleIntakeInventoryItem::query()
+                    ->withTrashed()
+                    ->where('vehicle_type_id', $vehicleType->id)
+                    ->where('item_key', $itemKey)
+                    ->first();
 
-    public function inventoryUpdate(Request $request, VehicleType $vehicleType): RedirectResponse
-    {
-        $this->assertVehicleTypeScope($vehicleType);
-
-        $inventoryDefinitions = [
-            'ESPEJOS' => 'Espejos',
-            'FARO_DELANTERO' => 'Faro delantero',
-            'DIRECCIONALES' => 'Direccionales',
-            'TAPON_GASOLINA' => 'Tapon de gasolina',
-            'PEDALES' => 'Pedales',
-            'CLAXON' => 'Claxon',
-            'ASIENTOS' => 'Asientos',
-            'LUZ_STOP_TRASERA' => 'Luz stop trasera',
-            'CUBIERTAS_COMPLETAS' => 'Cubiertas completas',
-            'TACOMETROS' => 'Tacometros',
-            'STEREO' => 'Stereo',
-            'PARABRISAS' => 'Parabrisas',
-            'TAPON_RADIADORES' => 'Tapon de radiadores',
-            'FILTRO_AIRE' => 'Filtro de aire',
-            'BATERIA' => 'Bateria',
-            'LLAVES' => 'Llaves',
-        ];
-
-        $validated = $request->validate([
-            'items' => ['nullable', 'array'],
-            'items.*' => ['nullable', 'boolean'],
-        ]);
-
-        $items = (array) ($validated['items'] ?? []);
-        $orderNum = 0;
-
-        foreach ($inventoryDefinitions as $itemKey => $label) {
-            $orderNum++;
-            $checked = array_key_exists($itemKey, $items) ? (bool) $items[$itemKey] : false;
-
-            $existing = WorkshopVehicleIntakeInventoryItem::query()
-                ->withTrashed()
-                ->where('vehicle_type_id', $vehicleType->id)
-                ->where('item_key', $itemKey)
-                ->first();
-
-            if ($checked) {
                 if ($existing) {
                     $existing->label = $label;
                     $existing->order_num = $orderNum;
@@ -200,7 +159,82 @@ class WorkshopVehicleTypeController extends Controller
                         $existing->restore();
                     }
                     $existing->save();
+                    continue;
+                }
+
+                WorkshopVehicleIntakeInventoryItem::query()->create([
+                    'vehicle_type_id' => $vehicleType->id,
+                    'item_key' => $itemKey,
+                    'label' => $label,
+                    'order_num' => $orderNum,
+                ]);
+            }
+
+            $items = WorkshopVehicleIntakeInventoryItem::query()
+                ->where('vehicle_type_id', $vehicleType->id)
+                ->orderBy('order_num')
+                ->get(['item_key', 'label', 'order_num']);
+        }
+
+        return view('workshop.vehicle-types.inventory', [
+            'vehicleType' => $vehicleType,
+            'items' => $items,
+        ]);
+    }
+
+    public function inventoryUpdate(Request $request, VehicleType $vehicleType): RedirectResponse
+    {
+        $this->assertVehicleTypeScope($vehicleType);
+
+        $validated = $request->validate([
+            'new_item_label' => ['nullable', 'string', 'max:255'],
+            'active_keys' => ['nullable', 'array'],
+            'active_keys.*' => ['nullable', 'string', 'max:80'],
+            'labels' => ['nullable', 'array'],
+            'labels.*' => ['nullable', 'string', 'max:255'],
+            'orders' => ['nullable', 'array'],
+            'orders.*' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $activeKeys = array_map(fn ($k) => (string) $k, (array) ($validated['active_keys'] ?? []));
+        $labels = (array) ($validated['labels'] ?? []);
+        $orders = (array) ($validated['orders'] ?? []);
+
+        $existingItems = WorkshopVehicleIntakeInventoryItem::query()
+            ->withTrashed()
+            ->where('vehicle_type_id', $vehicleType->id)
+            ->get(['item_key', 'label', 'order_num', 'deleted_at'])
+            ->keyBy('item_key');
+
+        $submittedKeys = array_unique(array_merge(array_keys($labels), array_keys($orders)));
+
+        foreach ($submittedKeys as $itemKey) {
+            $itemKey = (string) $itemKey;
+            if (trim($itemKey) === '') {
+                continue;
+            }
+
+            $label = isset($labels[$itemKey]) ? trim((string) $labels[$itemKey]) : null;
+            $orderNum = isset($orders[$itemKey]) ? (int) $orders[$itemKey] : 0;
+            $isActive = in_array($itemKey, $activeKeys, true);
+
+            $existing = $existingItems->get($itemKey);
+
+            if ($isActive) {
+                if ($existing) {
+                    if ($label !== null && $label !== '') {
+                        $existing->label = $label;
+                    }
+                    $existing->order_num = $orderNum;
+                    if ($existing->trashed()) {
+                        $existing->restore();
+                    }
+                    $existing->save();
                 } else {
+                    if ($label === null || $label === '') {
+                        continue;
+                    }
+
                     WorkshopVehicleIntakeInventoryItem::query()->create([
                         'vehicle_type_id' => $vehicleType->id,
                         'item_key' => $itemKey,
@@ -209,13 +243,72 @@ class WorkshopVehicleTypeController extends Controller
                     ]);
                 }
             } else {
-                if ($existing) {
+                if ($existing && !$existing->trashed()) {
+                    $existing->delete();
+                } elseif ($existing && $existing->trashed() === false) {
                     $existing->delete();
                 }
             }
         }
 
+        $newItemLabel = trim((string) ($validated['new_item_label'] ?? ''));
+        if ($newItemLabel !== '') {
+            $nextOrderNum = (int) (WorkshopVehicleIntakeInventoryItem::query()
+                ->where('vehicle_type_id', $vehicleType->id)
+                ->max('order_num') ?? 0) + 1;
+
+            $newItemKey = $this->generateInventoryItemKey($newItemLabel, $vehicleType->id);
+
+            $existing = WorkshopVehicleIntakeInventoryItem::query()
+                ->withTrashed()
+                ->where('vehicle_type_id', $vehicleType->id)
+                ->where('item_key', $newItemKey)
+                ->first();
+
+            if ($existing) {
+                $existing->label = $newItemLabel;
+                $existing->order_num = $nextOrderNum;
+                if ($existing->trashed()) {
+                    $existing->restore();
+                }
+                $existing->save();
+            } else {
+                WorkshopVehicleIntakeInventoryItem::query()->create([
+                    'vehicle_type_id' => $vehicleType->id,
+                    'item_key' => $newItemKey,
+                    'label' => $newItemLabel,
+                    'order_num' => $nextOrderNum,
+                ]);
+            }
+        }
+
         return back()->with('status', 'Inventario por tipo actualizado correctamente.');
+    }
+
+    private function generateInventoryItemKey(string $label, int $vehicleTypeId): string
+    {
+        $base = strtoupper(trim((string) $label));
+        $base = preg_replace('/[^A-Z0-9]+/', '_', (string) $base);
+        $base = trim((string) $base, '_');
+
+        if ($base === '') {
+            $base = 'ITEM';
+        }
+
+        $candidate = $base;
+        $suffix = 1;
+        while (
+            WorkshopVehicleIntakeInventoryItem::query()
+                ->withTrashed()
+                ->where('vehicle_type_id', $vehicleTypeId)
+                ->where('item_key', $candidate)
+                ->exists()
+        ) {
+            $candidate = $base . '_' . $suffix;
+            $suffix++;
+        }
+
+        return $candidate;
     }
 
     private function assertVehicleTypeScope(VehicleType $vehicleType): void

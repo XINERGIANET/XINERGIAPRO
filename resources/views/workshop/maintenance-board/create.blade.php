@@ -82,24 +82,6 @@
     serviceLines: [],
     inventoryItemsByVehicleType: @js($inventoryItemsByVehicleType ?? []),
     inventoryChecks: @js(collect(old('inventory', []))->map(fn ($v) => (bool) $v)->all()),
-    defaultInventoryItems: @js([
-        ['item_key' => 'ESPEJOS', 'label' => 'Espejos'],
-        ['item_key' => 'FARO_DELANTERO', 'label' => 'Faro delantero'],
-        ['item_key' => 'DIRECCIONALES', 'label' => 'Direccionales'],
-        ['item_key' => 'TAPON_GASOLINA', 'label' => 'Tapon de gasolina'],
-        ['item_key' => 'PEDALES', 'label' => 'Pedales'],
-        ['item_key' => 'CLAXON', 'label' => 'Claxon'],
-        ['item_key' => 'ASIENTOS', 'label' => 'Asientos'],
-        ['item_key' => 'LUZ_STOP_TRASERA', 'label' => 'Luz stop trasera'],
-        ['item_key' => 'CUBIERTAS_COMPLETAS', 'label' => 'Cubiertas completas'],
-        ['item_key' => 'TACOMETROS', 'label' => 'Tacometros'],
-        ['item_key' => 'STEREO', 'label' => 'Stereo'],
-        ['item_key' => 'PARABRISAS', 'label' => 'Parabrisas'],
-        ['item_key' => 'TAPON_RADIADORES', 'label' => 'Tapon de radiadores'],
-        ['item_key' => 'FILTRO_AIRE', 'label' => 'Filtro de aire'],
-        ['item_key' => 'BATERIA', 'label' => 'Bateria'],
-        ['item_key' => 'LLAVES', 'label' => 'Llaves'],
-    ]),
     selectedVehicleTypeId: '',
     showInventory: @js($showInventoryDefault ?? true),
     syncVehicle() {
@@ -115,7 +97,7 @@
     inventoryItemsForSelectedVehicle() {
         const typeId = String(this.selectedVehicleTypeId || this.quickVehicle.vehicle_type_id || '');
         const items = this.inventoryItemsByVehicleType[typeId] || [];
-        return items.length ? items : this.defaultInventoryItems;
+        return items;
     },
     async openClientHistory() {
         if (!String(this.selectedClientId || '').trim()) return;
