@@ -79,6 +79,7 @@
     branchDistrictName: @js($selectedDistrictName ?? ''),
     selectedServiceIds: @js(collect(old('service_lines', []))->pluck('service_id')->filter()->map(fn($id) => (string) $id)->values()),
     serviceLines: [],
+    showInventory: @js($showInventoryDefault ?? true),
     syncVehicle() {
         const selected = this.vehicles.find(v => String(v.id) === String(this.selectedVehicleId));
         if (!selected) return;
@@ -666,34 +667,43 @@
 
             <div class="rounded-xl border border-gray-200 bg-white p-4 md:col-span-3">
                 <div class="mb-3">
-                    <h4 class="text-sm font-semibold text-gray-800">Inspeccion e inventario recibido</h4>
-                    <p class="text-xs text-gray-500">Estos datos se guardan al iniciar el mantenimiento.</p>
+                    <label class="inline-flex items-center gap-2 text-sm font-semibold text-gray-700">
+                        <input type="checkbox" x-model="showInventory" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        <span>Mostrar inventario recibido</span>
+                    </label>
                 </div>
 
-                <div class="grid grid-cols-2 gap-2 md:grid-cols-4">
-                    @foreach ([
-                        'ESPEJOS' => 'Espejos',
-                        'FARO_DELANTERO' => 'Faro delantero',
-                        'DIRECCIONALES' => 'Direccionales',
-                        'TAPON_GASOLINA' => 'Tapon de gasolina',
-                        'PEDALES' => 'Pedales',
-                        'CLAXON' => 'Claxon',
-                        'ASIENTOS' => 'Asientos',
-                        'LUZ_STOP_TRASERA' => 'Luz stop trasera',
-                        'CUBIERTAS_COMPLETAS' => 'Cubiertas completas',
-                        'TACOMETROS' => 'Tacometros',
-                        'STEREO' => 'Stereo',
-                        'PARABRISAS' => 'Parabrisas',
-                        'TAPON_RADIADORES' => 'Tapon de radiadores',
-                        'FILTRO_AIRE' => 'Filtro de aire',
-                        'BATERIA' => 'Bateria',
-                        'LLAVES' => 'Llaves',
-                    ] as $key => $label)
-                        <label class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700">
-                            <input type="checkbox" name="inventory[{{ $key }}]" value="1" class="h-4 w-4 rounded border-gray-300">
-                            <span>{{ $label }}</span>
-                        </label>
-                    @endforeach
+                <div x-show="showInventory" x-cloak>
+                    <div class="mb-3">
+                        <h4 class="text-sm font-semibold text-gray-800">Inspeccion e inventario recibido</h4>
+                        <p class="text-xs text-gray-500">Estos datos se guardan al iniciar el mantenimiento.</p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 md:grid-cols-4">
+                        @foreach ([
+                            'ESPEJOS' => 'Espejos',
+                            'FARO_DELANTERO' => 'Faro delantero',
+                            'DIRECCIONALES' => 'Direccionales',
+                            'TAPON_GASOLINA' => 'Tapon de gasolina',
+                            'PEDALES' => 'Pedales',
+                            'CLAXON' => 'Claxon',
+                            'ASIENTOS' => 'Asientos',
+                            'LUZ_STOP_TRASERA' => 'Luz stop trasera',
+                            'CUBIERTAS_COMPLETAS' => 'Cubiertas completas',
+                            'TACOMETROS' => 'Tacometros',
+                            'STEREO' => 'Stereo',
+                            'PARABRISAS' => 'Parabrisas',
+                            'TAPON_RADIADORES' => 'Tapon de radiadores',
+                            'FILTRO_AIRE' => 'Filtro de aire',
+                            'BATERIA' => 'Bateria',
+                            'LLAVES' => 'Llaves',
+                        ] as $key => $label)
+                            <label class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700">
+                                <input type="checkbox" name="inventory[{{ $key }}]" value="1" class="h-4 w-4 rounded border-gray-300">
+                                <span>{{ $label }}</span>
+                            </label>
+                        @endforeach
+                    </div>
                 </div>
 
                 <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">

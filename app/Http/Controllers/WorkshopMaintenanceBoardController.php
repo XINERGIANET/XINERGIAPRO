@@ -270,6 +270,23 @@ class WorkshopMaintenanceBoardController extends Controller
             }
         }
 
+        $showInventoryDefault = true;
+        $showInventoryBaseParameter = DB::table('parameters')
+            ->where('description', 'Mostrar inventario')
+            ->first();
+
+        if ($showInventoryBaseParameter) {
+            $showInventoryBranchValue = DB::table('branch_parameters')
+                ->where('parameter_id', $showInventoryBaseParameter->id)
+                ->where('branch_id', $branchId)
+                ->whereNull('deleted_at')
+                ->value('value');
+
+            $rawValue = $showInventoryBranchValue ?? $showInventoryBaseParameter->value;
+            $normalized = strtoupper(trim((string) $rawValue));
+            $showInventoryDefault = in_array($normalized, ['1', 'TRUE', 'YES', 'SI', 'S'], true);
+        }
+
         return compact(
             'vehicles',
             'clients',
@@ -285,7 +302,8 @@ class WorkshopMaintenanceBoardController extends Controller
             'selectedDepartmentName',
             'selectedProvinceName',
             'selectedDistrictName',
-            'technicians'
+            'technicians',
+            'showInventoryDefault'
         );
     }
             

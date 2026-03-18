@@ -36,6 +36,7 @@ class WorkshopParameterSeeder extends Seeder
             ['description' => 'WS_ALLOW_MULTI_FULL_SALES', 'value' => '0'],
             ['description' => 'WS_NO_LABOR_CHARGE_WARRANTY', 'value' => '1'],
             ['description' => 'WS_REQUIRED_CHECKLIST_TYPES', 'value' => 'PDI,OS_INTAKE'],
+            ['description' => 'Mostrar inventario', 'value' => 'Si'],
         ];
 
         $parameterIds = [];
