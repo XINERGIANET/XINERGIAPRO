@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\VehicleType;
+use App\Models\WorkshopVehicleIntakeInventoryItem;
 use App\Support\WorkshopAuthorization;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -111,6 +112,110 @@ class WorkshopVehicleTypeController extends Controller
 
         $vehicleType->delete();
         return back()->with('status', 'Tipo de vehiculo eliminado correctamente.');
+    }
+
+    public function inventoryEdit(Request $request, VehicleType $vehicleType): \Illuminate\View\View
+    {
+        $this->assertVehicleTypeScope($vehicleType);
+
+        $inventoryDefinitions = [
+            'ESPEJOS' => 'Espejos',
+            'FARO_DELANTERO' => 'Faro delantero',
+            'DIRECCIONALES' => 'Direccionales',
+            'TAPON_GASOLINA' => 'Tapon de gasolina',
+            'PEDALES' => 'Pedales',
+            'CLAXON' => 'Claxon',
+            'ASIENTOS' => 'Asientos',
+            'LUZ_STOP_TRASERA' => 'Luz stop trasera',
+            'CUBIERTAS_COMPLETAS' => 'Cubiertas completas',
+            'TACOMETROS' => 'Tacometros',
+            'STEREO' => 'Stereo',
+            'PARABRISAS' => 'Parabrisas',
+            'TAPON_RADIADORES' => 'Tapon de radiadores',
+            'FILTRO_AIRE' => 'Filtro de aire',
+            'BATERIA' => 'Bateria',
+            'LLAVES' => 'Llaves',
+        ];
+
+        $enabledItemKeys = WorkshopVehicleIntakeInventoryItem::query()
+            ->where('vehicle_type_id', $vehicleType->id)
+            ->pluck('item_key')
+            ->map(fn ($k) => (string) $k)
+            ->values()
+            ->all();
+
+        return view('workshop.vehicle-types.inventory', [
+            'vehicleType' => $vehicleType,
+            'inventoryDefinitions' => $inventoryDefinitions,
+            'enabledItemKeys' => $enabledItemKeys,
+        ]);
+    }
+
+    public function inventoryUpdate(Request $request, VehicleType $vehicleType): RedirectResponse
+    {
+        $this->assertVehicleTypeScope($vehicleType);
+
+        $inventoryDefinitions = [
+            'ESPEJOS' => 'Espejos',
+            'FARO_DELANTERO' => 'Faro delantero',
+            'DIRECCIONALES' => 'Direccionales',
+            'TAPON_GASOLINA' => 'Tapon de gasolina',
+            'PEDALES' => 'Pedales',
+            'CLAXON' => 'Claxon',
+            'ASIENTOS' => 'Asientos',
+            'LUZ_STOP_TRASERA' => 'Luz stop trasera',
+            'CUBIERTAS_COMPLETAS' => 'Cubiertas completas',
+            'TACOMETROS' => 'Tacometros',
+            'STEREO' => 'Stereo',
+            'PARABRISAS' => 'Parabrisas',
+            'TAPON_RADIADORES' => 'Tapon de radiadores',
+            'FILTRO_AIRE' => 'Filtro de aire',
+            'BATERIA' => 'Bateria',
+            'LLAVES' => 'Llaves',
+        ];
+
+        $validated = $request->validate([
+            'items' => ['nullable', 'array'],
+            'items.*' => ['nullable', 'boolean'],
+        ]);
+
+        $items = (array) ($validated['items'] ?? []);
+        $orderNum = 0;
+
+        foreach ($inventoryDefinitions as $itemKey => $label) {
+            $orderNum++;
+            $checked = array_key_exists($itemKey, $items) ? (bool) $items[$itemKey] : false;
+
+            $existing = WorkshopVehicleIntakeInventoryItem::query()
+                ->withTrashed()
+                ->where('vehicle_type_id', $vehicleType->id)
+                ->where('item_key', $itemKey)
+                ->first();
+
+            if ($checked) {
+                if ($existing) {
+                    $existing->label = $label;
+                    $existing->order_num = $orderNum;
+                    if ($existing->trashed()) {
+                        $existing->restore();
+                    }
+                    $existing->save();
+                } else {
+                    WorkshopVehicleIntakeInventoryItem::query()->create([
+                        'vehicle_type_id' => $vehicleType->id,
+                        'item_key' => $itemKey,
+                        'label' => $label,
+                        'order_num' => $orderNum,
+                    ]);
+                }
+            } else {
+                if ($existing) {
+                    $existing->delete();
+                }
+            }
+        }
+
+        return back()->with('status', 'Inventario por tipo actualizado correctamente.');
     }
 
     private function assertVehicleTypeScope(VehicleType $vehicleType): void

@@ -117,6 +117,27 @@
                                     </div>
 
                                     @if($type->company_id)
+                                        {{-- Botón Inventario --}}
+                                        <div class="relative group/tooltip">
+                                            <x-ui.button
+                                                size="icon"
+                                                variant="primary"
+                                                type="button"
+                                                onclick="window.location='{{ route('workshop.vehicle-types.inventory.edit', $type) }}'"
+                                                className="rounded-xl"
+                                                style="background-color: #10B981; color: #FFFFFF;"
+                                                aria-label="Inventario"
+                                            >
+                                                <i class="ri-list-check-2"></i>
+                                            </x-ui.button>
+                                            <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover/tooltip:opacity-100 z-[100] shadow-xl">
+                                                Configurar inventario
+                                                <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
+                                            </span>
+                                        </div>
+                                    @endif
+
+                                    @if($type->company_id)
                                         {{-- Botón Editar --}}
                                         <div class="relative group/tooltip">
                                             <x-ui.button
