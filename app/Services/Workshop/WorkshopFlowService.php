@@ -35,6 +35,7 @@ use App\Models\WorkshopMovementDetail;
 use App\Models\WorkshopPreexistingDamage;
 use App\Models\WorkshopStatusHistory;
 use App\Models\WorkshopMovementStatusLog;
+use App\Models\WorkshopVehicleIntakeInventoryItem;
 use App\Models\WorkshopStockReservation;
 use App\Models\WorkshopVehicleLog;
 use App\Models\WorkshopWarranty;
@@ -411,18 +412,57 @@ class WorkshopFlowService
                 throw new \RuntimeException('No se puede modificar inspeccion/inventario despues de aprobado.');
             }
 
-            foreach ($inventory as $itemKey => $present) {
-                if (!is_string($itemKey) || trim($itemKey) === '') {
-                    continue;
-                }
+            $vehicleTypeId = Vehicle::query()
+                ->where('id', (int) $order->vehicle_id)
+                ->value('vehicle_type_id');
+
+            $configuredItemKeys = WorkshopVehicleIntakeInventoryItem::query()
+                ->when($vehicleTypeId, fn ($q) => $q->where('vehicle_type_id', (int) $vehicleTypeId))
+                ->orderBy('order_num')
+                ->pluck('item_key')
+                ->map(fn ($k) => (string) $k)
+                ->values()
+                ->all();
+
+            $defaultInventoryItemKeys = [
+                'ESPEJOS',
+                'FARO_DELANTERO',
+                'DIRECCIONALES',
+                'TAPON_GASOLINA',
+                'PEDALES',
+                'CLAXON',
+                'ASIENTOS',
+                'LUZ_STOP_TRASERA',
+                'CUBIERTAS_COMPLETAS',
+                'TACOMETROS',
+                'STEREO',
+                'PARABRISAS',
+                'TAPON_RADIADORES',
+                'FILTRO_AIRE',
+                'BATERIA',
+                'LLAVES',
+            ];
+
+            if (empty($configuredItemKeys)) {
+                $configuredItemKeys = $defaultInventoryItemKeys;
+            }
+
+            // Asegura que la OS guarde inventario exactamente según el tipo de vehículo.
+            WorkshopIntakeInventory::query()
+                ->where('workshop_movement_id', $order->id)
+                ->whereNotIn('item_key', $configuredItemKeys)
+                ->delete();
+
+            foreach ($configuredItemKeys as $itemKey) {
+                $present = array_key_exists($itemKey, $inventory) ? (bool) $inventory[$itemKey] : false;
 
                 WorkshopIntakeInventory::query()->updateOrCreate(
                     [
                         'workshop_movement_id' => $order->id,
-                        'item_key' => trim($itemKey),
+                        'item_key' => $itemKey,
                     ],
                     [
-                        'present' => (bool) $present,
+                        'present' => $present,
                     ]
                 );
             }

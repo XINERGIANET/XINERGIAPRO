@@ -8,6 +8,7 @@
         return [
             'id' => $v->id,
             'client_person_id' => $v->client_person_id,
+            'vehicle_type_id' => $v->vehicle_type_id,
             'client_name' => $clientName,
             'label' => trim($v->brand . ' ' . $v->model . ' ' . ($v->plate ? ('- ' . $v->plate) : '')),
             'display_label' => trim($v->brand . ' ' . $v->model . ' ' . ($v->plate ? ('- ' . $v->plate) : '')) . ($clientName !== '' ? ' (Cliente: ' . $clientName . ')' : ''),
@@ -79,6 +80,27 @@
     branchDistrictName: @js($selectedDistrictName ?? ''),
     selectedServiceIds: @js(collect(old('service_lines', []))->pluck('service_id')->filter()->map(fn($id) => (string) $id)->values()),
     serviceLines: [],
+    inventoryItemsByVehicleType: @js($inventoryItemsByVehicleType ?? []),
+    inventoryChecks: @js(collect(old('inventory', []))->map(fn ($v) => (bool) $v)->all()),
+    defaultInventoryItems: @js([
+        ['item_key' => 'ESPEJOS', 'label' => 'Espejos'],
+        ['item_key' => 'FARO_DELANTERO', 'label' => 'Faro delantero'],
+        ['item_key' => 'DIRECCIONALES', 'label' => 'Direccionales'],
+        ['item_key' => 'TAPON_GASOLINA', 'label' => 'Tapon de gasolina'],
+        ['item_key' => 'PEDALES', 'label' => 'Pedales'],
+        ['item_key' => 'CLAXON', 'label' => 'Claxon'],
+        ['item_key' => 'ASIENTOS', 'label' => 'Asientos'],
+        ['item_key' => 'LUZ_STOP_TRASERA', 'label' => 'Luz stop trasera'],
+        ['item_key' => 'CUBIERTAS_COMPLETAS', 'label' => 'Cubiertas completas'],
+        ['item_key' => 'TACOMETROS', 'label' => 'Tacometros'],
+        ['item_key' => 'STEREO', 'label' => 'Stereo'],
+        ['item_key' => 'PARABRISAS', 'label' => 'Parabrisas'],
+        ['item_key' => 'TAPON_RADIADORES', 'label' => 'Tapon de radiadores'],
+        ['item_key' => 'FILTRO_AIRE', 'label' => 'Filtro de aire'],
+        ['item_key' => 'BATERIA', 'label' => 'Bateria'],
+        ['item_key' => 'LLAVES', 'label' => 'Llaves'],
+    ]),
+    selectedVehicleTypeId: '',
     showInventory: @js($showInventoryDefault ?? true),
     syncVehicle() {
         const selected = this.vehicles.find(v => String(v.id) === String(this.selectedVehicleId));
@@ -86,8 +108,14 @@
         this.selectedClientId = selected.client_person_id ? String(selected.client_person_id) : '';
         this.mileageIn = selected.km ? String(selected.km) : '';
         this.vehicleSearch = selected.display_label || selected.label || '';
+        this.selectedVehicleTypeId = selected.vehicle_type_id ? String(selected.vehicle_type_id) : String(this.quickVehicle.vehicle_type_id || '');
         this.syncHistoryUrl();
         this.refreshServiceLinePrices();
+    },
+    inventoryItemsForSelectedVehicle() {
+        const typeId = String(this.selectedVehicleTypeId || this.quickVehicle.vehicle_type_id || '');
+        const items = this.inventoryItemsByVehicleType[typeId] || [];
+        return items.length ? items : this.defaultInventoryItems;
     },
     async openClientHistory() {
         if (!String(this.selectedClientId || '').trim()) return;
@@ -680,29 +708,16 @@
                     </div>
 
                     <div class="grid grid-cols-2 gap-2 md:grid-cols-4">
-                        @foreach ([
-                            'ESPEJOS' => 'Espejos',
-                            'FARO_DELANTERO' => 'Faro delantero',
-                            'DIRECCIONALES' => 'Direccionales',
-                            'TAPON_GASOLINA' => 'Tapon de gasolina',
-                            'PEDALES' => 'Pedales',
-                            'CLAXON' => 'Claxon',
-                            'ASIENTOS' => 'Asientos',
-                            'LUZ_STOP_TRASERA' => 'Luz stop trasera',
-                            'CUBIERTAS_COMPLETAS' => 'Cubiertas completas',
-                            'TACOMETROS' => 'Tacometros',
-                            'STEREO' => 'Stereo',
-                            'PARABRISAS' => 'Parabrisas',
-                            'TAPON_RADIADORES' => 'Tapon de radiadores',
-                            'FILTRO_AIRE' => 'Filtro de aire',
-                            'BATERIA' => 'Bateria',
-                            'LLAVES' => 'Llaves',
-                        ] as $key => $label)
+                        <template x-for="item in inventoryItemsForSelectedVehicle()" :key="item.item_key">
                             <label class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700">
-                                <input type="checkbox" name="inventory[{{ $key }}]" value="1" class="h-4 w-4 rounded border-gray-300">
-                                <span>{{ $label }}</span>
+                                <input type="checkbox"
+                                    :name="`inventory[${item.item_key}]`"
+                                    value="1"
+                                    x-model="inventoryChecks[item.item_key]"
+                                    class="h-4 w-4 rounded border-gray-300">
+                                <span x-text="item.label"></span>
                             </label>
-                        @endforeach
+                        </template>
                     </div>
                 </div>
 

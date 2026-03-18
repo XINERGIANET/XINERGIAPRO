@@ -17,6 +17,7 @@ use App\Models\VehicleType;
 use App\Models\WorkshopMovement;
 use App\Models\WorkshopMovementTechnician;
 use App\Models\WorkshopService;
+use App\Models\WorkshopVehicleIntakeInventoryItem;
 use App\Services\Workshop\WorkshopFlowService;
 use App\Support\WorkshopAuthorization;
 use Illuminate\Http\JsonResponse;
@@ -130,7 +131,7 @@ class WorkshopMaintenanceBoardController extends Controller
             ->where('branch_id', $branchId)
             ->orderBy('brand')
             ->orderBy('model')
-            ->get(['id', 'client_person_id', 'brand', 'model', 'plate', 'current_mileage', 'engine_displacement_cc']);
+            ->get(['id', 'client_person_id', 'vehicle_type_id', 'brand', 'model', 'plate', 'current_mileage', 'engine_displacement_cc']);
 
         $vehicleTypes = VehicleType::query()
             ->where(function ($query) use ($companyId, $branchId) {
@@ -208,6 +209,17 @@ class WorkshopMaintenanceBoardController extends Controller
                 'name' => trim(($p->first_name ?? '') . ' ' . ($p->last_name ?? '')),
             ])
             ->values();
+
+        $inventoryItemsByVehicleType = WorkshopVehicleIntakeInventoryItem::query()
+            ->whereNull('deleted_at')
+            ->orderBy('order_num')
+            ->get(['vehicle_type_id', 'item_key', 'label'])
+            ->groupBy('vehicle_type_id')
+            ->map(fn ($items) => $items->values()->map(fn ($i) => [
+                'item_key' => (string) $i->item_key,
+                'label' => (string) $i->label,
+            ])->values()->all())
+            ->toArray();
 
         $products = ProductBranch::query()
             ->join('products', 'products.id', '=', 'product_branch.product_id')
@@ -303,6 +315,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'selectedProvinceName',
             'selectedDistrictName',
             'technicians',
+            'inventoryItemsByVehicleType',
             'showInventoryDefault'
         );
     }
