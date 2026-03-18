@@ -126,8 +126,12 @@
                             <p class="font-semibold text-slate-800">{{ trim(($card->client?->first_name ?? '') . ' ' . ($card->client?->last_name ?? '')) }}</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-                            <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ingreso</p>
-                            <p class="font-semibold text-slate-800">{{ optional($card->intake_date)->format('Y-m-d H:i') }}</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                {{ $card->status === 'in_progress' ? 'Inicio del servicio' : 'Ingreso' }}
+                            </p>
+                            <p class="font-semibold text-slate-800">
+                                {{ optional($card->status === 'in_progress' ? $card->started_at : $card->intake_date)->format('Y-m-d H:i') }}
+                            </p>
                         </div>
                     </div>
 
