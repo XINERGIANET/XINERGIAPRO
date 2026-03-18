@@ -16,12 +16,16 @@ class WorkshopService extends Model
         'name',
         'type',
         'base_price',
+        'frequency_each_km',
+        'frequency_enabled',
         'estimated_minutes',
         'active',
     ];
 
     protected $casts = [
         'base_price' => 'decimal:6',
+        'frequency_each_km' => 'integer',
+        'frequency_enabled' => 'boolean',
         'active' => 'boolean',
     ];
 
@@ -62,6 +66,13 @@ class WorkshopService extends Model
     public function details()
     {
         return $this->hasMany(WorkshopMovementDetail::class, 'service_id');
+    }
+
+    public function frequencies()
+    {
+        return $this->hasMany(WorkshopServiceFrequency::class, 'workshop_service_id')
+            ->orderBy('order_num')
+            ->orderByDesc('km');
     }
 }
 

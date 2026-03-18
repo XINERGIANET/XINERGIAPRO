@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\WorkshopService;
+use App\Models\WorkshopServiceFrequency;
 use App\Support\WorkshopAuthorization;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -61,10 +62,16 @@ class WorkshopServiceCatalogController extends Controller
                 'type' => $validated['type'],
                 'base_price' => $validated['base_price'],
                 'estimated_minutes' => $validated['estimated_minutes'],
+                'frequency_each_km' => $validated['frequency_each_km'] ?? null,
+                'frequency_enabled' => (bool) ($validated['frequency_enabled'] ?? false),
                 'active' => (bool) ($validated['active'] ?? true),
             ]);
 
             $this->syncPriceTiers($service, $validated['normalized_price_tiers']);
+
+            if (!$service->frequency_enabled) {
+                WorkshopServiceFrequency::query()->where('workshop_service_id', $service->id)->delete();
+            }
         });
 
         return back()->with('status', 'Servicio registrado correctamente.');
@@ -81,10 +88,16 @@ class WorkshopServiceCatalogController extends Controller
                 'type' => $validated['type'],
                 'base_price' => $validated['base_price'],
                 'estimated_minutes' => $validated['estimated_minutes'],
+                'frequency_each_km' => $validated['frequency_each_km'] ?? null,
+                'frequency_enabled' => (bool) ($validated['frequency_enabled'] ?? false),
                 'active' => (bool) ($validated['active'] ?? false),
             ]);
 
             $this->syncPriceTiers($service, $validated['normalized_price_tiers']);
+
+            if (!$service->frequency_enabled) {
+                WorkshopServiceFrequency::query()->where('workshop_service_id', $service->id)->delete();
+            }
         });
 
         return back()->with('status', 'Servicio actualizado correctamente.');
@@ -96,6 +109,134 @@ class WorkshopServiceCatalogController extends Controller
         $service->delete();
 
         return back()->with('status', 'Servicio eliminado correctamente.');
+    }
+
+    public function frequencyEdit(WorkshopService $service): \Illuminate\View\View
+    {
+        $this->assertServiceScope($service);
+
+        $frequencies = WorkshopServiceFrequency::query()
+            ->where('workshop_service_id', $service->id)
+            ->orderBy('order_num')
+            ->get(['id', 'km', 'multiplier', 'order_num']);
+
+        return view('workshop.services.frequencies', [
+            'service' => $service,
+            'frequencies' => $frequencies,
+        ]);
+    }
+
+    public function frequencyUpdate(Request $request, WorkshopService $service): RedirectResponse
+    {
+        $this->assertServiceScope($service);
+
+        $validated = $request->validate([
+            'frequency_enabled' => ['nullable', 'boolean'],
+            'frequency_each_km' => ['nullable', 'integer', 'min:1'],
+            'kms' => ['nullable', 'array'],
+            'kms.*' => ['nullable', 'integer', 'min:1'],
+            'multipliers' => ['nullable', 'array'],
+            'multipliers.*' => ['nullable', 'numeric', 'min:0'],
+            'delete_ids' => ['nullable', 'array'],
+            'delete_ids.*' => ['nullable', 'integer', 'min:1'],
+            'new_km' => ['nullable', 'integer', 'min:1'],
+            'new_multiplier' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $frequencyEnabled = (bool) ($validated['frequency_enabled'] ?? false);
+        $frequencyEachKm = $validated['frequency_each_km'] ?? null;
+
+        DB::transaction(function () use ($service, $frequencyEnabled, $frequencyEachKm, $validated) {
+            $service->frequency_enabled = $frequencyEnabled;
+            $service->frequency_each_km = $frequencyEachKm;
+            $service->save();
+
+            if (!$frequencyEnabled) {
+                WorkshopServiceFrequency::query()
+                    ->where('workshop_service_id', $service->id)
+                    ->delete();
+                return;
+            }
+
+            // Hard delete de filas marcadas
+            $deleteIds = array_map('intval', (array) ($validated['delete_ids'] ?? []));
+            if (!empty($deleteIds)) {
+                WorkshopServiceFrequency::query()
+                    ->where('workshop_service_id', $service->id)
+                    ->whereIn('id', $deleteIds)
+                    ->forceDelete();
+            }
+
+            $kms = (array) ($validated['kms'] ?? []);
+            $multipliers = (array) ($validated['multipliers'] ?? []);
+
+            foreach ($kms as $id => $kmValue) {
+                $id = (int) $id;
+                $km = (int) $kmValue;
+                $multiplier = isset($multipliers[$id]) ? (float) $multipliers[$id] : 1.0;
+
+                if ($id <= 0 || $km <= 0) {
+                    continue;
+                }
+
+                $freq = WorkshopServiceFrequency::query()->where('workshop_service_id', $service->id)->where('id', $id)->first();
+                if (!$freq) {
+                    continue;
+                }
+
+                // Evita colisiones de km por la constraint unique (service_id, km).
+                $duplicateKm = WorkshopServiceFrequency::query()
+                    ->where('workshop_service_id', $service->id)
+                    ->where('km', $km)
+                    ->where('id', '!=', $id)
+                    ->exists();
+                if ($duplicateKm) {
+                    continue;
+                }
+
+                $freq->km = $km;
+                $freq->multiplier = $multiplier;
+                $freq->save();
+            }
+
+            $newKm = $validated['new_km'] ?? null;
+            $newMultiplier = $validated['new_multiplier'] ?? null;
+
+            if ($newKm !== null && $newKm !== '' && $newMultiplier !== null && $newMultiplier !== '') {
+                $newKm = (int) $newKm;
+                $newMultiplier = (float) $newMultiplier;
+
+                $existing = WorkshopServiceFrequency::query()
+                    ->withTrashed()
+                    ->where('workshop_service_id', $service->id)
+                    ->where('km', $newKm)
+                    ->first();
+
+                if ($existing) {
+                    if ($existing->trashed()) {
+                        $existing->restore();
+                    }
+                    $existing->order_num = (int) (WorkshopServiceFrequency::query()
+                        ->where('workshop_service_id', $service->id)
+                        ->max('order_num') ?? 0) + 1;
+                    $existing->multiplier = $newMultiplier;
+                    $existing->save();
+                } else {
+                    $nextOrderNum = (int) (WorkshopServiceFrequency::query()
+                        ->where('workshop_service_id', $service->id)
+                        ->max('order_num') ?? 0) + 1;
+
+                    WorkshopServiceFrequency::query()->create([
+                        'workshop_service_id' => $service->id,
+                        'km' => $newKm,
+                        'multiplier' => $newMultiplier,
+                        'order_num' => $nextOrderNum,
+                    ]);
+                }
+            }
+        });
+
+        return back()->with('status', 'Frecuencia del servicio actualizada correctamente.');
     }
 
     private function assertServiceScope(WorkshopService $service): void
@@ -121,6 +262,8 @@ class WorkshopServiceCatalogController extends Controller
             'base_price' => ['nullable', 'numeric', 'min:0'],
             'estimated_minutes' => ['required', 'integer', 'min:0'],
             'active' => ['nullable', 'boolean'],
+            'frequency_each_km' => ['nullable', 'integer', 'min:1'],
+            'frequency_enabled' => ['nullable', 'boolean'],
             'price_tiers' => ['nullable', 'array'],
             'price_tiers.*.max_cc' => ['nullable', 'integer', 'min:1', 'max:5000'],
             'price_tiers.*.price' => ['nullable', 'numeric', 'min:0'],

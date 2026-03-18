@@ -484,6 +484,9 @@ Route::middleware('auth')->group(function () {
         Route::put('/servicios/{service}', [WorkshopServiceCatalogController::class, 'update'])->name('services.update');
         Route::delete('/servicios/{service}', [WorkshopServiceCatalogController::class, 'destroy'])->name('services.destroy');
 
+    Route::get('/servicios/{service}/frecuencia', [WorkshopServiceCatalogController::class, 'frequencyEdit'])->name('services.frequencies.edit');
+    Route::post('/servicios/{service}/frecuencia', [WorkshopServiceCatalogController::class, 'frequencyUpdate'])->name('services.frequencies.update');
+
         Route::get('/armados', [WorkshopAssemblyController::class, 'index'])->name('assemblies.index');
         Route::post('/armados', [WorkshopAssemblyController::class, 'store'])->name('assemblies.store');
         Route::put('/armados/{assembly}', [WorkshopAssemblyController::class, 'update'])->name('assemblies.update');

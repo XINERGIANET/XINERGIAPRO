@@ -416,10 +416,12 @@ class WorkshopMaintenanceBoardController extends Controller
             );
 
             $serviceCatalog = WorkshopService::query()
-                ->with(['priceTiers'])
+                ->with(['priceTiers', 'frequencies'])
                 ->whereIn('id', $serviceLines->pluck('service_id')->map(fn ($value) => (int) $value)->all())
                 ->get()
                 ->keyBy('id');
+
+            $mileageForFrequency = (int) ($validated['mileage_in'] ?? $vehicle->current_mileage ?? 0);
 
             foreach ($serviceLines as $line) {
                 $serviceId = (int) $line['service_id'];
@@ -435,6 +437,17 @@ class WorkshopMaintenanceBoardController extends Controller
                 );
                 if ($unitPrice < 0) {
                     $unitPrice = 0;
+                }
+
+                // Aplica multiplicador por frecuencia segun km del vehiculo.
+                if ((bool) ($service->frequency_enabled ?? false) && $mileageForFrequency > 0) {
+                    $validFrequencies = $service->frequencies
+                        ->filter(fn ($f) => (int) ($f->km ?? 0) > 0 && ((int) $mileageForFrequency % (int) $f->km) === 0)
+                        ->sortByDesc(fn ($f) => (int) $f->km)
+                        ->values();
+
+                    $multiplier = (float) ($validFrequencies->first()->multiplier ?? 1);
+                    $unitPrice = round((float) $unitPrice * $multiplier, 6);
                 }
 
                 $this->flowService->addDetail($workshop, [

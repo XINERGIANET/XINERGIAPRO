@@ -140,6 +140,27 @@
                                         </span>
                                     </div>
 
+                                    @if((bool) ($service->frequency_enabled ?? false))
+                                        {{-- Botón Frecuencia --}}
+                                        <div class="relative group">
+                                            <x-ui.button
+                                                size="icon"
+                                                variant="primary"
+                                                type="button"
+                                                onclick="window.location='{{ route('workshop.services.frequencies.edit', $service) }}'"
+                                                className="rounded-xl"
+                                                style="background-color: #10B981; color: #FFFFFF;"
+                                                aria-label="Configurar frecuencia"
+                                            >
+                                                <i class="ri-repeat-line"></i>
+                                            </x-ui.button>
+                                            <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
+                                                Configurar frecuencia
+                                                <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
+                                            </span>
+                                        </div>
+                                    @endif
+
                                     <form
                                         method="POST"
                                         action="{{ route('workshop.services.destroy', $service) }}"
@@ -227,6 +248,17 @@
                     <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Tiempo Estimado (Minutos)</label>
                     <input type="number" min="0" name="estimated_minutes" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" placeholder="Ej: 60" required>
                 </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Cada cuántos km</label>
+                    <input type="number" min="1" name="frequency_each_km" value="{{ old('frequency_each_km') }}" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" placeholder="Ej: 5000">
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Frecuencia activa</label>
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                        <input type="checkbox" name="frequency_enabled" value="1" class="h-4 w-4 rounded border-gray-300 text-indigo-600">
+                        <span>Usar multiplicador por km</span>
+                    </label>
+                </div>
                 <div class="md:col-span-3 rounded-2xl border border-gray-200 bg-gray-50/60 p-4">
                     <div class="mb-3 flex items-center justify-between gap-3">
                         <div>
@@ -309,6 +341,17 @@
                     <div>
                         <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Tiempo Estimado (Minutos)</label>
                         <input type="number" min="0" name="estimated_minutes" value="{{ (int) $service->estimated_minutes }}" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" required>
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Cada cuántos km</label>
+                        <input type="number" min="1" name="frequency_each_km" value="{{ $service->frequency_each_km }}" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" placeholder="Ej: 5000">
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Frecuencia activa</label>
+                        <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="frequency_enabled" value="1" @checked((bool) $service->frequency_enabled) class="h-4 w-4 rounded border-gray-300 text-indigo-600">
+                            <span>Usar multiplicador por km</span>
+                        </label>
                     </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Estado</label>
