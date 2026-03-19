@@ -68,7 +68,11 @@ class WorkshopOrderController extends Controller
         }
 
         $orders = WorkshopMovement::query()
-            ->with(['movement', 'vehicle', 'client'])
+            ->with([
+                'movement',
+                'vehicle',
+                'client' => fn ($query) => $query->withTrashed(),
+            ])
             ->when($companyId > 0, fn ($query) => $query->where('company_id', $companyId))
             ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
             ->when($selectedStatus !== 'all', fn ($query) => $query->where('status', $selectedStatus))

@@ -100,7 +100,9 @@
                         <tr class="relative hover:z-[60] border-t border-gray-100 dark:border-gray-800 transition hover:bg-gray-50 dark:hover:bg-white/5">
                             <td class="px-3 py-3 text-sm text-center align-middle font-medium text-gray-800 dark:text-white/90">{{ $order->movement?->number }}</td>
                             <td class="px-3 py-3 text-sm text-center align-middle whitespace-nowrap">{{ $order->intake_date?->format('j/m/Y H:i A') }}</td>
-                            <td class="px-3 py-3 text-sm text-center align-middle">{{ $order->client?->full_name }}</td>
+                            <td class="px-3 py-3 text-sm text-center align-middle">
+                                {{ trim(((string) ($order->client?->first_name ?? '')) . ' ' . ((string) ($order->client?->last_name ?? ''))) ?: ((string) ($order->client?->document_number ?? '-') ) }}
+                            </td>
                             <td class="px-3 py-3 text-sm text-center align-middle">{{ $order->vehicle?->brand }} {{ $order->vehicle?->model }} <span class="text-xs text-gray-500">({{ $order->vehicle?->plate }})</span></td>
                             <td class="px-3 py-3 text-sm text-center align-middle">
                                 @php
