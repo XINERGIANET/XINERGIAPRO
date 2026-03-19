@@ -11,6 +11,36 @@ use Illuminate\Support\Facades\DB;
 
 class MenuHelper
 {
+    /**
+     * IDs de opciones de menú permitidas para el usuario autenticado (perfil + sucursal).
+     * null = no aplicar filtro (p. ej. sin perfil en sesión, mismo criterio que el menú lateral).
+     * [] = sin permisos en esta sucursal.
+     *
+     * @return list<int>|null
+     */
+    public static function getAllowedMenuOptionIdsForCurrentUser(): ?array
+    {
+        $user = auth()->user();
+        if (!$user || !$user->profile_id) {
+            return null;
+        }
+
+        $branchId = session('branch_id') ?? $user->person?->branch_id;
+        if (!$branchId) {
+            return [];
+        }
+
+        return DB::table('user_permission')
+            ->where('profile_id', $user->profile_id)
+            ->where('branch_id', $branchId)
+            ->whereNull('deleted_at')
+            ->where('status', 1)
+            ->pluck('menu_option_id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+    }
+
     private const DISABLED_ACTION_PREFIXES = [
         'areas.',
         'tables.',
@@ -32,22 +62,7 @@ class MenuHelper
     {
         $menuStructure = [];
 
-        $allowedMenuOptionIds = null;
-        $user = auth()->user();
-        if ($user && $user->profile_id) {
-            $branchId = session('branch_id') ?? $user->person?->branch_id;
-            if ($branchId) {
-                $allowedMenuOptionIds = DB::table('user_permission')
-                    ->where('profile_id', $user->profile_id)
-                    ->where('branch_id', $branchId)
-                    ->whereNull('deleted_at')
-                    ->where('status', 1)
-                    ->pluck('menu_option_id')
-                    ->all();
-            } else {
-                $allowedMenuOptionIds = [];
-            }
-        }
+        $allowedMenuOptionIds = self::getAllowedMenuOptionIdsForCurrentUser();
 
         $resolvePath = function ($action) {
             if (str_starts_with($action, '/') || str_starts_with($action, 'http')) {

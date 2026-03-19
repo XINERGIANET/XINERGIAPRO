@@ -5,6 +5,7 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\View;
 use App\Models\MenuOption;
+use App\Helpers\MenuHelper;
 use Illuminate\Support\Str;
 
 class AppServiceProvider extends ServiceProvider
@@ -24,14 +25,21 @@ class AppServiceProvider extends ServiceProvider
     {
         // Compartir quickOptions con el header y el sidebar
         View::composer(['layouts.app-header', 'layouts.sidebar'], function ($view) {
-            $quickOptions = MenuOption::where('status', 1)
+            $allowedMenuOptionIds = MenuHelper::getAllowedMenuOptionIdsForCurrentUser();
+
+            $query = MenuOption::where('status', 1)
                 ->where('quick_access', 1)
-                ->where(function ($query) {
-                    $query->where('action', 'not like', 'areas.%')
+                ->where(function ($q) {
+                    $q->where('action', 'not like', 'areas.%')
                         ->where('action', 'not like', 'tables.%');
                 })
-                ->orderBy('id', 'asc')
-                ->get();
+                ->orderBy('id', 'asc');
+
+            if (is_array($allowedMenuOptionIds)) {
+                $query->whereIn('id', $allowedMenuOptionIds);
+            }
+
+            $quickOptions = $query->get();
 
             $quickOptions = $quickOptions->filter(function ($option) {
                 $action = Str::lower((string) $option->action);

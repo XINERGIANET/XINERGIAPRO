@@ -179,9 +179,20 @@
             .filter(c => {
                 const doc = String(c.document_number ?? '').toLowerCase();
                 const name = `${String(c.first_name ?? '')} ${String(c.last_name ?? '')}`.toLowerCase().trim();
-                return doc.includes(q) || name.includes(q);
+                const label = this.getQuickVehicleClientLabel(c).toLowerCase();
+                if (label.includes(q) || doc.includes(q) || name.includes(q)) return true;
+                const parts = q.split(/\s*-\s*/).map(s => s.trim()).filter(Boolean);
+                if (parts.length >= 2) {
+                    return parts.every(part => doc.includes(part) || name.includes(part) || label.includes(part));
+                }
+                return false;
             })
             .slice(0, 30);
+    },
+    clearQuickVehicleClient() {
+        this.quickVehicle.client_person_id = '';
+        this.quickVehicleClientSearch = '';
+        this.quickVehicleClientDropdownOpen = false;
     },
     selectQuickVehicleClient(client) {
         this.quickVehicle.client_person_id = String(client.id);
@@ -617,10 +628,17 @@
                                     @focus="quickVehicleClientDropdownOpen = true"
                                     @click="quickVehicleClientDropdownOpen = true"
                                     @input="quickVehicleClientDropdownOpen = true"
-                                    class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+                                    class="h-12 w-full rounded-2xl border border-slate-200 bg-white py-2 pl-4 pr-11 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
                                     placeholder="Buscar DNI o nombres"
                                     autocomplete="off"
                                     >
+                                <button type="button"
+                                    class="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                                    title="Limpiar cliente"
+                                    x-show="String(quickVehicleClientSearch || '').trim() !== '' || String(quickVehicle.client_person_id || '').trim() !== ''"
+                                    @click.stop="clearQuickVehicleClient()">
+                                    <i class="ri-close-line text-lg"></i>
+                                </button>
                                 <div
                                     x-show="quickVehicleClientDropdownOpen"
                                     x-cloak
