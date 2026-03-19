@@ -620,7 +620,7 @@
                                     class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
                                     placeholder="Buscar DNI o nombres"
                                     autocomplete="off"
-                                    required>
+                                    >
                                 <div
                                     x-show="quickVehicleClientDropdownOpen"
                                     x-cloak
@@ -648,7 +648,7 @@
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">Tipo de vehículo</label>
-                        <select x-model="quickVehicle.vehicle_type_id" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                        <select x-model="quickVehicle.vehicle_type_id" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm">
                             <template x-for="type in vehicleTypes" :key="`type-${type.id}`">
                                 <option :value="type.id" x-text="String(type.name || '').toUpperCase()"></option>
                             </template>
@@ -656,11 +656,11 @@
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">Marca</label>
-                        <input x-model="quickVehicle.brand" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Marca" required>
+                        <input x-model="quickVehicle.brand" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Marca">
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">Modelo</label>
-                        <input x-model="quickVehicle.model" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Modelo" required>
+                        <input x-model="quickVehicle.model" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Modelo">
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">Año</label>
@@ -692,7 +692,7 @@
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">KM actual <span class="text-red-600">*</span></label>
-                        <input x-model="quickVehicle.current_mileage" type="number" min="0" required class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="KM actual">
+                        <input x-model="quickVehicle.current_mileage" type="number" min="0" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="KM actual">
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">Cilindrada (cc)</label>
