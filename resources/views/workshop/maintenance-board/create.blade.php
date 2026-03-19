@@ -353,6 +353,26 @@
     },
     async saveQuickVehicle() {
         this.quickVehicleError = '';
+        const kmStr = String(this.quickVehicle.current_mileage ?? '').trim();
+        if (kmStr === '') {
+            this.quickVehicleError = 'Debes registrar KM actual.';
+            return;
+        }
+
+        const kmNum = Number(kmStr);
+        if (!Number.isFinite(kmNum) || kmNum < 0) {
+            this.quickVehicleError = 'KM actual debe ser un numero valido.';
+            return;
+        }
+
+        const plate = String(this.quickVehicle.plate ?? '').trim();
+        const vin = String(this.quickVehicle.vin ?? '').trim();
+        const engineNumber = String(this.quickVehicle.engine_number ?? '').trim();
+        if (plate === '' && vin === '' && engineNumber === '') {
+            this.quickVehicleError = 'Debe registrar placa o VIN o numero de motor.';
+            return;
+        }
+
         this.ensureQuickVehicleClient();
         this.creatingVehicleLoading = true;
         try {
