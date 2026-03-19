@@ -1,10 +1,33 @@
 @extends('layouts.app')
 
 @section('content')
+@php
+    $statusLabels = [
+        'draft' => 'Borrador',
+        'diagnosis' => 'Diagnóstico',
+        'awaiting_approval' => 'Esperando aprobación',
+        'approved' => 'Aprobado',
+        'in_progress' => 'En reparación',
+        'finished' => 'Terminado',
+        'delivered' => 'Entregado',
+        'cancelled' => 'Anulado',
+        'pending' => 'Pendiente',
+        'partial' => 'Parcial',
+        'paid' => 'Pagado',
+        'rejected' => 'Rechazado',
+    ];
+    $translateStatus = function ($value) use ($statusLabels) {
+        $key = strtolower(trim((string) $value));
+        if ($key === '') {
+            return '-';
+        }
+        return $statusLabels[$key] ?? str_replace('_', ' ', $key);
+    };
+@endphp
 <div x-data="{}">
     <x-common.page-breadcrumb pageTitle="Detalle Orden de Servicio" />
 
-    <x-common.component-card title="OS {{ $order->movement?->number }}" desc="Estado actual: {{ $order->status }}">
+    <x-common.component-card title="OS {{ $order->movement?->number }}" desc="Estado actual: {{ $translateStatus($order->status) }}">
         @if (session('status'))
             <div class="mb-4 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-700">{{ session('status') }}</div>
         @endif
@@ -31,7 +54,7 @@
             <div><p class="text-xs text-gray-500">Cliente</p><p class="font-semibold text-gray-900">{{ $order->client?->first_name }} {{ $order->client?->last_name }}</p></div>
             <div><p class="text-xs text-gray-500">Vehiculo</p><p class="font-semibold text-gray-900">{{ $order->vehicle?->brand }} {{ $order->vehicle?->model }} {{ $order->vehicle?->plate }}</p></div>
             <div><p class="text-xs text-gray-500">KM Ingreso / Salida</p><p class="font-semibold text-gray-900">{{ $order->mileage_in ?: '-' }} / {{ $order->mileage_out ?: '-' }}</p></div>
-            <div><p class="text-xs text-gray-500">Aprobacion / Pago</p><p class="font-semibold text-gray-900">{{ $order->approval_status ?? 'pending' }} / {{ $order->payment_status ?? 'pending' }}</p></div>
+            <div><p class="text-xs text-gray-500">Aprobación / Pago</p><p class="font-semibold text-gray-900">{{ $translateStatus($order->approval_status ?? 'pending') }} / {{ $translateStatus($order->payment_status ?? 'pending') }}</p></div>
             <div><p class="text-xs text-gray-500">Total</p><p class="font-semibold text-gray-900">S/ {{ number_format((float) $order->total, 2) }}</p></div>
             <div><p class="text-xs text-gray-500">Pagado</p><p class="font-semibold text-gray-900">S/ {{ number_format((float) $order->paid_total, 2) }}</p></div>
             <div><p class="text-xs text-gray-500">Deuda</p><p class="font-semibold text-gray-900">S/ {{ number_format(max(0, (float)$order->total - (float)$order->paid_total), 2) }}</p></div>
@@ -188,8 +211,8 @@
                                 @forelse($order->statusHistories->sortByDesc('id')->take(30) as $history)
                                     <tr class="border-t border-gray-100">
                                         <td class="px-3 py-2">{{ optional($history->created_at)->format('Y-m-d H:i') }}</td>
-                                        <td class="px-3 py-2">{{ $history->from_status ?: '-' }}</td>
-                                        <td class="px-3 py-2">{{ $history->to_status }}</td>
+                                        <td class="px-3 py-2">{{ $translateStatus($history->from_status) }}</td>
+                                        <td class="px-3 py-2">{{ $translateStatus($history->to_status) }}</td>
                                         <td class="px-3 py-2">{{ $history->user?->name ?: ('#'.$history->user_id) }}</td>
                                     </tr>
                                 @empty
@@ -201,84 +224,10 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                <form method="POST" action="{{ route('workshop.orders.warranty.store', $order) }}" class="rounded-xl border border-gray-200 bg-white p-4">
-                    @csrf
-                    <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-700">Registrar Garantia</h3>
-                    <x-form.select-autocomplete
-                        name="workshop_movement_detail_id"
-                        :value="''"
-                        :options="collect($order->details ?? [])->map(fn($d) => ['value' => $d->id, 'label' => $d->line_type . ' - ' . $d->description])->prepend(['value' => '', 'label' => 'Toda la OS'])->values()->all()"
-                        placeholder="Toda la OS"
-                        inputClass="mb-2 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
-                    />
-                    <input type="number" min="1" max="3650" name="days" class="mb-2 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" value="30" required>
-                    <input name="note" class="mb-2 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nota de garantia">
-                    <button class="rounded-lg bg-indigo-700 px-3 py-2 text-xs font-semibold text-white">Registrar garantia</button>
-                </form>
+          
+           
 
-                <form method="POST" action="{{ route('workshop.orders.payment.refund', $order) }}" class="rounded-xl border border-gray-200 bg-white p-4">
-                    @csrf
-                    <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-700">Registrar Devolucion</h3>
-                    <x-form.select-autocomplete
-                        name="cash_register_id"
-                        :value="''"
-                        :options="collect($cashRegisters ?? [])->map(fn($c) => ['value' => $c->id, 'label' => $c->number])->prepend(['value' => '', 'label' => 'Caja'])->values()->all()"
-                        placeholder="Caja"
-                        :required="true"
-                        inputClass="mb-2 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
-                    />
-                    <x-form.select-autocomplete
-                        name="payment_method_id"
-                        :value="''"
-                        :options="collect($paymentMethods ?? [])->map(fn($m) => ['value' => $m->id, 'label' => $m->description])->prepend(['value' => '', 'label' => 'Metodo'])->values()->all()"
-                        placeholder="Metodo"
-                        :required="true"
-                        inputClass="mb-2 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
-                    />
-                    <input type="number" step="0.01" min="0.01" name="amount" class="mb-2 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Monto" required>
-                    <input name="reason" class="mb-2 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Motivo" required>
-                    <button class="rounded-lg bg-rose-700 px-3 py-2 text-xs font-semibold text-white">Registrar devolucion</button>
-                </form>
-            </div>
-
-            <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                <form method="POST" action="{{ route('workshop.orders.cancel', $order) }}" class="rounded-xl border border-red-300 bg-white p-4">
-                    @csrf
-                    <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-red-700">Anular OS</h3>
-                    <input name="reason" class="mb-2 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Motivo" required>
-                    <label class="mb-2 inline-flex items-center gap-2 text-sm"><input type="checkbox" name="auto_refund" value="1"> Revertir pagos automaticamente</label>
-                    <button class="rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white">Anular</button>
-                </form>
-
-                <form method="POST" action="{{ route('workshop.orders.reopen', $order) }}" class="rounded-xl border border-amber-300 bg-white p-4">
-                    @csrf
-                    <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-amber-700">Reabrir OS (Admin)</h3>
-                    <input name="reason" class="mb-2 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Motivo de reapertura" required>
-                    <button class="rounded-lg bg-amber-700 px-3 py-2 text-xs font-semibold text-white">Reabrir</button>
-                </form>
-            </div>
-
-            <form method="POST" action="{{ route('workshop.orders.checklists.store', $order) }}" class="rounded-xl border border-gray-200 bg-white p-4">
-                @csrf
-                <h3 class="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-700">Checklist Rapido</h3>
-                <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
-                    <x-form.select-autocomplete
-                        name="type"
-                        :value="'OS_INTAKE'"
-                        :options="[['value' => 'OS_INTAKE', 'label' => 'OS_INTAKE'], ['value' => 'GP_ACTIVATION', 'label' => 'GP_ACTIVATION'], ['value' => 'PDI', 'label' => 'PDI'], ['value' => 'MAINTENANCE', 'label' => 'MAINTENANCE']]"
-                        placeholder="Tipo"
-                        inputClass="h-11 rounded-lg border border-gray-300 px-3 text-sm"
-                    />
-                    <input name="items[0][group]" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Grupo">
-                    <input name="items[0][label]" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Item" required>
-                    <input name="items[0][result]" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Resultado">
-                    <input name="items[0][action]" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Accion">
-                    <input name="items[0][observation]" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Observacion">
-                    <input type="number" name="items[0][order_num]" value="1" min="1" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
-                </div>
-                <button class="mt-3 rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white">Guardar checklist</button>
-            </form>
+           
         </div>
     </x-common.component-card>
 </div>
