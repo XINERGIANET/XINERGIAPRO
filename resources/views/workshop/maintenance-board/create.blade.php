@@ -671,15 +671,15 @@
                         <input x-model="quickVehicle.color" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Color">
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Placa</label>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Placa <span class="text-red-600">*</span></label>
                         <input x-model="quickVehicle.plate" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Placa">
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">VIN</label>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">VIN <span class="text-red-600">*</span></label>
                         <input x-model="quickVehicle.vin" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="VIN">
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Nro. motor</label>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Nro. motor <span class="text-red-600">*</span></label>
                         <input x-model="quickVehicle.engine_number" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nro. motor">
                     </div>
                     <div>
@@ -691,8 +691,8 @@
                         <input x-model="quickVehicle.serial_number" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Serial">
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">KM actual</label>
-                        <input x-model="quickVehicle.current_mileage" type="number" min="0" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="KM actual">
+                        <label class="mb-1 block text-sm font-medium text-gray-700">KM actual <span class="text-red-600">*</span></label>
+                        <input x-model="quickVehicle.current_mileage" type="number" min="0" required class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="KM actual">
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">Cilindrada (cc)</label>
