@@ -37,17 +37,8 @@
 
         <div class="mb-5 flex flex-wrap items-center gap-2">
             <a class="rounded-lg bg-slate-700 px-3 py-2 text-xs font-semibold text-white" href="{{ route('workshop.pdf.order', $order) }}" target="_blank">PDF OS</a>
-            <a class="rounded-lg bg-slate-700 px-3 py-2 text-xs font-semibold text-white" href="{{ route('workshop.pdf.activation', $order) }}" target="_blank">PDF GP</a>
-            <a class="rounded-lg bg-slate-700 px-3 py-2 text-xs font-semibold text-white" href="{{ route('workshop.pdf.pdi', $order) }}" target="_blank">PDF PDI</a>
-            <a class="rounded-lg bg-slate-700 px-3 py-2 text-xs font-semibold text-white" href="{{ route('workshop.pdf.maintenance', $order) }}" target="_blank">PDF Mant.</a>
-            <a class="rounded-lg bg-slate-700 px-3 py-2 text-xs font-semibold text-white" href="{{ route('workshop.pdf.parts', $order) }}" target="_blank">PDF Repuestos</a>
-            @if($order->sale)
-                <a class="rounded-lg bg-slate-700 px-3 py-2 text-xs font-semibold text-white" href="{{ route('workshop.pdf.internal-sale', $order) }}" target="_blank">PDF Venta</a>
-            @endif
-            <form method="POST" action="{{ route('workshop.pdf.order.save', $order) }}">
-                @csrf
-                <button class="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white">Guardar snapshot PDF</button>
-            </form>
+
+           
         </div>
 
         <div class="mb-6 grid grid-cols-1 gap-3 rounded-xl border border-gray-200 bg-white p-4 md:grid-cols-2 xl:grid-cols-4">
