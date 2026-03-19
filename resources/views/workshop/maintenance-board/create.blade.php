@@ -44,6 +44,8 @@
     creatingVehicle: false,
     creatingVehicleLoading: false,
     quickVehicleError: '',
+    quickVehicleClientSearch: '',
+    quickVehicleClientDropdownOpen: false,
     creatingClientLoading: false,
     quickClientError: '',
     quickVehicle: {
@@ -84,6 +86,7 @@
     inventoryChecks: @js(collect(old('inventory', []))->map(fn ($v) => (bool) $v)->all()),
     selectedVehicleTypeId: '',
     showInventory: @js($showInventoryDefault ?? true),
+    showDamagesPreexisting: @js($showDamagesPreexistingDefault ?? true),
     syncVehicle() {
         const selected = this.vehicles.find(v => String(v.id) === String(this.selectedVehicleId));
         if (!selected) return;
@@ -152,6 +155,38 @@
             this.quickVehicle.client_person_id = this.selectedClientId || fallbackClientId;
         }
         this.syncHistoryUrl();
+        this.syncQuickVehicleClientSearch();
+    },
+    getQuickVehicleClientLabel(client) {
+        const doc = String(client?.document_number ?? '').trim();
+        const name = `${String(client?.first_name ?? '')} ${String(client?.last_name ?? '')}`.trim();
+        if (doc && name) return `${doc} - ${name}`;
+        return doc || name || '';
+    },
+    getClientById(id) {
+        const idStr = String(id ?? '');
+        return this.clientsList.find(c => String(c.id) === idStr) || null;
+    },
+    syncQuickVehicleClientSearch() {
+        const client = this.getClientById(this.quickVehicle.client_person_id);
+        this.quickVehicleClientSearch = this.getQuickVehicleClientLabel(client);
+    },
+    filteredQuickVehicleClients() {
+        const q = String(this.quickVehicleClientSearch || '').trim().toLowerCase();
+        if (!q) return this.clientsList.slice(0, 30);
+
+        return this.clientsList
+            .filter(c => {
+                const doc = String(c.document_number ?? '').toLowerCase();
+                const name = `${String(c.first_name ?? '')} ${String(c.last_name ?? '')}`.toLowerCase().trim();
+                return doc.includes(q) || name.includes(q);
+            })
+            .slice(0, 30);
+    },
+    selectQuickVehicleClient(client) {
+        this.quickVehicle.client_person_id = String(client.id);
+        this.quickVehicleClientSearch = this.getQuickVehicleClientLabel(client);
+        this.quickVehicleClientDropdownOpen = false;
     },
     get filteredVehicles() {
         const q = String(this.vehicleSearch || '').trim().toLowerCase();
@@ -307,6 +342,7 @@
             engine_displacement_cc: ''
         };
         this.quickVehicleError = '';
+        this.syncQuickVehicleClientSearch();
     },
     toggleQuickVehicle() {
         this.creatingVehicle = !this.creatingVehicle;
@@ -378,6 +414,7 @@
             this.clientsList.unshift(payload);
             this.selectedClientId = String(payload.id);
             this.quickVehicle.client_person_id = String(payload.id);
+            this.syncQuickVehicleClientSearch();
             this.syncHistoryUrl();
             this.quickClient = {
                 person_type: 'DNI',
@@ -553,37 +590,94 @@
 
                 <div class="grid grid-cols-1 gap-2 md:grid-cols-4">
                     <div class="md:col-span-2">
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Cliente</label>
-                        <div class="flex items-center gap-2">
-                            <select x-model="quickVehicle.client_person_id" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
-                                <template x-for="client in clientsList" :key="`quick-client-${client.id}`">
-                                    <option :value="client.id" x-text="`${client.first_name || ''} ${client.last_name || ''}`.trim() || `Cliente #${client.id}`"></option>
-                                </template>
-                            </select>
-                            <button class="inline-flex items-center justify-center font-medium gap-2 rounded-xl transition px-5 py-3.5 text-sm bg-brand-500 text-white shadow-theme-xs hover:bg-brand-600 disabled:bg-brand-300"
+                        <label class="mb-1 block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Cliente</label>
+                        <div class="flex items-start gap-2">
+                            <div class="relative w-full" @click.outside="quickVehicleClientDropdownOpen = false">
+                                <input x-model="quickVehicleClientSearch"
+                                    @focus="quickVehicleClientDropdownOpen = true"
+                                    @click="quickVehicleClientDropdownOpen = true"
+                                    @input="quickVehicleClientDropdownOpen = true"
+                                    class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+                                    placeholder="Buscar DNI o nombres"
+                                    autocomplete="off"
+                                    required>
+                                <div
+                                    x-show="quickVehicleClientDropdownOpen"
+                                    x-cloak
+                                    class="absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded-2xl border border-slate-200 bg-white shadow-xl"
+                                >
+                                    <template x-if="filteredQuickVehicleClients().length === 0">
+                                        <p class="px-4 py-3 text-sm text-slate-500">Sin resultados.</p>
+                                    </template>
+                                    <template x-for="client in filteredQuickVehicleClients()" :key="`quick-client-${client.id}`">
+                                        <button type="button"
+                                            @click="selectQuickVehicleClient(client)"
+                                            class="flex w-full items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 text-left hover:bg-slate-50 last:border-b-0">
+                                            <span class="text-sm font-medium text-slate-800 truncate" x-text="`${client.document_number || ''} - ${((client.first_name || '') + ' ' + (client.last_name || '')).trim()}`"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                            <button class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white shadow-theme-xs"
                                     type="button"
-                                    style="background-color:#00A389;color:#fff;"
+                                    style="background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff;box-shadow:0 12px 24px rgba(249,115,22,0.24);"
                                     @click="$dispatch('open-client-modal')">
-                                <i class="ri-add-line"></i>
+                                <i class="ri-add-line text-lg"></i>
                             </button>
                         </div>
                     </div>
-                                                          <select x-model="quickVehicle.vehicle_type_id" class="h-10 rounded-lg border border-gray-300 px-3 text-sm">
-                        <template x-for="type in vehicleTypes" :key="`type-${type.id}`">
-                            <option :value="type.id" x-text="type.name"></option>
-                        </template>
-                    </select>
-                    <input x-model="quickVehicle.brand" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Marca">
-                    <input x-model="quickVehicle.model" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Modelo">
-                    <input x-model="quickVehicle.year" type="number" min="1900" max="2100" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Anio">
-                    <input x-model="quickVehicle.color" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Color">
-                    <input x-model="quickVehicle.plate" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Placa">
-                    <input x-model="quickVehicle.vin" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="VIN">
-                    <input x-model="quickVehicle.engine_number" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nro motor">
-                    <input x-model="quickVehicle.chassis_number" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nro chasis">
-                    <input x-model="quickVehicle.serial_number" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Serial">
-                    <input x-model="quickVehicle.current_mileage" type="number" min="0" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="KM actual">
-                    <input x-model="quickVehicle.engine_displacement_cc" type="number" min="1" max="5000" class="h-10 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Cilindrada (cc)">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Tipo de vehículo</label>
+                        <select x-model="quickVehicle.vehicle_type_id" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                            <template x-for="type in vehicleTypes" :key="`type-${type.id}`">
+                                <option :value="type.id" x-text="String(type.name || '').toUpperCase()"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Marca</label>
+                        <input x-model="quickVehicle.brand" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Marca" required>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Modelo</label>
+                        <input x-model="quickVehicle.model" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Modelo" required>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Año</label>
+                        <input x-model="quickVehicle.year" type="number" min="1900" max="2100" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Año">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Color</label>
+                        <input x-model="quickVehicle.color" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Color">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Placa</label>
+                        <input x-model="quickVehicle.plate" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Placa">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">VIN</label>
+                        <input x-model="quickVehicle.vin" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="VIN">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Nro. motor</label>
+                        <input x-model="quickVehicle.engine_number" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nro. motor">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Nro. chasis</label>
+                        <input x-model="quickVehicle.chassis_number" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nro. chasis">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Serial</label>
+                        <input x-model="quickVehicle.serial_number" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Serial">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">KM actual</label>
+                        <input x-model="quickVehicle.current_mileage" type="number" min="0" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="KM actual">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Cilindrada (cc)</label>
+                        <input x-model="quickVehicle.engine_displacement_cc" type="number" min="1" max="5000" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Cilindrada (cc)">
+                    </div>
                 </div>
 
                 <div class="mt-3 flex items-center gap-2">
@@ -703,7 +797,14 @@
                     </div>
                 </div>
 
-                <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <div class="mb-3 mt-4">
+                    <label class="inline-flex items-center gap-2 text-sm font-semibold text-gray-700">
+                        <input type="checkbox" x-model="showDamagesPreexisting" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        <span>Mostrar Daños preexistentes recibido</span>
+                    </label>
+                </div>
+
+                <div class="rounded-lg border border-gray-200 bg-gray-50 p-3" x-show="showDamagesPreexisting" x-cloak>
                     <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-600">Daños preexistentes por lado</p>
                     <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
                         @foreach ([
@@ -813,7 +914,7 @@
 
             <div class="md:col-span-3 mt-2 flex gap-2">
                 <x-ui.button type="submit" size="md" variant="primary" style="background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff">
-                    <i class="ri-play-circle-line"></i><span>Iniciar mantenimiento</span>
+                    <i class="ri-play-circle-line"></i><span>Enviar a aprobación</span>
                 </x-ui.button>
                 <x-ui.link-button size="md" variant="outline" href="{{ route('workshop.maintenance-board.index') }}">
                     <i class="ri-close-line"></i><span>Cancelar</span>

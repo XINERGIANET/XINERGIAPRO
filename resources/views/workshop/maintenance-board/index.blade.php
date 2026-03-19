@@ -18,7 +18,7 @@
                     <i class="ri-add-circle-line"></i><span>Agregar Vehiculo</span>
                 </x-ui.link-button>
                 <x-ui.link-button size="md" variant="outline" href="{{ route('workshop.orders.index') }}">
-                    <i class="ri-file-list-3-line"></i><span>Ir a Ordenes de Servicio</span>
+                    <i class="ri-file-list-3-line"></i><span>Ir a OS</span>
                 </x-ui.link-button>
             </div>
 
