@@ -195,7 +195,7 @@
                 <table class="w-full">
                     <thead>
                         <tr class="text-white">
-                            <th style="background-color: #334155; color: #FFFFFF;" class="w-12 px-4 py-4 text-center first:rounded-tl-xl"></th>
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6 first:rounded-tl-xl"></th>
                             <th style="background-color: #334155; color: #FFFFFF;" class="hidden md:table-cell w-32 px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Código</p>
                             </th>
@@ -222,8 +222,8 @@
                     <tbody>
                         @forelse ($products as $product)
                             <tr
-                                class="group/row relative border-b border-gray-100 transition hover:z-[60] hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5">
-                                <td class="sticky-left px-4 py-4 text-center group-hover/row:!bg-gray-50 dark:group-hover/row:!bg-white/5">
+                                class="group/row border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5 relative hover:z-[60]">
+                                <td class="px-5 py-4 sm:px-6 text-center">
                                     <button type="button"
                                         @click="openRow === {{ $product->id }} ? openRow = null : openRow = {{ $product->id }}"
                                         class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-white transition hover:bg-brand-600 dark:bg-brand-500 dark:text-white">
