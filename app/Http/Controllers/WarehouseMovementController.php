@@ -15,6 +15,7 @@ use App\Services\KardexSyncService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class WarehouseMovementController extends Controller
 {
@@ -27,18 +28,16 @@ class WarehouseMovementController extends Controller
             abort(403, 'No se ha seleccionado una sucursal');
         }
 
-        // Cargar productos fisicos de la sucursal
-        $products = Product::where('classification', 'GOOD')
+        $productIdsInBranch = $this->productIdsForWarehouseBranch((int) $branchId);
+        $productsQuery = Product::where('classification', 'GOOD')
             ->with(['category', 'baseUnit'])
-            ->orderBy('description')
-            ->get();
-
-        // Si no hay productos fisicos, cargar todos los productos sin filtro
-        if ($products->isEmpty()) {
-            $products = Product::with(['category', 'baseUnit'])
-                ->orderBy('description')
-                ->get();
+            ->orderBy('description');
+        if ($productIdsInBranch !== []) {
+            $productsQuery->whereIn('id', $productIdsInBranch);
+        } else {
+            $productsQuery->whereRaw('1 = 0');
         }
+        $products = $productsQuery->get();
 
 
         // Cargar productBranches del branch para tener información de stock y precio
@@ -232,14 +231,24 @@ class WarehouseMovementController extends Controller
 
     public function outputStore(Request $request)
     {
+        $branchId = (int) session('branch_id');
+        if (!$branchId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se ha seleccionado una sucursal',
+            ], 403);
+        }
+
         $request->validate([
             'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.product_id' => [
+                'required',
+                'integer',
+                Rule::exists('product_branch', 'product_id')->where(fn ($q) => $q->where('branch_id', $branchId)),
+            ],
             'items.*.quantity' => 'required|numeric|min:0.01',
             'comment' => 'nullable|string|max:500',
         ]);
-
-        $branchId = session('branch_id');
         $userId = session('user_id');
         $userName = session('user_name') ?? 'Sistema';
         $personId = session('person_id');
@@ -645,16 +654,26 @@ class WarehouseMovementController extends Controller
 
     public function store(Request $request)
     {
+        $branchId = (int) session('branch_id');
+        if (!$branchId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se ha seleccionado una sucursal',
+            ], 403);
+        }
+
         $request->validate([
             'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.product_id' => [
+                'required',
+                'integer',
+                Rule::exists('product_branch', 'product_id')->where(fn ($q) => $q->where('branch_id', $branchId)),
+            ],
             'items.*.quantity' => 'required|numeric|min:0.01',
             'items.*.unit_cost' => 'nullable|numeric|min:0',
             'reason' => 'nullable|string|max:120',
             'comment' => 'nullable|string|max:500',
         ]);
-
-        $branchId = (int) session('branch_id');
         $userId = (int) session('user_id');
         $userName = (string) (session('user_name') ?? 'Sistema');
         $personId = (int) (session('person_id') ?? 0);
@@ -740,16 +759,7 @@ class WarehouseMovementController extends Controller
                     ->first();
 
                 if (!$productBranch) {
-                    // Si no existe ProductBranch, crearlo
-                    $productBranch = ProductBranch::create([
-                        'product_id' => $product->id,
-                        'branch_id' => $branchId,
-                        'stock' => 0,
-                        'price' => 0,
-                        'avg_cost' => 0,
-                        'status' => 'A',
-                        'supplier_id' => null,
-                    ]);
+                    throw new \Exception('El producto no pertenece al stock de esta sucursal.');
                 }
 
                 // Crear WarehouseMovementDetail
@@ -807,16 +817,19 @@ class WarehouseMovementController extends Controller
 
     public function updateEntry(Request $request, $warehouseMovement)
     {
+        $branchId = (int) session('branch_id');
         $request->validate([
             'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.product_id' => [
+                'required',
+                'integer',
+                Rule::exists('product_branch', 'product_id')->where(fn ($q) => $q->where('branch_id', $branchId)),
+            ],
             'items.*.quantity' => 'required|numeric|min:0.01',
             'items.*.unit_cost' => 'nullable|numeric|min:0',
             'reason' => 'nullable|string|max:255',
             'comment' => 'nullable|string|max:500',
         ]);
-
-        $branchId = (int) session('branch_id');
         $wm = WarehouseMovement::with(['movement.documentType', 'details'])
             ->where('id', $warehouseMovement->id ?? $warehouseMovement)
             ->where('branch_id', $branchId)
@@ -855,15 +868,7 @@ class WarehouseMovementController extends Controller
                     ->lockForUpdate()
                     ->first();
                 if (!$productBranch) {
-                    $productBranch = ProductBranch::create([
-                        'product_id' => $product->id,
-                        'branch_id' => $branchId,
-                        'stock' => 0,
-                        'price' => 0,
-                        'avg_cost' => 0,
-                        'status' => 'A',
-                        'supplier_id' => null,
-                    ]);
+                    throw new \Exception('El producto no pertenece al stock de esta sucursal.');
                 }
 
                 WarehouseMovementDetail::create([
@@ -912,14 +917,17 @@ class WarehouseMovementController extends Controller
 
     public function updateOutput(Request $request, $warehouseMovement)
     {
+        $branchId = (int) session('branch_id');
         $request->validate([
             'items' => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.product_id' => [
+                'required',
+                'integer',
+                Rule::exists('product_branch', 'product_id')->where(fn ($q) => $q->where('branch_id', $branchId)),
+            ],
             'items.*.quantity' => 'required|numeric|min:0.01',
             'comment' => 'nullable|string|max:500',
         ]);
-
-        $branchId = (int) session('branch_id');
         $wm = WarehouseMovement::with(['movement.documentType', 'details'])
             ->where('id', $warehouseMovement->id ?? $warehouseMovement)
             ->where('branch_id', $branchId)
@@ -994,6 +1002,26 @@ class WarehouseMovementController extends Controller
                 'message' => 'Error al actualizar la salida: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Productos dados de alta en la sucursal (tabla product_branch).
+     *
+     * @return list<int>
+     */
+    private function productIdsForWarehouseBranch(int $branchId): array
+    {
+        if ($branchId <= 0) {
+            return [];
+        }
+
+        return ProductBranch::query()
+            ->where('branch_id', $branchId)
+            ->pluck('product_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function isAdminUser(): bool
