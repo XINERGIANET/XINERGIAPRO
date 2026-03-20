@@ -150,53 +150,48 @@
             </div>
 
 
-            <div
-                class="table-responsive lg:!overflow-visible rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-                <table class="w-full min-w-max">
+            <div class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden dark:border-gray-800 dark:bg-white/[0.03]">
+                <table class="w-full xl:min-w-0 table-fixed">
                         <thead>
                             <tr class="text-white">
-                                <th style="background-color: #334155;" class="px-3 py-4 text-left whitespace-nowrap first:rounded-tl-xl sticky-left-header w-32 max-w-[128px] sm:w-auto sm:max-w-none">
-                                    <p class="font-bold text-gray-100 text-xs uppercase tracking-wider truncate">Razón social</p>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6 first:rounded-tl-xl w-[28%]">
+                                    <p class="font-semibold text-white text-theme-xs uppercase">Razón social</p>
                                 </th>
-                                <th style="background-color: #334155;" class="px-5 py-4 text-center whitespace-nowrap">
-                                    <p class="font-bold text-gray-100 text-xs uppercase tracking-wider">RUC</p>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6 w-[12%]">
+                                    <p class="font-semibold text-white text-theme-xs uppercase">RUC</p>
                                 </th>
-                                <th style="background-color: #334155;" class="px-5 py-4 text-left whitespace-nowrap">
-                                    <p class="font-bold text-gray-100 text-xs uppercase tracking-wider">Dirección</p>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6 w-[40%]">
+                                    <p class="font-semibold text-white text-theme-xs uppercase">Dirección</p>
                                 </th>
-                                <th style="background-color: #334155;" class="px-5 py-4 text-center whitespace-nowrap last:rounded-tr-xl">
-                                    <p class="font-bold text-gray-100 text-xs uppercase tracking-wider">Acciones</p>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6 last:rounded-tr-xl w-[20%]">
+                                    <p class="font-semibold text-white text-theme-xs uppercase">Acciones</p>
                                 </th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                             @forelse ($companies as $company)
-                                <tr
-                                    class="group/row hover:bg-gray-50/80 dark:hover:bg-white/5 relative hover:z-[60]"
-                                    onmouseenter="this.querySelector('.sticky-left')?.style.setProperty('background-color', '#f9fafbcc', 'important')"
-                                    onmouseleave="this.querySelector('.sticky-left')?.style.setProperty('background-color', '#ffffff', 'important')"
-                                >
-                                    <td class="px-3 py-4 whitespace-nowrap sticky-left w-32 max-w-[128px] sm:w-auto sm:max-w-none">
-                                        <div class="flex items-center gap-2">
-                                            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-500 dark:bg-brand-500/10 shrink-0">
+                                <tr class="group/row border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5 relative hover:z-[60]">
+                                    <td class="px-5 py-4 sm:px-6 align-top">
+                                        <div class="flex items-start gap-2 min-w-0">
+                                            <div class="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-brand-50 text-brand-500 dark:bg-brand-500/10">
                                                 <i class="ri-building-line text-xs"></i>
                                             </div>
-                                            <p class="font-semibold text-gray-800 text-theme-sm dark:text-white/90 truncate" title="{{ $company->legal_name }}">
+                                            <p class="min-w-0 font-semibold text-gray-800 text-theme-sm dark:text-white/90 whitespace-normal break-words" title="{{ $company->legal_name }}">
                                                 {{ $company->legal_name }}
                                             </p>
                                         </div>
                                     </td>
-                                    <td class="px-5 py-4 text-center whitespace-nowrap">
+                                    <td class="px-5 py-4 sm:px-6 text-center align-top whitespace-nowrap">
                                         <span class="inline-flex items-center rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">
                                             {{ $company->tax_id }}
                                         </span>
                                     </td>
-                                    <td class="px-5 py-4 min-w-[200px]">
-                                        <p class="text-gray-600 text-theme-sm dark:text-gray-400 line-clamp-1" title="{{ $company->address }}">
+                                    <td class="px-5 py-4 sm:px-6 align-top">
+                                        <p class="text-gray-600 text-theme-sm dark:text-gray-400 whitespace-normal break-words" title="{{ $company->address }}">
                                             {{ $company->address }}
                                         </p>
                                     </td>
-                                    <td class="px-5 py-4 whitespace-nowrap">
+                                    <td class="px-5 py-4 sm:px-6 align-top whitespace-nowrap">
                                         <div class="flex items-center justify-center gap-2">
                                             @foreach ($rowOperations as $operation)
                                                 @php
@@ -272,8 +267,6 @@
                                 </tr>
                             @endforelse
                         </tbody>
-                        @if ($companies->count() > 0)
-@endif
                 </table>
             </div>
 
