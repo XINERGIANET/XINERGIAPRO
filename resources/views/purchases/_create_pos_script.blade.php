@@ -275,6 +275,17 @@ function purchaseCreateForm(c) {
             };
         },
 
+        namesFromReniecPayload(payload) {
+            const n = String(payload?.first_name ?? payload?.nombres ?? '').trim();
+            const apPat = String(payload?.apellido_paterno ?? '').trim();
+            const apMat = String(payload?.apellido_materno ?? '').trim();
+            const lastUnified = String(payload?.last_name ?? '').trim() || [apPat, apMat].filter(Boolean).join(' ');
+            if (n !== '' || lastUnified !== '') {
+                return { first_name: n, last_name: lastUnified };
+            }
+            return this.splitName(String(payload?.name ?? payload?.nombre_completo ?? ''));
+        },
+
         async fetchReniecQuickProvider() {
             this.quickProviderError = '';
 
@@ -297,11 +308,11 @@ function purchaseCreateForm(c) {
                 });
                 const payload = await response.json();
 
-                if (!response.ok || !payload?.status || !payload?.name) {
+                if (!response.ok || !payload?.status || (!payload?.name && !payload?.nombres && !payload?.nombre_completo && !payload?.first_name)) {
                     throw new Error(payload?.message || 'No se encontro informacion en RENIEC.');
                 }
 
-                const parsed = this.splitName(payload.name);
+                const parsed = this.namesFromReniecPayload(payload);
                 this.quickProvider.first_name = parsed.first_name;
                 this.quickProvider.last_name = parsed.last_name;
                 this.quickProvider.fecha_nacimiento = payload?.fecha_nacimiento || '';

@@ -1077,9 +1077,15 @@
                             throw new Error(payload?.message || 'Error consultando RENIEC.');
                         }
 
-                        const parsed = parseFullName(payload?.name || payload?.nombre_completo || '');
-                        if (firstName) firstName.value = String(payload?.nombres || parsed.first_name || '').trim();
-                        if (lastName) lastName.value = String([payload?.apellido_paterno || '', payload?.apellido_materno || ''].filter(Boolean).join(' ') || parsed.last_name || '').trim();
+                        const fnVal = String(payload?.first_name ?? payload?.nombres ?? '').trim();
+                        const apPat = String(payload?.apellido_paterno ?? '').trim();
+                        const apMat = String(payload?.apellido_materno ?? '').trim();
+                        const lnUnified = String(payload?.last_name ?? '').trim() || [apPat, apMat].filter(Boolean).join(' ');
+                        const parsed = (!fnVal && !lnUnified)
+                            ? parseFullName(payload?.name || payload?.nombre_completo || '')
+                            : { first_name: fnVal, last_name: lnUnified };
+                        if (firstName) firstName.value = String(fnVal || parsed.first_name || '').trim();
+                        if (lastName) lastName.value = String(lnUnified || parsed.last_name || '').trim();
                         if (date) date.value = normalizeApiDate(payload?.fecha_nacimiento || '');
                         if (gender) gender.value = String(payload?.genero || '').trim();
                     } catch (error) {

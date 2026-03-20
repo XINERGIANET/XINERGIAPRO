@@ -116,7 +116,18 @@ class PersonController extends Controller
         $resultado = (array) ($data['resultado'] ?? []);
         $mensaje = (string) ($data['mensaje'] ?? $data['message'] ?? '');
 
-        if (!$estado || empty($resultado)) {
+        if ($estado && $resultado === []) {
+            $hasPersonFields = ($data['nombres'] ?? '') !== ''
+                || ($data['apellido_paterno'] ?? '') !== ''
+                || ($data['apellido_materno'] ?? '') !== ''
+                || ($data['nombre_completo'] ?? '') !== ''
+                || ($data['name'] ?? '') !== '';
+            if ($hasPersonFields) {
+                $resultado = $data;
+            }
+        }
+
+        if (!$estado || $resultado === []) {
             return response()->json([
                 'status' => false,
                 'message' => $mensaje !== '' ? $mensaje : 'No se encontro informacion en RENIEC.',
@@ -161,10 +172,11 @@ class PersonController extends Controller
             ], 422);
         }
 
+        $apellidosUnificados = trim(implode(' ', array_filter([$apellidoPaterno, $apellidoMaterno])));
+
         return response()->json([
             'status' => true,
             'message' => $mensaje !== '' ? $mensaje : 'Encontrado',
-            // Formato solicitado
             'id' => $id,
             'nombres' => $nombres,
             'apellido_paterno' => $apellidoPaterno,
@@ -173,7 +185,8 @@ class PersonController extends Controller
             'codigo_verificacion' => $codigoVerificacion,
             'fecha_nacimiento' => $fechaNacimiento,
             'genero' => $genero,
-            // Compatibilidad con frontend actual
+            'first_name' => $nombres,
+            'last_name' => $apellidosUnificados,
             'name' => $nombreCompleto,
         ]);
     }

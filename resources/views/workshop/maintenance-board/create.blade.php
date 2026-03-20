@@ -475,6 +475,16 @@
         if (parts.length === 3) return { first_name: parts[0], last_name: parts.slice(1).join(' ') };
         return { first_name: parts.slice(0, 2).join(' '), last_name: parts.slice(2).join(' ') };
     },
+    namesFromReniecPayload(payload) {
+        const n = String(payload?.first_name ?? payload?.nombres ?? '').trim();
+        const apPat = String(payload?.apellido_paterno ?? '').trim();
+        const apMat = String(payload?.apellido_materno ?? '').trim();
+        const lastUnified = String(payload?.last_name ?? '').trim() || [apPat, apMat].filter(Boolean).join(' ');
+        if (n !== '' || lastUnified !== '') {
+            return { first_name: n, last_name: lastUnified };
+        }
+        return this.splitName(String(payload?.name ?? payload?.nombre_completo ?? ''));
+    },
     async fetchReniecQuickClient() {
         this.quickClientError = '';
         if (String(this.quickClient.person_type).toUpperCase() !== 'DNI') {
@@ -492,10 +502,10 @@
                 headers: { 'Accept': 'application/json' }
             });
             const payload = await response.json();
-            if (!response.ok || !payload?.status || !payload?.name) {
+            if (!response.ok || !payload?.status || (!payload?.name && !payload?.nombres && !payload?.nombre_completo && !payload?.first_name)) {
                 throw new Error(payload?.message || 'No se encontro informacion en RENIEC.');
             }
-            const parsed = this.splitName(payload.name);
+            const parsed = this.namesFromReniecPayload(payload);
             this.quickClient.first_name = parsed.first_name;
             this.quickClient.last_name = parsed.last_name;
             this.quickClient.fecha_nacimiento = payload?.fecha_nacimiento || '';
