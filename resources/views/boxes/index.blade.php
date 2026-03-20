@@ -159,21 +159,21 @@
             </div>
         </div>
 
-        <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+        <div class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden dark:border-gray-800 dark:bg-white/[0.03]">
             <table class="w-full min-w-max">
                     <thead>
                         <tr class="border-b border-gray-100 dark:border-gray-800">
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6 sticky-left-header"><p class="font-medium text-white text-theme-xs dark:text-white">ID</p></th>
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6 first:rounded-tl-xl"><p class="font-medium text-white text-theme-xs dark:text-white">ID</p></th>
                             <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6"><p class="font-medium text-white text-theme-xs dark:text-white">Numero</p></th>
                             <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6"><p class="font-medium text-white text-theme-xs dark:text-white">Serie</p></th>
                             <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-left sm:px-6"><p class="font-medium text-white text-theme-xs dark:text-white">Estado</p></th>
-                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6"><p class="font-medium text-white text-theme-xs dark:text-white">Acciones</p></th>
+                            <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6 last:rounded-tr-xl"><p class="font-medium text-white text-theme-xs dark:text-white">Acciones</p></th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse ($cash as $box)
                             <tr class="group/row border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5 relative hover:z-[60]">
-                                <td class="px-5 py-4 sm:px-6 sticky-left"><span class="font-bold text-gray-700 dark:text-gray-200">#{{ $box->id }}</span></td>
+                                <td class="px-5 py-4 sm:px-6"><span class="font-bold text-gray-700 dark:text-gray-200">#{{ $box->id }}</span></td>
                                 <td class="px-5 py-4 sm:px-6">
                                     <p class="font-medium text-gray-800 text-theme-sm dark:text-white/90">{{ $box->number }}</p>
                                 </td>
