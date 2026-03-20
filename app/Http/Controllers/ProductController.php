@@ -412,17 +412,57 @@ class ProductController extends Controller
 
     public function destroy(Request $request, Product $product)
     {
-        // Eliminar la imagen si existe
-        if ($product->image && !empty($product->image) && Storage::disk('public')->exists($product->image)) {
-            Storage::disk('public')->delete($product->image);
-        }
-        
-        $product->delete();
+        $branchId = $request->session()->get('branch_id');
         $viewId = $request->input('view_id');
+
+        if (!$branchId) {
+            return redirect()
+                ->route('admin.products.index', $viewId ? ['view_id' => $viewId] : [])
+                ->with('error', 'No hay sucursal seleccionada.');
+        }
+
+        $destroyOutcome = 'full';
+
+        DB::transaction(function () use ($product, $branchId, &$destroyOutcome) {
+            $productBranch = ProductBranch::query()
+                ->where('product_id', $product->id)
+                ->where('branch_id', $branchId)
+                ->first();
+
+            $removedThisBranch = false;
+            if ($productBranch) {
+                $productBranch->delete();
+                $removedThisBranch = true;
+            }
+
+            $hasOtherBranches = ProductBranch::query()
+                ->where('product_id', $product->id)
+                ->exists();
+
+            if ($hasOtherBranches) {
+                $destroyOutcome = $removedThisBranch ? 'branch_only' : 'no_op';
+
+                return;
+            }
+
+            if ($product->image && !empty($product->image) && Storage::disk('public')->exists($product->image)) {
+                Storage::disk('public')->delete($product->image);
+            }
+
+            $product->delete();
+        });
+
+        if ($destroyOutcome === 'branch_only') {
+            $statusMessage = 'Producto quitado de esta sucursal. Sigue existiendo en otras sedes.';
+        } elseif ($destroyOutcome === 'no_op') {
+            $statusMessage = 'Este producto no estaba vinculado a la sucursal actual.';
+        } else {
+            $statusMessage = 'Producto eliminado correctamente.';
+        }
 
         return redirect()
             ->route('admin.products.index', $viewId ? ['view_id' => $viewId] : [])
-            ->with('status', 'Producto eliminado correctamente.');
+            ->with('status', $statusMessage);
     }
 
     private function validateProduct(Request $request): array
