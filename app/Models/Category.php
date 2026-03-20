@@ -52,11 +52,12 @@ class Category extends Model
             ->get()
             ->mapWithKeys(fn ($row) => [((int) $row->category_id) . ':' . ((int) $row->branch_id) => true]);
 
-        $trashedByKey = DB::table('category_branch')
+        $trashedKeys = DB::table('category_branch')
             ->whereNotNull('deleted_at')
-            ->select('id', 'category_id', 'branch_id')
+            ->select('category_id', 'branch_id')
+            ->distinct()
             ->get()
-            ->mapWithKeys(fn ($row) => [((int) $row->category_id) . ':' . ((int) $row->branch_id) => $row->id]);
+            ->mapWithKeys(fn ($row) => [((int) $row->category_id) . ':' . ((int) $row->branch_id) => true]);
 
         $timestamp = now();
         $inserts = [];
@@ -68,13 +69,7 @@ class Category extends Model
                     continue;
                 }
 
-                if (isset($trashedByKey[$key])) {
-                    DB::table('category_branch')
-                        ->where('id', $trashedByKey[$key])
-                        ->update([
-                            'deleted_at' => null,
-                            'updated_at' => $timestamp,
-                        ]);
+                if (isset($trashedKeys[$key])) {
                     continue;
                 }
 
