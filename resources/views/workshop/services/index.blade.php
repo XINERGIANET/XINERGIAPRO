@@ -50,7 +50,17 @@
             </div>
 
             {{-- Botón Nuevo --}}
-            <div class="ml-auto">
+            <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
+                <x-ui.button
+                    size="md"
+                    variant="outline"
+                    type="button"
+                    class="h-11 rounded-xl border-2 border-emerald-500/40 bg-gradient-to-r from-emerald-50 to-teal-50 px-5 font-bold text-emerald-800 shadow-sm transition-all hover:border-emerald-500 hover:from-emerald-100 hover:to-teal-100 active:scale-95 dark:from-emerald-950/40 dark:to-teal-950/40 dark:text-emerald-200"
+                    @click="$dispatch('open-import-services-modal')"
+                >
+                    <i class="ri-file-excel-2-line text-lg"></i>
+                    <span>Importar Excel</span>
+                </x-ui.button>
                 <x-ui.button 
                     size="md" 
                     variant="primary" 
@@ -67,6 +77,9 @@
 
         @if (session('status'))
             <div class="mb-4 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-700">{{ session('status') }}</div>
+        @endif
+        @if (session('error'))
+            <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ session('error') }}</div>
         @endif
         @if ($errors->any())
             <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first() }}</div>
@@ -214,6 +227,82 @@
             </div>
         </div>
     </x-common.component-card>
+
+    <x-ui.modal x-data="{ open: false, fileName: '', dragging: false }" x-on:open-import-services-modal.window="open = true; fileName = ''; dragging = false; $nextTick(() => { const el = $refs.importFile; if (el) el.value = '' })" :isOpen="false" :showCloseButton="false" class="max-w-lg">
+        <div class="overflow-hidden rounded-3xl bg-white dark:bg-gray-900">
+            <div class="relative bg-gradient-to-br from-emerald-600 via-teal-600 to-slate-800 px-6 pb-10 pt-8 text-white">
+                <div class="absolute -right-6 -top-6 h-28 w-28 rounded-full bg-white/10 blur-2xl"></div>
+                <div class="absolute -bottom-8 left-4 h-24 w-24 rounded-full bg-emerald-300/20 blur-xl"></div>
+                <div class="relative flex items-start justify-between gap-3">
+                    <div>
+                        <div class="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-emerald-50">
+                            <i class="ri-upload-cloud-2-line text-sm"></i>
+                            Importación masiva
+                        </div>
+                        <h3 class="mt-3 text-xl font-bold leading-tight sm:text-2xl">Lista de precios → servicios</h3>
+                        <p class="mt-2 max-w-md text-sm text-emerald-50/90">Sube un Excel con columnas <span class="font-bold">SERVICIO</span> y <span class="font-bold">PRECIO</span> (ej. S/ 15.00). Se crearán registros en esta sucursal.</p>
+                    </div>
+                    <button type="button" @click="open = false" class="flex h-11 w-11 flex-none items-center justify-center rounded-2xl bg-white/10 text-white transition hover:bg-white/20">
+                        <i class="ri-close-line text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="-mt-6 px-6 pb-8 pt-0">
+                <form method="POST" action="{{ route('workshop.services.import') }}" enctype="multipart/form-data" data-turbo="false" class="rounded-2xl border border-gray-200/80 bg-white p-5 shadow-xl dark:border-gray-700 dark:bg-gray-900">
+                    @csrf
+                    @if(request('view_id'))
+                        <input type="hidden" name="view_id" value="{{ request('view_id') }}">
+                    @endif
+                    <label x-ref="dropZone"
+                        @dragover.prevent="dragging = true"
+                        @dragleave.prevent="dragging = false"
+                        @drop.prevent="
+                            dragging = false;
+                            if ($event.dataTransfer.files.length) {
+                                const dt = new DataTransfer();
+                                dt.items.add($event.dataTransfer.files[0]);
+                                $refs.importFile.files = dt.files;
+                                fileName = $event.dataTransfer.files[0].name;
+                            }
+                        "
+                        :class="dragging ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-400/50' : 'border-gray-200 bg-gray-50/50 hover:border-emerald-300'"
+                        class="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-4 py-10 transition-all dark:border-gray-600 dark:bg-gray-800/50">
+                        <div class="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30">
+                            <i class="ri-file-excel-2-line text-2xl"></i>
+                        </div>
+                        <p class="text-center text-sm font-semibold text-gray-800 dark:text-gray-100">Arrastra tu archivo aquí o haz clic para elegir</p>
+                        <p class="mt-1 text-center text-xs text-gray-500 dark:text-gray-400">.xlsx, .xls o .csv &middot; max. 12 MB</p>
+                        <p class="mt-3 text-center text-xs font-medium text-emerald-700 dark:text-emerald-400" x-show="fileName !== ''" x-text="fileName"></p>
+                        <input type="file" name="import_file" x-ref="importFile" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" required class="sr-only" @change="fileName = $event.target.files.length ? $event.target.files[0].name : ''">
+                    </label>
+
+                    <div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Tipo para todos</label>
+                            <select name="import_type" class="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-800 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100" required>
+                                <option value="correctivo" selected>Correctivo</option>
+                                <option value="preventivo">Preventivo</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Tiempo estimado (min)</label>
+                            <input type="number" name="import_estimated_minutes" value="0" min="0" max="14400" required class="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-800 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100" placeholder="0">
+                        </div>
+                    </div>
+
+                    <div class="mt-5 flex flex-wrap items-center justify-end gap-3">
+                        <button type="button" @click="open = false" class="h-11 rounded-xl border border-gray-200 bg-white px-5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-6 text-sm font-bold text-white shadow-lg shadow-emerald-600/25 transition hover:brightness-110 active:scale-[0.98]">
+                            <i class="ri-upload-2-line text-lg"></i>
+                            Importar ahora
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </x-ui.modal>
 
     <x-ui.modal x-data="{ open: false }" x-on:open-service-modal.window="open = true" :isOpen="false" :showCloseButton="false" class="max-w-4xl">
         <div class="p-6 sm:p-8">

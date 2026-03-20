@@ -480,6 +480,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/ventas', [WorkshopSalesRegisterController::class, 'index'])->name('sales-register.index');
 
         Route::get('/servicios', [WorkshopServiceCatalogController::class, 'index'])->name('services.index');
+        Route::post('/servicios/importar', [WorkshopServiceCatalogController::class, 'importFromSpreadsheet'])->name('services.import');
         Route::post('/servicios', [WorkshopServiceCatalogController::class, 'store'])->name('services.store');
         Route::put('/servicios/{service}', [WorkshopServiceCatalogController::class, 'update'])->name('services.update');
         Route::delete('/servicios/{service}', [WorkshopServiceCatalogController::class, 'destroy'])->name('services.destroy');

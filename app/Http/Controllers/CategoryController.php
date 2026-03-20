@@ -4,7 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Operation;
+use App\Models\Product;
+use App\Models\ProductBranch;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class CategoryController extends Controller
@@ -137,11 +140,96 @@ class CategoryController extends Controller
 
     public function destroy(Request $request, Category $category)
     {
-        $category->delete();
+        $branchId = $request->session()->get('branch_id');
         $viewId = $request->input('view_id');
+
+        if (!$branchId) {
+            return redirect()
+                ->route('admin.categories.index', $viewId ? ['view_id' => $viewId] : [])
+                ->with('error', 'No hay sucursal seleccionada.');
+        }
+
+        $destroyOutcome = 'full';
+
+        DB::transaction(function () use ($category, $branchId, &$destroyOutcome) {
+            $pivot = DB::table('category_branch')
+                ->where('category_id', $category->id)
+                ->where('branch_id', $branchId)
+                ->whereNull('deleted_at')
+                ->first();
+
+            $removedThisBranch = false;
+            if ($pivot) {
+                DB::table('category_branch')
+                    ->where('id', $pivot->id)
+                    ->update(['deleted_at' => now(), 'updated_at' => now()]);
+                $removedThisBranch = true;
+            }
+
+            if ($removedThisBranch) {
+                $productIds = Product::query()
+                    ->where('category_id', $category->id)
+                    ->pluck('id');
+
+                foreach ($productIds as $productId) {
+                    $productBranch = ProductBranch::query()
+                        ->where('product_id', $productId)
+                        ->where('branch_id', $branchId)
+                        ->first();
+
+                    if ($productBranch) {
+                        $productBranch->delete();
+                    }
+
+                    $hasOtherProductBranches = ProductBranch::query()
+                        ->where('product_id', $productId)
+                        ->exists();
+
+                    if ($hasOtherProductBranches) {
+                        continue;
+                    }
+
+                    $product = Product::query()->find($productId);
+                    if (!$product) {
+                        continue;
+                    }
+
+                    if ($product->image && !empty($product->image) && Storage::disk('public')->exists($product->image)) {
+                        Storage::disk('public')->delete($product->image);
+                    }
+
+                    $product->delete();
+                }
+            }
+
+            $hasOtherCategoryBranches = DB::table('category_branch')
+                ->where('category_id', $category->id)
+                ->whereNull('deleted_at')
+                ->exists();
+
+            if ($hasOtherCategoryBranches) {
+                $destroyOutcome = $removedThisBranch ? 'branch_only' : 'no_op';
+
+                return;
+            }
+
+            if ($category->image && !empty($category->image) && Storage::disk('public')->exists($category->image)) {
+                Storage::disk('public')->delete($category->image);
+            }
+
+            $category->delete();
+        });
+
+        if ($destroyOutcome === 'branch_only') {
+            $statusMessage = 'Categoría quitada de esta sucursal. Sigue existiendo en otras sedes; se eliminaron los vínculos en sede de los productos de esta categoría.';
+        } elseif ($destroyOutcome === 'no_op') {
+            $statusMessage = 'Esta categoría no estaba vinculada a la sucursal actual.';
+        } else {
+            $statusMessage = 'Categoría eliminada correctamente.';
+        }
 
         return redirect()
             ->route('admin.categories.index', $viewId ? ['view_id' => $viewId] : [])
-            ->with('status', 'Categoria eliminada correctamente.');
+            ->with('status', $statusMessage);
     }
 }

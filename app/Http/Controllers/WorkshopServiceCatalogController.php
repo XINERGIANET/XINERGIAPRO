@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\WorkshopService;
 use App\Models\WorkshopServiceFrequency;
 use App\Support\WorkshopAuthorization;
+use App\Support\WorkshopServiceSpreadsheetImport;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rules\File;
 use Illuminate\Validation\ValidationException;
 
 class WorkshopServiceCatalogController extends Controller
@@ -45,6 +47,71 @@ class WorkshopServiceCatalogController extends Controller
             ->withQueryString();
 
         return view('workshop.services.index', compact('services', 'search', 'perPage'));
+    }
+
+    public function importFromSpreadsheet(Request $request): RedirectResponse
+    {
+        if (!class_exists(\PhpOffice\PhpSpreadsheet\IOFactory::class)) {
+            return back()->with('error', 'Ejecuta en el proyecto: composer update (se requiere phpoffice/phpspreadsheet para leer Excel).');
+        }
+
+        $validated = $request->validate([
+            'import_file' => ['required', File::types(['xlsx', 'xls', 'csv'])->max(12288)],
+            'import_type' => ['required', 'in:preventivo,correctivo'],
+            'import_estimated_minutes' => ['required', 'integer', 'min:0', 'max:14400'],
+        ]);
+
+        $branchId = (int) session('branch_id');
+        $branch = \App\Models\Branch::query()->findOrFail($branchId);
+
+        $path = $request->file('import_file')?->getRealPath();
+        if (!$path || !is_readable($path)) {
+            return back()->with('error', 'No se pudo leer el archivo subido.');
+        }
+
+        try {
+            $rows = WorkshopServiceSpreadsheetImport::extractRows($path);
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        $imported = 0;
+        $skippedDup = 0;
+
+        DB::transaction(function () use ($rows, $branch, $branchId, $validated, &$imported, &$skippedDup) {
+            foreach ($rows as $row) {
+                $name = $row['name'];
+                $exists = WorkshopService::query()
+                    ->where('branch_id', $branchId)
+                    ->whereRaw('LOWER(name) = ?', [mb_strtolower($name, 'UTF-8')])
+                    ->exists();
+                if ($exists) {
+                    $skippedDup++;
+
+                    continue;
+                }
+
+                WorkshopService::query()->create([
+                    'company_id' => $branch->company_id,
+                    'branch_id' => $branchId,
+                    'name' => $name,
+                    'type' => $validated['import_type'],
+                    'base_price' => $row['price'],
+                    'estimated_minutes' => (int) $validated['import_estimated_minutes'],
+                    'frequency_each_km' => null,
+                    'frequency_enabled' => false,
+                    'active' => true,
+                ]);
+                $imported++;
+            }
+        });
+
+        $parts = ["Importación lista: {$imported} servicio(s) creado(s)."];
+        if ($skippedDup > 0) {
+            $parts[] = "{$skippedDup} fila(s) omitidas (el nombre ya existía en esta sucursal).";
+        }
+
+        return back()->with('status', implode(' ', $parts));
     }
 
     public function store(Request $request): RedirectResponse
