@@ -222,8 +222,8 @@
                     <tbody>
                         @forelse ($products as $product)
                             <tr
-                                class="border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5">
-                                <td class="px-4 py-4 text-center sticky-left">
+                                class="group/row relative border-b border-gray-100 transition hover:z-[60] hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5">
+                                <td class="sticky-left px-4 py-4 text-center group-hover/row:!bg-gray-50 dark:group-hover/row:!bg-white/5">
                                     <button type="button"
                                         @click="openRow === {{ $product->id }} ? openRow = null : openRow = {{ $product->id }}"
                                         class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-white transition hover:bg-brand-600 dark:bg-brand-500 dark:text-white">
