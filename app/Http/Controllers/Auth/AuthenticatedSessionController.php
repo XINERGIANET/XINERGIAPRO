@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Helpers\MenuHelper;
 use App\Http\Controllers\Controller;
+use App\Models\MenuOption;
 use App\Models\Shift;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -57,8 +59,23 @@ class AuthenticatedSessionController extends Controller
                     $request->session()->put('shift_snapshot', $shiftSnapshot);
                 }
             }
-            
-            return redirect()->intended(route('dashboard'));
+
+            $defaultAfterLogin = route('dashboard');
+            if ($user->default_menu_option_id && $user->profile_id && $person) {
+                $allowedIds = MenuHelper::getAllowedMenuOptionIdsForProfileAndBranch((int) $user->profile_id, (int) $person->branch_id);
+                if (in_array((int) $user->default_menu_option_id, $allowedIds, true)) {
+                    $menuOption = MenuOption::query()
+                        ->where('id', $user->default_menu_option_id)
+                        ->where('status', 1)
+                        ->first();
+                    $resolved = MenuHelper::resolveMenuOptionUrl($menuOption);
+                    if ($resolved) {
+                        $defaultAfterLogin = $resolved;
+                    }
+                }
+            }
+
+            return redirect()->intended($defaultAfterLogin);
         }
 
         return back()->withErrors([

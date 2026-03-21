@@ -38,7 +38,7 @@ class WorkshopClientController extends Controller
     public function index(Request $request)
     {
         [$branchId, $companyId] = $this->branchScope();
-        $branch = Branch::query()->findOrFail($branchId);
+        $branch = Branch::query()->with('company')->findOrFail($branchId);
 
         $search = trim((string) $request->input('search', ''));
         $type = (string) $request->input('type', '');
@@ -70,7 +70,7 @@ class WorkshopClientController extends Controller
                     $roleQuery->where('roles.id', $roleId);
                 });
             })
-            ->with('roles')
+            ->with(['roles', 'user'])
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
@@ -89,18 +89,21 @@ class WorkshopClientController extends Controller
             'selectedRoleIds' => old('roles', []),
             'selectedProfileId' => old('profile_id'),
             'userName' => old('user_name'),
+            'branch' => $branch,
+            'company' => $branch->company,
         ] + $this->getLocationData(null, $branch->location_id));
     }
 
     public function store(StoreWorkshopClientRequest $request): RedirectResponse
     {
         [$branchId] = $this->branchScope();
+        $branch = Branch::query()->findOrFail($branchId);
         $data = $request->validated();
         $data['phone'] = (string) ($data['phone'] ?? '');
         $data['email'] = (string) ($data['email'] ?? '');
         $roleIds = $this->validateRoles($request);
         $hasUserRole = in_array(1, $roleIds, true);
-        $userData = $this->validateUserData($request, $hasUserRole, null);
+        $userData = $this->validateUserData($request, $hasUserRole, null, $branch);
 
         DB::transaction(function () use ($branchId, $data, $roleIds, $hasUserRole, $userData) {
             $person = Person::query()->create(array_merge(
@@ -116,6 +119,7 @@ class WorkshopClientController extends Controller
                     'password' => Hash::make($userData['password']),
                     'person_id' => $person->id,
                     'profile_id' => $userData['profile_id'],
+                    'default_menu_option_id' => $userData['default_menu_option_id'] ?? null,
                 ]);
             }
         });
@@ -127,12 +131,13 @@ class WorkshopClientController extends Controller
     {
         [$branchId] = $this->branchScope();
         $this->assertClientScope($person, $branchId);
+        $branch = Branch::query()->findOrFail($branchId);
         $data = $request->validated();
         $data['phone'] = (string) ($data['phone'] ?? '');
         $data['email'] = (string) ($data['email'] ?? '');
         $roleIds = $this->validateRoles($request);
         $hasUserRole = in_array(1, $roleIds, true);
-        $userData = $this->validateUserData($request, $hasUserRole, $person);
+        $userData = $this->validateUserData($request, $hasUserRole, $person, $branch);
 
         DB::transaction(function () use ($person, $branchId, $data, $roleIds, $hasUserRole, $userData) {
             $person->update($data);
@@ -145,6 +150,7 @@ class WorkshopClientController extends Controller
                         'name' => $userData['user_name'],
                         'email' => $person->email,
                         'profile_id' => $userData['profile_id'],
+                        'default_menu_option_id' => $userData['default_menu_option_id'] ?? null,
                     ]);
                     if (!empty($userData['password'])) {
                         $user->update([
@@ -158,6 +164,7 @@ class WorkshopClientController extends Controller
                         'password' => Hash::make($userData['password']),
                         'person_id' => $person->id,
                         'profile_id' => $userData['profile_id'],
+                        'default_menu_option_id' => $userData['default_menu_option_id'] ?? null,
                     ]);
                 }
             }
@@ -307,7 +314,7 @@ class WorkshopClientController extends Controller
         return array_values(array_unique(array_map('intval', $validated['roles'] ?? [])));
     }
 
-    private function validateUserData(Request $request, bool $hasUserRole, ?Person $person): array
+    private function validateUserData(Request $request, bool $hasUserRole, ?Person $person, Branch $branch): array
     {
         if (!$hasUserRole) {
             return [];
@@ -316,6 +323,34 @@ class WorkshopClientController extends Controller
         $rules = [
             'user_name' => ['required', 'string', 'max:255'],
             'profile_id' => ['required', 'integer', 'exists:profiles,id'],
+            'default_menu_option_id' => [
+                'nullable',
+                'integer',
+                'exists:menu_option,id',
+                function ($attribute, $value, $fail) use ($request, $branch) {
+                    if ($value === null || $value === '') {
+                        return;
+                    }
+                    $profileId = (int) $request->input('profile_id');
+                    if ($profileId < 1) {
+                        $fail('Seleccione un perfil valido para el menu por defecto.');
+
+                        return;
+                    }
+                    $ok = DB::table('user_permission')
+                        ->join('menu_option', 'menu_option.id', '=', 'user_permission.menu_option_id')
+                        ->where('user_permission.profile_id', $profileId)
+                        ->where('user_permission.branch_id', $branch->id)
+                        ->whereNull('user_permission.deleted_at')
+                        ->where('user_permission.status', 1)
+                        ->where('user_permission.menu_option_id', (int) $value)
+                        ->where('menu_option.status', 1)
+                        ->exists();
+                    if (!$ok) {
+                        $fail('El menu por defecto no esta permitido para este perfil en esta sucursal.');
+                    }
+                },
+            ],
         ];
 
         if ($person && $person->user) {

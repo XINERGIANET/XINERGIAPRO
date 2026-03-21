@@ -41,6 +41,64 @@ class MenuHelper
             ->all();
     }
 
+    /**
+     * IDs de opciones de menú permitidas para un perfil y sucursal (user_permission).
+     *
+     * @return list<int>
+     */
+    public static function getAllowedMenuOptionIdsForProfileAndBranch(int $profileId, int $branchId): array
+    {
+        return DB::table('user_permission')
+            ->where('profile_id', $profileId)
+            ->where('branch_id', $branchId)
+            ->whereNull('deleted_at')
+            ->where('status', 1)
+            ->pluck('menu_option_id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    public static function resolveMenuOptionUrl(?MenuOption $option): ?string
+    {
+        if (!$option) {
+            return null;
+        }
+
+        $action = (string) ($option->action ?? '');
+        if ($action === '') {
+            return null;
+        }
+
+        if (self::isDisabledMenuOption($option->action, $option->name)) {
+            return null;
+        }
+
+        if (str_starts_with($action, '/') || str_starts_with($action, 'http')) {
+            $path = $action;
+        } elseif (Route::has($action)) {
+            try {
+                $path = route($action);
+            } catch (\Exception $e) {
+                return null;
+            }
+        } else {
+            return null;
+        }
+
+        if ($path === '#' || $path === '') {
+            return null;
+        }
+
+        $path = self::appendViewIdToPath($path, $option->view_id);
+
+        if ($path === '#' || $path === '') {
+            return null;
+        }
+
+        return $path;
+    }
+
     private const DISABLED_ACTION_PREFIXES = [
         'areas.',
         'tables.',

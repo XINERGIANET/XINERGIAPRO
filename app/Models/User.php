@@ -23,6 +23,7 @@ class User extends Authenticatable
         'password',
         'person_id',
         'profile_id',
+        'default_menu_option_id',
     ];
 
     /**
@@ -54,5 +55,10 @@ class User extends Authenticatable
     public function person()
     {
         return $this->belongsTo(Person::class);
+    }
+
+    public function defaultMenuOption()
+    {
+        return $this->belongsTo(MenuOption::class, 'default_menu_option_id');
     }
 }

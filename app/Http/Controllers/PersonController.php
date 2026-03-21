@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\Company;
+use App\Models\MenuOption;
 use App\Models\Location;
 use App\Models\Movement;
 use App\Models\Operation;
@@ -89,6 +90,31 @@ class PersonController extends Controller
             'operaciones' => $operaciones,
         ] + $this->getLocationData(null, $branch->location_id));
     }
+
+    public function profileMenuOptions(Request $request, Company $company, Branch $branch)
+    {
+        $branch = $this->resolveBranch($company, $branch);
+        $validated = $request->validate([
+            'profile_id' => ['required', 'integer', 'exists:profiles,id'],
+        ]);
+        $profileId = (int) $validated['profile_id'];
+
+        $ids = DB::table('user_permission')
+            ->where('profile_id', $profileId)
+            ->where('branch_id', $branch->id)
+            ->whereNull('deleted_at')
+            ->where('status', 1)
+            ->pluck('menu_option_id');
+
+        $options = MenuOption::query()
+            ->whereIn('id', $ids)
+            ->where('status', 1)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return response()->json($options);
+    }
+
     public function apiReniec(Request $request)
     {
         $dni = (string) $request->query('dni', '');
@@ -277,7 +303,7 @@ class PersonController extends Controller
         $data['branch_id'] = $branch->id;
         $roleIds = $this->validateRoles($request);
         $hasUserRole = in_array(1, $roleIds, true);
-        $userData = $this->validateUserData($request, $hasUserRole, null);
+        $userData = $this->validateUserData($request, $hasUserRole, null, $branch);
 
         DB::transaction(function () use ($branch, $data, $roleIds, $hasUserRole, $userData) {
             $person = $branch->people()->create($data);
@@ -290,6 +316,7 @@ class PersonController extends Controller
                     'password' => Hash::make($userData['password']),
                     'person_id' => $person->id,
                     'profile_id' => $userData['profile_id'],
+                    'default_menu_option_id' => $userData['default_menu_option_id'] ?? null,
                 ]);
             }
         });
@@ -331,7 +358,7 @@ class PersonController extends Controller
         $data['email'] = (string) ($data['email'] ?? '');
         $roleIds = $this->validateRoles($request);
         $hasUserRole = in_array(1, $roleIds, true);
-        $userData = $this->validateUserData($request, $hasUserRole, $person);
+        $userData = $this->validateUserData($request, $hasUserRole, $person, $branch);
 
         DB::transaction(function () use ($person, $branch, $data, $roleIds, $hasUserRole, $userData) {
             $person->update($data);
@@ -344,6 +371,7 @@ class PersonController extends Controller
                         'name' => $userData['user_name'],
                         'email' => $person->email,
                         'profile_id' => $userData['profile_id'],
+                        'default_menu_option_id' => $userData['default_menu_option_id'] ?? null,
                     ]);
                     if (!empty($userData['password'])) {
                         $user->update([
@@ -357,6 +385,7 @@ class PersonController extends Controller
                         'password' => Hash::make($userData['password']),
                         'person_id' => $person->id,
                         'profile_id' => $userData['profile_id'],
+                        'default_menu_option_id' => $userData['default_menu_option_id'] ?? null,
                     ]);
                 }
             }
@@ -477,7 +506,7 @@ class PersonController extends Controller
         return array_values(array_unique(array_map('intval', $validated['roles'] ?? [])));
     }
 
-    private function validateUserData(Request $request, bool $hasUserRole, ?Person $person): array
+    private function validateUserData(Request $request, bool $hasUserRole, ?Person $person, Branch $branch): array
     {
         if (!$hasUserRole) {
             return [];
@@ -486,6 +515,34 @@ class PersonController extends Controller
         $rules = [
             'user_name' => ['required', 'string', 'max:255'],
             'profile_id' => ['required', 'integer', 'exists:profiles,id'],
+            'default_menu_option_id' => [
+                'nullable',
+                'integer',
+                'exists:menu_option,id',
+                function ($attribute, $value, $fail) use ($request, $branch) {
+                    if ($value === null || $value === '') {
+                        return;
+                    }
+                    $profileId = (int) $request->input('profile_id');
+                    if ($profileId < 1) {
+                        $fail('Seleccione un perfil valido para el menu por defecto.');
+
+                        return;
+                    }
+                    $ok = DB::table('user_permission')
+                        ->join('menu_option', 'menu_option.id', '=', 'user_permission.menu_option_id')
+                        ->where('user_permission.profile_id', $profileId)
+                        ->where('user_permission.branch_id', $branch->id)
+                        ->whereNull('user_permission.deleted_at')
+                        ->where('user_permission.status', 1)
+                        ->where('user_permission.menu_option_id', (int) $value)
+                        ->where('menu_option.status', 1)
+                        ->exists();
+                    if (!$ok) {
+                        $fail('El menu por defecto no esta permitido para este perfil en esta sucursal.');
+                    }
+                },
+            ],
         ];
 
         if ($person && $person->user) {

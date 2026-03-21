@@ -5,6 +5,7 @@
     $selectedRoleIds = old('roles', $selectedRoleIds ?? []);
     $selectedProfileId = old('profile_id', $selectedProfileId ?? null);
     $userName = old('user_name', $userName ?? null);
+    $defaultMenuOptionId = old('default_menu_option_id', $person?->user?->default_menu_option_id);
 @endphp
 
 <div
@@ -20,6 +21,8 @@
     data-selected-roles='@json($selectedRoleIds ?? [], JSON_HEX_APOS | JSON_HEX_QUOT)'
     data-profiles='@json($profiles ?? [], JSON_HEX_APOS | JSON_HEX_QUOT)'
     data-selected-profile='@json($selectedProfileId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT)'
+    data-profile-menu-options-url="{{ (isset($company) && isset($branch)) ? route('admin.companies.branches.people.profile-menu-options', [$company, $branch]) : '' }}"
+    data-default-menu-option-id='@json($defaultMenuOptionId, JSON_HEX_APOS | JSON_HEX_QUOT)'
     x-data="{
         departments: JSON.parse($el.dataset.departments || '[]'),
         provinces: JSON.parse($el.dataset.provinces || '[]'),
@@ -45,6 +48,10 @@
         rucLookupMeta: null,
         roleToAdd: '',
         userRoleId: '1',
+        profileMenuOptionsUrl: ($el.dataset.profileMenuOptionsUrl || '').trim(),
+        defaultMenuOptions: [],
+        defaultMenuOptionId: (() => { const raw = JSON.parse($el.dataset.defaultMenuOptionId || 'null'); return raw != null && raw !== '' ? String(raw) : ''; })(),
+        defaultMenuLoading: false,
         init() {
             if (!this.provinceId && this.districtId) {
                 const district = this.districts.find(d => d.id == this.districtId);
@@ -73,6 +80,48 @@
                     this.rucLookupMeta = null;
                 }
             });
+            this.$watch('selectedProfileId', () => {
+                this.loadDefaultMenuOptions();
+            });
+            this.$watch('selectedRoleIds', () => {
+                if (this.hasUserRole() && this.selectedProfileId) {
+                    this.loadDefaultMenuOptions();
+                }
+                if (!this.hasUserRole()) {
+                    this.defaultMenuOptions = [];
+                    this.defaultMenuOptionId = '';
+                }
+            });
+            this.$nextTick(() => {
+                if (this.hasUserRole() && this.selectedProfileId) {
+                    this.loadDefaultMenuOptions();
+                }
+            });
+        },
+        async loadDefaultMenuOptions() {
+            if (!this.profileMenuOptionsUrl || !this.selectedProfileId || !this.hasUserRole()) {
+                this.defaultMenuOptions = [];
+                return;
+            }
+            this.defaultMenuLoading = true;
+            try {
+                const url = new URL(this.profileMenuOptionsUrl, window.location.origin);
+                url.searchParams.set('profile_id', String(this.selectedProfileId));
+                const r = await fetch(url.toString(), {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                });
+                const data = await r.json();
+                this.defaultMenuOptions = Array.isArray(data) ? data : [];
+                const cur = String(this.defaultMenuOptionId || '');
+                if (cur && !this.defaultMenuOptions.some(o => String(o.id) === cur)) {
+                    this.defaultMenuOptionId = '';
+                }
+            } catch (e) {
+                this.defaultMenuOptions = [];
+            } finally {
+                this.defaultMenuLoading = false;
+            }
         },
         isRucPerson() {
             return String(this.personType || '').toUpperCase() === 'RUC';
@@ -512,6 +561,24 @@
                 </template>
             </select>
             @error('profile_id')
+                <p class="mt-1 text-xs text-error-500">{{ $message }}</p>
+            @enderror
+        </div>
+
+        <div>
+            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Menu por defecto</label>
+            <select
+                name="default_menu_option_id"
+                x-model="defaultMenuOptionId"
+                :disabled="!selectedProfileId || defaultMenuLoading"
+                class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 disabled:opacity-60"
+            >
+                <option value="">Dashboard (predeterminado)</option>
+                <template x-for="opt in defaultMenuOptions" :key="opt.id">
+                    <option :value="String(opt.id)" x-text="opt.name"></option>
+                </template>
+            </select>
+            @error('default_menu_option_id')
                 <p class="mt-1 text-xs text-error-500">{{ $message }}</p>
             @enderror
         </div>
