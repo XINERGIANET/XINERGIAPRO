@@ -65,7 +65,6 @@ class ProductController extends Controller
         }
 
         ProductType::ensureDefaultsForBranch((int) $branchId);
-        $this->syncBranchProductsFromOtherBranches((int) $branchId);
 
         $products = Product::query()
             ->with([
@@ -97,7 +96,6 @@ class ProductController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
-        Category::syncExistingToAllBranches();
         $categories = Category::query()
             ->forBranch((int) $branchId)
             ->orderBy('description')
@@ -201,7 +199,6 @@ class ProductController extends Controller
     public function edit(Request $request, Product $product)
     {
         $branchId = $request->session()->get('branch_id');
-        Category::syncExistingToAllBranches();
         $categories = Category::query()
             ->forBranch((int) $branchId)
             ->orderBy('description')
@@ -619,59 +616,5 @@ class ProductController extends Controller
         }
 
         return '1';
-    }
-
-    private function syncBranchProductsFromOtherBranches(int $branchId): void
-    {
-        if ($branchId <= 0) {
-            return;
-        }
-
-        $hasProductsInBranch = ProductBranch::query()
-            ->where('branch_id', $branchId)
-            ->exists();
-
-        if ($hasProductsInBranch) {
-            return;
-        }
-
-        $templateRows = ProductBranch::query()
-            ->where('branch_id', '!=', $branchId)
-            ->whereNull('deleted_at')
-            ->orderBy('id')
-            ->get()
-            ->unique('product_id');
-
-        if ($templateRows->isEmpty()) {
-            return;
-        }
-
-        DB::transaction(function () use ($branchId, $templateRows) {
-            foreach ($templateRows as $template) {
-                ProductBranch::query()->firstOrCreate(
-                    [
-                        'product_id' => $template->product_id,
-                        'branch_id' => $branchId,
-                    ],
-                    [
-                        'status' => $template->status ?? 'A',
-                        'expiration_date' => $template->expiration_date,
-                        'stock_minimum' => $template->stock_minimum ?? 0,
-                        'stock_maximum' => $template->stock_maximum ?? 0,
-                        'minimum_sell' => $template->minimum_sell ?? 0,
-                        'minimum_purchase' => $template->minimum_purchase ?? 0,
-                        'favorite' => $template->favorite ?? 'N',
-                        'tax_rate_id' => $template->tax_rate_id,
-                        'unit_sale' => $template->unit_sale ?? 'N',
-                        'duration_minutes' => $template->duration_minutes,
-                        'supplier_id' => $template->supplier_id,
-                        'stock' => 0,
-                        'price' => $template->price ?? 0,
-                        'purchase_price' => $template->purchase_price ?? 0,
-                        'avg_cost' => $template->avg_cost ?? 0,
-                    ]
-                );
-            }
-        });
     }
 }

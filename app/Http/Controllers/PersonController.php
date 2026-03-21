@@ -300,6 +300,7 @@ class PersonController extends Controller
         $data = $this->validatePerson($request, $branch);
         $data['phone'] = (string) ($data['phone'] ?? '');
         $data['email'] = (string) ($data['email'] ?? '');
+        $data['address'] = trim((string) ($data['address'] ?? ''));
         $data['branch_id'] = $branch->id;
         $roleIds = $this->validateRoles($request);
         $hasUserRole = in_array(1, $roleIds, true);
@@ -356,6 +357,7 @@ class PersonController extends Controller
         $data = $this->validatePerson($request, $branch, $person);
         $data['phone'] = (string) ($data['phone'] ?? '');
         $data['email'] = (string) ($data['email'] ?? '');
+        $data['address'] = trim((string) ($data['address'] ?? ''));
         $roleIds = $this->validateRoles($request);
         $hasUserRole = in_array(1, $roleIds, true);
         $userData = $this->validateUserData($request, $hasUserRole, $person, $branch);
@@ -491,7 +493,7 @@ class PersonController extends Controller
                     // }
                 },
             ],
-            'address' => ['required', 'string', 'max:255'],
+            'address' => ['nullable', 'string', 'max:255'],
             'location_id' => ['required', 'integer', 'exists:locations,id'],
         ]);
     }

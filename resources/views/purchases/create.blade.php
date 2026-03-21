@@ -84,7 +84,12 @@
 
                     <div>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700" x-text="isQuickProviderRuc() ? 'Fecha de inscripcion' : 'Fecha de nacimiento'"></label>
-                        <input type="date" x-model="quickProvider.fecha_nacimiento" onclick="this.showPicker && this.showPicker()" onfocus="this.showPicker && this.showPicker()" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                        <div class="flex items-center gap-2">
+                            <input type="date" x-ref="quickProviderFechaInput" x-model="quickProvider.fecha_nacimiento" class="h-11 min-w-0 flex-1 rounded-lg border border-gray-300 px-3 text-sm">
+                            <button type="button" @click="$refs.quickProviderFechaInput?.showPicker?.()" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-gray-50 text-gray-600 hover:bg-gray-100" aria-label="Abrir calendario" title="Abrir calendario">
+                                <i class="ri-calendar-line text-xl"></i>
+                            </button>
+                        </div>
                     </div>
                     <div x-show="!isQuickProviderRuc()" x-cloak>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700">Genero</label>

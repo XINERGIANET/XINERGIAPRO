@@ -101,6 +101,7 @@ class WorkshopClientController extends Controller
         $data = $request->validated();
         $data['phone'] = (string) ($data['phone'] ?? '');
         $data['email'] = (string) ($data['email'] ?? '');
+        $data['address'] = trim((string) ($data['address'] ?? ''));
         $roleIds = $this->validateRoles($request);
         $hasUserRole = in_array(1, $roleIds, true);
         $userData = $this->validateUserData($request, $hasUserRole, null, $branch);
@@ -135,6 +136,7 @@ class WorkshopClientController extends Controller
         $data = $request->validated();
         $data['phone'] = (string) ($data['phone'] ?? '');
         $data['email'] = (string) ($data['email'] ?? '');
+        $data['address'] = trim((string) ($data['address'] ?? ''));
         $roleIds = $this->validateRoles($request);
         $hasUserRole = in_array(1, $roleIds, true);
         $userData = $this->validateUserData($request, $hasUserRole, $person, $branch);

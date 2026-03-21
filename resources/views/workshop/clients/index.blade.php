@@ -222,7 +222,7 @@
     <x-ui.modal x-data="{ open: false }" x-on:open-client-modal.window="open = true" :isOpen="false" :showCloseButton="false" class="max-w-6xl">
         <div class="p-6 sm:p-8">
             <div class="mb-6 flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Registrar cliente</h3>
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Registrar Persona</h3>
                 <button type="button" @click="open = false" class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
                     <i class="ri-close-line text-xl"></i>
                 </button>

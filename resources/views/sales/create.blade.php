@@ -402,9 +402,15 @@
                         <div>
                             <label id="quick-client-date-label" class="mb-1.5 block text-sm font-medium text-gray-700">Fecha
                                 de nacimiento</label>
-                            <input id="quick-client-date" type="date" onclick="this.showPicker && this.showPicker()"
-                                onfocus="this.showPicker && this.showPicker()"
-                                class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                            <div class="flex items-center gap-2">
+                                <input id="quick-client-date" type="date"
+                                    class="h-11 min-w-0 flex-1 rounded-lg border border-gray-300 px-3 text-sm">
+                                <button type="button" id="quick-client-date-picker-btn"
+                                    class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-gray-50 text-gray-600 hover:bg-gray-100"
+                                    aria-label="Abrir calendario" title="Abrir calendario">
+                                    <i class="ri-calendar-line text-xl"></i>
+                                </button>
+                            </div>
                         </div>
                         <div id="quick-client-gender-wrap">
                             <label class="mb-1.5 block text-sm font-medium text-gray-700">Genero</label>
@@ -2610,6 +2616,12 @@ const total = subtotalBase + tax - discount;
             document.getElementById('quick-client-cancel-button')?.addEventListener('click', closeQuickClientModal);
             document.getElementById('quick-client-modal-backdrop')?.addEventListener('click', closeQuickClientModal);
             document.getElementById('quick-client-search-button')?.addEventListener('click', fetchQuickClientDocumentData);
+            document.getElementById('quick-client-date-picker-btn')?.addEventListener('click', () => {
+                const el = document.getElementById('quick-client-date');
+                if (el && typeof el.showPicker === 'function') {
+                    el.showPicker();
+                }
+            });
             document.getElementById('quick-client-person-type')?.addEventListener('change', syncQuickClientPersonTypeUI);
             document.getElementById('quick-client-department')?.addEventListener('change', onQuickClientDepartmentChange);
             document.getElementById('quick-client-province')?.addEventListener('change', onQuickClientProvinceChange);

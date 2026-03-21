@@ -38,7 +38,6 @@ class RecipeController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
-        Category::syncExistingToAllBranches();
         $categories = Category::query()
             ->forBranch($branchId)
             ->orderBy('description')
@@ -57,7 +56,6 @@ class RecipeController extends Controller
     public function create()
     {
         $branchId = (int) session('branch_id');
-        Category::syncExistingToAllBranches();
         $categories = Category::query()
             ->forBranch($branchId)
             ->orderBy('description')
@@ -115,7 +113,6 @@ class RecipeController extends Controller
     public function edit(Recipe $recipe)
     {
         $branchId = (int) session('branch_id');
-        Category::syncExistingToAllBranches();
         $categories = Category::query()
             ->forBranch($branchId)
             ->orderBy('description')

@@ -245,7 +245,7 @@
                     const parsed = this.namesFromReniecPayload(payload);
                     this.firstName = parsed.first_name;
                     this.lastName = parsed.last_name;
-                    this.fechaNacimiento = payload?.fecha_nacimiento || this.fechaNacimiento;
+                    this.fechaNacimiento = this.normalizeApiDate(payload?.fecha_nacimiento || '') || this.fechaNacimiento;
                     this.genero = payload?.genero || '';
                 } catch (error) {
                     this.lookupError = error?.message || 'Error consultando RENIEC.';
@@ -331,7 +331,6 @@
                 class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-[#244BB3] px-4 text-sm font-medium text-white hover:bg-[#1f3f98] disabled:opacity-60"
             >
                 <i class="ri-search-line"></i>
-                <span class="ml-1" x-text="lookupLoading ? 'Buscando...' : 'Buscar'"></span>
             </button>
         </div>
         <p x-show="lookupError" x-cloak class="mt-1 text-xs text-red-600" x-text="lookupError"></p>
@@ -371,14 +370,24 @@
     </div>
     <div>
         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400" x-text="isRucPerson() ? 'Fecha de inscripcion' : 'Fecha de nacimiento'"></label>
-        <input
-            type="date"
-            name="fecha_nacimiento"
-            x-model="fechaNacimiento"
-            onclick="this.showPicker && this.showPicker()"
-            onfocus="this.showPicker && this.showPicker()"
-            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-        />
+        <div class="flex items-center gap-2">
+            <input
+                type="date"
+                x-ref="fechaNacimientoInput"
+                name="fecha_nacimiento"
+                x-model="fechaNacimiento"
+                class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 min-w-0 flex-1 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+            />
+            <button
+                type="button"
+                @click="$refs.fechaNacimientoInput?.showPicker?.()"
+                class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-gray-50 text-gray-600 transition hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                aria-label="Abrir calendario"
+                title="Abrir calendario"
+            >
+                <i class="ri-calendar-line text-xl"></i>
+            </button>
+        </div>
         @error('fecha_nacimiento')
             <p class="mt-1 text-xs text-error-500">{{ $message }}</p>
         @enderror
@@ -435,7 +444,6 @@
             type="text"
             name="address"
             x-model="addressText"
-            required
             placeholder="Ingrese la direccion"
             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
         />

@@ -49,8 +49,6 @@ class CategoryController extends Controller
             $perPage = 10;
         }
 
-        Category::syncExistingToAllBranches();
-
         $categories = Category::query()
             ->forBranch((int) $branchId)
             ->when($search, function ($query) use ($search) {

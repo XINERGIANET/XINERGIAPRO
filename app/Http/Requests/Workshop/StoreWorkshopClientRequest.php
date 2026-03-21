@@ -23,7 +23,7 @@ class StoreWorkshopClientRequest extends FormRequest
             'last_name' => ['required', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:255'],
-            'address' => ['required', 'string', 'max:255'],
+            'address' => ['nullable', 'string', 'max:255'],
             'location_id' => ['nullable', 'integer', 'exists:locations,id'],
             'genero' => ['nullable', 'string', 'max:30'],
             'fecha_nacimiento' => ['nullable', 'date'],

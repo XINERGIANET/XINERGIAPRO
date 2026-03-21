@@ -188,18 +188,18 @@
                 </div>
             </div>
 
-            <div class="table-responsive lg:!overflow-visible mt-4 rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
-                <table class="w-full min-w-max border-separate border-spacing-0">
+            <div class="table-responsive mt-4 min-w-0 max-w-full rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+                <table class="w-full xl:min-w-0 min-w-max border-separate border-spacing-0">
                     <thead>
                         <tr class="border-b border-gray-100 dark:border-gray-800 text-white">
-                            <th style="background-color: #334155;" class="w-12 px-4 py-3 text-center first:rounded-tl-2xl sticky-left-header"></th>
+                            <th style="background-color: #334155;" class="w-12 px-4 py-3 text-center first:rounded-tl-xl sticky-left-header"></th>
                             <th style="background-color: #334155;" class="px-3 py-3 text-left sm:px-6 whitespace-nowrap">Nombres</th>
                             <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6 whitespace-nowrap">Tipo</th>
                             <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6 whitespace-nowrap">Nro. Documento</th>
                             <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6 whitespace-nowrap">Fecha nac.</th>
                             <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6 whitespace-nowrap">Genero</th>
                             <th style="background-color: #334155;" class="px-5 py-3 text-left sm:px-6 whitespace-nowrap">Ubicacion</th>
-                            <th style="background-color: #334155;" class="px-5 py-3 text-right sm:px-6 whitespace-nowrap last:rounded-tr-2xl">Acciones</th>
+                            <th style="background-color: #334155;" class="px-5 py-3 text-right sm:px-6 whitespace-nowrap last:rounded-tr-xl">Acciones</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">

@@ -600,8 +600,6 @@ class PurchaseController extends Controller
 
         $units = Unit::query()->orderBy('description')->get(['id', 'description']);
 
-        Category::syncExistingToAllBranches();
-
         $products = Product::query()
             ->join('product_branch', function ($join) use ($branchId) {
                 $join->on('product_branch.product_id', '=', 'products.id')
