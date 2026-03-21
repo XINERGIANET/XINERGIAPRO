@@ -56,6 +56,12 @@
             this.invoiceNumber = '';
         }
     },
+    cardTypeLabel(type) {
+        const c = String(type || '').trim().toUpperCase();
+        if (c === 'C') return 'Crédito';
+        if (c === 'D') return 'Débito';
+        return '';
+    },
     get paymentMethodVariants() {
         return this.paymentMethodOptions.flatMap(m => {
             const id = Number(m.id), d = String(m.description || ''), k = m.kind || 'other';
@@ -70,14 +76,19 @@
                 }));
             }
             if (k === 'card' && this.cardOptions.length) {
-                return this.cardOptions.map(card => ({
-                    key: `card:${id}:${Number(card.id)}`, 
-                    payment_method_id: id, 
-                    digital_wallet_id: null, 
-                    card_id: Number(card.id), 
-                    label: `${d} - ${card.description}`, 
-                    kind: k
-                }));
+                return this.cardOptions.map(card => {
+                    const typePart = this.cardTypeLabel(card.type);
+                    const base = `${d} - ${card.description}`;
+                    const label = typePart ? `${base} (${typePart})` : base;
+                    return {
+                        key: `card:${id}:${Number(card.id)}`, 
+                        payment_method_id: id, 
+                        digital_wallet_id: null, 
+                        card_id: Number(card.id), 
+                        label, 
+                        kind: k
+                    };
+                });
             }
             return [{
                 key: `plain:${id}`, 

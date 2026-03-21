@@ -1,6 +1,8 @@
 <script>
 function purchaseCreateForm(c) {
+    const sacBase = typeof window.formAutocompleteHelpers === 'function' ? window.formAutocompleteHelpers() : {};
     return {
+        ...sacBase,
         products: c.products || [],
         units: c.units || [],
         providers: c.providers || [],
@@ -54,6 +56,13 @@ function purchaseCreateForm(c) {
         includesTax: c.initialIncludesTax || 'N',
         currency: c.initialCurrency || 'PEN',
         exchangeRate: Number(c.initialExchangeRate || 3.5),
+        affectsKardex: c.initialAffectsKardex || 'S',
+        summaryUi: {
+            detailType: { open: false, q: '' },
+            affectsKardex: { open: false, q: '' },
+            includesTax: { open: false, q: '' },
+            currency: { open: false, q: '' },
+        },
         items: [],
         paymentRows: [],
         movedAtListenerBound: false,
@@ -107,6 +116,126 @@ function purchaseCreateForm(c) {
                 this.bindMovedAtInput();
                 this.syncCreditDueDate(false);
             });
+
+            if (String(this.quickProvider.person_type).toUpperCase() === 'RUC') {
+                this.quickProvider.last_name = '';
+                this.quickProvider.genero = '';
+            }
+            this.$watch('quickProvider.person_type', (value) => {
+                this.quickProviderError = '';
+                if (String(value).toUpperCase() === 'RUC') {
+                    this.quickProvider.last_name = '';
+                    this.quickProvider.genero = '';
+                }
+            });
+        },
+
+        isQuickProviderRuc() {
+            return String(this.quickProvider.person_type || '').toUpperCase() === 'RUC';
+        },
+
+        normalizeQuickProviderLocationText(value) {
+            return String(value || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .trim();
+        },
+
+        findQuickProviderDepartmentByName(name) {
+            const target = this.normalizeQuickProviderLocationText(name);
+            return this.departments.find((item) => this.normalizeQuickProviderLocationText(item.name) === target) || null;
+        },
+
+        findQuickProviderProvinceByName(name, departmentId) {
+            const target = this.normalizeQuickProviderLocationText(name);
+            return this.provinces.find((item) => (
+                String(item.parent_location_id || '') === String(departmentId || '')
+                && this.normalizeQuickProviderLocationText(item.name) === target
+            )) || null;
+        },
+
+        findQuickProviderDistrictByName(name, provinceId) {
+            const target = this.normalizeQuickProviderLocationText(name);
+            return this.districts.find((item) => (
+                String(item.parent_location_id || '') === String(provinceId || '')
+                && this.normalizeQuickProviderLocationText(item.name) === target
+            )) || null;
+        },
+
+        applyQuickProviderLocationFromLookup(payload) {
+            const department = this.findQuickProviderDepartmentByName(payload.department);
+            if (!department) {
+                return;
+            }
+            this.quickProvider.department_id = String(department.id);
+            const province = this.findQuickProviderProvinceByName(payload.province, department.id);
+            if (!province) {
+                this.quickProvider.province_id = '';
+                this.quickProvider.location_id = '';
+                return;
+            }
+            this.quickProvider.province_id = String(province.id);
+            const district = this.findQuickProviderDistrictByName(payload.district, province.id);
+            this.quickProvider.location_id = district ? String(district.id) : '';
+        },
+
+        normalizeQuickProviderApiDate(value) {
+            const raw = String(value || '').trim();
+            if (!raw) {
+                return '';
+            }
+            const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+            return match ? match[1] : '';
+        },
+
+        async fetchQuickProviderDocument() {
+            const t = String(this.quickProvider.person_type || '').toUpperCase();
+            if (t === 'DNI') {
+                return this.fetchReniecQuickProvider();
+            }
+            if (t === 'RUC') {
+                return this.fetchRucQuickProvider();
+            }
+            this.quickProviderError = 'La busqueda automatica solo aplica para DNI o RUC.';
+        },
+
+        async fetchRucQuickProvider() {
+            this.quickProviderError = '';
+            const ruc = String(this.quickProvider.document_number || '').trim();
+            if (!/^\d{11}$/.test(ruc)) {
+                this.quickProviderError = 'Ingrese un RUC valido de 11 digitos.';
+                return;
+            }
+
+            this.creatingProviderLoading = true;
+
+            try {
+                const base = String(c.rucApiUrl || '').trim() || '/api/ruc';
+                const response = await fetch(`${base}?ruc=${encodeURIComponent(ruc)}`, {
+                    headers: { Accept: 'application/json' },
+                });
+                const payload = await response.json();
+
+                if (!response.ok || payload?.status === false) {
+                    throw new Error(payload?.message || 'No se encontro informacion para el RUC ingresado.');
+                }
+
+                this.quickProvider.document_number = payload.ruc || ruc;
+                this.quickProvider.first_name = payload.legal_name || this.quickProvider.first_name;
+                this.quickProvider.last_name = '';
+                this.quickProvider.genero = '';
+                if (payload.address) {
+                    this.quickProvider.address = payload.address;
+                }
+                const raw = payload.raw || {};
+                this.quickProvider.fecha_nacimiento = this.normalizeQuickProviderApiDate(raw.fecha_inscripcion || raw.fechaInscripcion || '');
+                this.applyQuickProviderLocationFromLookup(payload);
+            } catch (error) {
+                this.quickProviderError = error?.message || 'Error consultando RUC.';
+            } finally {
+                this.creatingProviderLoading = false;
+            }
         },
 
         activeTabStyle() {
@@ -303,7 +432,8 @@ function purchaseCreateForm(c) {
             this.creatingProviderLoading = true;
 
             try {
-                const response = await fetch(`/api/reniec?dni=${encodeURIComponent(dni)}`, {
+                const base = String(c.reniecApiUrl || '').trim() || '/api/reniec';
+                const response = await fetch(`${base}?dni=${encodeURIComponent(dni)}`, {
                     headers: { Accept: 'application/json' },
                 });
                 const payload = await response.json();
@@ -329,6 +459,12 @@ function purchaseCreateForm(c) {
             this.creatingProviderLoading = true;
 
             try {
+                const bodyPayload = { ...this.quickProvider };
+                if (String(bodyPayload.person_type || '').toUpperCase() === 'RUC') {
+                    bodyPayload.last_name = '';
+                    bodyPayload.genero = '';
+                }
+
                 const response = await fetch(String(c.quickProviderStoreUrl || ''), {
                     method: 'POST',
                     headers: {
@@ -336,7 +472,7 @@ function purchaseCreateForm(c) {
                         Accept: 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
                     },
-                    body: JSON.stringify(this.quickProvider),
+                    body: JSON.stringify(bodyPayload),
                 });
 
                 const payload = await response.json();
@@ -519,6 +655,45 @@ function purchaseCreateForm(c) {
             return ['General', ...Array.from(unique).sort((a, b) => a.localeCompare(b))];
         },
 
+        paymentTypeOptions: [
+            { value: 'CONTADO', label: 'CONTADO' },
+            { value: 'CREDITO', label: 'CREDITO / DEUDA' },
+        ],
+
+        quickProviderPersonTypeOptions: [
+            { value: 'DNI', label: 'DNI' },
+            { value: 'RUC', label: 'RUC' },
+            { value: 'CARNET DE EXTRANGERIA', label: 'CARNET DE EXTRANGERIA' },
+            { value: 'PASAPORTE', label: 'PASAPORTE' },
+        ],
+
+        quickProviderGeneroOptions: [
+            { value: '', label: 'Seleccione genero' },
+            { value: 'MASCULINO', label: 'MASCULINO' },
+            { value: 'FEMENINO', label: 'FEMENINO' },
+            { value: 'OTRO', label: 'OTRO' },
+        ],
+
+        get cashRegisterOptions() {
+            return (this.cashRegisters || []).map((r) => ({
+                id: r.id,
+                label: r.status === 'A' ? `${r.number} (Activa)` : String(r.number),
+            }));
+        },
+
+        cashRegisterDisplayLabel(id) {
+            const r = (this.cashRegisters || []).find((c) => Number(c.id) === Number(id));
+            if (!r) {
+                return 'Seleccionar caja';
+            }
+            return r.status === 'A' ? `${r.number} (Activa)` : String(r.number);
+        },
+
+        paymentVariantRowLabel(row) {
+            const v = (this.paymentMethodVariants || []).find((x) => x.key === row.method_variant_key);
+            return v ? v.label : '';
+        },
+
         get filteredCatalogProducts() {
             const term = String(this.productSearch || '').toLowerCase().trim();
             const list = this.products.filter((product) => {
@@ -550,13 +725,122 @@ function purchaseCreateForm(c) {
             this.syncPaymentAmounts();
         },
 
+        getSummaryOptions(key) {
+            const map = {
+                detailType: [
+                    { value: 'DETALLADO', label: 'DETALLADO' },
+                    { value: 'GLOSA', label: 'GLOSA' },
+                ],
+                affectsKardex: [
+                    { value: 'S', label: 'Si' },
+                    { value: 'N', label: 'No' },
+                ],
+                includesTax: [
+                    { value: 'S', label: 'Si' },
+                    { value: 'N', label: 'No' },
+                ],
+                currency: [
+                    { value: 'PEN', label: 'PEN' },
+                    { value: 'USD', label: 'USD' },
+                ],
+            };
+            return map[key] || [];
+        },
+
+        summaryValue(key) {
+            if (key === 'detailType') {
+                return this.detailType;
+            }
+            if (key === 'affectsKardex') {
+                return this.affectsKardex;
+            }
+            if (key === 'includesTax') {
+                return this.includesTax;
+            }
+            if (key === 'currency') {
+                return this.currency;
+            }
+            return '';
+        },
+
+        summarySelectedLabel(key) {
+            const v = this.summaryValue(key);
+            const opt = this.getSummaryOptions(key).find((o) => String(o.value) === String(v));
+            return opt ? opt.label : '';
+        },
+
+        filterSummaryOptions(key) {
+            const opts = this.getSummaryOptions(key);
+            const q = String(this.summaryUi[key]?.q || '')
+                .trim()
+                .toLowerCase();
+            if (!q) {
+                return opts;
+            }
+            return opts.filter((o) => String(o.label || '').toLowerCase().includes(q));
+        },
+
+        selectSummaryOption(key, opt) {
+            if (key === 'detailType') {
+                this.changeDetailType(opt.value);
+            } else if (key === 'affectsKardex') {
+                this.affectsKardex = opt.value;
+            } else if (key === 'includesTax') {
+                this.includesTax = opt.value;
+            } else if (key === 'currency') {
+                this.currency = opt.value;
+            }
+            if (this.summaryUi[key]) {
+                this.summaryUi[key].open = false;
+                this.summaryUi[key].q = '';
+            }
+        },
+
+        toggleSummaryDropdown(key) {
+            const ui = this.summaryUi[key];
+            if (!ui) {
+                return;
+            }
+            const willOpen = !ui.open;
+            Object.keys(this.summaryUi).forEach((k) => {
+                this.summaryUi[k].open = false;
+                this.summaryUi[k].q = '';
+            });
+            if (willOpen) {
+                ui.open = true;
+                this.$nextTick(() => {
+                    const refs = {
+                        detailType: this.$refs.summarySearchDetailType,
+                        affectsKardex: this.$refs.summarySearchAffectsKardex,
+                        includesTax: this.$refs.summarySearchIncludesTax,
+                        currency: this.$refs.summarySearchCurrency,
+                    };
+                    const input = refs[key];
+                    if (input && typeof input.focus === 'function') {
+                        input.focus();
+                    }
+                });
+            }
+        },
+
         addItem() {
             this.items.push(this.newItem());
             this.syncPaymentAmounts();
         },
 
+        defaultGlosaUnitId() {
+            const list = this.units || [];
+            const norm = (s) => String(s || '').trim().toLowerCase();
+            const exact = list.find((u) => norm(u.description) === 'unidad(es)');
+            if (exact) {
+                return Number(exact.id || 0);
+            }
+            const startsUnidad = list.find((u) => /^unidad/i.test(String(u.description || '').trim()));
+            return Number((startsUnidad || list[0])?.id || 0);
+        },
+
         newGlosaItem() {
-            const defaultUnitId = Number(this.units?.[0]?.id || 0);
+            const defaultUnitId = this.defaultGlosaUnitId();
             return {
                 product_id: 0,
                 unit_id: defaultUnitId,
@@ -772,6 +1056,17 @@ function purchaseCreateForm(c) {
             return 'plain';
         },
 
+        cardTypeLabel(type) {
+            const c = String(type || '').trim().toUpperCase();
+            if (c === 'C') {
+                return 'Crédito';
+            }
+            if (c === 'D') {
+                return 'Débito';
+            }
+            return '';
+        },
+
         get paymentMethodVariants() {
             return this.paymentMethods.flatMap((method) => {
                 const methodId = Number(method.id);
@@ -790,14 +1085,19 @@ function purchaseCreateForm(c) {
                 }
 
                 if (kind === 'card' && this.cards.length) {
-                    return this.cards.map((card) => ({
-                        key: `card:${methodId}:${Number(card.id)}`,
-                        payment_method_id: methodId,
-                        digital_wallet_id: null,
-                        card_id: Number(card.id),
-                        label: `${description} - ${card.description}`,
-                        kind,
-                    }));
+                    return this.cards.map((card) => {
+                        const typePart = this.cardTypeLabel(card.type);
+                        const base = `${description} - ${card.description}`;
+                        const label = typePart ? `${base} (${typePart})` : base;
+                        return {
+                            key: `card:${methodId}:${Number(card.id)}`,
+                            payment_method_id: methodId,
+                            digital_wallet_id: null,
+                            card_id: Number(card.id),
+                            label,
+                            kind,
+                        };
+                    });
                 }
 
                 return [{

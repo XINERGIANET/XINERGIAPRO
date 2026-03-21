@@ -83,16 +83,16 @@
                 <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 group-focus-within:text-brand-500 transition-colors duration-200 pointer-events-none">
                     <i class="ri-toggle-line text-xl"></i>
                 </span>
-                <select
+                <x-form.select-autocomplete
                     name="status"
-                    class="block w-full h-12 pl-12 pr-10 text-sm text-gray-800 bg-white border border-gray-200 rounded-2xl shadow-sm focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 transition-all duration-200 appearance-none dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                >
-                    <option value="1" {{ old('status', $module->status ?? 1) == 1 ? 'selected' : '' }}>Activo</option>
-                    <option value="0" {{ old('status', $module->status ?? 1) == 0 ? 'selected' : '' }}>Inactivo</option>
-                </select>
-                <span class="absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400 pointer-events-none">
-                    <i class="ri-arrow-down-s-line text-xl"></i>
-                </span>
+                    class="[&_.flex]:pl-12"
+                    inputClass="block w-full h-12 pl-12 pr-10 text-sm text-gray-800 bg-white border border-gray-200 rounded-2xl shadow-sm focus:ring-4 focus:ring-brand-500/10 focus:border-brand-500 transition-all duration-200 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
+                    :value="(string) old('status', $module->status ?? 1)"
+                    :options="[
+                        ['value' => '1', 'label' => 'Activo'],
+                        ['value' => '0', 'label' => 'Inactivo'],
+                    ]"
+                />
             </div>
         </div>
     </div>

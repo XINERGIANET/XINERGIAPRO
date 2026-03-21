@@ -167,6 +167,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/admin/ventas/cobrar', [SalesController::class, 'charge'])
         ->name('admin.sales.charge');
 
+    // POS: vista previa serie/correlativo (create.blade.php)
+    Route::get('/admin/ventas/vista-previa-cabecera', [SalesController::class, 'previewSalePosHeader'])
+        ->name('admin.sales.preview.header');
+
     // POS: procesar venta (usado por resources/views/sales/create.blade.php)
     Route::post('/admin/ventas/procesar', [SalesController::class, 'processSale'])
         ->name('admin.sales.process');

@@ -972,9 +972,7 @@ class PettyCashController extends Controller
             $category = $this->classifyCloseMovementCategory($cashMovement);
             $movementTypeLabel = $category === 'expense' ? 'Egreso' : 'Ingreso';
 
-            if ($category === 'sale') {
-                $totalSales += (float) $cashMovement->total;
-            } elseif ($category === 'income') {
+            if ($category === 'income') {
                 $totalOtherIncome += (float) $cashMovement->total;
             } elseif ($category === 'expense') {
                 $totalExpenses += (float) $cashMovement->total;
@@ -982,15 +980,19 @@ class PettyCashController extends Controller
 
             foreach ($cashMovement->details as $detail) {
                 $amount = (float) $detail->amount;
-                $method = trim((string) ($detail->payment_method ?: 'Sin medio'));
+                $method = $this->resolveClosePageMethodLabel($detail);
                 $suffix = $this->resolveCloseDetailSuffix($detail);
                 $detailType = mb_strtoupper((string) ($detail->type ?: 'PAGADO'), 'UTF-8');
+                if ($category === 'sale' && $detailType !== 'DEUDA') {
+                    $totalSales += $amount;
+                }
                 $groupKey = implode('|', [$detailType, $category, $conceptLabel, $method, $suffix]);
 
                 if (!isset($detailGroups[$groupKey])) {
                     $detailGroups[$groupKey] = [
                         'type' => $detailType,
                         'type_label' => $this->resolveCloseDetailTypeLabel($detailType),
+                        'flow_label' => $movementTypeLabel,
                         'category' => $category,
                         'sort_order' => $categoryOrder[$category] ?? 99,
                         'amount' => 0.0,
@@ -1008,6 +1010,7 @@ class PettyCashController extends Controller
                     $detailGroups[$groupKey]['records'][$recordKey] = [
                         'number' => (string) ($cashMovement->movement?->number ?? str_pad((string) $cashMovement->id, 8, '0', STR_PAD_LEFT)),
                         'type_label' => $movementTypeLabel,
+                        'payment_type_label' => $this->resolveCloseDetailTypeLabel($detailType),
                         'concept' => $conceptLabel,
                         'movement_total' => (float) $cashMovement->total,
                         'method_total' => 0.0,
@@ -1132,6 +1135,21 @@ class PettyCashController extends Controller
         $value = mb_strtolower(trim((string) $method), 'UTF-8');
 
         return str_contains($value, 'efectivo') || str_contains($value, 'cash');
+    }
+
+    /**
+     * Etiqueta para columna "Medio" en cierre de caja: la deuda no es un medio de pago real.
+     */
+    private function resolveClosePageMethodLabel(CashMovementDetail $detail): string
+    {
+        $detailType = mb_strtoupper((string) ($detail->type ?? ''), 'UTF-8');
+        $raw = trim((string) ($detail->payment_method ?? ''));
+
+        if ($detailType === 'DEUDA' || mb_strtolower($raw, 'UTF-8') === 'deuda') {
+            return 'Crédito';
+        }
+
+        return $raw !== '' ? $raw : 'Sin medio';
     }
 
     private function resolveCloseDetailSuffix(CashMovementDetail $detail): string

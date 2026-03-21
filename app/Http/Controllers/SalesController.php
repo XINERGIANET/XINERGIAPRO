@@ -388,7 +388,7 @@ class SalesController extends Controller
             ->where('branch_id', $branchId)
             ->orderByRaw("CASE WHEN status = 'A' THEN 0 ELSE 1 END")
             ->orderBy('number')
-            ->get(['id', 'number', 'status']);
+            ->get(['id', 'number', 'status', 'series']);
         $defaultCashRegisterId = $this->getBranchConfiguredCashRegisterId($branchId, $cashRegisters, 'caja ventas');
 
         $initialSaleData = null;
@@ -399,6 +399,19 @@ class SalesController extends Controller
             $defaultDocumentTypeId = (int) ($initialSaleData['document_type_id'] ?? $defaultDocumentTypeId);
             $defaultCashRegisterId = (int) ($initialSaleData['cash_register_id'] ?? $defaultCashRegisterId);
             $posMode = 'edit';
+        }
+
+        $defaultCashRegisterModel = $cashRegisters->firstWhere('id', $defaultCashRegisterId) ?? $cashRegisters->first();
+        $saleSeriesPreview = (string) ($defaultCashRegisterModel?->series ?: '001');
+        $saleNumberPreview = ($defaultDocumentTypeId > 0 && $defaultCashRegisterId > 0)
+            ? $this->generateSaleNumber((int) $defaultDocumentTypeId, (int) $defaultCashRegisterId, false)
+            : '00000001';
+        $saleMovedAtDefault = now()->format('Y-m-d H:i');
+
+        if ($initialSaleData) {
+            $saleSeriesPreview = (string) ($initialSaleData['display_series'] ?? $initialSaleData['invoice_series'] ?? $saleSeriesPreview);
+            $saleNumberPreview = (string) ($initialSaleData['number'] ?? $saleNumberPreview);
+            $saleMovedAtDefault = (string) ($initialSaleData['moved_at'] ?? $saleMovedAtDefault);
         }
 
         return [
@@ -428,7 +441,55 @@ class SalesController extends Controller
             'branchDepartmentName' => $branchDepartment?->description,
             'branchProvinceName' => $branchProvince?->description,
             'branchDistrictName' => $branchDistrict?->description,
+            'saleSeriesPreview' => $saleSeriesPreview,
+            'saleNumberPreview' => $saleNumberPreview,
+            'saleMovedAtDefault' => $saleMovedAtDefault,
         ];
+    }
+
+    /**
+     * POS: serie (caja) y correlativo siguiente segun tipo de documento (solo vista previa).
+     */
+    public function previewSalePosHeader(Request $request)
+    {
+        $user = $request->user();
+        $branchId = (int) (session('branch_id') ?? $user?->branch_id ?? $user?->person?->branch_id);
+        if (!$branchId) {
+            return response()->json(['message' => 'No se pudo determinar la sucursal.'], 422);
+        }
+
+        $documentTypeId = (int) $request->query('document_type_id', 0);
+        $cashRegisterId = (int) $request->query('cash_register_id', 0);
+        if ($documentTypeId <= 0 || $cashRegisterId <= 0) {
+            return response()->json(['series' => '001', 'number' => '00000001']);
+        }
+
+        $cashRegister = CashRegister::query()
+            ->where('id', $cashRegisterId)
+            ->where('branch_id', $branchId)
+            ->first();
+        if (!$cashRegister) {
+            return response()->json(['message' => 'Caja no valida para esta sucursal.'], 422);
+        }
+
+        $documentType = DocumentType::query()
+            ->where('id', $documentTypeId)
+            ->where('movement_type_id', 2)
+            ->first();
+        if (!$documentType) {
+            return response()->json(['message' => 'Tipo de documento no valido.'], 422);
+        }
+
+        try {
+            $number = $this->generateSaleNumber($documentTypeId, $cashRegisterId, false);
+        } catch (\Throwable $e) {
+            $number = '00000001';
+        }
+
+        return response()->json([
+            'series' => (string) ($cashRegister->series ?: '001'),
+            'number' => $number,
+        ]);
     }
 
     private function getLocationData(?int $defaultLocationId = null): array
@@ -560,9 +621,35 @@ class SalesController extends Controller
             $grossTotalBeforeDiscount - (float) ($sale->salesMovement?->total ?? 0)
         );
 
+        $creditDays = 0;
+        $debtDueDate = '';
+        if ($debtRegistered && $cashMovement) {
+            $debtRow = DB::table('cash_movement_details')
+                ->where('cash_movement_id', $cashMovement->id)
+                ->where('type', 'DEUDA')
+                ->where('status', 'A')
+                ->orderByDesc('id')
+                ->first(['due_at']);
+            if ($debtRow && $debtRow->due_at && $sale->moved_at) {
+                try {
+                    $dueCarbon = Carbon::parse($debtRow->due_at);
+                    $debtDueDate = $dueCarbon->format('Y-m-d');
+                    $creditDays = max(
+                        0,
+                        (int) Carbon::parse($sale->moved_at)->startOfDay()->diffInDays($dueCarbon->copy()->startOfDay(), false)
+                    );
+                } catch (\Throwable $e) {
+                    $creditDays = 0;
+                    $debtDueDate = '';
+                }
+            }
+        }
+
         return [
             'id' => (int) $sale->id,
             'number' => (string) ($sale->number ?? ''),
+            'moved_at' => optional($sale->moved_at)->format('Y-m-d H:i') ?? now()->format('Y-m-d H:i'),
+            'display_series' => (string) ($sale->salesMovement?->series ?: '001'),
             'clientId' => $sale->person_id ? (int) $sale->person_id : null,
             'clientName' => $sale->person_name ?: 'Publico General',
             'notes' => (string) ($sale->comment ?? ''),
@@ -572,6 +659,8 @@ class SalesController extends Controller
             'invoice_series' => (string) ($sale->salesMovement?->series ?: '001'),
             'invoice_number' => (string) ($sale->salesMovement?->billing_number ?: ($this->isInvoiceDocumentType($sale->documentType) ? ($sale->number ?? '') : '')),
             'payment_type' => $paymentType,
+            'credit_days' => $creditDays,
+            'debt_due_date' => $debtDueDate,
             'discount_type' => $discountPercentage > 0 ? 'PERCENTAGE' : 'NONE',
             'discount_value' => $discountPercentage > 0 ? round($discountPercentage, 6) : 0,
             'discount_amount' => round($discountAmount, 2),
@@ -764,6 +853,9 @@ class SalesController extends Controller
                 'discount_value' => 'nullable|numeric|min:0',
                 'notes' => 'nullable|string',
                 'movement_id' => 'nullable|integer|exists:movements,id', // ID del borrador a completar
+                'moved_at' => 'nullable|string|max:32',
+                'credit_days' => 'nullable|integer|min:0|max:3650',
+                'debt_due_date' => 'nullable|date_format:Y-m-d',
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
@@ -810,6 +902,27 @@ class SalesController extends Controller
             $isDebtSale = $paymentType === 'DEUDA';
             $discountType = strtoupper((string) ($validated['discount_type'] ?? 'NONE'));
             $discountValue = (float) ($validated['discount_value'] ?? 0);
+            $movedAt = now();
+            if (!empty($validated['moved_at'])) {
+                try {
+                    $movedAt = Carbon::parse($validated['moved_at']);
+                } catch (\Throwable $e) {
+                    $movedAt = now();
+                }
+            }
+            $debtDueAt = $movedAt->copy();
+            if ($isDebtSale) {
+                $dueDateStr = trim((string) ($validated['debt_due_date'] ?? ''));
+                if ($dueDateStr !== '') {
+                    try {
+                        $debtDueAt = Carbon::parse($dueDateStr)->endOfDay();
+                    } catch (\Throwable $e) {
+                        $debtDueAt = $movedAt->copy()->addDays(max(0, (int) ($validated['credit_days'] ?? 0)));
+                    }
+                } else {
+                    $debtDueAt = $movedAt->copy()->addDays(max(0, (int) ($validated['credit_days'] ?? 0)));
+                }
+            }
             $invoiceSeries = $isInvoiceDocument
                 ? trim((string) ($validated['invoice_series'] ?? '001'))
                 : '001';
@@ -935,6 +1048,7 @@ class SalesController extends Controller
                     'person_name' => $selectedPerson
                         ? trim(($selectedPerson->first_name ?? '') . ' ' . ($selectedPerson->last_name ?? ''))
                         : 'Publico General',
+                    'moved_at' => $movedAt,
                 ]);
                 
                 // Al editar una venta activa, primero reponer el stock previo antes de recalcular.
@@ -971,7 +1085,7 @@ class SalesController extends Controller
                 
                 $movement = Movement::create([
                     'number' => $number,
-                    'moved_at' => now(),
+                    'moved_at' => $movedAt,
                     'user_id' => $user?->id,
                     'user_name' => $user?->name ?? 'Sistema',
                     'person_id' => $selectedPerson?->id,
@@ -1212,7 +1326,7 @@ class SalesController extends Controller
                 DB::table('cash_movement_details')->insert([
                     'cash_movement_id' => $cashMovement->id,
                     'type' => 'DEUDA',
-                    'due_at' => $movement->moved_at ?? now(),
+                    'due_at' => $debtDueAt,
                     'paid_at' => null,
                     'payment_method_id' => $debtPaymentMethod->id,
                     'payment_method' => $debtPaymentMethod->description ?? 'Deuda',
@@ -1236,7 +1350,7 @@ class SalesController extends Controller
                 app(AccountReceivablePayableService::class)->syncDebtAccount(
                     $cashMovement,
                     AccountReceivablePayableService::TYPE_RECEIVABLE,
-                    $movement->moved_at ?? now()
+                    $debtDueAt
                 );
             } else {
                 app(AccountReceivablePayableService::class)->removeDebtAccountByCashMovementId((int) $cashMovement->id);
@@ -2034,6 +2148,7 @@ class SalesController extends Controller
 
     /**
      * Genera numero de venta en formato correlativo simple: 00000127.
+     * Por sucursal, tipo de documento, año y caja (via cash_movements del cobro).
      * Mantiene compatibilidad leyendo tambien numeros historicos con formato antiguo.
      */
     private function generateSaleNumber(int $documentTypeId, int $cashRegisterId, bool $reserve = true): string
@@ -2055,10 +2170,29 @@ class SalesController extends Controller
 
         $year = (int) now()->year;
 
+        // Correlativo por caja: el cobro queda en cash_movements (movimiento hijo -> parent = venta).
+        $saleIdsForCashRegister = CashMovements::query()
+            ->join('movements as cash_entry_movement', 'cash_entry_movement.id', '=', 'cash_movements.movement_id')
+            ->where('cash_movements.cash_register_id', $cashRegisterId)
+            ->where('cash_movements.branch_id', $branchId)
+            ->whereNull('cash_movements.deleted_at')
+            ->whereNull('cash_entry_movement.deleted_at')
+            ->whereNotNull('cash_entry_movement.parent_movement_id')
+            ->pluck('cash_entry_movement.parent_movement_id')
+            ->unique()
+            ->values()
+            ->all();
+
         $query = Movement::query()
             ->where('branch_id', $branchId)
             ->where('document_type_id', $documentTypeId)
             ->whereYear('moved_at', $year);
+
+        if ($saleIdsForCashRegister !== []) {
+            $query->whereIn('id', $saleIdsForCashRegister);
+        } else {
+            $query->whereRaw('1 = 0');
+        }
 
         if ($reserve) {
             $query->lockForUpdate();

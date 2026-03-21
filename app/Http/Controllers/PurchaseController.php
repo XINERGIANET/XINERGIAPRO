@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Card;
 use App\Models\Branch;
+use App\Models\Category;
 use App\Models\CashMovements;
 use App\Models\CashRegister;
 use App\Models\DocumentType;
@@ -118,7 +119,7 @@ class PurchaseController extends Controller
             'person_type' => ['required', 'in:DNI,RUC,CARNET DE EXTRANGERIA,PASAPORTE'],
             'document_number' => ['required', 'string', 'max:50'],
             'first_name' => ['required', 'string', 'max:255'],
-            'last_name' => ['required', 'string', 'max:255'],
+            'last_name' => ['required_unless:person_type,RUC', 'nullable', 'string', 'max:255'],
             'credit_days' => ['nullable', 'integer', 'min:0', 'max:3650'],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:255'],
@@ -171,6 +172,10 @@ class PurchaseController extends Controller
         $validated['address'] = trim((string) ($validated['address'] ?? '')) ?: '-';
         $validated['location_id'] = (int) ($validated['location_id'] ?? $branchDistrictId);
         $validated['credit_days'] = (int) ($validated['credit_days'] ?? 0);
+        if (strtoupper((string) ($validated['person_type'] ?? '')) === 'RUC') {
+            $validated['last_name'] = '';
+            $validated['genero'] = null;
+        }
 
         $person = DB::transaction(function () use ($validated, $branchId) {
             $person = Person::query()->create(array_merge(
@@ -595,6 +600,8 @@ class PurchaseController extends Controller
 
         $units = Unit::query()->orderBy('description')->get(['id', 'description']);
 
+        Category::syncExistingToAllBranches();
+
         $products = Product::query()
             ->join('product_branch', function ($join) use ($branchId) {
                 $join->on('product_branch.product_id', '=', 'products.id')
@@ -602,6 +609,11 @@ class PurchaseController extends Controller
             })
             ->leftJoin('units', 'units.id', '=', 'products.base_unit_id')
             ->leftJoin('categories', 'categories.id', '=', 'products.category_id')
+            ->leftJoin('category_branch', function ($join) use ($branchId) {
+                $join->on('category_branch.category_id', '=', 'categories.id')
+                    ->where('category_branch.branch_id', '=', $branchId)
+                    ->whereNull('category_branch.deleted_at');
+            })
             ->where('products.classification', 'GOOD')
             ->orderBy('products.description')
             ->get([
@@ -614,7 +626,7 @@ class PurchaseController extends Controller
                 'product_branch.avg_cost',
                 'product_branch.stock',
                 'units.description as unit_name',
-                'categories.description as category_name',
+                DB::raw('CASE WHEN category_branch.id IS NOT NULL THEN categories.description ELSE NULL END as category_name'),
             ]);
 
         $defaultTaxRate = (float) (TaxRate::query()->where('status', true)->orderBy('order_num')->value('tax_rate') ?? 18);
@@ -630,7 +642,7 @@ class PurchaseController extends Controller
                 'img' => ($p->image && !empty($p->image))
                     ? asset('storage/' . ltrim((string) $p->image, '/'))
                     : null,
-                'category' => (string) ($p->category_name ?? 'Sin categoria'),
+                'category' => trim((string) ($p->category_name ?? '')) !== '' ? (string) $p->category_name : 'Sin categoria',
                 'stock' => (float) ($p->stock ?? 0),
                 'unit_id' => (int) ($p->unit_sale ?? 0),
                 'unit_name' => (string) ($p->unit_name ?? ''),
@@ -657,6 +669,7 @@ class PurchaseController extends Controller
             'initialCashRegisterId' => (int) old('cash_register_id', $defaultCashRegisterId ?? 0),
             'initialRows' => old('payment_methods', []),
             'initialDetailType' => (string) old('detail_type', 'DETALLADO'),
+            'initialAffectsKardex' => (string) old('affects_kardex', 'S'),
             'initialTaxRate' => (float) old('tax_rate_percent', $defaultTaxRate),
             'initialIncludesTax' => (string) old('includes_tax', 'S'),
             'initialCurrency' => (string) old('currency', 'PEN'),
@@ -664,6 +677,8 @@ class PurchaseController extends Controller
             'initialMovedAt' => (string) old('moved_at', now()->format('Y-m-d H:i')),
             'purchaseNumberPreview' => (string) $purchaseNumberPreview,
             'quickProviderStoreUrl' => route('admin.purchases.providers.store'),
+            'reniecApiUrl' => route('api.reniec'),
+            'rucApiUrl' => route('api.ruc'),
             'departments' => $locationData['departments'],
             'provinces' => $locationData['provinces'],
             'districts' => $locationData['districts'],

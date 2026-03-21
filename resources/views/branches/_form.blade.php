@@ -58,7 +58,7 @@
     data-department-id='@json(old('department_id', $selectedDepartmentId ?? null), JSON_HEX_APOS | JSON_HEX_QUOT)'
     data-province-id='@json(old('province_id', $selectedProvinceId ?? null), JSON_HEX_APOS | JSON_HEX_QUOT)'
     data-district-id='@json(old('location_id', $selectedDistrictId ?? ($branch->location_id ?? null)), JSON_HEX_APOS | JSON_HEX_QUOT)'
-    x-data="{
+    x-data="Object.assign(typeof formAutocompleteHelpers === 'function' ? formAutocompleteHelpers() : {}, {
         departments: JSON.parse($el.dataset.departments || '[]'),
         provinces: JSON.parse($el.dataset.provinces || '[]'),
         districts: JSON.parse($el.dataset.districts || '[]'),
@@ -168,7 +168,7 @@
                 this.rucLoading = false;
             }
         }
-    }"
+    })"
     x-init="init()"
 >
     <div class="sm:col-span-1">
@@ -266,17 +266,17 @@
             <span class="absolute top-1/2 left-0 -translate-y-1/2 border-r border-gray-200 px-3.5 py-3 text-gray-500 dark:border-gray-800 dark:text-gray-400">
                 {!! $LocationIcon !!}
             </span>
-            <select
+            <x-form.select-autocomplete-inline
+                fieldKey="branch_dept"
                 name="department_id"
-                x-model="departmentId"
-                @change="onDepartmentChange()"
-                class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-[62px] text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
-            >
-                <option value="">Seleccione departamento</option>
-                <template x-for="department in departments" :key="department.id">
-                    <option :value="department.id" :selected="department.id == departmentId" x-text="department.name"></option>
-                </template>
-            </select>
+                valueVar="departmentId"
+                optionsListExpr="departments"
+                optionLabel="name"
+                optionValue="id"
+                emptyText="Seleccione departamento"
+                pickExpr="departmentId = String(opt.id); onDepartmentChange()"
+                inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-[62px] text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+            />
         </div>
     </div>
 
@@ -286,17 +286,17 @@
             <span class="absolute top-1/2 left-0 -translate-y-1/2 border-r border-gray-200 px-3.5 py-3 text-gray-500 dark:border-gray-800 dark:text-gray-400">
                 {!! $LocationIcon !!}
             </span>
-            <select
+            <x-form.select-autocomplete-inline
+                fieldKey="branch_prov"
                 name="province_id"
-                x-model="provinceId"
-                @change="onProvinceChange()"
-                class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-[62px] text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
-            >
-                <option value="">Seleccione provincia</option>
-                <template x-for="province in filteredProvinces" :key="province.id">
-                    <option :value="province.id" :selected="province.id == provinceId" x-text="province.name"></option>
-                </template>
-            </select>
+                valueVar="provinceId"
+                optionsListExpr="filteredProvinces"
+                optionLabel="name"
+                optionValue="id"
+                emptyText="Seleccione provincia"
+                pickExpr="provinceId = String(opt.id); onProvinceChange()"
+                inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-[62px] text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+            />
         </div>
     </div>
 
@@ -306,17 +306,18 @@
             <span class="absolute top-1/2 left-0 -translate-y-1/2 border-r border-gray-200 px-3.5 py-3 text-gray-500 dark:border-gray-800 dark:text-gray-400">
                 {!! $LocationIcon !!}
             </span>
-            <select
+            <x-form.select-autocomplete-inline
+                fieldKey="branch_dist"
                 name="location_id"
-                x-model="districtId"
-                required
-                class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-[62px] text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
-            >
-                <option value="">Seleccione distrito</option>
-                <template x-for="district in filteredDistricts" :key="district.id">
-                    <option :value="district.id" :selected="district.id == districtId" x-text="district.name"></option>
-                </template>
-            </select>
+                valueVar="districtId"
+                optionsListExpr="filteredDistricts"
+                optionLabel="name"
+                optionValue="id"
+                emptyText="Seleccione distrito"
+                :required="true"
+                pickExpr="districtId = String(opt.id)"
+                inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-[62px] text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+            />
         </div>
         @error('location_id')
             <p class="mt-1 text-xs text-error-500">{{ $message }}</p>

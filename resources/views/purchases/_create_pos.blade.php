@@ -15,12 +15,14 @@
 
 <div class="flex items-start gap-6" style="display:flex;align-items:flex-start;gap:1.5rem;">
     <section class="min-w-0 space-y-5" style="flex:0 0 60%;max-width:60%;width:60%;">
-        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" x-show="detailType === 'DETALLADO'">
-            <div class="grid grid-cols-1 gap-3 xl:grid-cols-12">
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div class="grid grid-cols-1 gap-3 xl:grid-cols-12 xl:items-end">
                 <div class="xl:col-span-4">
+                    <label for="purchase-moved-at" class="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Fecha de compra</label>
                     <x-form.date-picker
+                        id="purchase-moved-at"
                         name="moved_at"
-                        label="Fecha de compra"
+                        :label="false"
                         placeholder="dd/mm/yyyy hh:mm"
                         :defaultDate="old('moved_at', $purchaseCreateConfig['initialMovedAt'])"
                         dateFormat="Y-m-d H:i"
@@ -30,26 +32,37 @@
                         altFormat="d/m/Y H:i"
                         locale="es"
                         :compact="true"
+                        inputClass="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 pr-11 text-sm font-semibold text-slate-700 placeholder:text-slate-400 focus:border-orange-400 focus:ring-[3px] focus:ring-orange-500/20 focus:outline-none"
                     />
                 </div>
-                <div class="xl:col-span-3">
+                <div class="xl:col-span-4">
                     <label class="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Documento</label>
-                    <select name="document_type_id" x-model.number="documentTypeId" class="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700" required>
-                        <template x-for="documentType in documentTypes" :key="documentType.id"><option :value="documentType.id" x-text="documentType.name"></option></template>
-                    </select>
+                    <x-form.select-autocomplete-inline
+                        fieldKey="purchase_doc"
+                        name="document_type_id"
+                        valueVar="documentTypeId"
+                        optionsListExpr="documentTypes"
+                        optionLabel="name"
+                        optionValue="id"
+                        emptyText="Documento"
+                        :numeric="true"
+                        :required="true"
+                        pickExpr="documentTypeId = Number(opt.id)"
+                        inputClass="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700"
+                    />
                 </div>
                 <div class="xl:col-span-2">
                     <label class="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Serie</label>
                     <input type="text" name="series" value="{{ old('series', '001') }}" class="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700" placeholder="001">
                 </div>
-                <div class="xl:col-span-3">
+                <div class="xl:col-span-2">
                     <label class="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Numero</label>
                     <input type="text" name="number" value="{{ old('number', $purchaseCreateConfig['purchaseNumberPreview']) }}" class="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700" placeholder="00000001" required>
                 </div>
             </div>
         </div>
 
-        <div class="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <div class="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6" x-show="detailType === 'DETALLADO'" x-cloak>
             <div class="mb-5 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                 <div>
                     <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Catálogo</p>
@@ -149,7 +162,7 @@
                 <template x-for="(item, idx) in items" :key="`glosa-${idx}`">
                     <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                         <div class="grid gap-3 md:grid-cols-12">
-                            <div class="md:col-span-5">
+                            <div class="md:col-span-4">
                                 <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Descripcion</label>
                                 <input
                                     type="text"
@@ -158,13 +171,20 @@
                                     placeholder="Ej. Compra administrativa, traslado, ajuste, repuesto externo"
                                 >
                             </div>
-                            <div class="md:col-span-2">
+                            <div class="md:col-span-3">
                                 <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Unidad</label>
-                                <select x-model.number="item.unit_id" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
-                                    <template x-for="unit in units" :key="`glosa-unit-${idx}-${unit.id}`">
-                                        <option :value="unit.id" x-text="unit.description"></option>
-                                    </template>
-                                </select>
+                                <x-form.select-autocomplete-inline
+                                    fieldKey="pu_g"
+                                    fieldKeyExpr="'pu_g_'+idx"
+                                    valueVar="item.unit_id"
+                                    optionsListExpr="units"
+                                    optionLabel="description"
+                                    optionValue="id"
+                                    emptyText="Unidad"
+                                    :numeric="true"
+                                    pickExpr="item.unit_id = Number(opt.id)"
+                                    inputClass="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
+                                />
                             </div>
                             <div class="md:col-span-2">
                                 <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Cantidad</label>
@@ -206,12 +226,84 @@
 
             <div x-show="asideTab==='summary'" class="bg-slate-50 p-5">
                 <div class="rounded-2xl border border-slate-200 bg-white p-4">
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div><label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Tipo detalle</label><select name="detail_type" x-model="detailType" @change="changeDetailType($event.target.value)" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"><option value="DETALLADO">DETALLADO</option><option value="GLOSA">GLOSA</option></select></div>
-                        <div><label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Afecta kardex</label><select name="affects_kardex" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"><option value="S" selected>Si</option><option value="N">No</option></select></div>
-                        <div><label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Incluye IGV</label><select name="includes_tax" x-model="includesTax" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"><option value="S">Si</option><option value="N">No</option></select></div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="relative" @click.outside="summaryUi.detailType.open = false">
+                            <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Tipo detalle</label>
+                            <input type="hidden" name="detail_type" :value="detailType">
+                            <div @click="toggleSummaryDropdown('detailType')" class="flex h-11 min-h-[2.75rem] w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
+                                <span class="min-w-0 flex-1 truncate" x-text="summarySelectedLabel('detailType')"></span>
+                                <span class="shrink-0 text-slate-400 transition" :class="summaryUi.detailType.open && 'rotate-180'"><i class="ri-arrow-down-s-line text-lg"></i></span>
+                            </div>
+                            <div x-show="summaryUi.detailType.open" x-cloak x-transition class="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg" style="display: none;">
+                                <div class="border-b border-slate-100 p-2">
+                                    <input x-ref="summarySearchDetailType" type="text" x-model="summaryUi.detailType.q" @click.stop placeholder="Buscar..." class="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-orange-300 focus:outline-none">
+                                </div>
+                                <div class="max-h-60 overflow-auto py-1">
+                                    <template x-for="opt in filterSummaryOptions('detailType')" :key="opt.value">
+                                        <button type="button" @click="selectSummaryOption('detailType', opt)" class="flex w-full items-center px-3 py-2.5 text-left text-sm text-slate-800 hover:bg-orange-50" :class="String(opt.value) === String(detailType) && 'bg-orange-50'" x-text="opt.label"></button>
+                                    </template>
+                                    <template x-if="filterSummaryOptions('detailType').length === 0"><p class="px-3 py-3 text-sm text-slate-500">Sin coincidencias.</p></template>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="relative" @click.outside="summaryUi.affectsKardex.open = false">
+                            <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Afecta kardex</label>
+                            <input type="hidden" name="affects_kardex" :value="affectsKardex">
+                            <div @click="toggleSummaryDropdown('affectsKardex')" class="flex h-11 min-h-[2.75rem] w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
+                                <span class="min-w-0 flex-1 truncate" x-text="summarySelectedLabel('affectsKardex')"></span>
+                                <span class="shrink-0 text-slate-400 transition" :class="summaryUi.affectsKardex.open && 'rotate-180'"><i class="ri-arrow-down-s-line text-lg"></i></span>
+                            </div>
+                            <div x-show="summaryUi.affectsKardex.open" x-cloak x-transition class="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg" style="display: none;">
+                                <div class="border-b border-slate-100 p-2">
+                                    <input x-ref="summarySearchAffectsKardex" type="text" x-model="summaryUi.affectsKardex.q" @click.stop placeholder="Buscar..." class="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-orange-300 focus:outline-none">
+                                </div>
+                                <div class="max-h-60 overflow-auto py-1">
+                                    <template x-for="opt in filterSummaryOptions('affectsKardex')" :key="opt.value">
+                                        <button type="button" @click="selectSummaryOption('affectsKardex', opt)" class="flex w-full items-center px-3 py-2.5 text-left text-sm text-slate-800 hover:bg-orange-50" :class="String(opt.value) === String(affectsKardex) && 'bg-orange-50'" x-text="opt.label"></button>
+                                    </template>
+                                    <template x-if="filterSummaryOptions('affectsKardex').length === 0"><p class="px-3 py-3 text-sm text-slate-500">Sin coincidencias.</p></template>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="relative" @click.outside="summaryUi.includesTax.open = false">
+                            <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Incluye IGV</label>
+                            <input type="hidden" name="includes_tax" :value="includesTax">
+                            <div @click="toggleSummaryDropdown('includesTax')" class="flex h-11 min-h-[2.75rem] w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
+                                <span class="min-w-0 flex-1 truncate" x-text="summarySelectedLabel('includesTax')"></span>
+                                <span class="shrink-0 text-slate-400 transition" :class="summaryUi.includesTax.open && 'rotate-180'"><i class="ri-arrow-down-s-line text-lg"></i></span>
+                            </div>
+                            <div x-show="summaryUi.includesTax.open" x-cloak x-transition class="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg" style="display: none;">
+                                <div class="border-b border-slate-100 p-2">
+                                    <input x-ref="summarySearchIncludesTax" type="text" x-model="summaryUi.includesTax.q" @click.stop placeholder="Buscar..." class="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-orange-300 focus:outline-none">
+                                </div>
+                                <div class="max-h-60 overflow-auto py-1">
+                                    <template x-for="opt in filterSummaryOptions('includesTax')" :key="opt.value">
+                                        <button type="button" @click="selectSummaryOption('includesTax', opt)" class="flex w-full items-center px-3 py-2.5 text-left text-sm text-slate-800 hover:bg-orange-50" :class="String(opt.value) === String(includesTax) && 'bg-orange-50'" x-text="opt.label"></button>
+                                    </template>
+                                    <template x-if="filterSummaryOptions('includesTax').length === 0"><p class="px-3 py-3 text-sm text-slate-500">Sin coincidencias.</p></template>
+                                </div>
+                            </div>
+                        </div>
                         <div><label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">IGV %</label><input type="number" step="0.01" min="0" max="100" name="tax_rate_percent" x-model.number="taxRate" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold" style="color:#f97316;" required></div>
-                        <div><label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Moneda</label><select name="currency" x-model="currency" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"><option value="PEN">PEN</option><option value="USD">USD</option></select></div>
+                        <div class="relative" @click.outside="summaryUi.currency.open = false">
+                            <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Moneda</label>
+                            <input type="hidden" name="currency" :value="currency">
+                            <div @click="toggleSummaryDropdown('currency')" class="flex h-11 min-h-[2.75rem] w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
+                                <span class="min-w-0 flex-1 truncate" x-text="summarySelectedLabel('currency')"></span>
+                                <span class="shrink-0 text-slate-400 transition" :class="summaryUi.currency.open && 'rotate-180'"><i class="ri-arrow-down-s-line text-lg"></i></span>
+                            </div>
+                            <div x-show="summaryUi.currency.open" x-cloak x-transition class="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg" style="display: none;">
+                                <div class="border-b border-slate-100 p-2">
+                                    <input x-ref="summarySearchCurrency" type="text" x-model="summaryUi.currency.q" @click.stop placeholder="Buscar..." class="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-orange-300 focus:outline-none">
+                                </div>
+                                <div class="max-h-60 overflow-auto py-1">
+                                    <template x-for="opt in filterSummaryOptions('currency')" :key="opt.value">
+                                        <button type="button" @click="selectSummaryOption('currency', opt)" class="flex w-full items-center px-3 py-2.5 text-left text-sm text-slate-800 hover:bg-orange-50" :class="String(opt.value) === String(currency) && 'bg-orange-50'" x-text="opt.label"></button>
+                                    </template>
+                                    <template x-if="filterSummaryOptions('currency').length === 0"><p class="px-3 py-3 text-sm text-slate-500">Sin coincidencias.</p></template>
+                                </div>
+                            </div>
+                        </div>
                         <div><label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Tipo cambio</label><input type="number" step="0.001" min="0.001" name="exchange_rate" x-model.number="exchangeRate" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold" style="color:#f97316;" required></div>
                     </div>
                 </div>
@@ -282,10 +374,7 @@
                     <div class="border-t border-dashed border-slate-200 pt-2"></div>
                     <div class="flex items-center justify-between"><span class="text-base font-bold text-slate-900">Total a pagar</span><span class="text-3xl font-black" style="color:#f97316;" x-text="money(summary.total)"></span></div>
                 </div>
-                <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-                    <label class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Notas</label>
-                    <textarea name="comment" rows="3" class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700" placeholder="Detalle adicional de la compra">{{ old('comment') }}</textarea>
-                </div>
+               
             </div>
 
             <div x-show="asideTab==='payment'" class="bg-slate-50 p-5">
@@ -319,8 +408,36 @@
                                 </div>
                             </div>
                         <div class="grid gap-3 sm:grid-cols-2">
-                            <div><label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Tipo pago</label><select name="payment_type" x-model="paymentType" @change="onPaymentTypeChange()" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"><option value="CONTADO">CONTADO</option><option value="CREDITO">CREDITO / DEUDA</option></select></div>
-                            <div><label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Caja</label><select name="cash_register_id" x-model.number="cashRegisterId" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"><template x-for="cashRegister in cashRegisters" :key="cashRegister.id"><option :value="cashRegister.id" x-text="cashRegister.status==='A' ? `${cashRegister.number} (Activa)` : cashRegister.number"></option></template></select></div>
+                            <div>
+                                <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Tipo pago</label>
+                                <x-form.select-autocomplete-inline
+                                    fieldKey="purchase_pt"
+                                    name="payment_type"
+                                    valueVar="paymentType"
+                                    optionsListExpr="paymentTypeOptions"
+                                    optionLabel="label"
+                                    optionValue="value"
+                                    emptyText="Tipo pago"
+                                    pickExpr="paymentType = opt.value; onPaymentTypeChange()"
+                                    inputClass="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
+                                />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Caja</label>
+                                <x-form.select-autocomplete-inline
+                                    fieldKey="purchase_cr"
+                                    name="cash_register_id"
+                                    valueVar="cashRegisterId"
+                                    optionsListExpr="cashRegisterOptions"
+                                    optionLabel="label"
+                                    optionValue="id"
+                                    displayExpr="cashRegisterDisplayLabel(cashRegisterId)"
+                                    emptyText="Seleccionar caja"
+                                    :numeric="true"
+                                    pickExpr="cashRegisterId = Number(opt.id)"
+                                    inputClass="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
+                                />
+                            </div>
                         </div>
                         <div x-show="paymentType==='CREDITO'" class="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
                             <p>Esta compra se registrara como deuda y se enviara a cuentas por pagar.</p>
@@ -363,9 +480,18 @@
                                 <div class="grid gap-3" :style="row.kind==='card' ? 'grid-template-columns:minmax(0,3.2fr) minmax(0,1.5fr) minmax(0,2.2fr) 52px;' : 'grid-template-columns:minmax(0,3.4fr) minmax(0,1.8fr) 52px;'">
                                     <div class="min-w-0">
                                         <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Metodo</label>
-                                        <select x-model="row.method_variant_key" @change="applyPaymentVariant(idx)" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
-                                            <template x-for="variant in paymentMethodVariants" :key="variant.key"><option :value="variant.key" x-text="variant.label"></option></template>
-                                        </select>
+                                        <x-form.select-autocomplete-inline
+                                            fieldKey="pmv"
+                                            fieldKeyExpr="'pmv_'+idx"
+                                            valueVar="row.method_variant_key"
+                                            optionsListExpr="paymentMethodVariants"
+                                            optionLabel="label"
+                                            optionValue="key"
+                                            displayExpr="paymentVariantRowLabel(row)"
+                                            emptyText="Metodo"
+                                            pickExpr="row.method_variant_key = opt.key; applyPaymentVariant(idx)"
+                                            inputClass="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
+                                        />
                                     </div>
                                     <div class="min-w-0">
                                         <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Monto</label>
@@ -373,10 +499,19 @@
                                     </div>
                                     <div class="min-w-0" x-show="row.kind==='card'">
                                         <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Pasarela</label>
-                                        <select :name="`payment_methods[${idx}][payment_gateway_id]`" x-model="row.payment_gateway_id" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
-                                            <option value="">Seleccionar</option>
-                                            <template x-for="gateway in paymentGateways" :key="gateway.id"><option :value="gateway.id" x-text="gateway.description"></option></template>
-                                        </select>
+                                        <input type="hidden" :name="`payment_methods[${idx}][payment_gateway_id]`" :value="row.payment_gateway_id">
+                                        <x-form.select-autocomplete-inline
+                                            fieldKey="pgw"
+                                            fieldKeyExpr="'pgw_'+idx"
+                                            valueVar="row.payment_gateway_id"
+                                            optionsListExpr="paymentGateways"
+                                            optionLabel="description"
+                                            optionValue="id"
+                                            emptyText="Seleccionar"
+                                            :numeric="true"
+                                            pickExpr="row.payment_gateway_id = Number(opt.id)"
+                                            inputClass="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
+                                        />
                                     </div>
                                     <div class="flex items-end">
                                         <button type="button" @click="removePaymentRow(idx)" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 hover:bg-rose-50" title="Eliminar"><i class="ri-delete-bin-line"></i></button>
@@ -389,6 +524,11 @@
                         <div class="flex items-center justify-between"><span class="font-semibold text-slate-500">Total pagado</span><span class="font-black" style="color:#f97316;" x-text="money(totalPaid)"></span></div>
                         <div class="mt-2 flex items-center justify-between border-t border-dashed border-slate-200 pt-2" x-show="Math.abs(paymentDifference) > .009"><span class="font-semibold" :style="paymentDifference >= 0 ? 'color:#ea580c;' : 'color:#059669;'" x-text="paymentDifference >= 0 ? 'Falta pagar' : 'Exceso'"></span><span class="font-black" :style="paymentDifference >= 0 ? 'color:#ea580c;' : 'color:#059669;'" x-text="money(Math.abs(paymentDifference))"></span></div>
                     </div>
+                </div>
+
+                <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                    <label class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Notas</label>
+                    <textarea name="comment" rows="3" class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700" placeholder="Detalle adicional de la compra">{{ old('comment') }}</textarea>
                 </div>
 
                 <div class="mt-4 grid grid-cols-2 gap-3">

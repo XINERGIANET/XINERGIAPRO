@@ -125,14 +125,7 @@
                 </div>
                 <div class="md:col-span-2">
                     <label class="mb-2 block text-sm font-medium text-gray-700">Numero</label>
-                    <input
-                        type="text"
-                        name="number"
-                        class="h-10 w-full rounded-xl border border-gray-300 px-3 text-sm"
-                        value="{{ old('number', $purchase->number ?? ($purchaseNumberPreview ?? '00000001')) }}"
-                        placeholder="00000001"
-                        required
-                    >
+                    
                 </div>
             </div>
         </div>

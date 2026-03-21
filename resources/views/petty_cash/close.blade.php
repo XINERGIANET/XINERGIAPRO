@@ -279,6 +279,8 @@
 
         .pc-status.income { background: #dcfce7; color: #166534; }
         .pc-status.expense { background: #fee2e2; color: #991b1b; }
+        .pc-status.paid { background: #e0f2fe; color: #075985; }
+        .pc-status.debt { background: #ffedd5; color: #9a3412; }
 
         /* Action Buttons */
         .pc-actions-bar {
@@ -516,6 +518,7 @@
                             <table class="pc-table">
                                 <thead>
                                     <tr>
+                                        <th class="text-left">FLUJO</th>
                                         <th class="text-left">TIPO</th>
                                         <th class="text-left">MONTO</th>
                                         <th class="text-left">MEDIO</th>
@@ -527,9 +530,12 @@
                                 <tbody>
                                     @forelse ($detailGroups as $index => $group)
                                         @php
-                                            $isIncome = $group['type_label'] !== 'Egreso' && $group['type_label'] !== 'Deuda';
+                                            $flowLabel = $group['flow_label'] ?? (($group['category'] ?? '') === 'expense' ? 'Egreso' : 'Ingreso');
+                                            $isIncome = $flowLabel !== 'Egreso';
                                             $statusClass = $isIncome ? 'pc-status income' : 'pc-status expense';
                                             $icon = $isIncome ? 'ri-arrow-right-up-line' : 'ri-arrow-right-down-line';
+                                            $paymentTypeLabel = $group['type_label'] ?? 'Pagado';
+                                            $paymentTypeClass = $paymentTypeLabel === 'Deuda' ? 'pc-status debt' : 'pc-status paid';
                                             
                                             $noteStyle = match ($group['category']) {
                                                 'opening' => 'background:#fde68a;color:#78350f;',
@@ -543,7 +549,12 @@
                                             <td>
                                                 <span class="{{ $statusClass }}">
                                                     <i class="{{ $icon }}"></i>
-                                                    {{ $isIncome ? 'Ingreso' : 'Egreso' }}
+                                                    {{ $flowLabel }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span class="{{ $paymentTypeClass }}">
+                                                    {{ $paymentTypeLabel }}
                                                 </span>
                                             </td>
                                             <td class="font-bold text-slate-700">S/ {{ $money($group['amount']) }}</td>
@@ -562,7 +573,7 @@
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="6" class="px-6 py-12 text-center text-slate-400 font-medium">
+                                            <td colspan="7" class="px-6 py-12 text-center text-slate-400 font-medium">
                                                 No hay movimientos acumulados para este cierre.
                                             </td>
                                         </tr>
@@ -642,6 +653,7 @@
                         <thead>
                             <tr>
                                 <th style="background-color: #334155; color: #FFFFFF;" class="px-3 py-3 text-xs uppercase tracking-wider font-bold">N°</th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-3 py-3 text-xs uppercase tracking-wider font-bold">Flujo</th>
                                 <th style="background-color: #334155; color: #FFFFFF;" class="px-3 py-3 text-xs uppercase tracking-wider font-bold">Tipo</th>
                                 <th style="background-color: #334155; color: #FFFFFF;" class="px-3 py-3 text-xs uppercase tracking-wider font-bold">Concepto</th>
                                 <th style="background-color: #334155; color: #FFFFFF;" class="px-3 py-3 text-xs uppercase tracking-wider font-bold">Total Mov.</th>
@@ -656,6 +668,9 @@
                                     <td class="px-3 py-3 font-bold text-slate-900 text-sm" x-text="record.number || '-'"></td>
                                     <td class="px-3 py-3">
                                         <span :class="record.type_label === 'Ingreso' ? 'pc-status income' : 'pc-status expense'" x-text="record.type_label"></span>
+                                    </td>
+                                    <td class="px-3 py-3">
+                                        <span :class="record.payment_type_label === 'Deuda' ? 'pc-status debt' : 'pc-status paid'" x-text="record.payment_type_label || 'Pagado'"></span>
                                     </td>
                                     <td class="px-3 py-3">
                                         <span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[10px] font-bold uppercase whitespace-nowrap" x-text="record.concept"></span>

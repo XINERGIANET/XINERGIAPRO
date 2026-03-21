@@ -135,7 +135,8 @@
                                 <!-- Button -->
                                 <div>
                                     <button
-                                        class="bg-brand-500 shadow-theme-xs hover:bg-brand-600 flex w-full items-center justify-center rounded-lg px-4 py-3 text-sm font-medium text-white transition">
+                                        type="submit"
+                                        class="flex w-full items-center justify-center rounded-xl border border-[#344154] bg-[#344154] px-4 py-3 text-sm font-semibold text-white shadow-theme-xs transition hover:bg-[#2a3548] hover:border-[#2a3548] focus:outline-hidden focus:ring-4 focus:ring-[#344154]/35">
                                         Sign Up
                                     </button>
                                 </div>
@@ -150,15 +151,16 @@
                     </div>
                 </div>
             </div>
-            <div class="bg-brand-950 relative hidden h-full w-full items-center lg:grid lg:w-1/2 dark:bg-white/5">
-                <div class="z-1 flex items-center justify-center">
-                    <!-- ===== Common Grid Shape Start ===== -->
+            <div class="relative hidden h-full w-full items-center bg-brand-950 lg:grid lg:w-1/2 dark:bg-white/5">
+                <div class="pointer-events-none absolute inset-0 z-0 overflow-hidden [&_img]:brightness-0 [&_img]:invert [&_img]:opacity-[0.4]">
                     <x-common.common-grid-shape />
-                    <div class="flex max-w-xs flex-col items-center">
-                        <a href="/" class="mb-4 block">
-                            <img src="./images/logo/auth-logo.svg" alt="Logo" />
+                </div>
+                <div class="relative z-10 flex w-full items-center justify-center">
+                    <div class="flex max-w-sm flex-col items-center px-8">
+                        <a href="/" class="mb-5 block drop-shadow-lg">
+                            <img src="/images/logo/auth-logo.svg" alt="Logo" class="max-h-24 w-auto brightness-0 invert" />
                         </a>
-                        <p class="text-center text-gray-400 dark:text-white/60">
+                        <p class="max-w-xs text-center text-sm leading-relaxed text-white">
                             Free and Open-Source Tailwind CSS Admin Dashboard Template
                         </p>
                     </div>

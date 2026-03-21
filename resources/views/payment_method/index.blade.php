@@ -197,7 +197,14 @@
                                                 $variant = $isDelete ? 'eliminate' : (str_contains($action, 'edit') ? 'edit' : 'primary');
                                             @endphp
                                             @if ($isDelete)
-                                                <form action="{{ $actionUrl }}"
+                                                @php
+                                                    $destroyFormUrl = route('admin.payment_methods.destroy', $paymentMethod);
+                                                    if ($viewId && $destroyFormUrl !== '#') {
+                                                        $destroySep = str_contains($destroyFormUrl, '?') ? '&' : '?';
+                                                        $destroyFormUrl .= $destroySep . 'view_id=' . urlencode($viewId);
+                                                    }
+                                                @endphp
+                                                <form action="{{ $destroyFormUrl }}"
                                                     method="POST"
                                                     class="relative group js-swal-delete"
                                                     data-swal-title="Eliminar método de pago?"

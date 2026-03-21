@@ -305,6 +305,59 @@ const bindSelectAllCheckboxes = () => {
 
 bindSelectAllCheckboxes();
 
+/**
+ * Helpers para selects tipo autocomplete en el mismo x-data (sin scope anidado).
+ * Uso en Blade: Object.assign(formAutocompleteHelpers(), { ... }) o ...formAutocompleteHelpers() en return.
+ */
+window.formAutocompleteHelpers = function formAutocompleteHelpers() {
+    return {
+        sacKeys: {},
+        sacEnsure(key) {
+            const k = String(key);
+            if (!this.sacKeys[k]) {
+                this.sacKeys[k] = { open: false, q: '' };
+            }
+            return this.sacKeys[k];
+        },
+        sacClose(key) {
+            const ui = this.sacEnsure(String(key));
+            ui.open = false;
+            ui.q = '';
+        },
+        sacToggle(key) {
+            const k = String(key);
+            const ui = this.sacEnsure(k);
+            const opening = !ui.open;
+            Object.keys(this.sacKeys).forEach((sk) => {
+                this.sacKeys[sk].open = false;
+                this.sacKeys[sk].q = '';
+            });
+            if (opening) {
+                ui.open = true;
+                this.$nextTick(() => this.$refs.sacSearchInput?.focus?.());
+            }
+        },
+        sacFiltered(key, list, labelPath = 'name') {
+            const ui = this.sacEnsure(String(key));
+            const q = String(ui.q || '').trim().toLowerCase();
+            const arr = list || [];
+            if (!q) {
+                return arr;
+            }
+            const lp = String(labelPath || 'name');
+            return arr.filter((item) => String(item?.[lp] ?? '').toLowerCase().includes(q));
+        },
+        sacLabel(key, list, value, labelPath = 'name', valuePath = 'id') {
+            const v = String(value ?? '');
+            const arr = list || [];
+            const vp = String(valuePath || 'id');
+            const lp = String(labelPath || 'name');
+            const item = arr.find((i) => String(i?.[vp]) === v);
+            return item ? String(item[lp] ?? '') : '';
+        },
+    };
+};
+
 Alpine.data('crudModal', (el) => {
     const parseJson = (value, fallback) => {
         if (value === undefined || value === null || value === '') {

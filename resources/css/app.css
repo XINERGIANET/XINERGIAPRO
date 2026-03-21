@@ -428,6 +428,16 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     display: none;
     -webkit-appearance: none;
   }
+
+  /* Flatpickr móvil: datetime-local + icono SVG del date-picker = doble calendario */
+  .custom-datepicker input[type='datetime-local']::-webkit-calendar-picker-indicator,
+  .custom-datepicker input.flatpickr-mobile::-webkit-calendar-picker-indicator {
+    display: none;
+    opacity: 0;
+    -webkit-appearance: none;
+    width: 0;
+    height: 0;
+  }
 }
 
 .sidebar:hover {

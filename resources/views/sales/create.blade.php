@@ -25,6 +25,54 @@
             <div class="flex items-start gap-6" style="display:flex; align-items:flex-start; gap:1.5rem;">
                 <section class="min-w-0 space-y-5" style="flex: 0 0 60%; max-width: 60%; width: 60%;">
 
+                    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <div class="grid grid-cols-1 gap-3 xl:grid-cols-12 xl:items-end">
+                            <div class="xl:col-span-4">
+                                <label for="sale-moved-at" class="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Fecha de venta</label>
+                                <x-form.date-picker
+                                    id="sale-moved-at"
+                                    name="moved_at"
+                                    :label="false"
+                                    placeholder="dd/mm/yyyy hh:mm"
+                                    :defaultDate="old('moved_at', $saleMovedAtDefault ?? now()->format('Y-m-d H:i'))"
+                                    dateFormat="Y-m-d H:i"
+                                    :enableTime="true"
+                                    :time24hr="true"
+                                    :altInput="true"
+                                    altFormat="d/m/Y H:i"
+                                    locale="es"
+                                    :compact="true"
+                                    inputClass="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 pr-11 text-sm font-semibold text-slate-700 placeholder:text-slate-400 focus:border-orange-400 focus:ring-[3px] focus:ring-orange-500/20 focus:outline-none"
+                                />
+                            </div>
+                            <div class="xl:col-span-4">
+                                <label for="document-type-select" class="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Documento <span class="text-red-500">*</span></label>
+                                <x-form.select-autocomplete
+                                    name=""
+                                    selectId="document-type-select"
+                                    :value="(string) ((int) ($defaultDocumentTypeId ?? 0))"
+                                    :options="collect($documentTypes ?? [])->map(fn ($documentType) => ['value' => $documentType->id, 'label' => $documentType->name])->values()->all()"
+                                    placeholder="Seleccione documento"
+                                    inputClass="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+                                />
+                            </div>
+                            <div class="xl:col-span-2">
+                                <label for="sale-header-series" class="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Serie</label>
+                                <input type="text" id="sale-header-series" readonly tabindex="-1"
+                                    value="{{ $saleSeriesPreview ?? '001' }}"
+                                    class="h-12 w-full cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-100 px-4 text-sm font-semibold text-slate-600"
+                                    autocomplete="off">
+                            </div>
+                            <div class="xl:col-span-2">
+                                <label for="sale-header-number" class="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Numero <span class="text-red-500">*</span></label>
+                                <input type="text" id="sale-header-number" readonly tabindex="-1"
+                                    value="{{ $saleNumberPreview ?? '00000001' }}"
+                                    class="h-12 w-full cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-100 px-4 text-sm font-semibold text-slate-600"
+                                    autocomplete="off">
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                             <div class="relative flex-1">
@@ -49,19 +97,6 @@
                         </div>
                     </div>
 
-                    <div class="flex flex-wrap items-center justify-end gap-2">
-                        <a href="{{ $salesIndexUrl }}"
-                            class="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                            <i class="ri-arrow-left-line"></i>
-                            <span>Volver</span>
-                        </a>
-                        <button type="button" id="clear-sale-button"
-                            class="inline-flex h-10 items-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 hover:bg-rose-100">
-                            <i class="ri-delete-bin-6-line"></i>
-                            <span>Limpiar orden</span>
-                        </button>
-                    </div>
-
                     <div class="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                         <div class="mb-5 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                             <div>
@@ -70,13 +105,20 @@
                             </div>
                             <div id="category-filters" class="flex flex-wrap gap-3"></div>
                         </div>
-                        <div class="relative">
-                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-800">
-                                <i class="ri-search-line text-[22px]"></i>
-                            </span>
-                            <input id="product-search" type="text"
-                                placeholder="Buscar por codigo de barras, nombre o categoria"
-                                class="h-14 w-full rounded-[22px] border border-slate-200 bg-slate-50 pl-14 pr-4 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-stretch">
+                            <div class="relative min-w-0 flex-1">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-800">
+                                    <i class="ri-search-line text-[22px]"></i>
+                                </span>
+                                <input id="product-search" type="text"
+                                    placeholder="Buscar por codigo de barras, nombre o categoria"
+                                    class="h-14 w-full rounded-[22px] border border-slate-200 bg-slate-50 pl-14 pr-4 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100">
+                            </div>
+                            <button type="button" id="clear-sale-button"
+                                class="inline-flex h-14 shrink-0 items-center justify-center gap-2 rounded-[22px] border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 sm:px-5">
+                                <i class="ri-delete-bin-6-line"></i>
+                                <span>Limpiar orden</span>
+                            </button>
                         </div>
                         <div id="products-grid" class="mt-5 grid gap-4"></div>
                     </div>
@@ -126,13 +168,7 @@
                                             id="ticket-total" class="text-3xl font-black"
                                             style="color:#f97316;">$0.00</span></div>
                                 </div>
-                                <div id="payment-methods-section"
-                                    class="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-                                    <label for="sale-notes"
-                                        class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Notas</label>
-                                    <textarea id="sale-notes" rows="2" placeholder="Detalle adicional de la venta"
-                                        class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"></textarea>
-                                </div>
+                               
                             </div>
                         </div>
 
@@ -165,44 +201,53 @@
                                         </div>
                                     </div>
 
-                                    <div class="grid gap-3 sm:grid-cols-3">
-                                        <div class="space-y-2">
-                                            <label for="document-type-select"
-                                                class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Documento</label>
-                                            <select id="document-type-select"
-                                                class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                                                @foreach ($documentTypes ?? [] as $documentType)
-                                                    <option value="{{ $documentType->id }}" @selected((int) ($defaultDocumentTypeId ?? 0) === (int) $documentType->id)>
-                                                        {{ $documentType->name }}</option>
-                                                @endforeach
-                                            </select>
-                                        </div>
+                                    <div class="grid gap-3 sm:grid-cols-2">
                                         <div class="space-y-2">
                                             <label for="payment-type-select"
-                                                class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Condicion</label>
-                                            <select id="payment-type-select"
-                                                class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                                                <option value="CONTADO">Contado</option>
-                                                <option value="DEUDA">Deuda</option>
-                                            </select>
+                                                class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Tipo pago</label>
+                                            <x-form.select-autocomplete
+                                                name=""
+                                                selectId="payment-type-select"
+                                                value="CONTADO"
+                                                :options="[
+                                                    ['value' => 'CONTADO', 'label' => 'CONTADO'],
+                                                    ['value' => 'DEUDA', 'label' => 'CREDITO / DEUDA'],
+                                                ]"
+                                                placeholder="Tipo pago"
+                                                inputClass="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+                                            />
                                         </div>
                                         <div class="space-y-2">
                                             <label for="cash-register-select"
                                                 class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Caja</label>
-                                            <select id="cash-register-select"
-                                                class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                                                @foreach ($cashRegisters ?? [] as $cashRegister)
-                                                    <option value="{{ $cashRegister->id }}" @selected((int) ($defaultCashRegisterId ?? 0) === (int) $cashRegister->id)>
-                                                        {{ $cashRegister->number }}{{ $cashRegister->status === 'A' ? ' (Activa)' : '' }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
+                                            <x-form.select-autocomplete
+                                                name=""
+                                                selectId="cash-register-select"
+                                                :value="(string) ((int) ($defaultCashRegisterId ?? 0))"
+                                                :options="collect($cashRegisters ?? [])->map(fn ($cashRegister) => ['value' => $cashRegister->id, 'label' => $cashRegister->number . ($cashRegister->status === 'A' ? ' (Activa)' : '')])->values()->all()"
+                                                placeholder="Seleccione caja"
+                                                inputClass="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+                                            />
                                         </div>
                                     </div>
 
                                     <div id="sale-debt-notice"
-                                        class="hidden rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-                                        Esta venta se registrara como deuda y se enviara a cuentas por cobrar.
+                                        class="hidden space-y-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+                                        <p>Esta venta se registrara como deuda y se enviara a cuentas por cobrar.</p>
+                                        <div class="grid gap-3 sm:grid-cols-2">
+                                            <div class="space-y-2">
+                                                <label for="sale-debt-credit-days"
+                                                    class="block text-[10px] font-bold uppercase tracking-[0.18em] text-amber-800">Dias de credito</label>
+                                                <input type="number" id="sale-debt-credit-days" min="0" step="1" value="0"
+                                                    class="h-12 w-full rounded-2xl border border-amber-200 bg-white px-4 text-sm font-bold text-slate-700 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-200">
+                                            </div>
+                                            <div class="space-y-2">
+                                                <label for="sale-debt-due-date"
+                                                    class="block text-[10px] font-bold uppercase tracking-[0.18em] text-amber-800">Fecha vencimiento</label>
+                                                <input type="date" id="sale-debt-due-date"
+                                                    class="h-12 w-full rounded-2xl border border-amber-200 bg-white px-4 text-sm font-bold text-slate-700 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-200">
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div id="invoice-billing-block"
@@ -211,11 +256,17 @@
                                             <div class="space-y-2">
                                                 <label for="billing-status-select"
                                                     class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Factura</label>
-                                                <select id="billing-status-select"
-                                                    class="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                                                    <option value="INVOICED">Facturado</option>
-                                                    <option value="PENDING">Por facturar</option>
-                                                </select>
+                                                <x-form.select-autocomplete
+                                                    name=""
+                                                    selectId="billing-status-select"
+                                                    value="PENDING"
+                                                    :options="[
+                                                        ['value' => 'INVOICED', 'label' => 'Facturado'],
+                                                        ['value' => 'PENDING', 'label' => 'Por facturar'],
+                                                    ]"
+                                                    placeholder="Estado factura"
+                                                    inputClass="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+                                                />
                                             </div>
                                             <div id="invoice-series-group" class="space-y-2 sm:col-span-1">
                                                 <label for="invoice-series-input"
@@ -237,28 +288,36 @@
                             </div>
 
                             <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-                                <div class="mb-3 flex items-center justify-between">
-                                    <div>
-                                        <p class="mt-1 text-sm font-bold text-slate-900">Métodos de pago</p>
+                                <div id="payment-methods-section">
+                                    <div class="mb-3 flex items-center justify-between">
+                                        <div>
+                                            <p class="mt-1 text-sm font-bold text-slate-900">Métodos de pago</p>
+                                        </div>
+                                        <button type="button" id="add-payment-row-button"
+                                            class="inline-flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-bold text-white shadow-theme-xs"
+                                            style="background:linear-gradient(90deg,#ff7a00,#ff4d00); color:#fff; box-shadow:0 10px 20px rgba(249,115,22,0.18);">
+                                            <i class="ri-add-line"></i>
+                                            <span>Agregar</span>
+                                        </button>
                                     </div>
-                                    <button type="button" id="add-payment-row-button"
-                                        class="inline-flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-bold text-white shadow-theme-xs"
-                                        style="background:linear-gradient(90deg,#ff7a00,#ff4d00); color:#fff; box-shadow:0 10px 20px rgba(249,115,22,0.18);">
-                                        <i class="ri-add-line"></i>
-                                        <span>Agregar</span>
-                                    </button>
+                                    <div id="payment-rows" class="space-y-3"></div>
+                                    <div class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                                        <div class="flex items-center justify-between">
+                                            <span class="font-semibold text-slate-500">Total pagado</span>
+                                            <span id="payment-total" class="font-black">$0.00</span>
+                                        </div>
+                                        <div id="payment-difference-wrap"
+                                            class="mt-2 hidden flex items-center justify-between border-t border-dashed border-slate-200 pt-2">
+                                            <span id="payment-difference-label" class="font-semibold">Falta pagar</span>
+                                            <span id="payment-difference" class="font-black" style="color:#ea580c;">$0.00</span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div id="payment-rows" class="space-y-3"></div>
-                                <div class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-                                    <div class="flex items-center justify-between">
-                                        <span class="font-semibold text-slate-500">Total pagado</span>
-                                        <span id="payment-total" class="font-black">$0.00</span>
-                                    </div>
-                                    <div id="payment-difference-wrap"
-                                        class="mt-2 hidden flex items-center justify-between border-t border-dashed border-slate-200 pt-2">
-                                        <span id="payment-difference-label" class="font-semibold">Falta pagar</span>
-                                        <span id="payment-difference" class="font-black" style="color:#ea580c;">$0.00</span>
-                                    </div>
+                                <div class="mt-4">
+                                    <label for="sale-notes"
+                                        class="block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Notas</label>
+                                    <textarea id="sale-notes" rows="2" placeholder="Detalle adicional de la venta"
+                                        class="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"></textarea>
                                 </div>
                             </div>
 
@@ -299,13 +358,20 @@
                     <form id="quick-client-form" class="grid grid-cols-1 gap-4 md:grid-cols-4">
                         <div>
                             <label class="mb-1.5 block text-sm font-medium text-gray-700">Tipo de persona</label>
-                            <select id="quick-client-person-type"
-                                class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
-                                <option value="DNI">DNI</option>
-                                <option value="RUC">RUC</option>
-                                <option value="CARNET DE EXTRANGERIA">CARNET DE EXTRANGERIA</option>
-                                <option value="PASAPORTE">PASAPORTE</option>
-                            </select>
+                            <x-form.select-autocomplete
+                                name=""
+                                selectId="quick-client-person-type"
+                                value="DNI"
+                                :options="[
+                                    ['value' => 'DNI', 'label' => 'DNI'],
+                                    ['value' => 'RUC', 'label' => 'RUC'],
+                                    ['value' => 'CARNET DE EXTRANGERIA', 'label' => 'CARNET DE EXTRANGERIA'],
+                                    ['value' => 'PASAPORTE', 'label' => 'PASAPORTE'],
+                                ]"
+                                placeholder="Tipo de persona"
+                                inputClass="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                                required
+                            />
                         </div>
                         <div>
                             <label class="mb-1.5 block text-sm font-medium text-gray-700">Documento</label>
@@ -684,6 +750,8 @@
                     billing_status: String(initialSaleData.billing_status || 'NOT_APPLICABLE'),
                     invoice_series: String(initialSaleData.invoice_series || '001'),
                     invoice_number: String(initialSaleData.invoice_number || ''),
+                    credit_days: Math.max(0, parseInt(initialSaleData.credit_days, 10) || 0),
+                    debt_due_date: String(initialSaleData.debt_due_date || '').trim(),
                 }
                 : (db[activeKey] || {
                     id: Date.now(),
@@ -699,6 +767,8 @@
                     billing_status: 'NOT_APPLICABLE',
                     invoice_series: '001',
                     invoice_number: '',
+                    credit_days: 0,
+                    debt_due_date: '',
                 });
             currentSale.document_type_id = Number(currentSale.document_type_id || defaultDocumentTypeId || 0) || null;
             currentSale.cash_register_id = Number(currentSale.cash_register_id || defaultCashRegisterId || 0) || null;
@@ -706,6 +776,8 @@
             currentSale.billing_status = String(currentSale.billing_status || 'NOT_APPLICABLE');
             currentSale.invoice_series = String(currentSale.invoice_series || '001');
             currentSale.invoice_number = String(currentSale.invoice_number || '');
+            currentSale.credit_days = Math.max(0, parseInt(currentSale.credit_days, 10) || 0);
+            currentSale.debt_due_date = String(currentSale.debt_due_date || '').trim();
             paymentRows = Array.isArray(currentSale.payment_methods)
                 ? currentSale.payment_methods.map((row) => ({
                     payment_method_id: Number(row.payment_method_id || row.methodId || paymentMethods[0]?.id || 0),
@@ -729,6 +801,33 @@
                 ? imgUrl
                 : 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIj48cmVjdCBmaWxsPSIjZTJlOGYwIiB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiM2NDc0OGIiPlNpbiBpbWFnZW48L3RleHQ+PC9zdmc+';
             const formatMoney = (value) => `S/ ${Number(value || 0).toFixed(2)}`;
+            const syncAutocompleteDisplay = (selectEl) => {
+                if (!selectEl) return;
+                selectEl.dispatchEvent(new CustomEvent('sync-autocomplete-display'));
+            };
+            const saleHeaderPreviewUrl = @json(route('admin.sales.preview.header'));
+            async function refreshSaleHeaderPreview() {
+                if (isEditMode) return;
+                const docId = Number(document.getElementById('document-type-select')?.value || 0);
+                const cashId = Number(document.getElementById('cash-register-select')?.value || 0);
+                if (!docId || !cashId) return;
+                const url = new URL(saleHeaderPreviewUrl, window.location.origin);
+                url.searchParams.set('document_type_id', String(docId));
+                url.searchParams.set('cash_register_id', String(cashId));
+                try {
+                    const res = await fetch(url.toString(), {
+                        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    });
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    const sEl = document.getElementById('sale-header-series');
+                    const nEl = document.getElementById('sale-header-number');
+                    if (sEl && data.series != null) sEl.value = String(data.series);
+                    if (nEl && data.number != null) nEl.value = String(data.number);
+                } catch (e) {
+                    /* ignorar */
+                }
+            }
             const quickClientStoreUrl = @json($quickClientStoreUrl ?? route('admin.sales.clients.store'));
             const reniecApiUrl = @json(route('api.reniec'));
             const rucApiUrl = @json(route('api.ruc'));
@@ -951,6 +1050,7 @@
                 }
                 if (gender && isRuc) {
                     gender.value = '';
+                    syncAutocompleteDisplay(gender);
                 }
             };
 
@@ -970,12 +1070,18 @@
                     district,
                 } = getQuickClientElements();
 
-                if (personType) personType.value = 'DNI';
+                if (personType) {
+                    personType.value = 'DNI';
+                    syncAutocompleteDisplay(personType);
+                }
                 if (documentNumber) documentNumber.value = '';
                 if (firstName) firstName.value = '';
                 if (lastName) lastName.value = '';
                 if (date) date.value = '';
-                if (gender) gender.value = '';
+                if (gender) {
+                    gender.value = '';
+                    syncAutocompleteDisplay(gender);
+                }
                 if (phone) phone.value = '';
                 if (email) email.value = '';
                 if (address) address.value = '';
@@ -1087,7 +1193,10 @@
                         if (firstName) firstName.value = String(fnVal || parsed.first_name || '').trim();
                         if (lastName) lastName.value = String(lnUnified || parsed.last_name || '').trim();
                         if (date) date.value = normalizeApiDate(payload?.fecha_nacimiento || '');
-                        if (gender) gender.value = String(payload?.genero || '').trim();
+                        if (gender) {
+                            gender.value = String(payload?.genero || '').trim();
+                            syncAutocompleteDisplay(gender);
+                        }
                     } catch (error) {
                         showQuickClientError(error?.message || 'Error consultando RENIEC.');
                     } finally {
@@ -1171,6 +1280,113 @@
             };
             const isInvoiceDocumentSelected = () => invoiceDocumentIds.has(Number(currentSale.document_type_id || 0));
             const isDebtSaleSelected = () => String(currentSale.payment_type || 'CONTADO') === 'DEUDA';
+            let saleMovedAtDebtListenerBound = false;
+            let saleDebtFieldsBound = false;
+            const parseSaleMovedAtAsDate = () => {
+                const raw = String(document.getElementById('sale-moved-at')?.value || '').trim();
+                if (!raw) {
+                    return new Date();
+                }
+                const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
+                const parsed = new Date(normalized);
+                return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+            };
+            const formatDebtIsoDate = (d) => {
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+            const syncSaleDebtDueFromCreditDays = () => {
+                if (!isDebtSaleSelected()) {
+                    return;
+                }
+                const base = parseSaleMovedAtAsDate();
+                const days = Math.max(0, parseInt(currentSale.credit_days, 10) || 0);
+                const next = new Date(base.getTime());
+                next.setDate(next.getDate() + days);
+                const iso = formatDebtIsoDate(next);
+                currentSale.debt_due_date = iso;
+                const dueEl = document.getElementById('sale-debt-due-date');
+                const cdEl = document.getElementById('sale-debt-credit-days');
+                if (dueEl) {
+                    dueEl.value = iso;
+                }
+                if (cdEl) {
+                    cdEl.value = String(days);
+                }
+                saveDB();
+            };
+            const applySaleDebtCreditDaysInput = (value) => {
+                currentSale.credit_days = Math.max(0, parseInt(value, 10) || 0);
+                syncSaleDebtDueFromCreditDays();
+            };
+            const applySaleDebtDueDateInput = (value) => {
+                const iso = String(value || '').trim();
+                currentSale.debt_due_date = iso;
+                if (!iso) {
+                    syncSaleDebtDueFromCreditDays();
+                    return;
+                }
+                const base = parseSaleMovedAtAsDate();
+                const due = new Date(`${iso}T12:00:00`);
+                if (Number.isNaN(due.getTime())) {
+                    return;
+                }
+                const baseDay = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+                const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+                const diffMs = dueDay.getTime() - baseDay.getTime();
+                const diffDays = Math.max(0, Math.round(diffMs / 86400000));
+                currentSale.credit_days = diffDays;
+                const cdEl = document.getElementById('sale-debt-credit-days');
+                if (cdEl) {
+                    cdEl.value = String(diffDays);
+                }
+                saveDB();
+            };
+            const syncSaleDebtFieldsToDOM = () => {
+                const cdEl = document.getElementById('sale-debt-credit-days');
+                const dueEl = document.getElementById('sale-debt-due-date');
+                if (!cdEl || !dueEl) {
+                    return;
+                }
+                cdEl.value = String(Math.max(0, parseInt(currentSale.credit_days, 10) || 0));
+                if (String(currentSale.debt_due_date || '').trim() !== '') {
+                    dueEl.value = String(currentSale.debt_due_date).trim();
+                } else {
+                    syncSaleDebtDueFromCreditDays();
+                }
+            };
+            const bindSaleMovedAtDebtListener = () => {
+                if (saleMovedAtDebtListenerBound) {
+                    return;
+                }
+                const el = document.getElementById('sale-moved-at');
+                if (!el) {
+                    return;
+                }
+                saleMovedAtDebtListenerBound = true;
+                const resync = () => {
+                    if (isDebtSaleSelected()) {
+                        syncSaleDebtDueFromCreditDays();
+                    }
+                };
+                el.addEventListener('change', resync);
+                el.addEventListener('input', resync);
+            };
+            const bindSaleDebtFieldsOnce = () => {
+                if (saleDebtFieldsBound) {
+                    return;
+                }
+                const cd = document.getElementById('sale-debt-credit-days');
+                const dd = document.getElementById('sale-debt-due-date');
+                if (!cd || !dd) {
+                    return;
+                }
+                saleDebtFieldsBound = true;
+                cd.addEventListener('input', (e) => applySaleDebtCreditDaysInput(e.target.value));
+                dd.addEventListener('change', (e) => applySaleDebtDueDateInput(e.target.value));
+            };
             const normalizeBillingState = () => {
                 if (!isInvoiceDocumentSelected()) {
                     currentSale.billing_status = 'NOT_APPLICABLE';
@@ -1211,6 +1427,7 @@
 
                 if (billingStatusSelect) {
                     billingStatusSelect.value = isInvoice ? currentSale.billing_status : 'PENDING';
+                    syncAutocompleteDisplay(billingStatusSelect);
                 }
 
                 if (invoiceSeriesInput) {
@@ -1237,6 +1454,7 @@
 
                 if (paymentTypeSelect) {
                     paymentTypeSelect.value = isDebtSale ? 'DEUDA' : 'CONTADO';
+                    syncAutocompleteDisplay(paymentTypeSelect);
                 }
 
                 if (paymentMethodsSection) {
@@ -1245,6 +1463,9 @@
 
                 if (debtNotice) {
                     debtNotice.classList.toggle('hidden', !isDebtSale);
+                    if (isDebtSale) {
+                        syncSaleDebtFieldsToDOM();
+                    }
                 }
             };
             const handlePaymentTypeChange = (nextValue) => {
@@ -1284,11 +1505,96 @@
     return itemsTotal - discount;
 
 };
+            const escapeHtml = (value) => String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+            let salePaymentMethodAcOutsideBound = false;
+            const bindSalePaymentMethodAcOutsideClose = () => {
+                if (salePaymentMethodAcOutsideBound) return;
+                salePaymentMethodAcOutsideBound = true;
+                document.addEventListener('click', (e) => {
+                    if (!e.target.closest('.js-payment-method-ac')) {
+                        document.querySelectorAll('#payment-rows .payment-method-ac-dropdown').forEach((el) => el.classList.add('hidden'));
+                    }
+                });
+            };
+            const applyPaymentMethodVariant = (index, key) => {
+                const variant = getPaymentVariantByKey(key);
+                if (!variant) return;
+                paymentRows[index].method_variant_key = variant.key;
+                paymentRows[index].payment_method_id = Number(variant.payment_method_id) || null;
+                paymentRows[index].card_id = variant.card_id ? Number(variant.card_id) : null;
+                paymentRows[index].digital_wallet_id = variant.digital_wallet_id ? Number(variant.digital_wallet_id) : null;
+                if (variant.kind !== 'card') {
+                    paymentRows[index].payment_gateway_id = null;
+                }
+                syncPaymentRows();
+                renderPaymentRows();
+            };
+            const initPaymentMethodAutocompletes = (root) => {
+                bindSalePaymentMethodAcOutsideClose();
+                root.querySelectorAll('.js-payment-method-ac').forEach((wrap) => {
+                    const index = Number(wrap.dataset.index);
+                    const listEl = wrap.querySelector('.payment-method-ac-list');
+                    const searchEl = wrap.querySelector('.payment-method-ac-search');
+                    const trigger = wrap.querySelector('.payment-method-ac-trigger');
+                    const dropdown = wrap.querySelector('.payment-method-ac-dropdown');
+                    if (!listEl || !searchEl || !trigger || !dropdown) return;
+                    const renderList = (filter) => {
+                        const q = String(filter || '').trim().toLowerCase();
+                        listEl.innerHTML = '';
+                        let count = 0;
+                        paymentMethodVariants.forEach((variant) => {
+                            if (q && !String(variant.label || '').toLowerCase().includes(q)) return;
+                            count += 1;
+                            const btn = document.createElement('button');
+                            btn.type = 'button';
+                            btn.className = 'flex w-full px-3 py-2.5 text-left text-sm text-slate-800 hover:bg-orange-50';
+                            btn.dataset.variantKey = variant.key;
+                            btn.textContent = variant.label;
+                            btn.addEventListener('click', (ev) => {
+                                ev.stopPropagation();
+                                dropdown.classList.add('hidden');
+                                applyPaymentMethodVariant(index, variant.key);
+                            });
+                            listEl.appendChild(btn);
+                        });
+                        if (count === 0) {
+                            const empty = document.createElement('p');
+                            empty.className = 'px-3 py-3 text-sm text-slate-500';
+                            empty.textContent = 'Sin coincidencias.';
+                            listEl.appendChild(empty);
+                        }
+                    };
+                    searchEl.addEventListener('click', (ev) => ev.stopPropagation());
+                    searchEl.addEventListener('input', () => renderList(searchEl.value));
+                    trigger.addEventListener('click', (ev) => {
+                        ev.stopPropagation();
+                        const wasOpen = !dropdown.classList.contains('hidden');
+                        document.querySelectorAll('#payment-rows .payment-method-ac-dropdown').forEach((el) => el.classList.add('hidden'));
+                        if (!wasOpen) {
+                            dropdown.classList.remove('hidden');
+                            searchEl.value = '';
+                            renderList('');
+                            searchEl.focus();
+                        }
+                    });
+                    renderList('');
+                });
+            };
             const inferPaymentMethodKind = (description) => {
                 const normalized = String(description || '').toLowerCase();
                 if (normalized.includes('tarjeta') || normalized.includes('card')) return 'card';
                 if (normalized.includes('billetera') || normalized.includes('wallet')) return 'wallet';
                 return 'plain';
+            };
+            const cardTypeLabel = (type) => {
+                const c = String(type || '').trim().toUpperCase();
+                if (c === 'C') return 'Crédito';
+                if (c === 'D') return 'Débito';
+                return '';
             };
             const buildPaymentMethodVariants = () => paymentMethods.flatMap((method) => {
                 const methodId = Number(method.id);
@@ -1307,14 +1613,19 @@
                 }
 
                 if (kind === 'card' && cards.length) {
-                    return cards.map((card) => ({
-                        key: `card:${methodId}:${Number(card.id)}`,
-                        payment_method_id: methodId,
-                        digital_wallet_id: null,
-                        card_id: Number(card.id),
-                        label: `${description} - ${card.description}`,
-                        kind,
-                    }));
+                    return cards.map((card) => {
+                        const typePart = cardTypeLabel(card.type);
+                        const base = `${description} - ${card.description}`;
+                        const label = typePart ? `${base} (${typePart})` : base;
+                        return {
+                            key: `card:${methodId}:${Number(card.id)}`,
+                            payment_method_id: methodId,
+                            digital_wallet_id: null,
+                            card_id: Number(card.id),
+                            label,
+                            kind,
+                        };
+                    });
                 }
 
                 return [{
@@ -1341,7 +1652,13 @@
 
             function getCategories() {
                 const unique = new Set();
-                products.forEach((prod) => unique.add(getProductCategory(prod)));
+                products.forEach((prod) => {
+                    const productId = Number(prod.id);
+                    if (typeof priceByProductId.get(productId) === 'undefined') {
+                        return;
+                    }
+                    unique.add(getProductCategory(prod));
+                });
                 return ['General', ...Array.from(unique).sort((a, b) => a.localeCompare(b))];
             }
 
@@ -1645,18 +1962,23 @@
                     const gatewayOptions = paymentGateways.map((gateway) => `
                             <option value="${gateway.id}" ${Number(row.payment_gateway_id) === Number(gateway.id) ? 'selected' : ''}>${gateway.description}</option>
                         `).join('');
-                    const methodOptions = paymentMethodVariants.map((variant) => `
-                            <option value="${variant.key}" ${selectedVariantKey === variant.key ? 'selected' : ''}>${variant.label}</option>
-                        `).join('');
+                    const methodLabel = escapeHtml(selectedVariant?.label || 'Seleccionar');
 
                     return `
                             <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
                                 <div style="${layoutStyle}">
-                                    <div class="space-y-1">
+                                    <div class="space-y-1 js-payment-method-ac relative" data-index="${index}">
                                         <label class="block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Metodo</label>
-                                        <select data-role="method" data-index="${index}" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                                            ${methodOptions}
-                                        </select>
+                                        <button type="button" class="payment-method-ac-trigger flex h-11 w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 text-left text-sm font-semibold text-slate-700 outline-none transition hover:border-orange-200 focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                            <span class="payment-method-ac-label min-w-0 flex-1 truncate">${methodLabel}</span>
+                                            <span class="shrink-0 text-slate-400"><i class="ri-arrow-down-s-line text-lg"></i></span>
+                                        </button>
+                                        <div class="payment-method-ac-dropdown absolute z-[200] mt-1 hidden flex w-full min-w-[220px] max-w-[min(100%,24rem)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl" style="max-height:min(70vh,20rem);">
+                                            <div class="shrink-0 border-b border-slate-100 p-2">
+                                                <input type="text" class="payment-method-ac-search h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-orange-400 focus:outline-none" placeholder="Buscar..." autocomplete="off">
+                                            </div>
+                                            <div class="payment-method-ac-list min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-1" style="-webkit-overflow-scrolling:touch;"></div>
+                                        </div>
                                     </div>
                                     <div class="space-y-1">
                                         <label class="block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Monto</label>
@@ -1681,22 +2003,7 @@
                         `;
                 }).join('');
 
-                container.querySelectorAll('[data-role="method"]').forEach((element) => {
-                    element.addEventListener('change', (event) => {
-                        const index = Number(event.currentTarget.dataset.index);
-                        const variant = getPaymentVariantByKey(event.currentTarget.value);
-                        if (!variant) return;
-                        paymentRows[index].method_variant_key = variant.key;
-                        paymentRows[index].payment_method_id = Number(variant.payment_method_id) || null;
-                        paymentRows[index].card_id = variant.card_id ? Number(variant.card_id) : null;
-                        paymentRows[index].digital_wallet_id = variant.digital_wallet_id ? Number(variant.digital_wallet_id) : null;
-                        if (variant.kind !== 'card') {
-                            paymentRows[index].payment_gateway_id = null;
-                        }
-                        syncPaymentRows();
-                        renderPaymentRows();
-                    });
-                });
+                initPaymentMethodAutocompletes(container);
 
                 container.querySelectorAll('[data-role="amount"]').forEach((element) => {
                     element.addEventListener('input', (event) => {
@@ -2018,6 +2325,8 @@ const total = subtotalBase + tax - discount;
                 currentSale.items = [];
                 currentSale.notes = '';
                 currentSale.payment_type = 'CONTADO';
+                currentSale.credit_days = 0;
+                currentSale.debt_due_date = '';
                 paymentRows = [];
                 saveDB();
                 syncPaymentRows();
@@ -2097,6 +2406,11 @@ const total = subtotalBase + tax - discount;
     })),
 
     notes: document.getElementById('sale-notes')?.value || '',
+    moved_at: String(document.getElementById('sale-moved-at')?.value || '').trim(),
+    ...(isDebtSaleSelected() ? {
+        credit_days: Math.max(0, parseInt(currentSale.credit_days, 10) || 0),
+        debt_due_date: String(currentSale.debt_due_date || document.getElementById('sale-debt-due-date')?.value || '').trim() || null,
+    } : {}),
 };
                 if (isEditMode && currentSale.id) {
                     payload.movement_id = Number(currentSale.id);
@@ -2234,6 +2548,7 @@ const total = subtotalBase + tax - discount;
                 normalizeBillingState();
                 syncInvoiceBillingFields();
                 saveDB();
+                refreshSaleHeaderPreview();
             });
             document.getElementById('payment-type-select')?.addEventListener('change', (event) => {
                 handlePaymentTypeChange(event.target.value);
@@ -2241,6 +2556,7 @@ const total = subtotalBase + tax - discount;
             document.getElementById('cash-register-select')?.addEventListener('change', (event) => {
                 currentSale.cash_register_id = Number(event.target.value || 0) || null;
                 saveDB();
+                refreshSaleHeaderPreview();
             });
             document.getElementById('billing-status-select')?.addEventListener('change', (event) => {
                 currentSale.billing_status = String(event.target.value || 'PENDING');
@@ -2403,22 +2719,6 @@ document.getElementById('sale-discount-save-button')?.addEventListener('click', 
             if (notesInput) {
                 notesInput.value = currentSale.notes || '';
             }
-            const documentTypeSelect = document.getElementById('document-type-select');
-            if (documentTypeSelect && currentSale.document_type_id) {
-                documentTypeSelect.value = String(currentSale.document_type_id);
-            }
-            const cashRegisterSelect = document.getElementById('cash-register-select');
-            if (cashRegisterSelect && currentSale.cash_register_id) {
-                cashRegisterSelect.value = String(currentSale.cash_register_id);
-            }
-            const paymentTypeSelect = document.getElementById('payment-type-select');
-            if (paymentTypeSelect) {
-                paymentTypeSelect.value = currentSale.payment_type || 'CONTADO';
-            }
-            const billingStatusSelect = document.getElementById('billing-status-select');
-            if (billingStatusSelect) {
-                billingStatusSelect.value = ['INVOICED', 'PENDING'].includes(currentSale.billing_status) ? currentSale.billing_status : 'PENDING';
-            }
             const invoiceSeriesInput = document.getElementById('invoice-series-input');
             if (invoiceSeriesInput) {
                 invoiceSeriesInput.value = currentSale.invoice_series || '001';
@@ -2433,10 +2733,49 @@ document.getElementById('sale-discount-save-button')?.addEventListener('click', 
             renderCategoryFilters();
             renderProducts();
             renderTicket();
-            syncPaymentTypeUI();
-            syncInvoiceBillingFields();
             renderPaymentRows();
             setAsideTab(invoiceMode ? 'payment' : 'summary');
+
+            let posAlpineSelectsBooted = false;
+            const bootPosAlpineAutocompleteSelects = () => {
+                if (posAlpineSelectsBooted) return;
+                posAlpineSelectsBooted = true;
+                const documentTypeSelect = document.getElementById('document-type-select');
+                if (documentTypeSelect) {
+                    if (currentSale.document_type_id) {
+                        documentTypeSelect.value = String(currentSale.document_type_id);
+                    }
+                    syncAutocompleteDisplay(documentTypeSelect);
+                }
+                const cashRegisterSelect = document.getElementById('cash-register-select');
+                if (cashRegisterSelect) {
+                    if (currentSale.cash_register_id) {
+                        cashRegisterSelect.value = String(currentSale.cash_register_id);
+                    }
+                    syncAutocompleteDisplay(cashRegisterSelect);
+                }
+                const paymentTypeSelect = document.getElementById('payment-type-select');
+                if (paymentTypeSelect) {
+                    paymentTypeSelect.value = currentSale.payment_type || 'CONTADO';
+                    syncAutocompleteDisplay(paymentTypeSelect);
+                }
+                const billingStatusSelect = document.getElementById('billing-status-select');
+                if (billingStatusSelect) {
+                    billingStatusSelect.value = ['INVOICED', 'PENDING'].includes(currentSale.billing_status) ? currentSale.billing_status : 'PENDING';
+                    syncAutocompleteDisplay(billingStatusSelect);
+                }
+                syncPaymentTypeUI();
+                syncInvoiceBillingFields();
+                bindSaleDebtFieldsOnce();
+                bindSaleMovedAtDebtListener();
+                if (!isEditMode) {
+                    refreshSaleHeaderPreview();
+                }
+            };
+            document.addEventListener('alpine:initialized', () => {
+                queueMicrotask(() => bootPosAlpineAutocompleteSelects());
+            }, { once: true });
+            window.setTimeout(() => bootPosAlpineAutocompleteSelects(), 250);
 
             window.goBack = goBack;
             window.cancelEditSale = cancelEditSale;

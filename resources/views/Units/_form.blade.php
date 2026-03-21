@@ -25,15 +25,16 @@
 
     <div>
         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Tipo de unidad</label>
-        <select
+        <x-form.select-autocomplete
             name="type"
-            required
-            class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
-        >
-            <option value="MASA" @selected(old('type', $unit->type ?? 'MASA') === 'MASA')>Masa</option>
-            <option value="LONGITUD" @selected(old('type', $unit->type ?? 'LONGITUD') === 'LONGITUD')>Longitud</option>
-            <option value="OTRO" @selected(old('type', $unit->type ?? 'OTRO') === 'OTRO')>Otro</option>
-        </select>
+            :value="(string) old('type', $unit->type ?? 'MASA')"
+            :options="[
+                ['value' => 'MASA', 'label' => 'Masa'],
+                ['value' => 'LONGITUD', 'label' => 'Longitud'],
+                ['value' => 'OTRO', 'label' => 'Otro'],
+            ]"
+            :required="true"
+        />
     </div>
 
     <div>

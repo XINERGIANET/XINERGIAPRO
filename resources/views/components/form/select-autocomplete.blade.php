@@ -8,6 +8,8 @@
     'inputClass' => '',
     'submitOnChange' => false,
     'required' => false,
+    'disabled' => false,
+    'selectId' => null,
 ])
 
 @php
@@ -16,7 +18,8 @@
 @endphp
 
 <div
-    class="relative {{ $class }}"
+    class="relative {{ $class }} @if($disabled) pointer-events-none opacity-60 @endif"
+    {{ $attributes->except(['class']) }}
     x-data="{
         open: false,
         query: '',
@@ -42,7 +45,15 @@
         },
         init() {
             this.$nextTick(() => {
-                if (this.$refs.hiddenSelect) this.$refs.hiddenSelect.value = this.value;
+                const el = this.$refs.hiddenSelect;
+                if (!el) return;
+                el.value = this.value;
+                el.addEventListener('change', () => {
+                    this.value = String(el.value);
+                });
+                el.addEventListener('sync-autocomplete-display', () => {
+                    this.value = String(el.value);
+                });
             });
         }
     }"
@@ -52,7 +63,7 @@
     @if($label)
         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">{{ $label }}</label>
     @endif
-    <select x-ref="hiddenSelect" name="{{ $name }}" class="sr-only" aria-hidden="true" tabindex="-1" @if($required) required @endif>
+    <select x-ref="hiddenSelect" name="{{ $name }}" class="sr-only" aria-hidden="true" tabindex="-1" @if($selectId) id="{{ $selectId }}" @endif @if($required) required @endif @if($disabled) disabled @endif>
         @foreach($options as $opt)
             <option value="{{ $opt['value'] }}" @selected($value === (string) $opt['value'])>{{ $opt['label'] }}</option>
         @endforeach

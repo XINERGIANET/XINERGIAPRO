@@ -26,11 +26,15 @@
     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
         Estado
     </label>
-    <select name="status" required
-        class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
-        <option value="1" {{ old('status', $bank->status ?? 1) == 1 ? 'selected' : '' }}>Activo</option>
-        <option value="0" {{ old('status', $bank->status ?? 1) == 0 ? 'selected' : '' }}>Inactivo</option>
-    </select>
+    <x-form.select-autocomplete
+        name="status"
+        :value="(string) old('status', $bank->status ?? 1)"
+        :options="[
+            ['value' => '1', 'label' => 'Activo'],
+            ['value' => '0', 'label' => 'Inactivo'],
+        ]"
+        :required="true"
+    />
     @error('status')
         <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p>
     @enderror

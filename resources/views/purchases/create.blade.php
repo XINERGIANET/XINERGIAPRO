@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('content')
     @php
@@ -33,7 +33,7 @@
             x-on:close-provider-modal.window="open = false"
             :isOpen="false"
             :showCloseButton="false"
-            class="max-w-4xl"
+            class="w-full max-w-7xl"
         >
             <div class="p-6 sm:p-8">
                 <div class="mb-6 flex items-center justify-between">
@@ -48,20 +48,24 @@
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
                     <div>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700">Tipo de persona</label>
-                        <select x-model="quickProvider.person_type" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
-                            <option value="DNI">DNI</option>
-                            <option value="RUC">RUC</option>
-                            <option value="CARNET DE EXTRANGERIA">CARNET DE EXTRANGERIA</option>
-                            <option value="PASAPORTE">PASAPORTE</option>
-                        </select>
+                        <x-form.select-autocomplete-inline
+                            fieldKey="qpp_type"
+                            valueVar="quickProvider.person_type"
+                            optionsListExpr="quickProviderPersonTypeOptions"
+                            optionLabel="label"
+                            optionValue="value"
+                            emptyText="Tipo de persona"
+                            pickExpr="quickProvider.person_type = opt.value"
+                            inputClass="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                        />
                     </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700">Documento</label>
                         <div class="flex items-center gap-2">
-                            <input x-model="quickProvider.document_number" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Documento" required>
+                            <input x-model="quickProvider.document_number" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" :placeholder="isQuickProviderRuc() ? 'Ingrese el RUC (11 digitos)' : 'Ingrese el DNI u otro documento'" required>
                             <button
                                 type="button"
-                                @click="fetchReniecQuickProvider()"
+                                @click="fetchQuickProviderDocument()"
                                 :disabled="creatingProviderLoading"
                                 class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-[#334155] px-4 text-sm font-medium text-white hover:bg-[#1f3f98] disabled:opacity-60"
                             >
@@ -70,26 +74,30 @@
                         </div>
                     </div>
                     <div>
-                        <label class="mb-1.5 block text-sm font-medium text-gray-700">Nombres</label>
-                        <input x-model="quickProvider.first_name" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nombres / Razon social" required>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700" x-text="isQuickProviderRuc() ? 'Razon social' : 'Nombres'"></label>
+                        <input x-model="quickProvider.first_name" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" :placeholder="isQuickProviderRuc() ? 'Ingrese la razon social' : 'Ingrese los nombres'" required>
                     </div>
-                    <div>
+                    <div x-show="!isQuickProviderRuc()" x-cloak>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700">Apellidos</label>
-                        <input x-model="quickProvider.last_name" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Apellidos" required>
+                        <input x-model="quickProvider.last_name" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Ingrese los apellidos" :required="!isQuickProviderRuc()">
                     </div>
 
                     <div>
-                        <label class="mb-1.5 block text-sm font-medium text-gray-700">Fecha de nacimiento</label>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700" x-text="isQuickProviderRuc() ? 'Fecha de inscripcion' : 'Fecha de nacimiento'"></label>
                         <input type="date" x-model="quickProvider.fecha_nacimiento" onclick="this.showPicker && this.showPicker()" onfocus="this.showPicker && this.showPicker()" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
                     </div>
-                    <div>
+                    <div x-show="!isQuickProviderRuc()" x-cloak>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700">Genero</label>
-                        <select x-model="quickProvider.genero" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
-                            <option value="">Seleccione genero</option>
-                            <option value="MASCULINO">MASCULINO</option>
-                            <option value="FEMENINO">FEMENINO</option>
-                            <option value="OTRO">OTRO</option>
-                        </select>
+                        <x-form.select-autocomplete-inline
+                            fieldKey="qpp_gen"
+                            valueVar="quickProvider.genero"
+                            optionsListExpr="quickProviderGeneroOptions"
+                            optionLabel="label"
+                            optionValue="value"
+                            emptyText="Seleccione genero"
+                            pickExpr="quickProvider.genero = opt.value"
+                            inputClass="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                        />
                     </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700">Telefono</label>
@@ -110,30 +118,42 @@
                     </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700">Departamento</label>
-                        <select x-model="quickProvider.department_id" @change="onQuickProviderDepartmentChange()" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
-                            <option value="">Seleccione departamento</option>
-                            <template x-for="department in departments" :key="`quick-provider-department-${department.id}`">
-                                <option :value="String(department.id)" :selected="String(department.id) === String(quickProvider.department_id)" x-text="department.name"></option>
-                            </template>
-                        </select>
+                        <x-form.select-autocomplete-inline
+                            fieldKey="qpp_dept"
+                            valueVar="quickProvider.department_id"
+                            optionsListExpr="departments"
+                            optionLabel="name"
+                            optionValue="id"
+                            emptyText="Seleccione departamento"
+                            pickExpr="quickProvider.department_id = String(opt.id); onQuickProviderDepartmentChange()"
+                            inputClass="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                        />
                     </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700">Provincia</label>
-                        <select x-model="quickProvider.province_id" @change="onQuickProviderProvinceChange()" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
-                            <option value="">Seleccione provincia</option>
-                            <template x-for="province in filteredQuickProviderProvinces" :key="`quick-provider-province-${province.id}`">
-                                <option :value="String(province.id)" :selected="String(province.id) === String(quickProvider.province_id)" x-text="province.name"></option>
-                            </template>
-                        </select>
+                        <x-form.select-autocomplete-inline
+                            fieldKey="qpp_prov"
+                            valueVar="quickProvider.province_id"
+                            optionsListExpr="filteredQuickProviderProvinces"
+                            optionLabel="name"
+                            optionValue="id"
+                            emptyText="Seleccione provincia"
+                            pickExpr="quickProvider.province_id = String(opt.id); onQuickProviderProvinceChange()"
+                            inputClass="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                        />
                     </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700">Distrito</label>
-                        <select x-model="quickProvider.location_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
-                            <option value="">Seleccione distrito</option>
-                            <template x-for="district in filteredQuickProviderDistricts" :key="`quick-provider-district-${district.id}`">
-                                <option :value="String(district.id)" :selected="String(district.id) === String(quickProvider.location_id)" x-text="district.name"></option>
-                            </template>
-                        </select>
+                        <x-form.select-autocomplete-inline
+                            fieldKey="qpp_dist"
+                            valueVar="quickProvider.location_id"
+                            optionsListExpr="filteredQuickProviderDistricts"
+                            optionLabel="name"
+                            optionValue="id"
+                            emptyText="Seleccione distrito"
+                            pickExpr="quickProvider.location_id = String(opt.id)"
+                            inputClass="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                        />
                     </div>
 
                     <div class="md:col-span-4">
