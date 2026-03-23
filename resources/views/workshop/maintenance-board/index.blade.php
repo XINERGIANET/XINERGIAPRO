@@ -70,15 +70,29 @@
                         'order_label' => 'OS ' . ($card->movement?->number ?? ('#' . $card->id)) . ' - ' . trim(($card->vehicle?->brand ?? '') . ' ' . ($card->vehicle?->model ?? '')),
                         'status' => (string) $card->status,
                         'quote_lines' => $card->details
-                            ->where('line_type', 'SERVICE')
-                            ->whereNull('sales_movement_id')
-                            ->map(fn ($detail) => [
-                                'detail_id' => (int) $detail->id,
-                                'description' => (string) ($detail->description ?: ($detail->service?->name ?? 'Servicio')),
-                                'qty' => (float) $detail->qty,
-                                'unit_price' => (float) $detail->unit_price,
-                                'subtotal' => (float) $detail->total,
-                            ])
+                            ->filter(fn ($detail) => in_array((string) $detail->line_type, ['SERVICE', 'PART'], true) && $detail->sales_movement_id === null)
+                            ->values()
+                            ->map(function ($detail) {
+                                $label = trim((string) ($detail->description ?? ''));
+                                if ($label === '') {
+                                    if ((string) $detail->line_type === 'PART') {
+                                        $code = trim((string) ($detail->product?->code ?? ''));
+                                        $name = trim((string) ($detail->product?->description ?? ''));
+                                        $label = $code !== '' ? ($code . ($name !== '' ? ' - ' . $name : '')) : ($name !== '' ? $name : 'Repuesto');
+                                    } else {
+                                        $label = (string) ($detail->service?->name ?? 'Servicio');
+                                    }
+                                }
+
+                                return [
+                                    'detail_id' => (int) $detail->id,
+                                    'line_type' => (string) $detail->line_type,
+                                    'description' => $label,
+                                    'qty' => (float) $detail->qty,
+                                    'unit_price' => (float) $detail->unit_price,
+                                    'subtotal' => (float) $detail->total,
+                                ];
+                            })
                             ->values()
                             ->all(),
                     ];
@@ -231,7 +245,7 @@
             <div class="mb-6 flex items-center justify-between">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-600">Cotización de mantenimiento</p>
-                    <h3 class="text-xl font-bold text-gray-900 dark:text-white">Servicios seleccionados</h3>
+                    <h3 class="text-xl font-bold text-gray-900 dark:text-white">Servicios y repuestos</h3>
                     <p class="text-sm text-gray-500" x-text="order_label"></p>
                 </div>
                 <button type="button" @click="open = false" class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
@@ -246,7 +260,7 @@
                         <span class="font-semibold" x-text="status === 'awaiting_approval' ? 'Esperando aprobación' : (status === 'approved' ? 'Aprobado' : (status === 'in_progress' ? 'En reparación' : status))"></span>
                     </div>
                     <div class="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-white px-3 py-1">
-                        <span class="text-[11px] font-semibold uppercase tracking-wide text-indigo-700">Servicios</span>
+                        <span class="text-[11px] font-semibold uppercase tracking-wide text-indigo-700">Lineas</span>
                         <span class="rounded-full bg-indigo-600 px-2 py-0.5 text-xs font-bold text-white" x-text="quote_lines.length"></span>
                     </div>
                 </div>
@@ -258,7 +272,8 @@
                     <table class="w-full">
                         <thead class="bg-slate-800 text-white">
                             <tr>
-                                <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide">Servicio</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide">Tipo</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide">Concepto</th>
                                 <th class="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide">Cantidad</th>
                                 <th class="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide">Precio</th>
                                 <th class="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide">Subtotal</th>
@@ -268,11 +283,14 @@
                         <tbody class="divide-y divide-slate-100 bg-white">
                             <template x-if="quote_lines.length === 0">
                                 <tr>
-                                    <td colspan="5" class="px-3 py-6 text-center text-sm text-slate-500">No hay servicios para cotizar en esta OS.</td>
+                                    <td colspan="6" class="px-3 py-6 text-center text-sm text-slate-500">No hay servicios ni repuestos para cotizar en esta OS.</td>
                                 </tr>
                             </template>
-                            <template x-for="(line, index) in quote_lines" :key="`quote-line-${line.detail_id}`">
+                            <template x-for="(line, index) in quote_lines" :key="`quote-line-${line.detail_id}-${line.line_type || 'x'}`">
                                 <tr>
+                                    <td class="px-3 py-2 text-xs font-semibold uppercase text-slate-600">
+                                        <span x-text="line.line_type === 'PART' ? 'Repuesto' : 'Servicio'"></span>
+                                    </td>
                                     <td class="px-3 py-2 text-sm font-medium text-slate-700" x-text="line.description"></td>
                                     <td class="px-3 py-2">
                                         <input type="hidden" :name="`quote_lines[${index}][detail_id]`" :value="line.detail_id">

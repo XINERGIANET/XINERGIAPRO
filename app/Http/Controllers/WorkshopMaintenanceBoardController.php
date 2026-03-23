@@ -67,10 +67,11 @@ class WorkshopMaintenanceBoardController extends Controller
                 'vehicle',
                 'client',
                 'details' => fn ($query) => $query
-                    ->where('line_type', 'SERVICE')
+                    ->whereIn('line_type', ['SERVICE', 'PART'])
                     ->whereNull('deleted_at')
                     ->orderBy('id'),
                 'details.service:id,name,type,base_price',
+                'details.product:id,code,description',
             ])
             ->withCount([
                 'details as pending_billing_count' => fn ($query) => $query->whereNull('sales_movement_id'),
@@ -666,7 +667,7 @@ class WorkshopMaintenanceBoardController extends Controller
         $user = auth()->user();
 
         try {
-            DB::transaction(function () use ($order, $validated, $branchId, $vehicle, $serviceLines, $user) {
+            DB::transaction(function () use ($order, $request, $validated, $branchId, $vehicle, $serviceLines, $user) {
                 $lockedOrder = WorkshopMovement::query()
                     ->where('id', $order->id)
                     ->lockForUpdate()
@@ -874,17 +875,24 @@ class WorkshopMaintenanceBoardController extends Controller
                 }
 
                 $detailsById = $lockedOrder->details()
-                    ->where('line_type', 'SERVICE')
+                    ->whereIn('line_type', ['SERVICE', 'PART'])
                     ->whereNull('sales_movement_id')
                     ->get()
                     ->keyBy('id');
 
-                $submittedDetailIds = collect((array) $validated['quote_lines'])->pluck('detail_id')->map(fn($id) => (int) $id)->all();
+                $submittedDetailIds = collect((array) $validated['quote_lines'])->pluck('detail_id')->map(fn ($id) => (int) $id)->all();
                 foreach ($detailsById as $id => $detail) {
                     if (!in_array((int) $id, $submittedDetailIds, true)) {
-                        $detail->delete();
+                        $this->flowService->removeDetail($detail);
                     }
                 }
+
+                $lockedOrder->refresh();
+                $detailsById = $lockedOrder->details()
+                    ->whereIn('line_type', ['SERVICE', 'PART'])
+                    ->whereNull('sales_movement_id')
+                    ->get()
+                    ->keyBy('id');
 
                 foreach ((array) $validated['quote_lines'] as $line) {
                     $detailId = (int) $line['detail_id'];
