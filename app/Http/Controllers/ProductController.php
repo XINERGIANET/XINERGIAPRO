@@ -83,7 +83,8 @@ class ProductController extends Controller
                 $query->where(function ($inner) use ($search) {
                     $inner->where('description', 'ILIKE', "%{$search}%")
                         ->orWhere('code', 'ILIKE', "%{$search}%")
-                        ->orWhere('abbreviation', 'ILIKE', "%{$search}%");
+                        ->orWhere('abbreviation', 'ILIKE', "%{$search}%")
+                        ->orWhere('marca', 'ILIKE', "%{$search}%");
                 });
             })
             ->when($categoryId > 0, function ($query) use ($categoryId) {
@@ -385,6 +386,7 @@ class ProductController extends Controller
                     'id' => $product->id,
                     'code' => $product->code,
                     'description' => $product->description,
+                    'marca' => $product->marca,
                 ],
                 'unit_id' => $product->baseUnit?->id ?? 1,
                 'quantity' => abs($stockDelta),
@@ -547,10 +549,13 @@ class ProductController extends Controller
     {
         $productType = ProductType::query()->findOrFail((int) $validated['product_type_id']);
 
+        $marca = trim((string) ($validated['marca'] ?? ''));
+
         return [
             'code' => $validated['code'],
             'description' => $validated['description'],
             'abbreviation' => $validated['abbreviation'],
+            'marca' => $marca !== '' ? $marca : null,
             'type' => $productType->behavior,
             'product_type_id' => $productType->id,
             'category_id' => $validated['category_id'],

@@ -127,7 +127,7 @@
                             <i class="ri-search-line"></i>
                         </span>
                         <input type="text" name="search" value="{{ $search }}"
-                            placeholder="Buscar por codigo o descripcion"
+                            placeholder="Buscar por codigo, descripcion o marca"
                             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 pl-12 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30" />
                     </div>
                     <div class="w-full sm:w-48 flex-none">
@@ -235,6 +235,10 @@
                                     <p class="font-medium text-gray-800 text-theme-sm dark:text-white/90">
                                         {{ $product->code }}</p>
                                 </td>
+                                <td class="hidden lg:table-cell px-5 py-4 text-center sm:px-6">
+                                    <p class="text-gray-500 text-theme-sm dark:text-gray-400">
+                                        {{ $product->marca !== null && $product->marca !== '' ? $product->marca : '—' }}</p>
+                                </td>
                                 <td class="px-5 py-4 text-center sm:px-6">
                                     <p class="text-gray-500 text-theme-sm dark:text-gray-400">{{ $product->description }}
                                     </p>
@@ -327,7 +331,7 @@
                                 </td>
                             </tr>
                             <tr x-show="openRow === {{ $product->id }}" x-cloak class="bg-gray-50/70 dark:bg-gray-800/40 border-b border-gray-100 dark:border-gray-800">
-                                <td colspan="8" class="px-6 py-4">
+                                <td colspan="9" class="px-6 py-4">
                                     @php
                                         $branchId = session('branch_id');
                                         $productBranch = $product->productBranches->where('branch_id', $branchId)->first();
@@ -471,7 +475,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="px-6 py-12">
+                                <td colspan="9" class="px-6 py-12">
                                     <div class="flex flex-col items-center gap-3 text-center text-sm text-gray-500">
                                         <div
                                             class="rounded-full bg-gray-100 p-3 text-gray-400 dark:bg-gray-800 dark:text-gray-300">

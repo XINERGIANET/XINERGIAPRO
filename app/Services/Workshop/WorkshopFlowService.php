@@ -402,13 +402,13 @@ class WorkshopFlowService
         });
     }
 
-    public function syncIntakeAndDamages(WorkshopMovement $order, array $inventory, array $damages, array $meta = []): void
+    public function syncIntakeAndDamages(WorkshopMovement $order, array $inventory, array $damages, array $meta = [], bool $allowEditWhenChecklistLocked = false): void
     {
-        DB::transaction(function () use ($order, $inventory, $damages, $meta) {
+        DB::transaction(function () use ($order, $inventory, $damages, $meta, $allowEditWhenChecklistLocked) {
             $order = WorkshopMovement::query()->lockForUpdate()->findOrFail($order->id);
             $this->assertWorkshopInCurrentBranch($order);
 
-            if ($this->isChecklistLocked($order) && !$this->isAdminUser()) {
+            if ($this->isChecklistLocked($order) && !$this->isAdminUser() && !$allowEditWhenChecklistLocked) {
                 throw new \RuntimeException('No se puede modificar inspeccion/inventario despues de aprobado.');
             }
 
@@ -774,6 +774,7 @@ class WorkshopFlowService
                     'id' => $product->id,
                     'code' => $product->code,
                     'description' => $product->description,
+                    'marca' => $product->marca,
                 ],
                 'unit_id' => $unitId,
                 'quantity' => $qty,
@@ -991,6 +992,7 @@ class WorkshopFlowService
                         'id' => $product->id,
                         'code' => $product->code,
                         'description' => $product->description,
+                        'marca' => $product->marca,
                     ] : null,
                     'unit_id' => $unitId,
                     'tax_rate_id' => $taxRate?->id,
@@ -1739,6 +1741,7 @@ class WorkshopFlowService
                 'id' => $product->id,
                 'code' => $product->code,
                 'description' => $product->description,
+                'marca' => $product->marca,
             ],
             'unit_id' => $unitId,
             'quantity' => $qty,

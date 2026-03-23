@@ -617,6 +617,7 @@ class PurchaseController extends Controller
             ->get([
                 'products.id',
                 'products.code',
+                'products.marca',
                 'products.description',
                 'products.image',
                 'products.base_unit_id as unit_sale',
@@ -636,7 +637,11 @@ class PurchaseController extends Controller
             'products' => $products->map(fn ($p) => [
                 'id' => (int) $p->id,
                 'code' => (string) ($p->code ?? ''),
-                'name' => (string) ($p->description ?? ''),
+                'marca' => (string) ($p->marca ?? ''),
+                'name' => trim(implode(' - ', array_filter([
+                    trim((string) ($p->marca ?? '')) !== '' ? (string) $p->marca : null,
+                    (string) ($p->description ?? ''),
+                ], fn ($v) => $v !== null && $v !== ''))),
                 'img' => ($p->image && !empty($p->image))
                     ? asset('storage/' . ltrim((string) $p->image, '/'))
                     : null,

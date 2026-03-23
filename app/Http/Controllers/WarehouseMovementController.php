@@ -347,6 +347,7 @@ class WarehouseMovementController extends Controller
                         'id' => $product->id,
                         'code' => $product->code,
                         'description' => $product->description,
+                        'marca' => $product->marca,
                     ],
                     'unit_id' => $product->baseUnit->id ?? 1,
                     'quantity' => (float) $item['quantity'],
@@ -522,7 +523,7 @@ class WarehouseMovementController extends Controller
                 WarehouseMovementDetail::create([
                     'warehouse_movement_id' => $outWarehouse->id,
                     'product_id' => $product->id,
-                    'product_snapshot' => ['id' => $product->id, 'code' => $product->code, 'description' => $product->description],
+                    'product_snapshot' => ['id' => $product->id, 'code' => $product->code, 'description' => $product->description, 'marca' => $product->marca],
                     'unit_id' => $product->baseUnit->id ?? 1,
                     'quantity' => $qty,
                     'comment' => 'Transferencia salida',
@@ -533,7 +534,7 @@ class WarehouseMovementController extends Controller
                 WarehouseMovementDetail::create([
                     'warehouse_movement_id' => $inWarehouse->id,
                     'product_id' => $product->id,
-                    'product_snapshot' => ['id' => $product->id, 'code' => $product->code, 'description' => $product->description],
+                    'product_snapshot' => ['id' => $product->id, 'code' => $product->code, 'description' => $product->description, 'marca' => $product->marca],
                     'unit_id' => $product->baseUnit->id ?? 1,
                     'quantity' => $qty,
                     'comment' => 'Transferencia ingreso',
@@ -770,6 +771,7 @@ class WarehouseMovementController extends Controller
                         'id' => $product->id,
                         'code' => $product->code,
                         'description' => $product->description,
+                        'marca' => $product->marca,
                     ],
                     'unit_id' => $product->baseUnit->id ?? 1,
                     'quantity' => (float) $item['quantity'],
@@ -874,7 +876,7 @@ class WarehouseMovementController extends Controller
                 WarehouseMovementDetail::create([
                     'warehouse_movement_id' => $wm->id,
                     'product_id' => $product->id,
-                    'product_snapshot' => ['id' => $product->id, 'code' => $product->code, 'description' => $product->description],
+                    'product_snapshot' => ['id' => $product->id, 'code' => $product->code, 'description' => $product->description, 'marca' => $product->marca],
                     'unit_id' => $product->baseUnit->id ?? 1,
                     'quantity' => (float) $item['quantity'],
                     'comment' => $item['comment'] ?? '',
@@ -974,7 +976,7 @@ class WarehouseMovementController extends Controller
                 WarehouseMovementDetail::create([
                     'warehouse_movement_id' => $wm->id,
                     'product_id' => $product->id,
-                    'product_snapshot' => ['id' => $product->id, 'code' => $product->code, 'description' => $product->description],
+                    'product_snapshot' => ['id' => $product->id, 'code' => $product->code, 'description' => $product->description, 'marca' => $product->marca],
                     'unit_id' => $product->baseUnit->id ?? 1,
                     'quantity' => (float) $item['quantity'],
                     'comment' => $item['comment'] ?? '',

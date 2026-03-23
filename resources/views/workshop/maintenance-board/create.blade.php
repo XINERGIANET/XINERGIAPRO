@@ -11,6 +11,7 @@
             return [
                 'detail_id' => $did !== null && $did !== '' ? (int) $did : null,
                 'service_id' => (string) ($l['service_id'] ?? ''),
+                'description' => (string) ($l['description'] ?? ''),
                 'qty' => (float) ($l['qty'] ?? 1),
                 'unit_price' => (float) ($l['unit_price'] ?? 0),
             ];
@@ -18,7 +19,12 @@
     } else {
         $serviceLinesForUi = $initialServiceLines ?? [];
     }
-    $selectedIdsFromLines = collect($serviceLinesForUi)->pluck('service_id')->filter()->map(fn ($id) => (string) $id)->values()->all();
+    $selectedIdsFromLines = collect($serviceLinesForUi)
+        ->pluck('service_id')
+        ->filter(fn ($id) => $id !== null && $id !== '' && trim((string) $id) !== '')
+        ->map(fn ($id) => (string) $id)
+        ->values()
+        ->all();
     $prodOld = old('product_lines');
     if ($hasFormOld && is_array($prodOld)) {
         $productLinesForUi = collect($prodOld)->map(function ($l) {
@@ -73,12 +79,18 @@
         'id' => $s->id,
         'name' => $s->name,
         'base_price' => (float) $s->base_price,
-        'type' => $s->type,
+        'type' => $s->type !== null && $s->type !== '' ? strtolower(trim((string) $s->type)) : null,
+        'frequency_enabled' => (bool) $s->frequency_enabled,
+        'frequency_each_km' => $s->frequency_each_km !== null ? (int) $s->frequency_each_km : null,
+        'frequency_kms' => $s->frequencies->map(fn ($f) => (int) $f->km)->filter(fn ($k) => $k > 0)->values()->all(),
         'price_tiers' => $s->priceTiers->map(fn($tier) => [
             'max_cc' => (int) $tier->max_cc,
             'price' => (float) $tier->price,
         ])->values(),
     ])),
+    serviceTypeFilter: '',
+    serviceKmFilterMode: 'all',
+    serviceFilterKmLocal: '',
     historyBase: @js(route('workshop.clients.history', ['person' => '__PERSON__'])),
     historyUrl: '',
     historyHtml: '',
@@ -131,13 +143,15 @@
     productsCatalog: @js(collect($products ?? [])->map(function ($p) {
         $row = is_array($p) ? $p : (array) $p;
         $code = (string) ($row['code'] ?? '');
+        $marca = trim((string) ($row['marca'] ?? ''));
         $desc = (string) ($row['description'] ?? '');
-        $label = trim($code !== '' ? $code . ' - ' . $desc : $desc);
+        $mid = $marca !== '' ? $marca . ' - ' : '';
+        $label = trim($code !== '' ? $code . ' - ' . $mid . $desc : ($mid . $desc));
         return array_merge($row, ['label' => $label]);
     })->values()->all()),
     productLines: @js($productLinesForUi),
     editingMode: @json((bool) $editing),
-    intakeLockedOnEdit: @json((bool) ($intakeLockedOnEdit ?? false)),
+    editingSignatureUrl: @js($editingSignatureUrl ?? null),
     editingVehicleLabel: @js($editingVehicleLabel ?? ''),
     editingClientLabel: @js($editingClientLabel ?? ''),
     selectedServiceIds: @js($selectedIdsFromLines),
@@ -291,6 +305,63 @@
     closeVehicleDropdown() {
         this.vehicleDropdownOpen = false;
     },
+    resolveServiceFilterKm() {
+        const raw = String(this.serviceFilterKmLocal || '').trim();
+        if (raw !== '') {
+            const n = parseInt(raw.replace(/\D/g, ''), 10);
+            return Number.isFinite(n) && n >= 0 ? n : 0;
+        }
+        return parseInt(String(this.mileageIn || '').replace(/\D/g, ''), 10) || 0;
+    },
+    normalizeWorkshopServiceType(raw) {
+        let t = String(raw ?? '').trim().toLowerCase();
+        if (t.startsWith('prev')) {
+            return 'preventivo';
+        }
+        if (t.startsWith('corr')) {
+            return 'correctivo';
+        }
+        return t;
+    },
+    filteredServicesCatalog() {
+        const km = this.resolveServiceFilterKm();
+        const tf = this.normalizeWorkshopServiceType(this.serviceTypeFilter);
+        const kmMode = this.serviceKmFilterMode || 'all';
+        const list = Array.isArray(this.servicesCatalog) ? this.servicesCatalog : [];
+        return list.filter((s) => {
+            const t = this.normalizeWorkshopServiceType(s.type);
+            if (tf === 'preventivo' && t !== 'preventivo') {
+                return false;
+            }
+            if (tf === 'correctivo' && t !== 'correctivo') {
+                return false;
+            }
+            if (kmMode !== 'by_mileage') {
+                return true;
+            }
+            if (t === 'correctivo') {
+                return true;
+            }
+            if (t !== 'preventivo') {
+                return true;
+            }
+            if (!s.frequency_enabled) {
+                return true;
+            }
+            if (km <= 0) {
+                return true;
+            }
+            const kms = Array.isArray(s.frequency_kms) ? s.frequency_kms.filter((k) => Number(k) > 0) : [];
+            if (kms.length > 0) {
+                return kms.some((k) => km % Number(k) === 0);
+            }
+            const each = Number(s.frequency_each_km || 0);
+            if (Number.isFinite(each) && each > 0) {
+                return km % each === 0;
+            }
+            return true;
+        });
+    },
     isServiceSelected(serviceId) {
         return this.selectedServiceIds.includes(String(serviceId));
     },
@@ -344,6 +415,9 @@
     },
     refreshServiceLinePrices() {
         this.serviceLines = this.serviceLines.map(line => {
+            if (this.isGlosaLine(line)) {
+                return line;
+            }
             const service = this.servicesCatalog.find(item => String(item.id) === String(line.service_id));
             if (!service) {
                 return line;
@@ -357,6 +431,31 @@
             };
         });
     },
+    isGlosaLine(line) {
+        return line == null || line.service_id == null || String(line.service_id).trim() === '';
+    },
+    lineKey(line, index) {
+        if (line.detail_id) {
+            return 'sl-d' + line.detail_id;
+        }
+        if (line.line_uid) {
+            return line.line_uid;
+        }
+        return 'sl-s' + (line.service_id || '') + '-' + index;
+    },
+    addGlosaLine() {
+        this.serviceLines.push({
+            detail_id: null,
+            service_id: '',
+            description: '',
+            qty: 1,
+            unit_price: 0,
+            line_uid: 'glosa_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9),
+        });
+    },
+    removeServiceLineAt(index) {
+        this.serviceLines.splice(index, 1);
+    },
     toggleService(serviceId) {
         const id = String(serviceId);
         if (this.isServiceSelected(id)) {
@@ -367,11 +466,14 @@
         this.syncServiceLinesFromSelection();
     },
     syncServiceLinesFromSelection() {
+        const glosas = this.serviceLines.filter((line) => this.isGlosaLine(line));
         const existingByService = {};
         this.serviceLines.forEach((line) => {
-            existingByService[String(line.service_id)] = line;
+            if (!this.isGlosaLine(line) && line.service_id) {
+                existingByService[String(line.service_id)] = line;
+            }
         });
-        this.serviceLines = this.selectedServiceIds
+        const catalogLines = this.selectedServiceIds
             .map((id) => {
                 const prev = existingByService[String(id)];
                 if (prev) {
@@ -382,11 +484,13 @@
                 return {
                     detail_id: null,
                     service_id: String(service.id),
+                    description: '',
                     qty: 1,
                     unit_price: this.resolveServicePrice(service),
                 };
             })
             .filter(Boolean);
+        this.serviceLines = catalogLines.concat(glosas);
     },
     lineSubtotal(line) {
         const qty = Number(line.qty || 0);
@@ -696,7 +800,7 @@
             url: URL.createObjectURL(file),
         }));
     }
-})" x-init="$nextTick(() => { if (editingMode && editingVehicleLabel) { vehicleSearch = editingVehicleLabel; } if (selectedVehicleId) { syncVehicle() } ensureQuickVehicleClient(); syncHistoryUrl(); initSignaturePad(); refreshServiceLinePrices(); })">
+})" x-init="$nextTick(() => { if (editingMode && editingVehicleLabel) { vehicleSearch = editingVehicleLabel; } if (selectedVehicleId) { syncVehicle() } ensureQuickVehicleClient(); syncHistoryUrl(); initSignaturePad(); refreshServiceLinePrices(); const __ep = @js($editingDamagePhotoPreviews ?? [0 => [], 1 => [], 2 => [], 3 => []]); [0,1,2,3].forEach((i) => { if (__ep && __ep[i] && __ep[i].length) { damagePreviews[i] = __ep[i]; } }); })">
     <x-common.page-breadcrumb
         :pageTitle="$editingOrder ? 'Editar ingreso a mantenimiento' : 'Nuevo Ingreso a Mantenimiento'"
         :crumbs="[
@@ -945,7 +1049,6 @@
                                     :name="`inventory[${item.item_key}]`"
                                     value="1"
                                     x-model="inventoryChecks[item.item_key]"
-                                    :disabled="editingMode && intakeLockedOnEdit"
                                     class="h-4 w-4 rounded border-gray-300">
                                 <span x-text="item.label"></span>
                             </label>
@@ -960,7 +1063,7 @@
                     </label>
                 </div>
 
-                <div class="rounded-lg border border-gray-200 bg-gray-50 p-3" x-show="showDamagesPreexisting" x-cloak :class="(editingMode && intakeLockedOnEdit) ? 'pointer-events-none opacity-60' : ''">
+                <div class="rounded-lg border border-gray-200 bg-gray-50 p-3" x-show="showDamagesPreexisting" x-cloak>
                     <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-600">Daños preexistentes por lado</p>
                     <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
                         @foreach ([
@@ -972,12 +1075,12 @@
                             <div class="rounded-lg border border-gray-200 bg-white p-3">
                                 <input type="hidden" name="damages[{{ $idx }}][side]" value="{{ $side['value'] }}">
                                 <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">{{ $side['label'] }}</label>
-                                <textarea name="damages[{{ $idx }}][description]" rows="2" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Describe daño preexistente (opcional)"></textarea>
+                                <textarea name="damages[{{ $idx }}][description]" rows="2" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Describe daño preexistente (opcional)">{{ old('damages.' . $idx . '.description', data_get($editingDamageRows, $idx . '.description', '')) }}</textarea>
                                 <select name="damages[{{ $idx }}][severity]" class="mt-2 h-10 w-full rounded-lg border border-gray-300 px-3 text-sm">
                                     <option value="">Severidad</option>
-                                    <option value="LOW">Baja</option>
-                                    <option value="MED">Media</option>
-                                    <option value="HIGH">Alta</option>
+                                    <option value="LOW" @selected(old('damages.' . $idx . '.severity', data_get($editingDamageRows, $idx . '.severity', '')) === 'LOW')>Baja</option>
+                                    <option value="MED" @selected(old('damages.' . $idx . '.severity', data_get($editingDamageRows, $idx . '.severity', '')) === 'MED')>Media</option>
+                                    <option value="HIGH" @selected(old('damages.' . $idx . '.severity', data_get($editingDamageRows, $idx . '.severity', '')) === 'HIGH')>Alta</option>
                                 </select>
                                 <label class="mt-2 block text-xs font-medium text-gray-700">Evidencia fotografica (camara)</label>
                                 <input type="file"
@@ -1007,7 +1110,14 @@
                     </div>
                 </div>
 
-                <div class="mt-4 rounded-lg border border-gray-200 bg-white p-3" :class="(editingMode && intakeLockedOnEdit) ? 'pointer-events-none opacity-60' : ''">
+                <div class="mt-4 rounded-lg border border-gray-200 bg-white p-3">
+                    <template x-if="editingMode && editingSignatureUrl">
+                        <div class="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Firma registrada</p>
+                            <img :src="editingSignatureUrl" alt="Firma del cliente" class="max-h-28 rounded border border-slate-200 bg-white object-contain">
+                            <p class="mt-2 text-[11px] text-slate-500">Puede limpiar el lienzo abajo y firmar de nuevo para reemplazarla.</p>
+                        </div>
+                    </template>
                     <div class="mb-2 flex items-center justify-between">
                         <p class="text-xs font-semibold uppercase tracking-wide text-gray-600">Firma del cliente</p>
                         <button type="button" @click="clearSignature()" class="rounded-md border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50">Limpiar firma</button>
@@ -1078,14 +1188,41 @@
             <div class="rounded-xl border border-gray-200 bg-gray-50/50 p-4 md:col-span-3">
                 <div class="mb-3 flex items-center justify-between">
                     <h4 class="text-sm font-semibold uppercase tracking-wide text-gray-800">Trabajo a realizar</h4>
-                    <span class="rounded-full bg-gray-200 px-3 py-1 text-xs font-semibold text-gray-700" x-text="`${selectedServiceIds.length} seleccionado(s)`"></span>
+                    <span class="rounded-full bg-gray-200 px-3 py-1 text-xs font-semibold text-gray-700" x-text="`${serviceLines.length} linea(s) en detalle`"></span>
                 </div>
 
+                <div class="mb-3 flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-3 sm:flex-row sm:flex-wrap sm:items-end">
+                    <div class="min-w-0 flex-1 sm:max-w-[200px]">
+                        <label class="mb-1 block text-xs font-semibold text-gray-600">Tipo</label>
+                        <select x-model="serviceTypeFilter" class="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm">
+                            <option value="">Todos</option>
+                            <option value="preventivo">Preventivo</option>
+                            <option value="correctivo">Correctivo</option>
+                        </select>
+                    </div>
+                    <div class="w-full min-w-0 sm:w-48">
+                        <label class="mb-1 block text-xs font-semibold text-gray-600">KM</label>
+                        <select x-model="serviceFilterKmLocal" class="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm">
+                            <option value="">KM de ingreso del vehículo</option>
+                            @for ($km = 5000; $km <= 200000; $km += 5000)
+                                <option value="{{ $km }}">{{ number_format($km, 0, ',', '.') }} km</option>
+                            @endfor
+                        </select>
+                    </div>
+                   
+                </div>
+                <p class="mb-3 text-[11px] text-gray-500">Elija un KM del listado o deje <span class="font-medium">KM de ingreso del vehículo</span> para usar el kilometraje del formulario. Con el filtro por intervalo, los <span class="font-medium">correctivos</span> siempre se muestran.</p>
+
+                <template x-if="filteredServicesCatalog().length === 0">
+                    <p class="mb-3 text-sm text-gray-500">No hay servicios que coincidan con los filtros. Cambie tipo o kilometraje.</p>
+                </template>
+
                 <div class="grid grid-cols-1 gap-x-6 gap-y-2 md:grid-cols-3">
-                    <template x-for="service in servicesCatalog" :key="`service-check-${service.id}`">
+                    <template x-for="service in filteredServicesCatalog()" :key="`service-check-${service.id}`">
                         <label class="inline-flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 hover:border-indigo-300">
                             <div class="min-w-0 flex-1">
                                 <span class="block truncate font-medium" x-text="service.name"></span>
+                                <span class="block text-[10px] font-semibold uppercase tracking-wide text-slate-500" x-text="String(service.type || '') === 'preventivo' ? 'Preventivo' : (String(service.type || '') === 'correctivo' ? 'Correctivo' : (service.type || ''))"></span>
                                 <span class="block text-xs text-gray-500" x-text="servicePricingLabel(service)"></span>
                             </div>
                             <div class="flex items-center gap-3">
@@ -1101,13 +1238,47 @@
                     </template>
                 </div>
 
-                <template x-for="(line, index) in serviceLines" :key="line.detail_id ? `line-hid-${line.detail_id}` : `line-hid-new-${index}`">
-                    <div>
-                        <input type="hidden" :name="`service_lines[${index}][detail_id]`" :value="line.detail_id || ''">
-                        <input type="hidden" :name="`service_lines[${index}][service_id]`" :value="line.service_id">
-                        <input type="hidden" :name="`service_lines[${index}][qty]`" :value="line.qty">
-                        <input type="hidden" :name="`service_lines[${index}][unit_price]`" :value="line.unit_price">
+                <div class="mt-4 rounded-lg border border-dashed border-indigo-200 bg-indigo-50/50 p-3 md:col-span-3">
+                    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <h5 class="text-xs font-semibold uppercase tracking-wide text-indigo-900">Servicio por glosa (texto libre)</h5>
+                        <button type="button" @click="addGlosaLine()" class="inline-flex items-center rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50">
+                            <i class="ri-add-line"></i><span class="ml-1">Agregar glosa</span>
+                        </button>
                     </div>
+                    <template x-for="(line, index) in serviceLines" :key="'glosa-' + lineKey(line, index)">
+                        <template x-if="isGlosaLine(line)">
+                            <div class="mb-2 flex flex-col gap-2 rounded-lg border border-indigo-100 bg-white p-2 sm:flex-row sm:flex-wrap sm:items-end">
+                                <input type="hidden" :name="`service_lines[${index}][detail_id]`" :value="line.detail_id || ''">
+                                <input type="hidden" :name="`service_lines[${index}][service_id]`" value="">
+                                <div class="min-w-0 flex-1 sm:flex-[2]">
+                                    <label class="mb-0.5 block text-[11px] font-semibold text-gray-600">Descripcion</label>
+                                    <input type="text" x-model="line.description" maxlength="255" :name="`service_lines[${index}][description]`" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Ej. Trabajo especial / otro concepto">
+                                </div>
+                                <div class="w-full sm:w-24">
+                                    <label class="mb-0.5 block text-[11px] font-semibold text-gray-600">Cant.</label>
+                                    <input type="number" min="0.001" step="any" x-model="line.qty" :name="`service_lines[${index}][qty]`" class="h-10 w-full rounded-lg border border-gray-300 px-2 text-sm">
+                                </div>
+                                <div class="w-full sm:w-28">
+                                    <label class="mb-0.5 block text-[11px] font-semibold text-gray-600">Monto</label>
+                                    <input type="number" min="0" step="0.01" x-model="line.unit_price" :name="`service_lines[${index}][unit_price]`" class="h-10 w-full rounded-lg border border-gray-300 px-2 text-sm">
+                                </div>
+                                <button type="button" @click="removeServiceLineAt(index)" class="h-10 rounded-lg border border-red-200 bg-red-50 px-3 text-xs font-semibold text-red-700 hover:bg-red-100 sm:mb-0">Quitar</button>
+                            </div>
+                        </template>
+                    </template>
+                    <p class="text-xs text-gray-500" x-show="!serviceLines.some(l => isGlosaLine(l))" x-cloak>Use el boton para agregar un servicio que no este en el catalogo.</p>
+                </div>
+
+                <template x-for="(line, index) in serviceLines" :key="'hid-' + lineKey(line, index)">
+                    <template x-if="!isGlosaLine(line)">
+                        <div>
+                            <input type="hidden" :name="`service_lines[${index}][detail_id]`" :value="line.detail_id || ''">
+                            <input type="hidden" :name="`service_lines[${index}][service_id]`" :value="line.service_id">
+                            <input type="hidden" :name="`service_lines[${index}][qty]`" :value="line.qty">
+                            <input type="hidden" :name="`service_lines[${index}][unit_price]`" :value="line.unit_price">
+                            <input type="hidden" :name="`service_lines[${index}][description]`" :value="line.description || ''">
+                        </div>
+                    </template>
                 </template>
 
                 <div class="mt-3 border-t border-gray-200 pt-2 text-right text-sm font-semibold text-gray-800">

@@ -13,6 +13,7 @@ class Product extends Model
         'code',
         'description',
         'abbreviation',
+        'marca',
         'type',
         'product_type_id',
         'category_id',

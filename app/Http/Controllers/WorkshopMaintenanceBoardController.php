@@ -16,6 +16,7 @@ use App\Models\Vehicle;
 use App\Models\VehicleType;
 use App\Models\WorkshopMovement;
 use App\Models\WorkshopMovementTechnician;
+use App\Models\WorkshopPreexistingDamage;
 use App\Models\WorkshopService;
 use App\Models\WorkshopVehicleIntakeInventoryItem;
 use App\Services\Workshop\WorkshopFlowService;
@@ -128,7 +129,9 @@ class WorkshopMaintenanceBoardController extends Controller
             'initialInventoryChecks' => [],
             'editingVehicleLabel' => '',
             'editingClientLabel' => '',
-            'intakeLockedOnEdit' => false,
+            'editingDamageRows' => [],
+            'editingDamagePhotoPreviews' => [0 => [], 1 => [], 2 => [], 3 => []],
+            'editingSignatureUrl' => null,
         ]);
     }
 
@@ -154,19 +157,27 @@ class WorkshopMaintenanceBoardController extends Controller
             'vehicle',
             'client',
             'intakeInventory',
+            'damages.photos',
             'details' => fn ($query) => $query->whereNull('sales_movement_id')->whereNull('deleted_at')->orderBy('id'),
             'details.service',
             'details.product',
         ]);
 
         $formData = $this->maintenanceFormData($branchId, $companyId);
+        if ($order->intakeInventory->isNotEmpty()) {
+            $formData['showInventoryDefault'] = true;
+        }
+        if ($order->damages->isNotEmpty()) {
+            $formData['showDamagesPreexistingDefault'] = true;
+        }
 
         $initialServiceLines = $order->details
             ->where('line_type', 'SERVICE')
             ->values()
             ->map(fn ($d) => [
                 'detail_id' => (int) $d->id,
-                'service_id' => (string) ($d->service_id ?? ''),
+                'service_id' => $d->service_id !== null ? (string) $d->service_id : '',
+                'description' => (string) ($d->description ?? ''),
                 'qty' => (float) $d->qty,
                 'unit_price' => (float) $d->unit_price,
             ])
@@ -200,6 +211,42 @@ class WorkshopMaintenanceBoardController extends Controller
         $editingVehicleLabel = trim(((string) ($order->vehicle?->brand ?? '')) . ' ' . ((string) ($order->vehicle?->model ?? '')) . (((string) ($order->vehicle?->plate ?? '') !== '' ? ' - ' . $order->vehicle->plate : '')));
         $editingClientLabel = trim(((string) ($order->client?->first_name ?? '')) . ' ' . ((string) ($order->client?->last_name ?? '')));
 
+        $sidesOrder = ['RIGHT', 'LEFT', 'FRONT', 'BACK'];
+        $editingDamageRows = [];
+        $editingDamagePhotoPreviews = [0 => [], 1 => [], 2 => [], 3 => []];
+        foreach ($sidesOrder as $idx => $side) {
+            $d = $order->damages->first(fn ($x) => strtoupper((string) $x->side) === $side);
+            $editingDamageRows[] = [
+                'description' => $d ? (string) ($d->description ?? '') : '',
+                'severity' => $d ? (string) ($d->severity ?? '') : '',
+            ];
+            if ($d) {
+                $urls = [];
+                foreach ($d->photos as $photo) {
+                    $path = (string) ($photo->photo_path ?? '');
+                    if ($path !== '' && Storage::disk('public')->exists($path)) {
+                        $urls[] = [
+                            'url' => Storage::disk('public')->url($path),
+                            'name' => basename($path),
+                        ];
+                    }
+                }
+                if ($urls === [] && $d->photo_path && Storage::disk('public')->exists((string) $d->photo_path)) {
+                    $urls[] = [
+                        'url' => Storage::disk('public')->url((string) $d->photo_path),
+                        'name' => basename((string) $d->photo_path),
+                    ];
+                }
+                $editingDamagePhotoPreviews[$idx] = $urls;
+            }
+        }
+
+        $editingSignatureUrl = null;
+        $sigPath = (string) ($order->intake_client_signature_path ?? '');
+        if ($sigPath !== '' && Storage::disk('public')->exists($sigPath)) {
+            $editingSignatureUrl = Storage::disk('public')->url($sigPath);
+        }
+
         return view('workshop.maintenance-board.create', $formData + [
             'editingOrder' => $order,
             'initialServiceLines' => $initialServiceLines,
@@ -207,7 +254,9 @@ class WorkshopMaintenanceBoardController extends Controller
             'initialInventoryChecks' => $initialInventoryChecks,
             'editingVehicleLabel' => $editingVehicleLabel,
             'editingClientLabel' => $editingClientLabel,
-            'intakeLockedOnEdit' => !in_array((string) $order->status, ['draft', 'diagnosis', 'awaiting_approval'], true),
+            'editingDamageRows' => $editingDamageRows,
+            'editingDamagePhotoPreviews' => $editingDamagePhotoPreviews,
+            'editingSignatureUrl' => $editingSignatureUrl,
         ]);
     }
 
@@ -250,7 +299,10 @@ class WorkshopMaintenanceBoardController extends Controller
             ->get(['id', 'first_name', 'last_name', 'document_number', 'person_type']);
 
         $services = WorkshopService::query()
-            ->with(['priceTiers:id,workshop_service_id,max_cc,price,order_num'])
+            ->with([
+                'priceTiers:id,workshop_service_id,max_cc,price,order_num',
+                'frequencies:id,workshop_service_id,km,order_num',
+            ])
             ->where('active', true)
             ->where(function ($query) use ($companyId) {
                 $query->whereNull('company_id')->orWhere('company_id', $companyId);
@@ -259,7 +311,7 @@ class WorkshopMaintenanceBoardController extends Controller
                 $query->whereNull('branch_id')->orWhere('branch_id', $branchId);
             })
             ->orderBy('name')
-            ->get(['id', 'name', 'base_price', 'type']);
+            ->get(['id', 'name', 'base_price', 'type', 'frequency_enabled', 'frequency_each_km']);
 
         $saleMovementTypeId = (int) \App\Models\MovementType::query()
             ->where('description', 'ILIKE', '%venta%')
@@ -321,11 +373,13 @@ class WorkshopMaintenanceBoardController extends Controller
                 'product_branch.stock',
                 'product_branch.tax_rate_id',
                 'products.code',
+                'products.marca',
                 'products.description',
             ])
             ->map(fn ($row) => [
                 'id' => (int) $row->product_id,
                 'code' => (string) ($row->code ?? ''),
+                'marca' => (string) ($row->marca ?? ''),
                 'description' => (string) ($row->description ?? ''),
                 'price' => (float) ($row->price ?? 0),
                 'stock' => (float) ($row->stock ?? 0),
@@ -448,9 +502,10 @@ class WorkshopMaintenanceBoardController extends Controller
             'client_signature_data' => ['nullable', 'string'],
             'service_lines' => ['nullable', 'array'],
             'service_lines.*.detail_id' => ['nullable', 'integer'],
-            'service_lines.*.service_id' => ['required_with:service_lines', 'integer', 'exists:workshop_services,id'],
-            'service_lines.*.qty' => ['required_with:service_lines', 'numeric', 'gt:0'],
-            'service_lines.*.unit_price' => ['required_with:service_lines', 'numeric', 'gte:0'],
+            'service_lines.*.service_id' => ['nullable', 'string', 'max:32'],
+            'service_lines.*.description' => ['nullable', 'string', 'max:255'],
+            'service_lines.*.qty' => ['nullable', 'numeric'],
+            'service_lines.*.unit_price' => ['nullable', 'numeric'],
             'product_lines' => ['nullable', 'array'],
             'product_lines.*.detail_id' => ['nullable', 'integer'],
             'product_lines.*.product_id' => ['required_with:product_lines', 'integer', 'exists:products,id'],
@@ -476,29 +531,15 @@ class WorkshopMaintenanceBoardController extends Controller
             return back()->withErrors(['error' => 'El vehiculo no pertenece al cliente seleccionado.']);
         }
 
-        $serviceLines = collect($validated['service_lines'] ?? [])
-            ->filter(fn ($line) => !empty($line['service_id']))
-            ->values();
-
-        if ($serviceLines->isNotEmpty()) {
-            $allowedServiceIds = WorkshopService::query()
-                ->where('active', true)
-                ->whereIn('id', $serviceLines->pluck('service_id')->map(fn ($value) => (int) $value)->all())
-                ->where(function ($query) use ($companyId) {
-                    $query->whereNull('company_id')->orWhere('company_id', $companyId);
-                })
-                ->where(function ($query) use ($branchId) {
-                    $query->whereNull('branch_id')->orWhere('branch_id', $branchId);
-                })
-                ->pluck('id')
-                ->map(fn ($value) => (int) $value)
-                ->all();
-
-            foreach ($serviceLines as $line) {
-                if (!in_array((int) $line['service_id'], $allowedServiceIds, true)) {
-                    return back()->withErrors(['error' => 'Hay servicios no permitidos para esta sucursal/empresa.']);
-                }
-            }
+        try {
+            $parsedServiceLines = $this->parseMaintenanceBoardServiceLines((array) ($validated['service_lines'] ?? []));
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
+        }
+        try {
+            $this->assertCatalogServiceLinesAllowed($parsedServiceLines, $branchId, $companyId);
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
         }
 
         $user = auth()->user();
@@ -527,17 +568,39 @@ class WorkshopMaintenanceBoardController extends Controller
                 ]
             );
 
-            $serviceCatalog = WorkshopService::query()
-                ->with(['priceTiers', 'frequencies'])
-                ->whereIn('id', $serviceLines->pluck('service_id')->map(fn ($value) => (int) $value)->all())
-                ->get()
-                ->keyBy('id');
+            $catalogIds = collect($parsedServiceLines)
+                ->where('kind', 'catalog')
+                ->pluck('service_id')
+                ->unique()
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->values()
+                ->all();
+
+            $serviceCatalog = $catalogIds === []
+                ? collect()
+                : WorkshopService::query()
+                    ->with(['priceTiers', 'frequencies'])
+                    ->whereIn('id', $catalogIds)
+                    ->get()
+                    ->keyBy('id');
 
             $mileageForFrequency = (int) ($validated['mileage_in'] ?? $vehicle->current_mileage ?? 0);
 
-            foreach ($serviceLines as $line) {
+            foreach ($parsedServiceLines as $line) {
+                if ($line['kind'] === 'glosa') {
+                    $this->flowService->addDetail($workshop, [
+                        'line_type' => 'SERVICE',
+                        'service_id' => null,
+                        'description' => $line['description'],
+                        'qty' => $line['qty'],
+                        'unit_price' => $line['unit_price'],
+                    ]);
+                    continue;
+                }
+
                 $serviceId = (int) $line['service_id'];
-                $qty = round((float) $line['qty'], 6);
+                $qty = $line['qty'];
                 $service = $serviceCatalog->get($serviceId);
                 if (!$service || $qty <= 0) {
                     continue;
@@ -578,7 +641,7 @@ class WorkshopMaintenanceBoardController extends Controller
                 $this->flowService->addDetail($workshop, [
                     'line_type' => 'PART',
                     'product_id' => $productId,
-                    'description' => trim((string) $row->code . ' - ' . (string) $row->description),
+                    'description' => $this->formatWorkshopProductPartDescription($row),
                     'qty' => $qty,
                     'unit_price' => $unitPrice,
                     'tax_rate_id' => $row->tax_rate_id ? (int) $row->tax_rate_id : null,
@@ -623,9 +686,10 @@ class WorkshopMaintenanceBoardController extends Controller
             'client_signature_data' => ['nullable', 'string'],
             'service_lines' => ['nullable', 'array'],
             'service_lines.*.detail_id' => ['nullable', 'integer'],
-            'service_lines.*.service_id' => ['required_with:service_lines', 'integer', 'exists:workshop_services,id'],
-            'service_lines.*.qty' => ['required_with:service_lines', 'numeric', 'gt:0'],
-            'service_lines.*.unit_price' => ['required_with:service_lines', 'numeric', 'gte:0'],
+            'service_lines.*.service_id' => ['nullable', 'string', 'max:32'],
+            'service_lines.*.description' => ['nullable', 'string', 'max:255'],
+            'service_lines.*.qty' => ['nullable', 'numeric'],
+            'service_lines.*.unit_price' => ['nullable', 'numeric'],
             'product_lines' => ['nullable', 'array'],
             'product_lines.*.detail_id' => ['nullable', 'integer'],
             'product_lines.*.product_id' => ['required_with:product_lines', 'integer', 'exists:products,id'],
@@ -639,35 +703,21 @@ class WorkshopMaintenanceBoardController extends Controller
             ->where('branch_id', $branchId)
             ->firstOrFail();
 
-        $serviceLines = collect($validated['service_lines'] ?? [])
-            ->filter(fn ($line) => !empty($line['service_id']))
-            ->values();
-
-        if ($serviceLines->isNotEmpty()) {
-            $allowedServiceIds = WorkshopService::query()
-                ->where('active', true)
-                ->whereIn('id', $serviceLines->pluck('service_id')->map(fn ($value) => (int) $value)->all())
-                ->where(function ($query) use ($companyId) {
-                    $query->whereNull('company_id')->orWhere('company_id', $companyId);
-                })
-                ->where(function ($query) use ($branchId) {
-                    $query->whereNull('branch_id')->orWhere('branch_id', $branchId);
-                })
-                ->pluck('id')
-                ->map(fn ($value) => (int) $value)
-                ->all();
-
-            foreach ($serviceLines as $line) {
-                if (!in_array((int) $line['service_id'], $allowedServiceIds, true)) {
-                    return back()->withErrors(['error' => 'Hay servicios no permitidos para esta sucursal/empresa.']);
-                }
-            }
+        try {
+            $parsedServiceLines = $this->parseMaintenanceBoardServiceLines((array) ($validated['service_lines'] ?? []));
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
+        }
+        try {
+            $this->assertCatalogServiceLinesAllowed($parsedServiceLines, $branchId, $companyId);
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
         }
 
         $user = auth()->user();
 
         try {
-            DB::transaction(function () use ($order, $request, $validated, $branchId, $vehicle, $serviceLines, $user) {
+            DB::transaction(function () use ($order, $request, $validated, $branchId, $vehicle, $parsedServiceLines, $user) {
                 $lockedOrder = WorkshopMovement::query()
                     ->where('id', $order->id)
                     ->lockForUpdate()
@@ -680,29 +730,39 @@ class WorkshopMaintenanceBoardController extends Controller
                     'observations' => $validated['observations'] ?? null,
                 ]);
 
-                $intakeEditable = in_array((string) $lockedOrder->status, ['draft', 'diagnosis', 'awaiting_approval'], true);
-                if ($intakeEditable) {
-                    $damagesWithPhotos = $this->uploadDamagePhotos($request, (array) ($validated['damages'] ?? []), $branchId);
-                    $signaturePath = $this->storeSignatureFromDataUri((string) ($validated['client_signature_data'] ?? ''), $branchId);
-                    $meta = [];
-                    if ($signaturePath) {
-                        $meta['intake_client_signature_path'] = $signaturePath;
-                    }
-                    $this->flowService->syncIntakeAndDamages(
-                        $lockedOrder,
-                        (array) ($validated['inventory'] ?? []),
-                        $damagesWithPhotos,
-                        $meta
-                    );
+                $damagesWithPhotos = $this->uploadDamagePhotos($request, (array) ($validated['damages'] ?? []), $branchId);
+                $damagesWithPhotos = $this->mergeExistingWorkshopDamagePhotos($lockedOrder, $damagesWithPhotos);
+                $signaturePath = $this->storeSignatureFromDataUri((string) ($validated['client_signature_data'] ?? ''), $branchId);
+                $meta = [];
+                if ($signaturePath) {
+                    $meta['intake_client_signature_path'] = $signaturePath;
                 }
+                $this->flowService->syncIntakeAndDamages(
+                    $lockedOrder,
+                    (array) ($validated['inventory'] ?? []),
+                    $damagesWithPhotos,
+                    $meta,
+                    true
+                );
 
                 $lockedOrder->refresh();
 
-                $serviceCatalog = WorkshopService::query()
-                    ->with(['priceTiers', 'frequencies'])
-                    ->whereIn('id', $serviceLines->pluck('service_id')->map(fn ($value) => (int) $value)->all())
-                    ->get()
-                    ->keyBy('id');
+                $catalogIds = collect($parsedServiceLines)
+                    ->where('kind', 'catalog')
+                    ->pluck('service_id')
+                    ->unique()
+                    ->map(fn ($id) => (int) $id)
+                    ->filter(fn ($id) => $id > 0)
+                    ->values()
+                    ->all();
+
+                $serviceCatalog = $catalogIds === []
+                    ? collect()
+                    : WorkshopService::query()
+                        ->with(['priceTiers', 'frequencies'])
+                        ->whereIn('id', $catalogIds)
+                        ->get()
+                        ->keyBy('id');
 
                 $mileageForFrequency = (int) ($validated['mileage_in'] ?? $vehicle->current_mileage ?? 0);
 
@@ -712,7 +772,11 @@ class WorkshopMaintenanceBoardController extends Controller
                     ->get()
                     ->keyBy('id');
 
-                $submittedDetailIds = $serviceLines->pluck('detail_id')->filter()->map(fn ($id) => (int) $id)->all();
+                $submittedDetailIds = collect($parsedServiceLines)
+                    ->pluck('detail_id')
+                    ->filter(fn ($id) => (int) $id > 0)
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
                 foreach ($detailsById as $id => $detail) {
                     if (!in_array((int) $id, $submittedDetailIds, true)) {
                         $this->flowService->removeDetail($detail);
@@ -726,16 +790,45 @@ class WorkshopMaintenanceBoardController extends Controller
                     ->get()
                     ->keyBy('id');
 
-                foreach ($serviceLines as $line) {
+                foreach ($parsedServiceLines as $line) {
+                    $qty = $line['qty'];
+                    $detailId = (int) ($line['detail_id'] ?? 0);
+
+                    if ($line['kind'] === 'glosa') {
+                        if ($detailId > 0 && !$detailsById->has($detailId)) {
+                            throw new \RuntimeException('Linea de servicio no valida para esta OS.');
+                        }
+                        if ($detailId > 0 && $detailsById->has($detailId)) {
+                            $this->flowService->updateDetail(
+                                $detailsById->get($detailId),
+                                [
+                                    'qty' => $qty,
+                                    'unit_price' => $line['unit_price'],
+                                    'description' => $line['description'],
+                                ],
+                                $branchId,
+                                (int) ($user?->id ?? 0),
+                                (string) ($user?->name ?? 'Sistema')
+                            );
+                        } else {
+                            $this->flowService->addDetail($lockedOrder, [
+                                'line_type' => 'SERVICE',
+                                'service_id' => null,
+                                'description' => $line['description'],
+                                'qty' => $qty,
+                                'unit_price' => $line['unit_price'],
+                            ]);
+                        }
+                        continue;
+                    }
+
                     $serviceId = (int) $line['service_id'];
-                    $qty = round((float) $line['qty'], 6);
                     $service = $serviceCatalog->get($serviceId);
                     if (!$service || $qty <= 0) {
                         continue;
                     }
 
                     $resolvedPrice = $this->resolveMaintenanceBoardServiceUnitPrice($service, $vehicle, $mileageForFrequency);
-                    $detailId = isset($line['detail_id']) ? (int) $line['detail_id'] : 0;
 
                     if ($detailId > 0 && !$detailsById->has($detailId)) {
                         throw new \RuntimeException('Linea de servicio no valida para esta OS.');
@@ -806,7 +899,7 @@ class WorkshopMaintenanceBoardController extends Controller
                         $unitPrice = 0;
                     }
 
-                    $description = trim((string) $row->code . ' - ' . (string) $row->description);
+                    $description = $this->formatWorkshopProductPartDescription($row);
                     $detailId = isset($line['detail_id']) ? (int) $line['detail_id'] : 0;
 
                     if ($detailId > 0 && !$partDetails->has($detailId)) {
@@ -1406,7 +1499,7 @@ class WorkshopMaintenanceBoardController extends Controller
                         $this->flowService->addDetail($lockedOrder, [
                             'line_type' => 'PART',
                             'product_id' => $productId,
-                            'description' => (string) ($product->description ?? ('Producto #' . $productId)),
+                            'description' => $this->formatWorkshopProductPartDescription($product),
                             'qty' => (float) $line['qty'],
                             'unit_price' => (float) $line['unit_price'],
                             'tax_rate_id' => $productBranch->tax_rate_id ? (int) $productBranch->tax_rate_id : null,
@@ -1480,6 +1573,40 @@ class WorkshopMaintenanceBoardController extends Controller
             ->with('status', 'Venta y cobro registrados. La OS fue entregada automaticamente.');
     }
 
+    private function mergeExistingWorkshopDamagePhotos(WorkshopMovement $order, array $damagesWithPhotos): array
+    {
+        $existing = WorkshopPreexistingDamage::query()
+            ->where('workshop_movement_id', $order->id)
+            ->with('photos')
+            ->get()
+            ->keyBy(fn ($d) => strtoupper((string) $d->side));
+
+        foreach ($damagesWithPhotos as $index => $damage) {
+            $side = strtoupper((string) ($damage['side'] ?? ''));
+            if ($side === '') {
+                continue;
+            }
+            $currentPhotos = isset($damage['photos']) && is_array($damage['photos']) ? $damage['photos'] : [];
+            if ($currentPhotos !== []) {
+                continue;
+            }
+            $row = $existing->get($side);
+            if (!$row) {
+                continue;
+            }
+            $paths = $row->photos->pluck('photo_path')->filter()->map(fn ($p) => (string) $p)->values()->all();
+            if ($paths === [] && $row->photo_path) {
+                $paths = [(string) $row->photo_path];
+            }
+            if ($paths !== []) {
+                $damagesWithPhotos[$index]['photos'] = $paths;
+                $damagesWithPhotos[$index]['photo_path'] = $paths[0];
+            }
+        }
+
+        return $damagesWithPhotos;
+    }
+
     private function resolveMaintenanceBoardServiceUnitPrice(WorkshopService $service, Vehicle $vehicle, int $mileageForFrequency): float
     {
         $unitPrice = round(
@@ -1503,6 +1630,22 @@ class WorkshopMaintenanceBoardController extends Controller
         return $unitPrice;
     }
 
+    private function formatWorkshopProductPartDescription(object $row): string
+    {
+        $code = trim((string) ($row->code ?? ''));
+        $marca = trim((string) ($row->marca ?? ''));
+        $description = trim((string) ($row->description ?? ''));
+        if ($description === '') {
+            $description = 'Producto #' . (int) ($row->product_id ?? $row->id ?? 0);
+        }
+        $parts = array_values(array_filter(
+            [$code, $marca !== '' ? $marca : null, $description],
+            fn ($p) => $p !== null && $p !== ''
+        ));
+
+        return $parts === [] ? '' : implode(' - ', $parts);
+    }
+
     private function productBranchRowForMaintenance(int $branchId, int $productId): ?object
     {
         return ProductBranch::query()
@@ -1517,7 +1660,109 @@ class WorkshopMaintenanceBoardController extends Controller
                 'product_branch.tax_rate_id',
                 'products.description',
                 'products.code',
+                'products.marca',
             ]);
+    }
+
+    /**
+     * @return array<int, array{kind: string, detail_id: int, service_id: ?int, description: string, qty: float, unit_price: float}>
+     */
+    private function parseMaintenanceBoardServiceLines(array $rows): array
+    {
+        $out = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $sidRaw = trim((string) ($row['service_id'] ?? ''));
+            $desc = trim((string) ($row['description'] ?? ''));
+            $qty = round((float) ($row['qty'] ?? 0), 6);
+            $unitPrice = round((float) ($row['unit_price'] ?? 0), 6);
+            $detailId = isset($row['detail_id']) && $row['detail_id'] !== '' && $row['detail_id'] !== null
+                ? (int) $row['detail_id']
+                : 0;
+
+            if ($qty <= 0) {
+                continue;
+            }
+
+            if ($sidRaw !== '' && ctype_digit($sidRaw)) {
+                if ($unitPrice < 0) {
+                    throw ValidationException::withMessages([
+                        'service_lines' => 'El precio unitario no puede ser negativo.',
+                    ]);
+                }
+                $out[] = [
+                    'kind' => 'catalog',
+                    'detail_id' => $detailId,
+                    'service_id' => (int) $sidRaw,
+                    'description' => $desc,
+                    'qty' => $qty,
+                    'unit_price' => $unitPrice,
+                ];
+                continue;
+            }
+
+            if ($desc !== '') {
+                if (mb_strlen($desc, 'UTF-8') > 255) {
+                    throw ValidationException::withMessages([
+                        'service_lines' => 'La glosa no puede superar 255 caracteres.',
+                    ]);
+                }
+                if ($unitPrice < 0) {
+                    throw ValidationException::withMessages([
+                        'service_lines' => 'El precio unitario no puede ser negativo.',
+                    ]);
+                }
+                $out[] = [
+                    'kind' => 'glosa',
+                    'detail_id' => $detailId,
+                    'service_id' => null,
+                    'description' => $desc,
+                    'qty' => $qty,
+                    'unit_price' => $unitPrice,
+                ];
+            }
+        }
+
+        return $out;
+    }
+
+    private function assertCatalogServiceLinesAllowed(array $parsedServiceLines, int $branchId, int $companyId): void
+    {
+        $ids = collect($parsedServiceLines)
+            ->where('kind', 'catalog')
+            ->pluck('service_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->filter(fn ($id) => $id > 0)
+            ->values()
+            ->all();
+
+        if ($ids === []) {
+            return;
+        }
+
+        $allowed = WorkshopService::query()
+            ->where('active', true)
+            ->whereIn('id', $ids)
+            ->where(function ($query) use ($companyId) {
+                $query->whereNull('company_id')->orWhere('company_id', $companyId);
+            })
+            ->where(function ($query) use ($branchId) {
+                $query->whereNull('branch_id')->orWhere('branch_id', $branchId);
+            })
+            ->pluck('id')
+            ->map(fn ($value) => (int) $value)
+            ->all();
+
+        foreach ($ids as $id) {
+            if (!in_array((int) $id, $allowed, true)) {
+                throw ValidationException::withMessages([
+                    'service_lines' => 'Hay servicios de catalogo no permitidos para esta sucursal o empresa.',
+                ]);
+            }
+        }
     }
 
     private function assertOrderScope(WorkshopMovement $order): void
