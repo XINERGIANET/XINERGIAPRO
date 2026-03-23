@@ -188,8 +188,26 @@
                             <span>Nuevo producto</span>
                         </x-ui.button>
                     @endif
+                    <form method="POST" action="{{ route('admin.products.import-excel') }}" enctype="multipart/form-data" class="inline" data-turbo="false">
+                        @csrf
+                        @if ($viewId)
+                            <input type="hidden" name="view_id" value="{{ $viewId }}">
+                        @endif
+                        <input type="file" name="file" id="product-excel-import-input" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" class="hidden" onchange="if (this.files.length) this.form.submit();">
+                        <x-ui.button size="md" variant="outline" type="button" class="h-11 border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-white/5"
+                            onclick="document.getElementById('product-excel-import-input').click();">
+                            <i class="ri-file-excel-2-line"></i>
+                            <span>Importar Excel</span>
+                        </x-ui.button>
+                    </form>
                 </div>
             </div>
+
+            @if ($errors->has('file'))
+            <div class="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800/50 dark:bg-red-950/30 dark:text-red-200">
+                <strong>Importación:</strong> {{ $errors->first('file') }}
+            </div>
+            @endif
 
             <div class="table-responsive mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] shadow-sm overflow-hidden">
                 <table class="w-full">

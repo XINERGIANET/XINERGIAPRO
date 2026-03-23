@@ -205,6 +205,8 @@ Route::middleware('auth')->group(function () {
         ->names('admin.categories')
         ->parameters(['categorias' => 'category'])
         ->only(['index', 'store', 'edit', 'update', 'destroy']);
+    Route::post('/admin/herramientas/productos/import-excel', [ProductController::class, 'importExcel'])
+        ->name('admin.products.import-excel');
     Route::resource('/admin/herramientas/productos', ProductController::class)
         ->names('admin.products')
         ->parameters(['productos' => 'product'])
