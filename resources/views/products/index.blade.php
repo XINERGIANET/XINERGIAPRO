@@ -345,28 +345,8 @@
                                     @if($productBranch)
                                         <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6 w-full">
                                             <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
-                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Código</p>
-                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $product->code ?: '-' }}</p>
-                                            </div>
-                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
-                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Descripción</p>
-                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $product->description ?: '-' }}</p>
-                                            </div>
-                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
                                                 <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Abreviatura</p>
                                                 <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $product->abbreviation ?: '-' }}</p>
-                                            </div>
-                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
-                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Categoría</p>
-                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $product->category?->description ?? '-' }}</p>
-                                            </div>
-                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
-                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Unidad base</p>
-                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $product->baseUnit?->description ?? '-' }}</p>
-                                            </div>
-                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
-                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Tipo</p>
-                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $product->productType?->name ?? '-' }}</p>
                                             </div>
                                             <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
                                                 <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Kardex</p>
@@ -391,10 +371,6 @@
                                             <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
                                                 <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Estado</p>
                                                 <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ ($productBranch->status ?? 'A') === 'A' ? 'Activo' : 'Inactivo' }}</p>
-                                            </div>
-                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
-                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Stock actual</p>
-                                                <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ number_format((float) $productBranch->stock, 2) }}</p>
                                             </div>
                                             <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
                                                 <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Precio venta</p>
