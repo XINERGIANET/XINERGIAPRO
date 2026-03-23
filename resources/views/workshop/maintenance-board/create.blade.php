@@ -1,7 +1,55 @@
 @extends('layouts.app')
 
 @section('content')
-<div x-data="{
+@php
+    $editing = $editingOrder ?? null;
+    $hasFormOld = session()->hasOldInput();
+    $svcOld = old('service_lines');
+    if ($hasFormOld && is_array($svcOld)) {
+        $serviceLinesForUi = collect($svcOld)->map(function ($l) {
+            $did = $l['detail_id'] ?? null;
+            return [
+                'detail_id' => $did !== null && $did !== '' ? (int) $did : null,
+                'service_id' => (string) ($l['service_id'] ?? ''),
+                'qty' => (float) ($l['qty'] ?? 1),
+                'unit_price' => (float) ($l['unit_price'] ?? 0),
+            ];
+        })->values()->all();
+    } else {
+        $serviceLinesForUi = $initialServiceLines ?? [];
+    }
+    $selectedIdsFromLines = collect($serviceLinesForUi)->pluck('service_id')->filter()->map(fn ($id) => (string) $id)->values()->all();
+    $prodOld = old('product_lines');
+    if ($hasFormOld && is_array($prodOld)) {
+        $productLinesForUi = collect($prodOld)->map(function ($l) {
+            $did = $l['detail_id'] ?? null;
+            return [
+                'detail_id' => $did !== null && $did !== '' ? (int) $did : null,
+                'product_id' => (string) ($l['product_id'] ?? ''),
+                'qty' => (float) ($l['qty'] ?? 1),
+                'unit_price' => (float) ($l['unit_price'] ?? 0),
+            ];
+        })->values()->all();
+    } else {
+        $productLinesForUi = $initialProductLines ?? [];
+    }
+    $invOld = old('inventory');
+    if ($hasFormOld && is_array($invOld)) {
+        $inventoryForUi = collect($invOld)->map(fn ($v) => (bool) $v)->all();
+    } else {
+        $inventoryForUi = $initialInventoryChecks ?? [];
+    }
+    $vehicleIdDefault = (string) old('vehicle_id', $editing ? (string) $editing->vehicle_id : '');
+    $clientIdDefault = (string) old('client_person_id', $editing ? (string) $editing->client_person_id : '');
+    if (old('mileage_in', null) !== null && old('mileage_in', null) !== '') {
+        $mileageDefault = (string) old('mileage_in');
+    } elseif ($editing && $editing->mileage_in !== null) {
+        $mileageDefault = (string) $editing->mileage_in;
+    } else {
+        $mileageDefault = '';
+    }
+@endphp
+<div x-data="Object.assign(typeof formAutocompleteHelpers === 'function' ? formAutocompleteHelpers() : {}, {
     vehicles: @js($vehicles->map(function ($v) use ($clients) {
         $client = $clients->firstWhere('id', $v->client_person_id);
         $clientName = trim(((string) ($client->first_name ?? '')) . ' ' . ((string) ($client->last_name ?? '')));
@@ -36,11 +84,11 @@
     historyHtml: '',
     historyLoading: false,
     historyRequestToken: 0,
-    selectedVehicleId: @js((string) old('vehicle_id', '')),
+    selectedVehicleId: @js($vehicleIdDefault),
     vehicleSearch: '',
     vehicleDropdownOpen: false,
-    selectedClientId: @js((string) old('client_person_id', '')),
-    mileageIn: @js((string) old('mileage_in', '')),
+    selectedClientId: @js($clientIdDefault),
+    mileageIn: @js($mileageDefault),
     creatingVehicle: false,
     creatingVehicleLoading: false,
     quickVehicleError: '',
@@ -80,10 +128,22 @@
     branchDepartmentName: @js($selectedDepartmentName ?? ''),
     branchProvinceName: @js($selectedProvinceName ?? ''),
     branchDistrictName: @js($selectedDistrictName ?? ''),
-    selectedServiceIds: @js(collect(old('service_lines', []))->pluck('service_id')->filter()->map(fn($id) => (string) $id)->values()),
-    serviceLines: [],
+    productsCatalog: @js(collect($products ?? [])->map(function ($p) {
+        $row = is_array($p) ? $p : (array) $p;
+        $code = (string) ($row['code'] ?? '');
+        $desc = (string) ($row['description'] ?? '');
+        $label = trim($code !== '' ? $code . ' - ' . $desc : $desc);
+        return array_merge($row, ['label' => $label]);
+    })->values()->all()),
+    productLines: @js($productLinesForUi),
+    editingMode: @json((bool) $editing),
+    intakeLockedOnEdit: @json((bool) ($intakeLockedOnEdit ?? false)),
+    editingVehicleLabel: @js($editingVehicleLabel ?? ''),
+    editingClientLabel: @js($editingClientLabel ?? ''),
+    selectedServiceIds: @js($selectedIdsFromLines),
+    serviceLines: @js($serviceLinesForUi),
     inventoryItemsByVehicleType: @js($inventoryItemsByVehicleType ?? []),
-    inventoryChecks: @js(collect(old('inventory', []))->map(fn ($v) => (bool) $v)->all()),
+    inventoryChecks: @js($inventoryForUi),
     selectedVehicleTypeId: '',
     showInventory: @js($showInventoryDefault ?? true),
     showDamagesPreexisting: @js($showDamagesPreexistingDefault ?? true),
@@ -218,6 +278,9 @@
         this.openClientHistory();
     },
     onVehicleSearchInput() {
+        if (this.editingMode) {
+            return;
+        }
         this.vehicleDropdownOpen = true;
         if (!String(this.vehicleSearch || '').trim()) {
             this.selectedVehicleId = '';
@@ -285,7 +348,9 @@
             if (!service) {
                 return line;
             }
-
+            if (line.detail_id) {
+                return line;
+            }
             return {
                 ...line,
                 unit_price: this.resolveServicePrice(service),
@@ -302,11 +367,20 @@
         this.syncServiceLinesFromSelection();
     },
     syncServiceLinesFromSelection() {
+        const existingByService = {};
+        this.serviceLines.forEach((line) => {
+            existingByService[String(line.service_id)] = line;
+        });
         this.serviceLines = this.selectedServiceIds
-            .map(id => {
+            .map((id) => {
+                const prev = existingByService[String(id)];
+                if (prev) {
+                    return prev;
+                }
                 const service = this.servicesCatalog.find(s => String(s.id) === String(id));
                 if (!service) return null;
                 return {
+                    detail_id: null,
                     service_id: String(service.id),
                     qty: 1,
                     unit_price: this.resolveServicePrice(service),
@@ -319,8 +393,32 @@
         const price = Number(line.unit_price || 0);
         return qty * price;
     },
+    catalogPriceForProduct(productId) {
+        const p = this.productsCatalog.find(x => String(x.id) === String(productId));
+        return p ? Number(p.price || 0) : 0;
+    },
+    onProductLineProductChange(pline) {
+        pline.unit_price = this.catalogPriceForProduct(pline.product_id);
+    },
+    addProductLine() {
+        this.productLines.push({
+            detail_id: null,
+            product_id: '',
+            qty: 1,
+            unit_price: 0,
+        });
+    },
+    removeProductLine(index) {
+        this.productLines.splice(index, 1);
+    },
+    estimatedProductsTotal() {
+        return this.productLines.reduce((sum, line) => {
+            return sum + Number(line.qty || 0) * Number(line.unit_price || 0);
+        }, 0);
+    },
     estimatedTotal() {
-        return this.serviceLines.reduce((sum, line) => sum + this.lineSubtotal(line), 0);
+        const services = this.serviceLines.reduce((sum, line) => sum + this.lineSubtotal(line), 0);
+        return services + this.estimatedProductsTotal();
     },
     get filteredProvinces() {
         return this.provinces.filter(p => String(p.parent_location_id) === String(this.quickClient.department_id || ''));
@@ -598,16 +696,16 @@
             url: URL.createObjectURL(file),
         }));
     }
-}" x-init="$nextTick(() => { if (selectedVehicleId) { syncVehicle() } ensureQuickVehicleClient(); syncHistoryUrl(); initSignaturePad(); syncServiceLinesFromSelection(); })">
+})" x-init="$nextTick(() => { if (editingMode && editingVehicleLabel) { vehicleSearch = editingVehicleLabel; } if (selectedVehicleId) { syncVehicle() } ensureQuickVehicleClient(); syncHistoryUrl(); initSignaturePad(); refreshServiceLinePrices(); })">
     <x-common.page-breadcrumb
-        pageTitle="Nuevo Ingreso a Mantenimiento"
+        :pageTitle="$editingOrder ? 'Editar ingreso a mantenimiento' : 'Nuevo Ingreso a Mantenimiento'"
         :crumbs="[
             ['label' => 'Tablero de Mantenimiento', 'url' => route('workshop.maintenance-board.index')],
-            ['label' => 'Nuevo Ingreso a Mantenimiento'],
+            ['label' => $editingOrder ? 'Editar ingreso a mantenimiento' : 'Nuevo Ingreso a Mantenimiento'],
         ]"
     />
 
-    <x-common.component-card title="Nuevo ingreso a mantenimiento" desc="Registra el vehiculo, cliente y servicios para iniciar la OS desde una vista completa.">
+    <x-common.component-card :title="$editingOrder ? 'Editar ingreso a mantenimiento' : 'Nuevo ingreso a mantenimiento'" :desc="$editingOrder ? 'Actualiza datos de la OS, servicios y repuestos; el importe queda en cuenta para cobrar en venta y cobro.' : 'Registra el vehiculo, cliente y servicios para iniciar la OS desde una vista completa.'">
         @if (session('status'))
             <div class="mb-4 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-700">{{ session('status') }}</div>
         @endif
@@ -617,11 +715,14 @@
 
    
 
-        <form method="POST" action="{{ route('workshop.maintenance-board.store') }}" enctype="multipart/form-data" @submit="syncSignature()" class="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <form method="POST" action="{{ $editingOrder ? route('workshop.maintenance-board.update', $editingOrder) : route('workshop.maintenance-board.store') }}" enctype="multipart/form-data" @submit="syncSignature()" class="grid grid-cols-1 gap-3 md:grid-cols-3">
             @csrf
+            @if($editingOrder)
+                @method('PUT')
+            @endif
             <input type="hidden" name="client_person_id" x-model="selectedClientId">
             <input type="hidden" name="client_signature_data" x-model="clientSignatureData">
-                <div x-show="creatingVehicle" x-cloak class="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 md:col-span-3">
+                <div x-show="creatingVehicle && !editingMode" x-cloak class="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 md:col-span-3">
                 <div class="mb-3 flex items-center justify-between">
                     <h4 class="text-sm font-semibold text-indigo-800">Registrar vehiculo rapido</h4>
                     <button type="button" @click="creatingVehicle = false" class="text-xs font-medium text-indigo-700 hover:text-indigo-900">Cerrar</button>
@@ -747,16 +848,17 @@
                             <label class="mb-1 block text-sm font-medium text-gray-700">Vehiculo</label>
                             <input
                                 x-model="vehicleSearch"
-                                @focus="vehicleDropdownOpen = true"
-                                @click="vehicleDropdownOpen = true"
+                                @focus="!editingMode && (vehicleDropdownOpen = true)"
+                                @click="!editingMode && (vehicleDropdownOpen = true)"
                                 @input="onVehicleSearchInput()"
                                 class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
                                 placeholder="Buscar vehiculo o cliente"
                                 autocomplete="off"
+                                :readonly="editingMode"
                                 required
                             >
                             <div
-                                x-show="vehicleDropdownOpen"
+                                x-show="vehicleDropdownOpen && !editingMode"
                                 x-cloak
                                 class="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg"
                             >
@@ -782,6 +884,7 @@
                             </div>
                         </div>
                         <button type="button"
+                                x-show="!editingMode"
                                 @click="toggleQuickVehicle()"
                                 class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">
                             <i class="ri-add-line"></i>
@@ -802,20 +905,24 @@
                 </div>
                 <div class="min-w-0 w-full md:flex-[2.5_1_0%]">
                     <label class="mb-1 block text-sm font-medium text-gray-700">Diagnostico</label>
-                    <input name="diagnosis_text" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Diagnostico inicial (opcional)">
+                    <input name="diagnosis_text" value="{{ old('diagnosis_text', optional($editingOrder)->diagnosis_text ?? '') }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Diagnostico inicial (opcional)">
                 </div>
 
                 <div class="flex flex-col">
                     <label class="mb-1 block text-sm font-medium text-gray-700 opacity-0">Spacer</label>
                     <label class="inline-flex h-11 shrink-0 items-center gap-2 whitespace-nowrap text-sm text-gray-700">
-                        <input type="checkbox" name="tow_in" value="1" class="h-4 w-4 rounded border-gray-300">
+                        <input type="checkbox" name="tow_in" value="1" class="h-4 w-4 rounded border-gray-300" @checked(old('tow_in', optional($editingOrder)->tow_in ?? false))>
                         Ingreso en grua
                     </label>
                 </div>
 
             </div>
 
-            <textarea name="observations" rows="3" class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-3" placeholder="Observaciones"></textarea>
+            <div class="md:col-span-3" x-show="editingMode" x-cloak>
+                <p class="text-xs text-gray-600"><span class="font-semibold text-gray-800">Cliente:</span> {{ $editingClientLabel ?? '' }}</p>
+            </div>
+
+            <textarea name="observations" rows="3" class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-3" placeholder="Observaciones">{{ old('observations', optional($editingOrder)->observations ?? '') }}</textarea>
 
             <div class="rounded-xl border border-gray-200 bg-white p-4 md:col-span-3">
                 <div class="mb-3">
@@ -838,6 +945,7 @@
                                     :name="`inventory[${item.item_key}]`"
                                     value="1"
                                     x-model="inventoryChecks[item.item_key]"
+                                    :disabled="editingMode && intakeLockedOnEdit"
                                     class="h-4 w-4 rounded border-gray-300">
                                 <span x-text="item.label"></span>
                             </label>
@@ -852,7 +960,7 @@
                     </label>
                 </div>
 
-                <div class="rounded-lg border border-gray-200 bg-gray-50 p-3" x-show="showDamagesPreexisting" x-cloak>
+                <div class="rounded-lg border border-gray-200 bg-gray-50 p-3" x-show="showDamagesPreexisting" x-cloak :class="(editingMode && intakeLockedOnEdit) ? 'pointer-events-none opacity-60' : ''">
                     <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-600">Daños preexistentes por lado</p>
                     <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
                         @foreach ([
@@ -899,7 +1007,7 @@
                     </div>
                 </div>
 
-                <div class="mt-4 rounded-lg border border-gray-200 bg-white p-3">
+                <div class="mt-4 rounded-lg border border-gray-200 bg-white p-3" :class="(editingMode && intakeLockedOnEdit) ? 'pointer-events-none opacity-60' : ''">
                     <div class="mb-2 flex items-center justify-between">
                         <p class="text-xs font-semibold uppercase tracking-wide text-gray-600">Firma del cliente</p>
                         <button type="button" @click="clearSignature()" class="rounded-md border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50">Limpiar firma</button>
@@ -918,6 +1026,52 @@
                         class="w-full rounded-lg border border-dashed border-gray-300 bg-white"
                     ></canvas>
                     <p class="mt-1 text-[11px] text-gray-500">Conformidad de ingreso del vehiculo.</p>
+                </div>
+            </div>
+            <div class="rounded-xl border border-gray-200 bg-white p-4 md:col-span-3">
+                <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h4 class="text-sm font-semibold uppercase tracking-wide text-gray-800">Repuestos / productos</h4>
+                        <p class="text-xs text-gray-500">Se cargan a la OS con precio de lista; el cobro al cliente se hace despues en venta y cobro.</p>
+                    </div>
+                    <button type="button" @click="addProductLine()" class="inline-flex items-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">
+                        <i class="ri-add-line"></i><span class="ml-1">Agregar producto</span>
+                    </button>
+                </div>
+
+                <template x-if="productLines.length === 0">
+                    <p class="text-sm text-gray-500">Sin productos cargados.</p>
+                </template>
+
+                <div class="space-y-3">
+                    <template x-for="(pline, pindex) in productLines" :key="pline.detail_id ? `pl-${pline.detail_id}` : `pl-new-${pindex}`">
+                        <div class="flex flex-col gap-2 rounded-lg border border-gray-100 bg-gray-50/80 p-3 md:flex-row md:flex-wrap md:items-end">
+                            <input type="hidden" :name="`product_lines[${pindex}][detail_id]`" :value="pline.detail_id || ''">
+                            <div class="min-w-0 flex-1 md:min-w-[220px]">
+                                <label class="mb-1 block text-xs font-semibold text-gray-600">Producto</label>
+                                <input type="hidden" :name="`product_lines[${pindex}][product_id]`" :value="pline.product_id">
+                                <x-form.select-autocomplete-inline
+                                    fieldKeyExpr="'pl-' + pindex"
+                                    valueVar="pline.product_id"
+                                    optionsListExpr="productsCatalog"
+                                    optionLabel="label"
+                                    optionValue="id"
+                                    emptyText="Seleccionar producto..."
+                                    pickExpr="pline.product_id = String(opt.id); onProductLineProductChange(pline)"
+                                    inputClass="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                                />
+                            </div>
+                            <div class="w-full md:w-24">
+                                <label class="mb-1 block text-xs font-semibold text-gray-600">Cant.</label>
+                                <input type="number" min="0.001" step="any" x-model="pline.qty" :name="`product_lines[${pindex}][qty]`" class="h-10 w-full rounded-lg border border-gray-300 px-2 text-sm" required>
+                            </div>
+                            <div class="w-full md:w-32">
+                                <label class="mb-1 block text-xs font-semibold text-gray-600">P. unit.</label>
+                                <input type="number" min="0" step="0.01" x-model="pline.unit_price" :name="`product_lines[${pindex}][unit_price]`" class="h-10 w-full rounded-lg border border-gray-300 px-2 text-sm">
+                            </div>
+                            <button type="button" @click="removeProductLine(pindex)" class="h-10 rounded-lg border border-red-200 bg-red-50 px-3 text-xs font-semibold text-red-700 hover:bg-red-100 md:mb-0">Quitar</button>
+                        </div>
+                    </template>
                 </div>
             </div>
 
@@ -947,8 +1101,9 @@
                     </template>
                 </div>
 
-                <template x-for="(line, index) in serviceLines" :key="`line-hidden-${index}`">
+                <template x-for="(line, index) in serviceLines" :key="line.detail_id ? `line-hid-${line.detail_id}` : `line-hid-new-${index}`">
                     <div>
+                        <input type="hidden" :name="`service_lines[${index}][detail_id]`" :value="line.detail_id || ''">
                         <input type="hidden" :name="`service_lines[${index}][service_id]`" :value="line.service_id">
                         <input type="hidden" :name="`service_lines[${index}][qty]`" :value="line.qty">
                         <input type="hidden" :name="`service_lines[${index}][unit_price]`" :value="line.unit_price">
@@ -960,9 +1115,10 @@
                 </div>
             </div>
 
+           
             <div class="md:col-span-3 mt-2 flex gap-2">
                 <x-ui.button type="submit" size="md" variant="primary" style="background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff">
-                    <i class="ri-play-circle-line"></i><span>Enviar a aprobación</span>
+                    <i class="ri-play-circle-line"></i><span>{{ $editingOrder ? 'Guardar cambios' : 'Enviar a aprobación' }}</span>
                 </x-ui.button>
                 <x-ui.link-button size="md" variant="outline" href="{{ route('workshop.maintenance-board.index') }}">
                     <i class="ri-close-line"></i><span>Cancelar</span>

@@ -120,7 +120,94 @@ class WorkshopMaintenanceBoardController extends Controller
         [$branchId, $companyId] = $this->branchScope();
         $formData = $this->maintenanceFormData($branchId, $companyId);
 
-        return view('workshop.maintenance-board.create', $formData);
+        return view('workshop.maintenance-board.create', $formData + [
+            'editingOrder' => null,
+            'initialServiceLines' => [],
+            'initialProductLines' => [],
+            'initialInventoryChecks' => [],
+            'editingVehicleLabel' => '',
+            'editingClientLabel' => '',
+            'intakeLockedOnEdit' => false,
+        ]);
+    }
+
+    public function edit(WorkshopMovement $order): RedirectResponse|\Illuminate\View\View
+    {
+        $this->assertOrderScope($order);
+
+        if ($order->sales_movement_id) {
+            return redirect()
+                ->route('workshop.maintenance-board.index')
+                ->withErrors(['error' => 'La OS ya fue facturada, no se puede editar desde el tablero.']);
+        }
+
+        if (in_array((string) $order->status, ['cancelled', 'delivered'], true)) {
+            return redirect()
+                ->route('workshop.maintenance-board.index')
+                ->withErrors(['error' => 'No se puede editar una OS anulada o entregada.']);
+        }
+
+        [$branchId, $companyId] = $this->branchScope();
+
+        $order->load([
+            'vehicle',
+            'client',
+            'intakeInventory',
+            'details' => fn ($query) => $query->whereNull('sales_movement_id')->whereNull('deleted_at')->orderBy('id'),
+            'details.service',
+            'details.product',
+        ]);
+
+        $formData = $this->maintenanceFormData($branchId, $companyId);
+
+        $initialServiceLines = $order->details
+            ->where('line_type', 'SERVICE')
+            ->values()
+            ->map(fn ($d) => [
+                'detail_id' => (int) $d->id,
+                'service_id' => (string) ($d->service_id ?? ''),
+                'qty' => (float) $d->qty,
+                'unit_price' => (float) $d->unit_price,
+            ])
+            ->all();
+
+        $initialProductLines = $order->details
+            ->where('line_type', 'PART')
+            ->values()
+            ->map(fn ($d) => [
+                'detail_id' => (int) $d->id,
+                'product_id' => (string) ($d->product_id ?? ''),
+                'qty' => (float) $d->qty,
+                'unit_price' => (float) $d->unit_price,
+                'label' => (string) ($d->description ?? ''),
+            ])
+            ->all();
+
+        $vehicleTypeId = $order->vehicle?->vehicle_type_id;
+        $inventoryKeys = WorkshopVehicleIntakeInventoryItem::query()
+            ->when($vehicleTypeId, fn ($q) => $q->where('vehicle_type_id', (int) $vehicleTypeId))
+            ->orderBy('order_num')
+            ->pluck('item_key')
+            ->map(fn ($k) => (string) $k)
+            ->all();
+
+        $initialInventoryChecks = [];
+        foreach ($inventoryKeys as $key) {
+            $initialInventoryChecks[$key] = (bool) $order->intakeInventory->firstWhere('item_key', $key)?->present;
+        }
+
+        $editingVehicleLabel = trim(((string) ($order->vehicle?->brand ?? '')) . ' ' . ((string) ($order->vehicle?->model ?? '')) . (((string) ($order->vehicle?->plate ?? '') !== '' ? ' - ' . $order->vehicle->plate : '')));
+        $editingClientLabel = trim(((string) ($order->client?->first_name ?? '')) . ' ' . ((string) ($order->client?->last_name ?? '')));
+
+        return view('workshop.maintenance-board.create', $formData + [
+            'editingOrder' => $order,
+            'initialServiceLines' => $initialServiceLines,
+            'initialProductLines' => $initialProductLines,
+            'initialInventoryChecks' => $initialInventoryChecks,
+            'editingVehicleLabel' => $editingVehicleLabel,
+            'editingClientLabel' => $editingClientLabel,
+            'intakeLockedOnEdit' => !in_array((string) $order->status, ['draft', 'diagnosis', 'awaiting_approval'], true),
+        ]);
     }
 
     private function maintenanceFormData(int $branchId, int $companyId): array
@@ -359,9 +446,15 @@ class WorkshopMaintenanceBoardController extends Controller
             'damages.*.photos.*' => ['nullable', 'image', 'max:6144'],
             'client_signature_data' => ['nullable', 'string'],
             'service_lines' => ['nullable', 'array'],
+            'service_lines.*.detail_id' => ['nullable', 'integer'],
             'service_lines.*.service_id' => ['required_with:service_lines', 'integer', 'exists:workshop_services,id'],
             'service_lines.*.qty' => ['required_with:service_lines', 'numeric', 'gt:0'],
             'service_lines.*.unit_price' => ['required_with:service_lines', 'numeric', 'gte:0'],
+            'product_lines' => ['nullable', 'array'],
+            'product_lines.*.detail_id' => ['nullable', 'integer'],
+            'product_lines.*.product_id' => ['required_with:product_lines', 'integer', 'exists:products,id'],
+            'product_lines.*.qty' => ['required_with:product_lines', 'numeric', 'gt:0'],
+            'product_lines.*.unit_price' => ['nullable', 'numeric', 'gte:0'],
         ]);
 
         $vehicle = Vehicle::query()
@@ -449,24 +542,7 @@ class WorkshopMaintenanceBoardController extends Controller
                     continue;
                 }
 
-                $unitPrice = round(
-                    (float) $service->resolvePriceForDisplacement((int) ($vehicle->engine_displacement_cc ?? 0)),
-                    6
-                );
-                if ($unitPrice < 0) {
-                    $unitPrice = 0;
-                }
-
-                // Aplica multiplicador por frecuencia segun km del vehiculo.
-                if ((bool) ($service->frequency_enabled ?? false) && $mileageForFrequency > 0) {
-                    $validFrequencies = $service->frequencies
-                        ->filter(fn ($f) => (int) ($f->km ?? 0) > 0 && ((int) $mileageForFrequency % (int) $f->km) === 0)
-                        ->sortByDesc(fn ($f) => (int) $f->km)
-                        ->values();
-
-                    $multiplier = (float) ($validFrequencies->first()->multiplier ?? 1);
-                    $unitPrice = round((float) $unitPrice * $multiplier, 6);
-                }
+                $unitPrice = $this->resolveMaintenanceBoardServiceUnitPrice($service, $vehicle, $mileageForFrequency);
 
                 $this->flowService->addDetail($workshop, [
                     'line_type' => 'SERVICE',
@@ -476,6 +552,37 @@ class WorkshopMaintenanceBoardController extends Controller
                     'unit_price' => $unitPrice,
                 ]);
             }
+
+            $productLines = collect($validated['product_lines'] ?? [])
+                ->filter(fn ($line) => !empty($line['product_id']))
+                ->values();
+
+            foreach ($productLines as $line) {
+                $productId = (int) $line['product_id'];
+                $row = $this->productBranchRowForMaintenance($branchId, $productId);
+                if (!$row) {
+                    throw new \RuntimeException('Hay productos no disponibles en la sucursal.');
+                }
+
+                $qty = round((float) ($line['qty'] ?? 0), 6);
+                if ($qty <= 0) {
+                    continue;
+                }
+
+                $unitPrice = round((float) ($line['unit_price'] ?? (float) $row->price), 6);
+                if ($unitPrice < 0) {
+                    $unitPrice = 0;
+                }
+
+                $this->flowService->addDetail($workshop, [
+                    'line_type' => 'PART',
+                    'product_id' => $productId,
+                    'description' => trim((string) $row->code . ' - ' . (string) $row->description),
+                    'qty' => $qty,
+                    'unit_price' => $unitPrice,
+                    'tax_rate_id' => $row->tax_rate_id ? (int) $row->tax_rate_id : null,
+                ]);
+            }
         } catch (\Throwable $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
         }
@@ -483,6 +590,260 @@ class WorkshopMaintenanceBoardController extends Controller
         return redirect()
             ->route('workshop.maintenance-board.index')
             ->with('status', 'Servicio registrado y enviado a espera de aprobación.');
+    }
+
+    public function update(Request $request, WorkshopMovement $order): RedirectResponse
+    {
+        $this->assertOrderScope($order);
+
+        if ($order->sales_movement_id) {
+            return back()->withErrors(['error' => 'La OS ya fue facturada, no se puede editar.']);
+        }
+
+        if (in_array((string) $order->status, ['cancelled', 'delivered'], true)) {
+            return back()->withErrors(['error' => 'No se puede editar una OS anulada o entregada.']);
+        }
+
+        [$branchId, $companyId] = $this->branchScope();
+
+        $validated = $request->validate([
+            'mileage_in' => ['nullable', 'integer', 'min:0'],
+            'tow_in' => ['nullable', 'boolean'],
+            'diagnosis_text' => ['nullable', 'string'],
+            'observations' => ['nullable', 'string'],
+            'inventory' => ['nullable', 'array'],
+            'inventory.*' => ['nullable', 'boolean'],
+            'damages' => ['nullable', 'array'],
+            'damages.*.side' => ['nullable', 'in:RIGHT,LEFT,FRONT,BACK'],
+            'damages.*.description' => ['nullable', 'string'],
+            'damages.*.severity' => ['nullable', 'in:LOW,MED,HIGH'],
+            'damages.*.photos' => ['nullable', 'array'],
+            'damages.*.photos.*' => ['nullable', 'image', 'max:6144'],
+            'client_signature_data' => ['nullable', 'string'],
+            'service_lines' => ['nullable', 'array'],
+            'service_lines.*.detail_id' => ['nullable', 'integer'],
+            'service_lines.*.service_id' => ['required_with:service_lines', 'integer', 'exists:workshop_services,id'],
+            'service_lines.*.qty' => ['required_with:service_lines', 'numeric', 'gt:0'],
+            'service_lines.*.unit_price' => ['required_with:service_lines', 'numeric', 'gte:0'],
+            'product_lines' => ['nullable', 'array'],
+            'product_lines.*.detail_id' => ['nullable', 'integer'],
+            'product_lines.*.product_id' => ['required_with:product_lines', 'integer', 'exists:products,id'],
+            'product_lines.*.qty' => ['required_with:product_lines', 'numeric', 'gt:0'],
+            'product_lines.*.unit_price' => ['nullable', 'numeric', 'gte:0'],
+        ]);
+
+        $vehicle = Vehicle::query()
+            ->where('id', (int) $order->vehicle_id)
+            ->where('company_id', $companyId)
+            ->where('branch_id', $branchId)
+            ->firstOrFail();
+
+        $serviceLines = collect($validated['service_lines'] ?? [])
+            ->filter(fn ($line) => !empty($line['service_id']))
+            ->values();
+
+        if ($serviceLines->isNotEmpty()) {
+            $allowedServiceIds = WorkshopService::query()
+                ->where('active', true)
+                ->whereIn('id', $serviceLines->pluck('service_id')->map(fn ($value) => (int) $value)->all())
+                ->where(function ($query) use ($companyId) {
+                    $query->whereNull('company_id')->orWhere('company_id', $companyId);
+                })
+                ->where(function ($query) use ($branchId) {
+                    $query->whereNull('branch_id')->orWhere('branch_id', $branchId);
+                })
+                ->pluck('id')
+                ->map(fn ($value) => (int) $value)
+                ->all();
+
+            foreach ($serviceLines as $line) {
+                if (!in_array((int) $line['service_id'], $allowedServiceIds, true)) {
+                    return back()->withErrors(['error' => 'Hay servicios no permitidos para esta sucursal/empresa.']);
+                }
+            }
+        }
+
+        $user = auth()->user();
+
+        try {
+            DB::transaction(function () use ($order, $validated, $branchId, $vehicle, $serviceLines, $user) {
+                $lockedOrder = WorkshopMovement::query()
+                    ->where('id', $order->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                $this->flowService->updateOrder($lockedOrder, [
+                    'mileage_in' => $validated['mileage_in'] ?? null,
+                    'tow_in' => (bool) ($validated['tow_in'] ?? false),
+                    'diagnosis_text' => $validated['diagnosis_text'] ?? null,
+                    'observations' => $validated['observations'] ?? null,
+                ]);
+
+                $intakeEditable = in_array((string) $lockedOrder->status, ['draft', 'diagnosis', 'awaiting_approval'], true);
+                if ($intakeEditable) {
+                    $damagesWithPhotos = $this->uploadDamagePhotos($request, (array) ($validated['damages'] ?? []), $branchId);
+                    $signaturePath = $this->storeSignatureFromDataUri((string) ($validated['client_signature_data'] ?? ''), $branchId);
+                    $meta = [];
+                    if ($signaturePath) {
+                        $meta['intake_client_signature_path'] = $signaturePath;
+                    }
+                    $this->flowService->syncIntakeAndDamages(
+                        $lockedOrder,
+                        (array) ($validated['inventory'] ?? []),
+                        $damagesWithPhotos,
+                        $meta
+                    );
+                }
+
+                $lockedOrder->refresh();
+
+                $serviceCatalog = WorkshopService::query()
+                    ->with(['priceTiers', 'frequencies'])
+                    ->whereIn('id', $serviceLines->pluck('service_id')->map(fn ($value) => (int) $value)->all())
+                    ->get()
+                    ->keyBy('id');
+
+                $mileageForFrequency = (int) ($validated['mileage_in'] ?? $vehicle->current_mileage ?? 0);
+
+                $detailsById = $lockedOrder->details()
+                    ->where('line_type', 'SERVICE')
+                    ->whereNull('sales_movement_id')
+                    ->get()
+                    ->keyBy('id');
+
+                $submittedDetailIds = $serviceLines->pluck('detail_id')->filter()->map(fn ($id) => (int) $id)->all();
+                foreach ($detailsById as $id => $detail) {
+                    if (!in_array((int) $id, $submittedDetailIds, true)) {
+                        $this->flowService->removeDetail($detail);
+                    }
+                }
+
+                $lockedOrder->refresh();
+                $detailsById = $lockedOrder->details()
+                    ->where('line_type', 'SERVICE')
+                    ->whereNull('sales_movement_id')
+                    ->get()
+                    ->keyBy('id');
+
+                foreach ($serviceLines as $line) {
+                    $serviceId = (int) $line['service_id'];
+                    $qty = round((float) $line['qty'], 6);
+                    $service = $serviceCatalog->get($serviceId);
+                    if (!$service || $qty <= 0) {
+                        continue;
+                    }
+
+                    $resolvedPrice = $this->resolveMaintenanceBoardServiceUnitPrice($service, $vehicle, $mileageForFrequency);
+                    $detailId = isset($line['detail_id']) ? (int) $line['detail_id'] : 0;
+
+                    if ($detailId > 0 && !$detailsById->has($detailId)) {
+                        throw new \RuntimeException('Linea de servicio no valida para esta OS.');
+                    }
+
+                    if ($detailId > 0 && $detailsById->has($detailId)) {
+                        $this->flowService->updateDetail(
+                            $detailsById->get($detailId),
+                            [
+                                'qty' => $qty,
+                                'unit_price' => round((float) ($line['unit_price'] ?? $resolvedPrice), 6),
+                            ],
+                            $branchId,
+                            (int) ($user?->id ?? 0),
+                            (string) ($user?->name ?? 'Sistema')
+                        );
+                    } else {
+                        $this->flowService->addDetail($lockedOrder, [
+                            'line_type' => 'SERVICE',
+                            'service_id' => $serviceId,
+                            'description' => (string) $service->name,
+                            'qty' => $qty,
+                            'unit_price' => $resolvedPrice,
+                        ]);
+                    }
+                }
+
+                $lockedOrder->refresh();
+
+                $productLines = collect($validated['product_lines'] ?? [])
+                    ->filter(fn ($line) => !empty($line['product_id']))
+                    ->values();
+
+                $partDetails = $lockedOrder->details()
+                    ->where('line_type', 'PART')
+                    ->whereNull('sales_movement_id')
+                    ->get()
+                    ->keyBy('id');
+
+                $submittedPartIds = $productLines->pluck('detail_id')->filter()->map(fn ($id) => (int) $id)->all();
+                foreach ($partDetails as $id => $detail) {
+                    if (!in_array((int) $id, $submittedPartIds, true)) {
+                        $this->flowService->removeDetail($detail);
+                    }
+                }
+
+                $lockedOrder->refresh();
+                $partDetails = $lockedOrder->details()
+                    ->where('line_type', 'PART')
+                    ->whereNull('sales_movement_id')
+                    ->get()
+                    ->keyBy('id');
+
+                foreach ($productLines as $line) {
+                    $productId = (int) $line['product_id'];
+                    $row = $this->productBranchRowForMaintenance($branchId, $productId);
+                    if (!$row) {
+                        throw new \RuntimeException('Hay productos no disponibles en la sucursal.');
+                    }
+
+                    $qty = round((float) ($line['qty'] ?? 0), 6);
+                    if ($qty <= 0) {
+                        continue;
+                    }
+
+                    $unitPrice = round((float) ($line['unit_price'] ?? (float) $row->price), 6);
+                    if ($unitPrice < 0) {
+                        $unitPrice = 0;
+                    }
+
+                    $description = trim((string) $row->code . ' - ' . (string) $row->description);
+                    $detailId = isset($line['detail_id']) ? (int) $line['detail_id'] : 0;
+
+                    if ($detailId > 0 && !$partDetails->has($detailId)) {
+                        throw new \RuntimeException('Linea de producto no valida para esta OS.');
+                    }
+
+                    if ($detailId > 0 && $partDetails->has($detailId)) {
+                        $this->flowService->updateDetail(
+                            $partDetails->get($detailId),
+                            [
+                                'qty' => $qty,
+                                'unit_price' => $unitPrice,
+                                'description' => $description,
+                                'tax_rate_id' => $row->tax_rate_id ? (int) $row->tax_rate_id : null,
+                            ],
+                            $branchId,
+                            (int) ($user?->id ?? 0),
+                            (string) ($user?->name ?? 'Sistema')
+                        );
+                    } else {
+                        $this->flowService->addDetail($lockedOrder, [
+                            'line_type' => 'PART',
+                            'product_id' => $productId,
+                            'description' => $description,
+                            'qty' => $qty,
+                            'unit_price' => $unitPrice,
+                            'tax_rate_id' => $row->tax_rate_id ? (int) $row->tax_rate_id : null,
+                        ]);
+                    }
+                }
+            });
+        } catch (\Throwable $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+
+        return redirect()
+            ->route('workshop.maintenance-board.index')
+            ->with('status', 'Orden de servicio actualizada.');
     }
 
     public function quotation(Request $request, WorkshopMovement $order): RedirectResponse
@@ -1109,6 +1470,46 @@ class WorkshopMaintenanceBoardController extends Controller
         return redirect()
             ->route('workshop.maintenance-board.index')
             ->with('status', 'Venta y cobro registrados. La OS fue entregada automaticamente.');
+    }
+
+    private function resolveMaintenanceBoardServiceUnitPrice(WorkshopService $service, Vehicle $vehicle, int $mileageForFrequency): float
+    {
+        $unitPrice = round(
+            (float) $service->resolvePriceForDisplacement((int) ($vehicle->engine_displacement_cc ?? 0)),
+            6
+        );
+        if ($unitPrice < 0) {
+            $unitPrice = 0;
+        }
+
+        if ((bool) ($service->frequency_enabled ?? false) && $mileageForFrequency > 0) {
+            $validFrequencies = $service->frequencies
+                ->filter(fn ($f) => (int) ($f->km ?? 0) > 0 && ((int) $mileageForFrequency % (int) $f->km) === 0)
+                ->sortByDesc(fn ($f) => (int) $f->km)
+                ->values();
+
+            $multiplier = (float) ($validFrequencies->first()->multiplier ?? 1);
+            $unitPrice = round((float) $unitPrice * $multiplier, 6);
+        }
+
+        return $unitPrice;
+    }
+
+    private function productBranchRowForMaintenance(int $branchId, int $productId): ?object
+    {
+        return ProductBranch::query()
+            ->join('products', 'products.id', '=', 'product_branch.product_id')
+            ->where('product_branch.branch_id', $branchId)
+            ->whereNull('product_branch.deleted_at')
+            ->whereNull('products.deleted_at')
+            ->where('products.id', $productId)
+            ->first([
+                'product_branch.product_id',
+                'product_branch.price',
+                'product_branch.tax_rate_id',
+                'products.description',
+                'products.code',
+            ]);
     }
 
     private function assertOrderScope(WorkshopMovement $order): void

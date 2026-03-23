@@ -64,6 +64,7 @@
                     $pendingBillingCountCard = (int) ($card->pending_billing_count ?? 0);
                     $canQuoteCard = ((string) $card->status === 'awaiting_approval');
                     $canCheckoutCard = ((string) $card->status === 'finished' && $pendingDebtCard > 0);
+                    $canEditBoardCard = !in_array((string) $card->status, ['cancelled', 'delivered'], true) && !$card->sales_movement_id;
                     $quotationPayload = [
                         'action' => route('workshop.maintenance-board.quotation', $card),
                         'order_label' => 'OS ' . ($card->movement?->number ?? ('#' . $card->id)) . ' - ' . trim(($card->vehicle?->brand ?? '') . ' ' . ($card->vehicle?->model ?? '')),
@@ -178,6 +179,12 @@
                             <a href="{{ route('workshop.maintenance-board.checkout.page', $card) }}"
                                class="inline-flex items-center rounded-xl bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-800">
                                 Venta y cobro
+                            </a>
+                        @endif
+                        @if($canEditBoardCard)
+                            <a href="{{ route('workshop.maintenance-board.edit', $card) }}"
+                               class="rounded-xl bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-amber-700">
+                                Editar
                             </a>
                         @endif
                         <a href="{{ route('workshop.pdf.order', $card) }}" target="_blank" rel="noopener" class="rounded-xl bg-slate-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800">I. inicial</a>

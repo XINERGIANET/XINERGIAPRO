@@ -449,6 +449,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/tablero-mantenimiento', [WorkshopMaintenanceBoardController::class, 'index'])->name('maintenance-board.index');
         Route::get('/tablero-mantenimiento/nuevo', [WorkshopMaintenanceBoardController::class, 'create'])->name('maintenance-board.create');
         Route::post('/tablero-mantenimiento', [WorkshopMaintenanceBoardController::class, 'store'])->name('maintenance-board.store');
+        Route::get('/tablero-mantenimiento/{order}/editar', [WorkshopMaintenanceBoardController::class, 'edit'])->name('maintenance-board.edit');
+        Route::put('/tablero-mantenimiento/{order}', [WorkshopMaintenanceBoardController::class, 'update'])->name('maintenance-board.update');
         Route::post('/tablero-mantenimiento/vehiculos', [WorkshopMaintenanceBoardController::class, 'storeVehicleQuick'])->name('maintenance-board.vehicles.store');
         Route::post('/tablero-mantenimiento/clientes', [WorkshopMaintenanceBoardController::class, 'storeClientQuick'])->name('maintenance-board.clients.store');
         Route::post('/tablero-mantenimiento/{order}/iniciar', [WorkshopMaintenanceBoardController::class, 'start'])->name('maintenance-board.start');
