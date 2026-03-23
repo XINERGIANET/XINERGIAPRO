@@ -199,6 +199,9 @@
                             <th style="background-color: #334155; color: #FFFFFF;" class="hidden md:table-cell w-32 px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Código</p>
                             </th>
+                            <th style="background-color: #334155; color: #FFFFFF;" class="hidden lg:table-cell w-36 px-5 py-3 text-center sm:px-6">
+                                <p class="font-semibold text-white text-theme-xs uppercase">Marca</p>
+                            </th>
                             <th style="background-color: #334155; color: #FFFFFF;" class="px-5 py-3 text-center sm:px-6">
                                 <p class="font-semibold text-white text-theme-xs uppercase">Descripción</p>
                             </th>
