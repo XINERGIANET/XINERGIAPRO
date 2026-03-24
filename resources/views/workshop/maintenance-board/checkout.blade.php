@@ -199,7 +199,16 @@
         }
     }"
 >
-    <x-common.page-breadcrumb pageTitle="Venta y Cobro" />
+    @php
+        $checkoutOsLabel = 'OS ' . ($order->movement?->number ?? ('#' . $order->id));
+    @endphp
+    <x-common.page-breadcrumb
+        :pageTitle="'Venta y cobro · ' . $checkoutOsLabel"
+        :crumbs="[
+            ['label' => 'Tablero de Mantenimiento', 'url' => route('workshop.maintenance-board.index')],
+            ['label' => $checkoutOsLabel . ' | Venta y cobro'],
+        ]"
+    />
 
     <x-common.component-card title="OS Finalizada - Venta y cobro" desc="Factura servicios pendientes, agrega productos y registra el pago para entregar la unidad.">
         @if (session('status'))

@@ -755,7 +755,7 @@ class WorkshopFlowService
                 'movement_type_id' => $warehouseTypeId,
                 'document_type_id' => $warehouseDocId,
                 'branch_id' => $branchId,
-                'parent_movement_id' => $order->movement_id,
+                'parent_movement_id' => $this->normalizeMovementIdForParentFk($order->movement_id ? (int) $order->movement_id : null),
             ]);
 
             $warehouse = WarehouseMovement::query()->create([
@@ -919,7 +919,7 @@ class WorkshopFlowService
                 'movement_type_id' => $movementTypeId,
                 'document_type_id' => $documentTypeId,
                 'branch_id' => $branchId,
-                'parent_movement_id' => $order->movement_id,
+                'parent_movement_id' => $this->normalizeMovementIdForParentFk($order->movement_id ? (int) $order->movement_id : null),
             ]);
 
             $resolvedInvoiceSeries = $isInvoiceDocument
@@ -1293,7 +1293,7 @@ class WorkshopFlowService
                      'movement_type_id' => 4,
                     'document_type_id' => 9,
                     'branch_id' => $branchId,
-                    'parent_movement_id' => $order->sales_movement_id ?: $order->movement_id,
+                    'parent_movement_id' => $this->resolveWorkshopPaymentParentMovementId($order),
                 ]);
 
                 $cashMovement = CashMovements::query()->create([
@@ -1522,7 +1522,8 @@ class WorkshopFlowService
                 'movement_type_id' => $movementTypeId,
                 'document_type_id' => $documentTypeId,
                 'branch_id' => $branchId,
-                'parent_movement_id' => $order->cash?->movement_id ?: $order->movement_id,
+                'parent_movement_id' => $this->normalizeMovementIdForParentFk($order->cash?->movement_id ? (int) $order->cash->movement_id : null)
+                    ?? $this->normalizeMovementIdForParentFk($order->movement_id ? (int) $order->movement_id : null),
             ]);
 
             $cashMovement = CashMovements::query()->create([
@@ -1722,7 +1723,7 @@ class WorkshopFlowService
             'movement_type_id' => $movementTypeId,
             'document_type_id' => $documentTypeId,
             'branch_id' => $branchId,
-            'parent_movement_id' => $order->movement_id,
+            'parent_movement_id' => $this->normalizeMovementIdForParentFk($order->movement_id ? (int) $order->movement_id : null),
         ]);
 
         $warehouse = WarehouseMovement::query()->create([
@@ -2298,5 +2299,34 @@ class WorkshopFlowService
         $profileName = strtoupper((string) ($user?->profile?->name ?? ''));
 
         return (int) ($user?->profile_id ?? 0) === 1 || str_contains($profileName, 'ADMIN');
+    }
+
+    /** Comprueba que el id exista en movements (incluye soft delete) para la FK parent_movement_id. */
+    private function normalizeMovementIdForParentFk(?int $movementId): ?int
+    {
+        $id = $movementId ? (int) $movementId : 0;
+        if ($id <= 0) {
+            return null;
+        }
+
+        return Movement::withTrashed()->whereKey($id)->exists() ? $id : null;
+    }
+
+    /**
+     * Padre del movimiento de caja: el movement_id del comprobante de venta (tabla movements), no sales_movements.id.
+     */
+    private function resolveWorkshopPaymentParentMovementId(WorkshopMovement $order): ?int
+    {
+        if ((int) ($order->sales_movement_id ?? 0) > 0) {
+            $saleHeaderMovementId = SalesMovement::query()
+                ->whereKey((int) $order->sales_movement_id)
+                ->value('movement_id');
+            $fromSale = $this->normalizeMovementIdForParentFk($saleHeaderMovementId ? (int) $saleHeaderMovementId : null);
+            if ($fromSale !== null) {
+                return $fromSale;
+            }
+        }
+
+        return $this->normalizeMovementIdForParentFk($order->movement_id ? (int) $order->movement_id : null);
     }
 }
