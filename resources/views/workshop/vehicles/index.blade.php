@@ -139,7 +139,7 @@
                             <td class="px-4 py-3 text-sm text-center">{{ $vehicle->id }}</td>
                             <td class="px-4 py-3 text-sm text-center uppercase">{{ $vehicle->client?->first_name }} {{ $vehicle->client?->last_name }}</td>
                             <td class="px-4 py-3 text-sm text-center uppercase">{{ $vehicle->brand }} {{ $vehicle->model }} ({{ ucfirst($vehicle->vehicleType?->name ?? $vehicle->type) }})</td>
-                            <td class="px-4 py-3 text-sm text-center font-bold">{{ $vehicle->plate }}</td>
+                            <td class="px-4 py-3 text-sm text-center font-bold">{{ $vehicle->plate ?: '-' }}</td>
                             <td class="px-4 py-3 text-sm text-center">{{ $vehicle->engine_displacement_cc ? number_format((int) $vehicle->engine_displacement_cc) . ' cc' : '-' }}</td>
                             <td class="px-4 py-3 text-sm text-center">{{ number_format($vehicle->current_mileage) }}</td>
                             <td class="px-4 py-3 text-sm">
