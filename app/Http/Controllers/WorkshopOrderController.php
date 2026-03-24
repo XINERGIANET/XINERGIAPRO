@@ -21,13 +21,20 @@ use App\Models\TaxRate;
 use App\Models\WorkshopMovement;
 use App\Models\WorkshopMovementDetail;
 use App\Models\WorkshopMovementTechnician;
+use App\Models\Vehicle;
 use App\Models\WorkshopService;
 use App\Services\Workshop\WorkshopFlowService;
 use App\Support\WorkshopAuthorization;
+use App\Support\WorkshopOrdersExcelImport;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\File;
 
 class WorkshopOrderController extends Controller
 {
@@ -90,6 +97,197 @@ class WorkshopOrderController extends Controller
             ->withQueryString();
 
         return view('workshop.orders.index', compact('orders', 'search', 'perPage', 'selectedStatus'));
+    }
+
+    public function importExcel(Request $request): RedirectResponse
+    {
+        $viewId = $request->input('view_id');
+
+        $validator = Validator::make($request->all(), [
+            'file' => ['required', File::types(['xlsx', 'xls', 'csv'])->max(10240)],
+        ]);
+
+        if ($validator->fails()) {
+            $msg = (string) ($validator->errors()->first('file') ?: 'Archivo no válido. Usa .xlsx, .xls o .csv (máx. 10 MB).');
+
+            return redirect()
+                ->route('workshop.orders.index', array_filter(['view_id' => $viewId]))
+                ->withErrors($validator)
+                ->with('error', $msg);
+        }
+
+        $branchId = (int) session('branch_id');
+        $branch = $branchId > 0 ? \App\Models\Branch::query()->find($branchId) : null;
+        $companyId = (int) ($branch?->company_id ?? 0);
+
+        if ($branchId <= 0 || $companyId <= 0) {
+            return redirect()
+                ->route('workshop.orders.index', array_filter(['view_id' => $viewId]))
+                ->with('error', 'Selecciona una sucursal para importar órdenes.');
+        }
+
+        $uploaded = $request->file('file');
+        if (!$uploaded) {
+            return redirect()
+                ->route('workshop.orders.index', array_filter(['view_id' => $viewId]))
+                ->withErrors(['file' => 'No se recibió ningún archivo.'])
+                ->with('error', 'No se recibió ningún archivo.');
+        }
+
+        $ext = strtolower((string) $uploaded->getClientOriginalExtension());
+        if ($ext === '') {
+            $ext = 'xlsx';
+        }
+
+        $storedRelative = $uploaded->storeAs(
+            'temp/workshop-order-imports',
+            Str::uuid()->toString() . '.' . $ext,
+            'local'
+        );
+
+        if ($storedRelative === false) {
+            return redirect()
+                ->route('workshop.orders.index', array_filter(['view_id' => $viewId]))
+                ->withErrors(['file' => 'No se pudo guardar el archivo temporalmente.'])
+                ->with('error', 'No se pudo guardar el archivo temporalmente.');
+        }
+
+        $fullPath = Storage::disk('local')->path($storedRelative);
+
+        try {
+            $rows = WorkshopOrdersExcelImport::extractRows($fullPath);
+        } catch (\InvalidArgumentException $e) {
+            Storage::disk('local')->delete($storedRelative);
+
+            return redirect()
+                ->route('workshop.orders.index', array_filter(['view_id' => $viewId]))
+                ->withErrors(['file' => $e->getMessage()])
+                ->with('error', $e->getMessage());
+        }
+
+        Storage::disk('local')->delete($storedRelative);
+
+        $user = auth()->user();
+        $userId = (int) ($user?->id ?? 0);
+        $userName = (string) ($user?->name ?? 'Sistema');
+
+        $created = 0;
+        $rowErrors = [];
+
+        foreach ($rows as $row) {
+            try {
+                DB::transaction(function () use ($row, $branchId, $companyId, $userId, $userName) {
+                    $vehicle = $this->resolveVehicleForOrderImport($row['plate'], $companyId, $branchId);
+                    if (!$vehicle) {
+                        throw new \RuntimeException('No hay vehículo con placa «' . $row['plate'] . '» en esta empresa/sucursal.');
+                    }
+
+                    $doc = trim((string) $row['document']);
+                    if ($doc !== '') {
+                        $person = Person::query()
+                            ->where('branch_id', $branchId)
+                            ->whereRaw('TRIM(document_number) = ?', [$doc])
+                            ->first();
+                        if (!$person) {
+                            throw new \RuntimeException('Documento «' . $doc . '» no encontrado en la sucursal.');
+                        }
+                        if ((int) $vehicle->client_person_id !== (int) $person->id) {
+                            throw new \RuntimeException('El documento no coincide con el titular del vehículo.');
+                        }
+                    }
+
+                    $glosas = $row['service_descriptions'];
+                    if ($glosas === []) {
+                        throw new \RuntimeException('OBSERVACIONES sin ítems válidos después de separar por +.');
+                    }
+
+                    $intakeDate = $row['intake_date'] ?? now()->toDateString();
+
+                    $orderData = [
+                        'vehicle_id' => (int) $vehicle->id,
+                        'client_person_id' => (int) $vehicle->client_person_id,
+                        'intake_date' => $intakeDate,
+                        'mileage_in' => $row['mileage_in'],
+                        'observations' => $row['observations'],
+                        'status' => 'finished',
+                        'comment' => 'OS importada desde Excel',
+                    ];
+
+                    $order = $this->flowService->createOrder($orderData, $branchId, $userId, $userName);
+
+                    foreach ($glosas as $desc) {
+                        $this->flowService->addDetail($order, [
+                            'line_type' => 'SERVICE',
+                            'service_id' => null,
+                            'product_id' => null,
+                            'description' => $desc,
+                            'qty' => 1,
+                            'unit_price' => 0,
+                            'discount_amount' => 0,
+                            'tax_rate_id' => null,
+                        ]);
+                    }
+
+                    $order = WorkshopMovement::query()->findOrFail($order->id);
+                    $this->flowService->updateOrder($order, [
+                        'status' => 'delivered',
+                        'comment' => 'Entregada por importación histórica',
+                    ]);
+                });
+                $created++;
+            } catch (\Throwable $e) {
+                Log::warning('importExcel OS fila ' . $row['row_index'] . ': ' . $e->getMessage());
+                $rowErrors[] = 'Fila ' . $row['row_index'] . ': ' . $e->getMessage();
+            }
+        }
+
+        $msg = "Importación: {$created} orden(es) creada(s) como entregada(s), con servicios en glosa.";
+        if ($rowErrors !== []) {
+            $msg .= ' Errores: ' . implode(' | ', array_slice($rowErrors, 0, 8));
+            if (count($rowErrors) > 8) {
+                $msg .= ' (+' . (count($rowErrors) - 8) . ' más)';
+            }
+        }
+
+        $redirect = redirect()
+            ->route('workshop.orders.index', array_filter(['view_id' => $viewId]));
+
+        if ($created > 0) {
+            $redirect->with('status', $msg);
+        } else {
+            $redirect->with('error', $msg);
+        }
+
+        if ($created === 0 && $rowErrors !== []) {
+            $redirect->withErrors(['file' => implode("\n", array_slice($rowErrors, 0, 5))]);
+        }
+
+        return $redirect;
+    }
+
+    private function resolveVehicleForOrderImport(string $plate, int $companyId, int $branchId): ?Vehicle
+    {
+        $norm = strtoupper(preg_replace('/\s+/u', '', trim($plate)) ?? '');
+        if ($norm === '') {
+            return null;
+        }
+
+        $candidates = Vehicle::query()
+            ->where('company_id', $companyId)
+            ->where(function ($q) use ($branchId) {
+                $q->whereNull('branch_id')->orWhere('branch_id', $branchId);
+            })
+            ->orderByDesc('id')
+            ->get();
+
+        foreach ($candidates as $vehicle) {
+            $p = strtoupper(preg_replace('/\s+/u', '', trim((string) $vehicle->plate)) ?? '');
+            if ($p === $norm) {
+                return $vehicle;
+            }
+        }
+
+        return null;
     }
 
     public function create(Request $request): RedirectResponse

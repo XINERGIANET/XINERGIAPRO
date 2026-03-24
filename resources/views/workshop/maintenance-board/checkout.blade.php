@@ -7,7 +7,7 @@
         productsCatalog: @js(($products ?? collect())->values()->all()),
         productLines: @js(array_values(old('product_lines', []))),
         documentTypeOptions: @js(collect($documentTypes ?? collect())->map(fn ($doc) => ['id' => (int) $doc->id, 'name' => (string) ($doc->name ?? '')])->values()->all()),
-        selectedDocumentTypeId: @js((string) old('document_type_id', optional(($documentTypes ?? collect())->first())->id)),
+        selectedDocumentTypeId: @js((string) old('document_type_id', $defaultDocumentTypeId ?? optional(($documentTypes ?? collect())->first())->id)),
         billingStatus: @js((string) old('billing_status', 'PENDING')),
         invoiceSeries: @js((string) old('invoice_series', '001')),
         invoiceNumber: @js((string) old('invoice_number', '')),
@@ -18,13 +18,24 @@
         paymentGatewayOptionsByMethod: @js($paymentGatewayOptionsByMethod ?? []),
         paymentRows: @js(array_values(old('payment_methods', []))),
         pendingOs: Number(@json($pendingOs)),
+        nothingToCollect() {
+            return this.chargeTotal() <= 0.000009;
+        },
         init() {
             this.paymentType = String(this.paymentType || 'CONTADO').toUpperCase() === 'DEUDA' ? 'DEUDA' : 'CONTADO';
+            if (this.chargeTotal() <= 0.000009) {
+                this.paymentType = 'CONTADO';
+            }
             if (!Array.isArray(this.productLines)) this.productLines = [];
             if (!Array.isArray(this.paymentRows)) this.paymentRows = [];
             this.paymentRows = this.paymentRows.map((row) => this.normalizePaymentRow(row));
-            if (this.isDebtPaymentSelected()) this.paymentRows = [];
-            if (this.paymentRows.length === 0 && !this.isDebtPaymentSelected()) this.addPaymentRow(true);
+            if (this.isDebtPaymentSelected()) {
+                this.paymentRows = [];
+            } else if (this.nothingToCollect()) {
+                this.paymentRows = [];
+            } else if (this.paymentRows.length === 0) {
+                this.addPaymentRow(true);
+            }
             this.syncInvoiceBillingFields();
             this.syncAmount();
         },
@@ -128,6 +139,8 @@
             this.paymentType = this.isDebtPaymentSelected() ? 'DEUDA' : 'CONTADO';
             if (this.isDebtPaymentSelected()) {
                 this.paymentRows = [];
+            } else if (this.nothingToCollect()) {
+                this.paymentRows = [];
             } else if (this.paymentRows.length === 0) {
                 this.addPaymentRow(true);
                 return;
@@ -135,6 +148,10 @@
             this.syncAmount();
         },
         removePaymentRow(index) {
+            if (this.nothingToCollect()) {
+                this.paymentRows.splice(index, 1);
+                return;
+            }
             if (this.paymentRows.length === 1) {
                 this.paymentRows[0].amount = this.chargeTotal().toFixed(2);
                 return;
@@ -166,6 +183,14 @@
         },
         syncAmount() {
             if (this.isDebtPaymentSelected()) {
+                return;
+            }
+            if (this.nothingToCollect()) {
+                this.paymentRows = [];
+                return;
+            }
+            if (this.paymentRows.length === 0) {
+                this.addPaymentRow(true);
                 return;
             }
             if (this.paymentRows.length === 1) {
@@ -310,7 +335,7 @@
                     <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Condición</label>
                     <select x-model="paymentType" @change="onPaymentTypeChange()" name="payment_type" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
                         <option value="CONTADO">Contado</option>
-                        <option value="DEUDA">Deuda</option>
+                        <option value="DEUDA" x-bind:disabled="nothingToCollect()">Deuda</option>
                     </select>
                 </div>
                 <div>
@@ -363,7 +388,12 @@
                 </div>
             </div>
 
-            <div x-show="!isDebtPaymentSelected()" x-cloak class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div x-show="!isDebtPaymentSelected() && nothingToCollect()" x-cloak class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                <p class="font-semibold">Total a cobrar: S/ 0.00</p>
+                <p class="mt-1 text-xs text-sky-800">No se registran medios de pago. Elige el documento de venta y confirma para facturar (si aplica) y marcar la OS como entregada.</p>
+            </div>
+
+            <div x-show="!isDebtPaymentSelected() && !nothingToCollect()" x-cloak class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div class="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 md:flex-row md:items-center md:justify-between">
                     <div>
                         <p class="text-sm font-semibold text-slate-800">Desglose de cobro</p>

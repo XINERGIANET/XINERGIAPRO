@@ -1338,6 +1338,11 @@ class WorkshopMaintenanceBoardController extends Controller
             ])->values())
             ->all();
 
+        $defaultDocumentTypeId = $this->getBranchDefaultSaleDocumentTypeId(
+            $branchId,
+            collect($formData['documentTypes'] ?? [])
+        );
+
         return view('workshop.maintenance-board.checkout', array_merge($formData, [
             'order' => $order,
             'pendingLines' => $pendingLines,
@@ -1348,6 +1353,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'cardOptions' => $cardOptions,
             'digitalWalletOptions' => $digitalWalletOptions,
             'paymentGatewayOptionsByMethod' => $paymentGatewayOptionsByMethod,
+            'defaultDocumentTypeId' => $defaultDocumentTypeId,
         ]));
     }
 
@@ -1386,7 +1392,10 @@ class WorkshopMaintenanceBoardController extends Controller
             ->values()
             ->all();
 
-        if (!$isDebtCheckout && empty($validated['payment_methods'])) {
+        $orderForPaymentRule = WorkshopMovement::query()->findOrFail($order->id);
+        $amountPendingToCollect = max(0, (float) $orderForPaymentRule->total - (float) $orderForPaymentRule->paid_total);
+
+        if (!$isDebtCheckout && empty($validated['payment_methods']) && $amountPendingToCollect > 0.000001) {
             throw ValidationException::withMessages([
                 'payment_methods' => 'Debes registrar al menos un metodo de pago cuando el cobro es al contado.',
             ]);
@@ -1779,6 +1788,33 @@ class WorkshopMaintenanceBoardController extends Controller
         $branch = Branch::query()->findOrFail($branchId);
 
         return [$branchId, (int) $branch->company_id];
+    }
+
+    private function getBranchDefaultSaleDocumentTypeId(int $branchId, $documentTypes): ?int
+    {
+        $documentTypes = collect($documentTypes);
+
+        if ($branchId <= 0) {
+            return $documentTypes->first()?->id ? (int) $documentTypes->first()->id : null;
+        }
+
+        $configuredValue = DB::table('branch_parameters as bp')
+            ->join('parameters as p', 'p.id', '=', 'bp.parameter_id')
+            ->where('bp.branch_id', $branchId)
+            ->whereNull('bp.deleted_at')
+            ->whereNull('p.deleted_at')
+            ->where('p.description', 'ILIKE', '%tipo venta por defecto%')
+            ->value('bp.value');
+
+        if (is_numeric($configuredValue)) {
+            $configuredId = (int) $configuredValue;
+            $existsInSaleDocs = $documentTypes->contains(fn ($d) => (int) $d->id === $configuredId);
+            if ($existsInSaleDocs) {
+                return $configuredId;
+            }
+        }
+
+        return $documentTypes->first()?->id ? (int) $documentTypes->first()->id : null;
     }
 
     private function inferPaymentMethodKind(string $description): string

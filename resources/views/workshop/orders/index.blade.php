@@ -68,8 +68,19 @@
             </div>
 
             {{-- Botones de Acción (Reportes y Nueva OS) --}}
-            <div class="flex w-full gap-2 xl:ml-auto xl:w-auto xl:flex-none">
-           
+            <div class="flex w-full flex-wrap items-center gap-2 xl:ml-auto xl:w-auto xl:flex-none">
+                <form method="POST" action="{{ route('workshop.orders.import-excel') }}" enctype="multipart/form-data" class="inline" data-turbo="false">
+                    @csrf
+                    @if ($viewId)
+                        <input type="hidden" name="view_id" value="{{ $viewId }}">
+                    @endif
+                    <input type="file" name="file" id="workshop-orders-excel-import-input" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" class="hidden" onchange="if (this.files.length) this.form.submit();">
+                    <x-ui.button size="md" variant="outline" type="button" class="h-11 rounded-xl border-gray-300 px-4 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-white/5"
+                        onclick="document.getElementById('workshop-orders-excel-import-input').click();">
+                        <i class="ri-file-excel-2-line"></i>
+                        <span>Importar Excel</span>
+                    </x-ui.button>
+                </form>
                 <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.maintenance-board.create', $viewId ? ['view_id' => $viewId] : []) }}" class="h-11 rounded-xl px-5 font-bold shadow-sm transition-all hover:brightness-105 active:scale-95" style="background-color: #00A389; color: #FFFFFF; border-color: #00A389;">
                     <i class="ri-add-line"></i>
                     <span>Nueva OS</span>
@@ -77,8 +88,17 @@
             </div>
         </form>
 
+        @if ($errors->has('file'))
+            <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800/50 dark:bg-red-950/30 dark:text-red-200">
+                <strong>Importación OS:</strong> {{ $errors->first('file') }}
+            </div>
+        @endif
+
         @if (session('status'))
             <div class="mb-4 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-700">{{ session('status') }}</div>
+        @endif
+        @if (session('error'))
+            <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ session('error') }}</div>
         @endif
 
         <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
