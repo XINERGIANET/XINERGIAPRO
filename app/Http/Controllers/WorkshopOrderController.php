@@ -10,6 +10,7 @@ use App\Http\Requests\Workshop\StoreWorkshopLineRequest;
 use App\Http\Requests\Workshop\StoreWorkshopOrderRequest;
 use App\Http\Requests\Workshop\UpdateWorkshopLineRequest;
 use App\Http\Requests\Workshop\UpdateWorkshopOrderRequest;
+use App\Models\Branch;
 use App\Models\CashRegister;
 use App\Models\DocumentType;
 use App\Models\Movement;
@@ -177,23 +178,23 @@ class WorkshopOrderController extends Controller
         foreach ($rows as $row) {
             try {
                 DB::transaction(function () use ($row, $branchId, $companyId, $userId, $userName) {
-                    $vehicle = $this->resolveVehicleForOrderImport($row['plate'], $companyId, $branchId);
-                    if (!$vehicle) {
-                        throw new \RuntimeException('No hay vehículo con placa «' . $row['plate'] . '» en esta empresa/sucursal.');
-                    }
-
                     $doc = trim((string) $row['document']);
                     if ($doc !== '') {
-                        $person = Person::query()
-                            ->where('branch_id', $branchId)
-                            ->whereRaw('TRIM(document_number) = ?', [$doc])
-                            ->first();
-                        if (!$person) {
-                            throw new \RuntimeException('Documento «' . $doc . '» no encontrado en la sucursal.');
-                        }
-                        if ((int) $vehicle->client_person_id !== (int) $person->id) {
-                            throw new \RuntimeException('El documento no coincide con el titular del vehículo.');
-                        }
+                        $clientPerson = $this->ensureImportClientPersonByDocument($doc, $branchId, $companyId);
+                    } else {
+                        $clientPerson = $this->ensureImportGeneralClientPerson($branchId);
+                    }
+
+                    $vehicle = $this->resolveOrCreateVehicleForOrderImport(
+                        $row['plate'],
+                        $companyId,
+                        $branchId,
+                        $clientPerson,
+                        (int) $row['row_index']
+                    );
+
+                    if ($doc !== '' && (int) $vehicle->client_person_id !== (int) $clientPerson->id) {
+                        throw new \RuntimeException('El documento no coincide con el titular del vehículo (placa ya registrada a otro cliente).');
                     }
 
                     $glosas = $row['service_descriptions'];
@@ -267,27 +268,193 @@ class WorkshopOrderController extends Controller
 
     private function resolveVehicleForOrderImport(string $plate, int $companyId, int $branchId): ?Vehicle
     {
-        $norm = strtoupper(preg_replace('/\s+/u', '', trim($plate)) ?? '');
+        return $this->findVehicleByNormalizedPlate($plate, $companyId, $branchId);
+    }
+
+    private function findVehicleByNormalizedPlate(string $plate, int $companyId, int $branchId): ?Vehicle
+    {
+        $norm = $this->normalizePlateString($plate);
         if ($norm === '') {
             return null;
         }
 
         $candidates = Vehicle::query()
             ->where('company_id', $companyId)
-            ->where(function ($q) use ($branchId) {
-                $q->whereNull('branch_id')->orWhere('branch_id', $branchId);
-            })
             ->orderByDesc('id')
             ->get();
 
         foreach ($candidates as $vehicle) {
-            $p = strtoupper(preg_replace('/\s+/u', '', trim((string) $vehicle->plate)) ?? '');
+            $p = $this->normalizePlateString((string) $vehicle->plate);
             if ($p === $norm) {
                 return $vehicle;
             }
         }
 
         return null;
+    }
+
+    private function normalizePlateString(string $plate): string
+    {
+        return strtoupper(preg_replace('/\s+/u', '', trim($plate)) ?? '');
+    }
+
+    private function isPlaceholderImportPlate(string $normalized): bool
+    {
+        if ($normalized === '') {
+            return true;
+        }
+
+        $markers = ['-', '--', '.', '..', 'N/A', 'NA', 'S/N', 'SN', 'XXX', 'SINPLACA', '0', '00', '—', '–'];
+        foreach ($markers as $m) {
+            if ($normalized === strtoupper($m)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function uniqueGeneratedImportPlate(int $companyId, int $rowIndex): string
+    {
+        for ($i = 0; $i < 12; $i++) {
+            $candidate = 'IMP-' . $rowIndex . '-' . strtoupper(bin2hex(random_bytes(3)));
+            $exists = Vehicle::query()
+                ->where('company_id', $companyId)
+                ->whereRaw('UPPER(TRIM(plate)) = ?', [$candidate])
+                ->exists();
+            if (!$exists) {
+                return $candidate;
+            }
+        }
+
+        return 'IMP-' . $rowIndex . '-' . strtoupper(Str::random(8));
+    }
+
+    private function resolveOrCreateVehicleForOrderImport(
+        string $plate,
+        int $companyId,
+        int $branchId,
+        Person $clientPerson,
+        int $rowIndex
+    ): Vehicle {
+        $existing = $this->findVehicleByNormalizedPlate($plate, $companyId, $branchId);
+        if ($existing) {
+            return $existing;
+        }
+
+        $norm = $this->normalizePlateString($plate);
+        $finalPlate = $this->isPlaceholderImportPlate($norm)
+            ? $this->uniqueGeneratedImportPlate($companyId, $rowIndex)
+            : $norm;
+
+        return Vehicle::query()->create([
+            'company_id' => $companyId,
+            'branch_id' => $branchId,
+            'client_person_id' => $clientPerson->id,
+            'type' => 'moto',
+            'brand' => 'Importación',
+            'model' => 'Excel',
+            'plate' => $finalPlate,
+            'current_mileage' => 0,
+            'status' => 'active',
+        ]);
+    }
+
+    private function ensureImportGeneralClientPerson(int $branchId): Person
+    {
+        $branch = Branch::query()->findOrFail($branchId);
+        $person = Person::query()->firstOrCreate(
+            [
+                'branch_id' => $branchId,
+                'document_number' => '0',
+                'person_type' => 'DNI',
+            ],
+            [
+                'first_name' => 'CLIENTES VARIOS',
+                'last_name' => '',
+                'phone' => '-',
+                'email' => 'clientes.varios.' . $branchId . '@xinergia.local',
+                'address' => $branch->address ?: '-',
+                'location_id' => $branch->location_id,
+            ]
+        );
+
+        DB::table('role_person')->updateOrInsert(
+            [
+                'role_id' => 3,
+                'person_id' => $person->id,
+                'branch_id' => $branchId,
+            ],
+            [
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+
+        return $person;
+    }
+
+    private function ensureImportClientPersonByDocument(string $document, int $branchId, int $companyId): Person
+    {
+        $doc = trim($document);
+        if ($doc === '') {
+            return $this->ensureImportGeneralClientPerson($branchId);
+        }
+
+        $person = Person::query()
+            ->where('branch_id', $branchId)
+            ->whereRaw('TRIM(document_number) = ?', [$doc])
+            ->first();
+
+        if ($person) {
+            DB::table('role_person')->updateOrInsert(
+                [
+                    'role_id' => 3,
+                    'person_id' => $person->id,
+                    'branch_id' => $branchId,
+                ],
+                [
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+
+            return $person;
+        }
+
+        $branch = Branch::query()->findOrFail($branchId);
+        $districtId = (int) ($branch->location_id ?? 0);
+        if ($districtId <= 0) {
+            throw new \RuntimeException('La sucursal no tiene distrito configurado; no se puede crear el cliente para documento «' . $doc . '».');
+        }
+
+        $personType = preg_match('/^\d{11}$/', $doc) ? 'RUC' : 'DNI';
+
+        $person = Person::query()->create([
+            'branch_id' => $branchId,
+            'document_number' => $doc,
+            'person_type' => $personType,
+            'first_name' => 'Cliente',
+            'last_name' => 'Importación Excel',
+            'phone' => '-',
+            'email' => '',
+            'address' => '-',
+            'location_id' => $districtId,
+        ]);
+
+        DB::table('role_person')->updateOrInsert(
+            [
+                'role_id' => 3,
+                'person_id' => $person->id,
+                'branch_id' => $branchId,
+            ],
+            [
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+
+        return $person;
     }
 
     public function create(Request $request): RedirectResponse
