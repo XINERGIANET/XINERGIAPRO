@@ -156,6 +156,7 @@
     editingVehicleLabel: @js($editingVehicleLabel ?? ''),
     editingClientLabel: @js($editingClientLabel ?? ''),
     selectedServiceIds: @js($selectedIdsFromLines),
+    serviceCcOverrideById: {},
     serviceLines: @js($serviceLinesForUi),
     inventoryItemsByVehicleType: @js($inventoryItemsByVehicleType ?? []),
     inventoryChecks: @js($inventoryForUi),
@@ -393,9 +394,25 @@
         const selected = this.vehicles.find(v => String(v.id) === String(this.selectedVehicleId));
         return Number(selected?.engine_displacement_cc || 0);
     },
+    getServiceCcOverride(serviceId) {
+        const raw = this.serviceCcOverrideById[String(serviceId)];
+        return raw === undefined || raw === null || raw === '' ? 'auto' : String(raw);
+    },
+    setServiceCcOverride(serviceId, value) {
+        const id = String(serviceId);
+        const next = { ...this.serviceCcOverrideById };
+        if (value === 'auto' || value === '' || value == null) {
+            delete next[id];
+        } else {
+            next[id] = String(value);
+        }
+        this.serviceCcOverrideById = next;
+        this.refreshServiceLinePrices();
+    },
     resolveServicePricing(service) {
         const tiers = this.orderedServiceTiers(service);
         const basePrice = Number(service?.base_price || 0);
+        const mode = this.getServiceCcOverride(service.id);
 
         if (!tiers.length) {
             return {
@@ -404,9 +421,28 @@
             };
         }
 
+        if (mode === 'base' && basePrice > 0) {
+            return {
+                price: basePrice,
+                label: 'Precio base',
+            };
+        }
+
+        if (mode.startsWith('tier:')) {
+            const maxCc = Number(mode.slice(5));
+            const tier = tiers.find((t) => Number(t.max_cc || 0) === maxCc)
+                || tiers.find((t) => Number(t.max_cc || 0) >= maxCc);
+            if (tier) {
+                return {
+                    price: Number(tier.price || 0),
+                    label: `Hasta ${Number(tier.max_cc || 0)}cc`,
+                };
+            }
+        }
+
         const vehicleCc = this.selectedVehicleCc();
         if (vehicleCc > 0) {
-            const matchedTier = tiers.find(tier => vehicleCc <= Number(tier.max_cc || 0)) || tiers[tiers.length - 1];
+            const matchedTier = tiers.find((tier) => vehicleCc <= Number(tier.max_cc || 0)) || tiers[tiers.length - 1];
             return {
                 price: Number(matchedTier?.price || 0),
                 label: `Hasta ${Number(matchedTier?.max_cc || 0)}cc`,
@@ -1245,8 +1281,26 @@
                                 <span class="block text-[10px] font-semibold uppercase tracking-wide text-slate-500" x-text="String(service.type || '') === 'preventivo' ? 'Preventivo' : (String(service.type || '') === 'correctivo' ? 'Correctivo' : (service.type || ''))"></span>
                                 <span class="block text-xs text-gray-500" x-text="servicePricingLabel(service)"></span>
                             </div>
-                            <div class="flex items-center gap-3">
-                                <span class="whitespace-nowrap text-xs font-bold text-emerald-600" x-text="`S/ ${resolveServicePrice(service).toFixed(2)}`"></span>
+                            <div class="flex shrink-0 items-center gap-2">
+                                <div class="flex flex-col items-end gap-0.5">
+                                    <span class="whitespace-nowrap text-xs font-bold text-emerald-600" x-text="`S/ ${resolveServicePrice(service).toFixed(2)}`"></span>
+                                    <template x-if="orderedServiceTiers(service).length > 0">
+                                        <select
+                                            class="max-w-[118px] cursor-pointer rounded border border-gray-200/90 bg-gray-50 py-0.5 pl-1 pr-5 text-[10px] leading-tight text-gray-500 shadow-none focus:border-indigo-300 focus:outline-none focus:ring-0"
+                                            aria-label="Tarifa por cilindrada"
+                                            x-bind:value="getServiceCcOverride(service.id)"
+                                            @change="setServiceCcOverride(service.id, $event.target.value)"
+                                            @click.stop
+                                            @mousedown.stop
+                                        >
+                                            <option value="auto">Según cil. vehículo</option>
+                                            <option value="base" :disabled="Number(service.base_price || 0) <= 0">Precio base</option>
+                                            <template x-for="tier in orderedServiceTiers(service)" :key="`${service.id}-cc-${tier.max_cc}`">
+                                                <option :value="'tier:' + tier.max_cc" x-text="'Hasta ' + tier.max_cc + ' cc'"></option>
+                                            </template>
+                                        </select>
+                                    </template>
+                                </div>
                                 <input
                                     type="checkbox"
                                     :checked="isServiceSelected(service.id)"
