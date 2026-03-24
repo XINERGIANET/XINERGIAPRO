@@ -506,9 +506,9 @@ class WorkshopOrderController extends Controller
         return mb_strtoupper(preg_replace('/\\s+/u', ' ', trim($value)) ?? '');
     }
 
-    private function isImportGeneralClientPerson(?Person $person, int $branchId): bool
+    private function isImportGeneralClientPerson(?Person $person): bool
     {
-        if (!$person || (int) $person->branch_id !== $branchId) {
+        if (!$person) {
             return false;
         }
 
@@ -530,7 +530,7 @@ class WorkshopOrderController extends Controller
             ? $vehicle->client
             : Person::query()->find($vehicle->client_person_id);
 
-        return $this->isImportGeneralClientPerson($currentClient, $branchId);
+        return $this->isImportGeneralClientPerson($currentClient);
     }
 
     /**
