@@ -245,12 +245,12 @@ class WorkshopOrderController extends Controller
 
                     if (
                         $this->isImportAnonymousDocument($docRaw)
-                        &&  !== ''
+                        && $clientFullName !== ''
                         && (int) $vehicle->client_person_id !== (int) $clientPerson->id
                         && $this->vehicleClientCanBeReplacedFromExcelName($vehicle, $branchId)
                     ) {
                         $vehicle->update([
-                            'client_person_id' => (int) ->id,
+                            'client_person_id' => (int) $clientPerson->id,
                         ]);
                         $vehicle->refresh();
                     }
@@ -503,7 +503,7 @@ class WorkshopOrderController extends Controller
 
     private function normalizeImportPersonName(string $value): string
     {
-        return mb_strtoupper(preg_replace('/\\s+/u', ' ', trim()) ?? '');
+        return mb_strtoupper(preg_replace('/\\s+/u', ' ', trim($value)) ?? '');
     }
 
     private function isImportGeneralClientPerson(?Person $person, int $branchId): bool
@@ -513,18 +513,20 @@ class WorkshopOrderController extends Controller
         }
 
         $document = trim((string) $person->document_number);
-         = ->normalizeImportPersonName(trim((->first_name ?? '') . ' ' . (->last_name ?? '')));
+        $fullName = $this->normalizeImportPersonName(
+            trim(($person->first_name ?? '') . ' ' . ($person->last_name ?? ''))
+        );
 
-        if ( === '') {
+        if ($fullName === '') {
             return true;
         }
 
-        return  === '0' &&  === 'CLIENTES VARIOS';
+        return $document === '0' && $fullName === 'CLIENTES VARIOS';
     }
 
     private function vehicleClientCanBeReplacedFromExcelName(Vehicle $vehicle, int $branchId): bool
     {
-         = ->relationLoaded('client')
+        $currentClient = $vehicle->relationLoaded('client')
             ? $vehicle->client
             : Person::query()->find($vehicle->client_person_id);
 
@@ -551,11 +553,11 @@ class WorkshopOrderController extends Controller
 
         $normalizedFullName = $this->normalizeImportPersonName($fullName);
         $existing = Person::query()
-            ->where('branch_id', )
+            ->where('branch_id', $branchId)
             ->whereRaw('TRIM(document_number) = ?', ['0'])
             ->get()
             ->first(function (Person $person) use ($normalizedFullName) {
-                 = trim((->first_name ?? '') . ' ' . (->last_name ?? ''));
+                $personFullName = trim(($person->first_name ?? '') . ' ' . ($person->last_name ?? ''));
 
                 return $this->normalizeImportPersonName($personFullName) === $normalizedFullName;
             });
@@ -564,8 +566,8 @@ class WorkshopOrderController extends Controller
             DB::table('role_person')->updateOrInsert(
                 [
                     'role_id' => 3,
-                    'person_id' => ->id,
-                    'branch_id' => ,
+                    'person_id' => $existing->id,
+                    'branch_id' => $branchId,
                 ],
                 [
                     'updated_at' => now(),
@@ -576,21 +578,21 @@ class WorkshopOrderController extends Controller
             $updates = [];
             $phoneNormExisting = trim($phone);
             if (
-                 !== ''
-                &&  !== '0'
-                && strtoupper() !== 'N/A'
+                $phoneNormExisting !== ''
+                && $phoneNormExisting !== '0'
+                && strtoupper($phoneNormExisting) !== 'N/A'
                 && trim((string) $existing->phone) !== $phoneNormExisting
             ) {
-                ['phone'] = mb_substr(, 0, 50);
+                $updates['phone'] = mb_substr($phoneNormExisting, 0, 50);
             }
 
             $emailNormExisting = trim($email);
             if (
-                 !== ''
+                $emailNormExisting !== ''
                 && filter_var($emailNormExisting, FILTER_VALIDATE_EMAIL)
                 && trim((string) $existing->email) !== $emailNormExisting
             ) {
-                ['email'] = mb_substr(, 0, 255);
+                $updates['email'] = mb_substr($emailNormExisting, 0, 255);
             }
 
             if ($updates !== []) {
@@ -600,7 +602,7 @@ class WorkshopOrderController extends Controller
             return $existing->fresh();
         }
 
-        $phoneNorm = trim($phone);
+        $phoneNorm = trim((string) $phone);
         if ($phoneNorm === '' || $phoneNorm === '0' || strtoupper($phoneNorm) === 'N/A') {
             $phoneNorm = '0';
         }
