@@ -100,8 +100,7 @@ class WorkshopMaintenanceBoardController extends Controller
             })
             ->when(
                 $selectedStatus !== 'all',
-                fn ($query) => $query->where('status', $selectedStatus),
-                fn ($query) => $query->whereNotIn('status', ['delivered', 'cancelled'])
+                fn ($query) => $query->where('status', $selectedStatus)
             )
             ->orderByRaw("CASE status WHEN 'in_progress' THEN 1 WHEN 'approved' THEN 2 WHEN 'awaiting_approval' THEN 3 WHEN 'diagnosis' THEN 4 ELSE 5 END")
             ->orderByDesc('id')

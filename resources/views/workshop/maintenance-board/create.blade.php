@@ -285,7 +285,7 @@
     refreshVehicleFilter() {
         const q = String(this.vehicleSearch || '').trim().toLowerCase();
         if (!q) {
-            this.filteredVehicleList = this.vehicles.slice(0, 30);
+            this.filteredVehicleList = this.vehicles.slice();
             return;
         }
         const qCompact = this.compactSearchText(q);
@@ -303,8 +303,7 @@
                         || this.compactSearchText(v.client_name).includes(qCompact);
                 }
                 return false;
-            })
-            .slice(0, 30);
+            });
     },
     selectVehicle(vehicle) {
         this.selectedVehicleId = String(vehicle.id);
