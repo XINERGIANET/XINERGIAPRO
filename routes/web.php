@@ -457,8 +457,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/tablero-mantenimiento/clientes', [WorkshopMaintenanceBoardController::class, 'storeClientQuick'])->name('maintenance-board.clients.store');
         Route::post('/tablero-mantenimiento/{order}/iniciar', [WorkshopMaintenanceBoardController::class, 'start'])->name('maintenance-board.start');
         Route::post('/tablero-mantenimiento/{order}/finalizar', [WorkshopMaintenanceBoardController::class, 'finish'])->name('maintenance-board.finish');
-        Route::post('/tablero-mantenimiento/{order}/entregar-rapido', [WorkshopMaintenanceBoardController::class, 'quickDeliver'])->name('maintenance-board.deliver-quick');
-        Route::post('/tablero-mantenimiento/entregar-masivo', [WorkshopMaintenanceBoardController::class, 'quickDeliverBulk'])->name('maintenance-board.deliver-bulk');
         Route::post('/tablero-mantenimiento/{order}/cotizacion', [WorkshopMaintenanceBoardController::class, 'quotation'])->name('maintenance-board.quotation');
         Route::get('/tablero-mantenimiento/{order}/venta-cobro', [WorkshopMaintenanceBoardController::class, 'checkoutPage'])->name('maintenance-board.checkout.page');
         Route::post('/tablero-mantenimiento/{order}/venta-cobro', [WorkshopMaintenanceBoardController::class, 'checkout'])->name('maintenance-board.checkout');
@@ -474,7 +472,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/agenda/{appointment}/convertir-os', [WorkshopAppointmentController::class, 'convertToOrder'])->name('appointments.convert');
 
     Route::get('/vehiculos', [WorkshopVehicleController::class, 'index'])->name('vehicles.index');
-    Route::post('/vehiculos/eliminar-masivo', [WorkshopVehicleController::class, 'destroyBulk'])->name('vehicles.destroy-bulk');
     Route::post('/vehiculos', [WorkshopVehicleController::class, 'store'])->name('vehicles.store');
     Route::put('/vehiculos/{vehicle}', [WorkshopVehicleController::class, 'update'])->name('vehicles.update');
     Route::delete('/vehiculos/{vehicle}', [WorkshopVehicleController::class, 'destroy'])->name('vehicles.destroy');
@@ -516,7 +513,6 @@ Route::middleware('auth')->group(function () {
         Route::post('armados/venta-masiva', [WorkshopAssemblyController::class, 'processMassiveSale'])->name('assemblies.massive_sale');
 
         Route::get('/ordenes', [WorkshopOrderController::class, 'index'])->name('orders.index');
-        Route::post('/ordenes/eliminar-masivo', [WorkshopOrderController::class, 'destroyBulk'])->name('orders.destroy-bulk');
         Route::post('/ordenes/import-excel', [WorkshopOrderController::class, 'importExcel'])->name('orders.import-excel');
         Route::get('/ordenes/crear', [WorkshopOrderController::class, 'create'])->name('orders.create');
         Route::post('/ordenes', [WorkshopOrderController::class, 'store'])->name('orders.store');

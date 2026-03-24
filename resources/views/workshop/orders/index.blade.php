@@ -14,11 +14,7 @@
 @endphp
 
 @section('content')
-<div x-data="{
-    toggleAllOrders(checked) {
-        this.$root.querySelectorAll('input[data-order-bulk-id]').forEach((el) => { el.checked = checked; });
-    }
-}">
+<div x-data="{}">
     <x-common.page-breadcrumb pageTitle="Ordenes Taller" />
 
     <x-common.component-card title="Ordenes de servicio" desc="Consulta y gestiona ordenes del taller.">
@@ -106,61 +102,10 @@
             <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ session('error') }}</div>
         @endif
 
-        <div class="mb-3 flex flex-wrap items-center gap-2">
-            <form
-                id="orders-bulk-by-ids"
-                method="POST"
-                action="{{ route('workshop.orders.destroy-bulk') }}"
-                class="js-swal-delete inline-flex"
-                data-swal-title="Eliminar ordenes seleccionadas?"
-                data-swal-text="Se eliminaran las ordenes marcadas en esta pagina que no tengan venta ni pagos vinculados. Esta accion no se puede deshacer."
-                data-swal-confirm="Si, eliminar"
-                data-swal-cancel="Cancelar"
-                data-swal-confirm-color="#ef4444"
-                data-swal-cancel-color="#6b7280"
-            >
-                @csrf
-                <input type="hidden" name="bulk_mode" value="ids">
-                @if ($viewId)
-                    <input type="hidden" name="view_id" value="{{ $viewId }}">
-                @endif
-                <x-ui.button size="md" variant="outline" type="submit" class="h-10 border-red-200 text-red-700 hover:bg-red-50">
-                    <i class="ri-delete-bin-line"></i>
-                    <span class="ml-1">Eliminar seleccionadas</span>
-                </x-ui.button>
-            </form>
-            <form
-                method="POST"
-                action="{{ route('workshop.orders.destroy-bulk') }}"
-                class="js-swal-delete inline-flex"
-                data-swal-title="Eliminar todas las ordenes del filtro?"
-                data-swal-text="Se intentara eliminar todas las ordenes que coincidan con la busqueda y el estado actual (en todas las paginas). Las que tengan venta o pagos vinculados se omitiran."
-                data-swal-confirm="Si, eliminar todas"
-                data-swal-cancel="Cancelar"
-                data-swal-confirm-color="#ef4444"
-                data-swal-cancel-color="#6b7280"
-            >
-                @csrf
-                <input type="hidden" name="bulk_mode" value="filter">
-                <input type="hidden" name="search" value="{{ $search }}">
-                <input type="hidden" name="status" value="{{ $selectedStatus }}">
-                @if ($viewId)
-                    <input type="hidden" name="view_id" value="{{ $viewId }}">
-                @endif
-                <x-ui.button size="md" variant="outline" type="submit" class="h-10 border-amber-200 text-amber-800 hover:bg-amber-50">
-                    <i class="ri-delete-bin-2-line"></i>
-                    <span class="ml-1">Eliminar todas (filtro actual)</span>
-                </x-ui.button>
-            </form>
-        </div>
-
         <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
             <table class="w-full">
                 <thead style="background-color: #334155; color: #FFFFFF;">
                     <tr>
-                        <th class="w-10 px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider first:rounded-tl-xl text-white">
-                            <input type="checkbox" class="h-4 w-4 rounded border-white/40 bg-white/10" @change="toggleAllOrders($event.target.checked)" title="Seleccionar todos en esta pagina" aria-label="Seleccionar todos en esta pagina">
-                        </th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">OS</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Ingreso</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Cliente</th>
@@ -174,9 +119,6 @@
                 <tbody>
                     @forelse($orders as $order)
                         <tr class="relative hover:z-[60] border-t border-gray-100 dark:border-gray-800 transition hover:bg-gray-50 dark:hover:bg-white/5">
-                            <td class="px-2 py-3 text-center align-middle">
-                                <input type="checkbox" form="orders-bulk-by-ids" name="ids[]" value="{{ $order->id }}" data-order-bulk-id class="h-4 w-4 rounded border-gray-300 text-brand-600" aria-label="Seleccionar orden {{ $order->movement?->number }}">
-                            </td>
                             <td class="px-3 py-3 text-sm text-center align-middle font-medium text-gray-800 dark:text-white/90">{{ $order->movement?->number }}</td>
                             <td class="px-3 py-3 text-sm text-center align-middle whitespace-nowrap">{{ $order->intake_date?->format('j/m/Y H:i A') }}</td>
                             <td class="px-3 py-3 text-sm text-center align-middle">
