@@ -255,9 +255,6 @@ class WorkshopOrderController extends Controller
                         $vehicle->refresh();
                     }
 
-                    if (!$this->isImportAnonymousDocument($docRaw) && (int) $vehicle->client_person_id !== (int) $clientPerson->id) {
-                        throw new \RuntimeException('El documento no coincide con el titular del vehículo (placa ya registrada a otro cliente).');
-                    }
 
                     $glosas = $row['service_descriptions'];
                     if ($glosas === []) {
