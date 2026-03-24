@@ -29,6 +29,7 @@ use App\Services\AccountReceivablePayableService;
 use App\Services\KardexSyncService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
 class PurchaseController extends Controller
@@ -644,6 +645,27 @@ class PurchaseController extends Controller
         $productQuickCreateCurrentBranch = Branch::query()->find($branchId);
         $productQuickCreateNextCode = $this->nextBranchProductCodeForPurchase($branchId);
 
+        $hasProductMarca = Schema::hasColumn('products', 'marca');
+
+        $productColumns = [
+            'products.id',
+            'products.code',
+            'products.description',
+            'products.image',
+            'products.base_unit_id as unit_sale',
+            'product_branch.purchase_price',
+            'product_branch.avg_cost',
+            'product_branch.stock',
+            'units.description as unit_name',
+            DB::raw('CASE WHEN category_branch.id IS NOT NULL THEN categories.description ELSE NULL END as category_name'),
+        ];
+
+        if ($hasProductMarca) {
+            $productColumns[] = 'products.marca';
+        } else {
+            $productColumns[] = DB::raw("'' as marca");
+        }
+
         $products = Product::query()
             ->join('product_branch', function ($join) use ($branchId) {
                 $join->on('product_branch.product_id', '=', 'products.id')
@@ -658,19 +680,7 @@ class PurchaseController extends Controller
             })
             ->where('products.classification', 'GOOD')
             ->orderBy('products.description')
-            ->get([
-                'products.id',
-                'products.code',
-                'products.marca',
-                'products.description',
-                'products.image',
-                'products.base_unit_id as unit_sale',
-                'product_branch.purchase_price',
-                'product_branch.avg_cost',
-                'product_branch.stock',
-                'units.description as unit_name',
-                DB::raw('CASE WHEN category_branch.id IS NOT NULL THEN categories.description ELSE NULL END as category_name'),
-            ]);
+            ->get($productColumns);
 
         $defaultTaxRate = (float) (TaxRate::query()->where('status', true)->orderBy('order_num')->value('tax_rate') ?? 18);
         $purchaseNumberPreview = $documentTypes->isNotEmpty()
