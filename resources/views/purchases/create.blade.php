@@ -25,6 +25,11 @@
         @if (session('status'))
             <div class="mb-4 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-700">{{ session('status') }}</div>
         @endif
+        @if ($errors->any())
+            <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+                {{ $errors->first('error') ?: $errors->first() }}
+            </div>
+        @endif
 
         <x-common.component-card
             :title="$cardTitle"
