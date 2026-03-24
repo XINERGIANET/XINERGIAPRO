@@ -243,6 +243,18 @@ class WorkshopOrderController extends Controller
                         $clientPerson
                     );
 
+                    if (
+                        $this->isImportAnonymousDocument($docRaw)
+                        &&  !== ''
+                        && (int) $vehicle->client_person_id !== (int) $clientPerson->id
+                        && $this->vehicleClientCanBeReplacedFromExcelName($vehicle, $branchId)
+                    ) {
+                        $vehicle->update([
+                            'client_person_id' => (int) ->id,
+                        ]);
+                        $vehicle->refresh();
+                    }
+
                     if (!$this->isImportAnonymousDocument($docRaw) && (int) $vehicle->client_person_id !== (int) $clientPerson->id) {
                         throw new \RuntimeException('El documento no coincide con el titular del vehículo (placa ya registrada a otro cliente).');
                     }
@@ -489,6 +501,36 @@ class WorkshopOrderController extends Controller
         return [mb_substr($first, 0, 255), mb_substr($last, 0, 255)];
     }
 
+    private function normalizeImportPersonName(string $value): string
+    {
+        return mb_strtoupper(preg_replace('/\\s+/u', ' ', trim()) ?? '');
+    }
+
+    private function isImportGeneralClientPerson(?Person $person, int $branchId): bool
+    {
+        if (!$person || (int) $person->branch_id !== $branchId) {
+            return false;
+        }
+
+        $document = trim((string) $person->document_number);
+         = ->normalizeImportPersonName(trim((->first_name ?? '') . ' ' . (->last_name ?? '')));
+
+        if ( === '') {
+            return true;
+        }
+
+        return  === '0' &&  === 'CLIENTES VARIOS';
+    }
+
+    private function vehicleClientCanBeReplacedFromExcelName(Vehicle $vehicle, int $branchId): bool
+    {
+         = ->relationLoaded('client')
+            ? $vehicle->client
+            : Person::query()->find($vehicle->client_person_id);
+
+        return $this->isImportGeneralClientPerson($currentClient, $branchId);
+    }
+
     /**
      * Cliente con DNI/documento 0 pero nombre propio en Excel: siempre nueva persona (no CLIENTES VARIOS).
      */
@@ -506,6 +548,57 @@ class WorkshopOrderController extends Controller
         }
 
         [$firstName, $lastName] = $this->splitImportPersonFullName($fullName);
+
+        $normalizedFullName = $this->normalizeImportPersonName($fullName);
+        $existing = Person::query()
+            ->where('branch_id', )
+            ->whereRaw('TRIM(document_number) = ?', ['0'])
+            ->get()
+            ->first(function (Person $person) use ($normalizedFullName) {
+                 = trim((->first_name ?? '') . ' ' . (->last_name ?? ''));
+
+                return $this->normalizeImportPersonName($personFullName) === $normalizedFullName;
+            });
+
+        if ($existing) {
+            DB::table('role_person')->updateOrInsert(
+                [
+                    'role_id' => 3,
+                    'person_id' => ->id,
+                    'branch_id' => ,
+                ],
+                [
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+
+            $updates = [];
+            $phoneNormExisting = trim($phone);
+            if (
+                 !== ''
+                &&  !== '0'
+                && strtoupper() !== 'N/A'
+                && trim((string) $existing->phone) !== $phoneNormExisting
+            ) {
+                ['phone'] = mb_substr(, 0, 50);
+            }
+
+            $emailNormExisting = trim($email);
+            if (
+                 !== ''
+                && filter_var($emailNormExisting, FILTER_VALIDATE_EMAIL)
+                && trim((string) $existing->email) !== $emailNormExisting
+            ) {
+                ['email'] = mb_substr(, 0, 255);
+            }
+
+            if ($updates !== []) {
+                $existing->update($updates);
+            }
+
+            return $existing->fresh();
+        }
 
         $phoneNorm = trim($phone);
         if ($phoneNorm === '' || $phoneNorm === '0' || strtoupper($phoneNorm) === 'N/A') {
