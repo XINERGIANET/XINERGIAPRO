@@ -98,6 +98,7 @@
     historyRequestToken: 0,
     selectedVehicleId: @js($vehicleIdDefault),
     vehicleSearch: '',
+    filteredVehicleList: [],
     vehicleDropdownOpen: false,
     selectedClientId: @js($clientIdDefault),
     mileageIn: @js($mileageDefault),
@@ -168,6 +169,7 @@
         this.mileageIn = selected.km ? String(selected.km) : '';
         this.vehicleSearch = selected.display_label || selected.label || '';
         this.selectedVehicleTypeId = selected.vehicle_type_id ? String(selected.vehicle_type_id) : String(this.quickVehicle.vehicle_type_id || '');
+        this.refreshVehicleFilter();
         this.syncHistoryUrl();
         this.refreshServiceLinePrices();
     },
@@ -273,14 +275,30 @@
         this.quickVehicleClientSearch = this.getQuickVehicleClientLabel(client);
         this.quickVehicleClientDropdownOpen = false;
     },
-    get filteredVehicles() {
+    compactSearchText(s) {
+        return String(s || '').toLowerCase().replace(/[\s\-_.]/g, '');
+    },
+    refreshVehicleFilter() {
         const q = String(this.vehicleSearch || '').trim().toLowerCase();
-        if (!q) return this.vehicles.slice(0, 30);
-        return this.vehicles
-            .filter(v => {
-                const vehicleText = String(v.label || '').toLowerCase();
-                const clientText = String(v.client_name || '').toLowerCase();
-                return vehicleText.includes(q) || clientText.includes(q);
+        if (!q) {
+            this.filteredVehicleList = this.vehicles.slice(0, 30);
+            return;
+        }
+        const qCompact = this.compactSearchText(q);
+        this.filteredVehicleList = this.vehicles
+            .filter((v) => {
+                const label = String(v.label || '').toLowerCase();
+                const display = String(v.display_label || v.label || '').toLowerCase();
+                const client = String(v.client_name || '').toLowerCase();
+                if (label.includes(q) || display.includes(q) || client.includes(q)) {
+                    return true;
+                }
+                if (qCompact.length >= 2) {
+                    return this.compactSearchText(v.label).includes(qCompact)
+                        || this.compactSearchText(v.display_label || v.label).includes(qCompact)
+                        || this.compactSearchText(v.client_name).includes(qCompact);
+                }
+                return false;
             })
             .slice(0, 30);
     },
@@ -295,6 +313,7 @@
         if (this.editingMode) {
             return;
         }
+        this.refreshVehicleFilter();
         this.vehicleDropdownOpen = true;
         if (!String(this.vehicleSearch || '').trim()) {
             this.selectedVehicleId = '';
@@ -613,6 +632,7 @@
             this.selectedClientId = payload.client_person_id ? String(payload.client_person_id) : this.selectedClientId;
             this.mileageIn = payload.km ? String(payload.km) : this.mileageIn;
             this.vehicleSearch = this.vehicles[0].display_label || payload.label || '';
+            this.refreshVehicleFilter();
             this.syncHistoryUrl();
             this.refreshServiceLinePrices();
             this.creatingVehicle = false;
@@ -800,7 +820,7 @@
             url: URL.createObjectURL(file),
         }));
     }
-})" x-init="$nextTick(() => { if (editingMode && editingVehicleLabel) { vehicleSearch = editingVehicleLabel; } if (selectedVehicleId) { syncVehicle() } ensureQuickVehicleClient(); syncHistoryUrl(); initSignaturePad(); refreshServiceLinePrices(); const __ep = @js($editingDamagePhotoPreviews ?? [0 => [], 1 => [], 2 => [], 3 => []]); [0,1,2,3].forEach((i) => { if (__ep && __ep[i] && __ep[i].length) { damagePreviews[i] = __ep[i]; } }); })">
+})" x-init="$nextTick(() => { if (editingMode && editingVehicleLabel) { vehicleSearch = editingVehicleLabel; } if (selectedVehicleId) { syncVehicle() } else { refreshVehicleFilter(); } ensureQuickVehicleClient(); syncHistoryUrl(); initSignaturePad(); refreshServiceLinePrices(); const __ep = @js($editingDamagePhotoPreviews ?? [0 => [], 1 => [], 2 => [], 3 => []]); [0,1,2,3].forEach((i) => { if (__ep && __ep[i] && __ep[i].length) { damagePreviews[i] = __ep[i]; } }); })">
     <x-common.page-breadcrumb
         :pageTitle="$editingOrder ? 'Editar ingreso a mantenimiento' : 'Nuevo Ingreso a Mantenimiento'"
         :crumbs="[
@@ -952,8 +972,8 @@
                             <label class="mb-1 block text-sm font-medium text-gray-700">Vehiculo</label>
                             <input
                                 x-model="vehicleSearch"
-                                @focus="!editingMode && (vehicleDropdownOpen = true)"
-                                @click="!editingMode && (vehicleDropdownOpen = true)"
+                                @focus="!editingMode && (vehicleDropdownOpen = true) && refreshVehicleFilter()"
+                                @click="!editingMode && (vehicleDropdownOpen = true) && refreshVehicleFilter()"
                                 @input="onVehicleSearchInput()"
                                 class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
                                 placeholder="Buscar vehiculo o cliente"
@@ -972,10 +992,10 @@
                                         Cerrar
                                     </button>
                                 </div>
-                                <template x-if="filteredVehicles.length === 0">
+                                <template x-if="filteredVehicleList.length === 0">
                                     <p class="px-3 py-2 text-sm text-gray-500">Sin resultados.</p>
                                 </template>
-                                <template x-for="vehicle in filteredVehicles" :key="`vehicle-search-${vehicle.id}`">
+                                <template x-for="vehicle in filteredVehicleList" :key="`vehicle-search-${vehicle.id}`">
                                     <button
                                         type="button"
                                         @click="selectVehicle(vehicle)"
