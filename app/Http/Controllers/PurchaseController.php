@@ -1023,41 +1023,54 @@ class PurchaseController extends Controller
         return compact('subtotal', 'tax', 'total');
     }
 
-    private function incrementBranchStock(int $branchId, int $productId, float $quantity): void
+    private function incrementBranchStock(int , int , float ): void
     {
-        $pb = ProductBranch::query()
-            ->where('branch_id', $branchId)
-            ->where('product_id', $productId)
-            ->lockForUpdate()
-            ->first();
+         = ->ensureProductBranchRecord(, );
 
-        if (!$pb) {
-            throw new \RuntimeException("El producto {$productId} no está configurado para esta sucursal.");
-        }
-
-        $pb->update([
-            'stock' => round(((float) $pb->stock) + $quantity, 4),
+        ->update([
+            'stock' => round(((float) ->stock) + , 4),
         ]);
     }
 
-    private function decrementBranchStock(int $branchId, int $productId, float $quantity): void
+    private function decrementBranchStock(int , int , float ): void
     {
-        $pb = ProductBranch::query()
-            ->where('branch_id', $branchId)
-            ->where('product_id', $productId)
+         = ->ensureProductBranchRecord(, );
+
+        ->update([
+            'stock' => round(((float) ->stock) - , 4),
+        ]);
+    }
+
+    private function ensureProductBranchRecord(int , int ): ProductBranch
+    {
+         = ProductBranch::query()
+            ->where('branch_id', )
+            ->where('product_id', )
             ->lockForUpdate()
             ->first();
 
-        if (!$pb) {
-            throw new \RuntimeException("El producto {$productId} no está configurado para esta sucursal.");
+        if () {
+            return ;
         }
 
-        $newStock = round(((float) $pb->stock) - $quantity, 4);
-        if ($newStock < 0) {
-            throw new \RuntimeException("No se puede dejar stock negativo para el producto {$productId}.");
-        }
-
-        $pb->update(['stock' => $newStock]);
+        return ProductBranch::query()->create([
+            'product_id' => ,
+            'branch_id' => ,
+            'status' => 'A',
+            'stock' => 0,
+            'price' => 0,
+            'purchase_price' => 0,
+            'stock_minimum' => 0,
+            'stock_maximum' => 0,
+            'minimum_sell' => 0,
+            'minimum_purchase' => 0,
+            'favorite' => 'N',
+            'tax_rate_id' => null,
+            'unit_sale' => 'N',
+            'duration_minutes' => null,
+            'supplier_id' => null,
+            'expiration_date' => null,
+        ]);
     }
 
     private function registerPurchaseCashOutflow(
@@ -1436,3 +1449,4 @@ class PurchaseController extends Controller
         }
     }
 }
+
