@@ -25,7 +25,10 @@ class WorkshopOrdersExcelImport
      *   model: string,
      *   color: ?string,
      *   engine_displacement_cc: ?int,
-     *   vehicle_type_label: ?string
+     *   vehicle_type_label: ?string,
+     *   client_full_name: string,
+     *   client_phone: string,
+     *   client_email: string
      * }>
      */
     public static function extractRows(string $absolutePath): array
@@ -66,6 +69,9 @@ class WorkshopOrdersExcelImport
         $colColor = $detected['col_color'];
         $colCilindrada = $detected['col_cilindrada'];
         $colTipoVeh = $detected['col_tipo_vehiculo'];
+        $colClienteNombre = $detected['col_cliente_nombre'];
+        $colClienteTelefono = $detected['col_cliente_telefono'];
+        $colClienteEmail = $detected['col_cliente_email'];
 
         $out = [];
         $maxRow = (int) $sheet->getHighestDataRow();
@@ -107,6 +113,15 @@ class WorkshopOrdersExcelImport
             $tipoLabel = $colTipoVeh !== null
                 ? self::cellToString($sheet->getCell(Coordinate::stringFromColumnIndex($colTipoVeh) . $row))
                 : null;
+            $clientNombre = $colClienteNombre !== null
+                ? self::cellToString($sheet->getCell(Coordinate::stringFromColumnIndex($colClienteNombre) . $row))
+                : '';
+            $clientTelefono = $colClienteTelefono !== null
+                ? self::cellToString($sheet->getCell(Coordinate::stringFromColumnIndex($colClienteTelefono) . $row))
+                : '';
+            $clientEmail = $colClienteEmail !== null
+                ? self::cellToString($sheet->getCell(Coordinate::stringFromColumnIndex($colClienteEmail) . $row))
+                : '';
 
             $serviceDescriptions = self::splitObservations($obsRaw);
 
@@ -123,6 +138,9 @@ class WorkshopOrdersExcelImport
                 'color' => self::normalizeColorCell($colorRaw),
                 'engine_displacement_cc' => $cc,
                 'vehicle_type_label' => $tipoLabel !== null && trim($tipoLabel) !== '' ? trim($tipoLabel) : null,
+                'client_full_name' => trim($clientNombre),
+                'client_phone' => trim($clientTelefono),
+                'client_email' => trim($clientEmail),
             ];
         }
 
@@ -171,7 +189,10 @@ class WorkshopOrdersExcelImport
      *   col_modelo: int|null,
      *   col_color: int|null,
      *   col_cilindrada: int|null,
-     *   col_tipo_vehiculo: int|null
+     *   col_tipo_vehiculo: int|null,
+     *   col_cliente_nombre: int|null,
+     *   col_cliente_telefono: int|null,
+     *   col_cliente_email: int|null
      * }|null
      */
     private static function detectColumns(Worksheet $sheet): ?array
@@ -194,6 +215,9 @@ class WorkshopOrdersExcelImport
             $colColor = null;
             $colCilindrada = null;
             $colTipoVeh = null;
+            $colClienteNombre = null;
+            $colClienteTelefono = null;
+            $colClienteEmail = null;
 
             for ($c = 1; $c <= $highestColIdx; $c++) {
                 $coord = Coordinate::stringFromColumnIndex($c) . $r;
@@ -225,6 +249,14 @@ class WorkshopOrdersExcelImport
                     || str_contains($norm, 'clase veh')
                 ) {
                     $colTipoVeh = $c;
+                } elseif (str_contains($norm, 'cliente') && str_contains($norm, 'nombre')) {
+                    $colClienteNombre = $c;
+                } elseif (str_contains($norm, 'cliente') && (str_contains($norm, 'telef') || str_contains($norm, 'celular') || str_contains($norm, 'movil'))) {
+                    $colClienteTelefono = $c;
+                } elseif (
+                    (str_contains($norm, 'cliente') && (str_contains($norm, 'mail') || str_contains($norm, 'correo')))
+                ) {
+                    $colClienteEmail = $c;
                 } elseif (
                     str_contains($norm, 'document')
                     || $norm === 'dni'
@@ -260,6 +292,9 @@ class WorkshopOrdersExcelImport
                     'col_color' => $colColor,
                     'col_cilindrada' => $colCilindrada,
                     'col_tipo_vehiculo' => $colTipoVeh,
+                    'col_cliente_nombre' => $colClienteNombre,
+                    'col_cliente_telefono' => $colClienteTelefono,
+                    'col_cliente_email' => $colClienteEmail,
                 ];
             }
         }

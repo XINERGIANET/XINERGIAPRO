@@ -179,11 +179,25 @@ class WorkshopOrderController extends Controller
         foreach ($rows as $row) {
             try {
                 DB::transaction(function () use ($row, $branchId, $companyId, $userId, $userName) {
-                    $doc = trim((string) $row['document']);
-                    if ($doc !== '') {
-                        $clientPerson = $this->ensureImportClientPersonByDocument($doc, $branchId, $companyId);
+                    $docRaw = trim((string) $row['document']);
+                    $clientFullName = trim((string) ($row['client_full_name'] ?? ''));
+                    $clientPhone = trim((string) ($row['client_phone'] ?? ''));
+                    $clientEmail = trim((string) ($row['client_email'] ?? ''));
+
+                    if ($this->isImportAnonymousDocument($docRaw)) {
+                        if ($clientFullName !== '') {
+                            $clientPerson = $this->createImportClientPersonDocumentZeroNamed(
+                                $clientFullName,
+                                $clientPhone,
+                                $clientEmail,
+                                $branchId,
+                                (int) $row['row_index']
+                            );
+                        } else {
+                            $clientPerson = $this->ensureImportGeneralClientPerson($branchId);
+                        }
                     } else {
-                        $clientPerson = $this->ensureImportGeneralClientPerson($branchId);
+                        $clientPerson = $this->ensureImportClientPersonByDocument($docRaw, $branchId, $companyId);
                     }
 
                     $vehicle = $this->resolveOrCreateVehicleForOrderImport(
@@ -194,7 +208,7 @@ class WorkshopOrderController extends Controller
                         (int) $row['row_index']
                     );
 
-                    if ($doc !== '' && (int) $vehicle->client_person_id !== (int) $clientPerson->id) {
+                    if (!$this->isImportAnonymousDocument($docRaw) && (int) $vehicle->client_person_id !== (int) $clientPerson->id) {
                         throw new \RuntimeException('El documento no coincide con el titular del vehículo (placa ya registrada a otro cliente).');
                     }
 
@@ -402,6 +416,100 @@ class WorkshopOrderController extends Controller
         return $t === '-' || $t === '—' || $t === '–' || $t === 'N/A' || $t === 'S/N';
     }
 
+    private function isImportAnonymousDocument(string $doc): bool
+    {
+        $t = trim($doc);
+        if ($t === '') {
+            return true;
+        }
+        $u = strtoupper($t);
+        if (in_array($u, ['-', 'N/A', 'S/N', 'SN', '—', '–'], true)) {
+            return true;
+        }
+        if (preg_match('/^\d+$/', $t)) {
+            return (int) $t === 0;
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private function splitImportPersonFullName(string $full): array
+    {
+        $full = preg_replace('/\s+/u', ' ', trim($full)) ?? '';
+        if ($full === '') {
+            return ['Cliente', 'Importacion'];
+        }
+        $parts = explode(' ', $full);
+        if (count($parts) === 1) {
+            return [mb_substr($parts[0], 0, 255), '-'];
+        }
+        $last = array_pop($parts);
+        $first = implode(' ', $parts);
+
+        return [mb_substr($first, 0, 255), mb_substr($last, 0, 255)];
+    }
+
+    /**
+     * Cliente con DNI/documento 0 pero nombre propio en Excel: siempre nueva persona (no CLIENTES VARIOS).
+     */
+    private function createImportClientPersonDocumentZeroNamed(
+        string $fullName,
+        string $phone,
+        string $email,
+        int $branchId,
+        int $rowIndex
+    ): Person {
+        $branch = Branch::query()->findOrFail($branchId);
+        $districtId = (int) ($branch->location_id ?? 0);
+        if ($districtId <= 0) {
+            throw new \RuntimeException('La sucursal no tiene distrito configurado; no se puede crear el cliente de la fila «' . $fullName . '».');
+        }
+
+        [$firstName, $lastName] = $this->splitImportPersonFullName($fullName);
+
+        $phoneNorm = trim($phone);
+        if ($phoneNorm === '' || $phoneNorm === '0' || strtoupper($phoneNorm) === 'N/A') {
+            $phoneNorm = '0';
+        }
+        $phoneNorm = mb_substr($phoneNorm, 0, 50);
+
+        $emailNorm = trim($email);
+        if ($emailNorm === '' || strtoupper($emailNorm) === '0' || !filter_var($emailNorm, FILTER_VALIDATE_EMAIL)) {
+            $emailNorm = 'import.os.f' . $rowIndex . '.b' . $branchId . '.' . substr(sha1((string) microtime(true) . random_bytes(4)), 0, 10) . '@xinergia-import.local';
+        } else {
+            $emailNorm = mb_substr($emailNorm, 0, 255);
+        }
+
+        $person = Person::query()->create([
+            'branch_id' => $branchId,
+            'document_number' => '0',
+            'person_type' => 'DNI',
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'phone' => $phoneNorm,
+            'email' => $emailNorm,
+            'address' => '-',
+            'location_id' => $districtId,
+        ]);
+
+        DB::table('role_person')->updateOrInsert(
+            [
+                'role_id' => 3,
+                'person_id' => $person->id,
+                'branch_id' => $branchId,
+            ],
+            [
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+
+        return $person;
+    }
+
     private function ensureImportGeneralClientPerson(int $branchId): Person
     {
         $branch = Branch::query()->findOrFail($branchId);
@@ -440,6 +548,9 @@ class WorkshopOrderController extends Controller
     {
         $doc = trim($document);
         if ($doc === '') {
+            return $this->ensureImportGeneralClientPerson($branchId);
+        }
+        if ($this->isImportAnonymousDocument($doc)) {
             return $this->ensureImportGeneralClientPerson($branchId);
         }
 
