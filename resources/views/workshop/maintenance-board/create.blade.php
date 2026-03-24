@@ -157,6 +157,7 @@
     editingClientLabel: @js($editingClientLabel ?? ''),
     selectedServiceIds: @js($selectedIdsFromLines),
     serviceCcOverrideById: {},
+    totalsTick: 0,
     serviceLines: @js($serviceLinesForUi),
     inventoryItemsByVehicleType: @js($inventoryItemsByVehicleType ?? []),
     inventoryChecks: @js($inventoryForUi),
@@ -429,8 +430,10 @@
         }
 
         if (mode.startsWith('tier:')) {
-            const maxCc = Number(mode.slice(5));
-            const tier = tiers.find((t) => Number(t.max_cc || 0) === maxCc)
+            const rawMax = String(mode.slice(5)).trim();
+            const maxCc = Number(rawMax);
+            const tier = tiers.find((t) => String(t.max_cc) === rawMax)
+                || tiers.find((t) => Number(t.max_cc || 0) === maxCc)
                 || tiers.find((t) => Number(t.max_cc || 0) >= maxCc);
             if (tier) {
                 return {
@@ -469,22 +472,26 @@
         return this.resolveServicePricing(service).label;
     },
     refreshServiceLinePrices() {
-        this.serviceLines = this.serviceLines.map(line => {
+        const next = this.serviceLines.map((line) => {
             if (this.isGlosaLine(line)) {
-                return line;
+                return { ...line };
             }
-            const service = this.servicesCatalog.find(item => String(item.id) === String(line.service_id));
+            const sid = String(line.service_id ?? '').trim();
+            const service = this.servicesCatalog.find((item) => String(item.id) === sid);
             if (!service) {
-                return line;
+                return { ...line };
             }
             if (line.detail_id) {
-                return line;
+                return { ...line };
             }
+            const price = this.resolveServicePrice(service);
             return {
                 ...line,
-                unit_price: this.resolveServicePrice(service),
+                unit_price: price,
             };
         });
+        this.serviceLines = next;
+        this.totalsTick = (this.totalsTick || 0) + 1;
     },
     isGlosaLine(line) {
         return line == null || line.service_id == null || String(line.service_id).trim() === '';
@@ -546,6 +553,7 @@
             })
             .filter(Boolean);
         this.serviceLines = catalogLines.concat(glosas);
+        this.refreshServiceLinePrices();
     },
     lineSubtotal(line) {
         const qty = Number(line.qty || 0);
@@ -576,6 +584,8 @@
         }, 0);
     },
     estimatedTotal() {
+        void this.serviceCcOverrideById;
+        void this.totalsTick;
         const services = this.serviceLines.reduce((sum, line) => sum + this.lineSubtotal(line), 0);
         return services + this.estimatedProductsTotal();
     },
@@ -1348,15 +1358,15 @@
                         <div>
                             <input type="hidden" :name="`service_lines[${index}][detail_id]`" :value="line.detail_id || ''">
                             <input type="hidden" :name="`service_lines[${index}][service_id]`" :value="line.service_id">
-                            <input type="hidden" :name="`service_lines[${index}][qty]`" :value="line.qty">
-                            <input type="hidden" :name="`service_lines[${index}][unit_price]`" :value="line.unit_price">
+                            <input type="hidden" :name="`service_lines[${index}][qty]`" x-model="line.qty">
+                            <input type="hidden" :name="`service_lines[${index}][unit_price]`" x-model="line.unit_price">
                             <input type="hidden" :name="`service_lines[${index}][description]`" :value="line.description || ''">
                         </div>
                     </template>
                 </template>
 
                 <div class="mt-3 border-t border-gray-200 pt-2 text-right text-sm font-semibold text-gray-800">
-                    Total estimado: S/ <span x-text="estimatedTotal().toFixed(2)"></span>
+                    Total estimado: S/ <span x-text="(totalsTick, estimatedTotal().toFixed(2))"></span>
                 </div>
             </div>
 

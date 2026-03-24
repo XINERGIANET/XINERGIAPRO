@@ -606,7 +606,11 @@ class WorkshopMaintenanceBoardController extends Controller
                     continue;
                 }
 
-                $unitPrice = $this->resolveMaintenanceBoardServiceUnitPrice($service, $vehicle, $mileageForFrequency);
+                $resolvedPrice = $this->resolveMaintenanceBoardServiceUnitPrice($service, $vehicle, $mileageForFrequency);
+                $unitPrice = round((float) ($line['unit_price'] ?? $resolvedPrice), 6);
+                if ($unitPrice < 0) {
+                    $unitPrice = 0;
+                }
 
                 $this->flowService->addDetail($workshop, [
                     'line_type' => 'SERVICE',
@@ -846,12 +850,16 @@ class WorkshopMaintenanceBoardController extends Controller
                             (string) ($user?->name ?? 'Sistema')
                         );
                     } else {
+                        $unitPrice = round((float) ($line['unit_price'] ?? $resolvedPrice), 6);
+                        if ($unitPrice < 0) {
+                            $unitPrice = 0;
+                        }
                         $this->flowService->addDetail($lockedOrder, [
                             'line_type' => 'SERVICE',
                             'service_id' => $serviceId,
                             'description' => (string) $service->name,
                             'qty' => $qty,
-                            'unit_price' => $resolvedPrice,
+                            'unit_price' => $unitPrice,
                         ]);
                     }
                 }
