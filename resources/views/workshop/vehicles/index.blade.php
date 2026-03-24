@@ -1,7 +1,11 @@
 @extends('layouts.app')
 
 @section('content')
-<div x-data="{}">
+<div x-data="{
+    toggleAllVehicles(checked) {
+        this.$root.querySelectorAll('input[data-vehicle-bulk-id]').forEach((el) => { el.checked = checked; });
+    }
+}">
     <x-common.page-breadcrumb pageTitle="Vehiculos Taller" />
 
     <x-common.component-card title="Vehiculos" desc="Administra vehiculos asociados a clientes del taller.">
@@ -11,6 +15,50 @@
         @if ($errors->any())
             <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first() }}</div>
         @endif
+        @if (session('error'))
+            <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ session('error') }}</div>
+        @endif
+
+        <div class="mb-3 flex flex-wrap items-center gap-2">
+            <form
+                id="vehicles-bulk-by-ids"
+                method="POST"
+                action="{{ route('workshop.vehicles.destroy-bulk') }}"
+                class="js-swal-delete inline-flex"
+                data-swal-title="Eliminar vehiculos seleccionados?"
+                data-swal-text="Se eliminaran los vehiculos marcados en esta pagina que no tengan ordenes de servicio ni citas vinculadas. Esta accion no se puede deshacer."
+                data-swal-confirm="Si, eliminar"
+                data-swal-cancel="Cancelar"
+                data-swal-confirm-color="#ef4444"
+                data-swal-cancel-color="#6b7280"
+            >
+                @csrf
+                <input type="hidden" name="bulk_mode" value="ids">
+                <x-ui.button size="md" variant="outline" type="submit" class="h-10 border-red-200 text-red-700 hover:bg-red-50">
+                    <i class="ri-delete-bin-line"></i>
+                    <span class="ml-1">Eliminar seleccionados</span>
+                </x-ui.button>
+            </form>
+            <form
+                method="POST"
+                action="{{ route('workshop.vehicles.destroy-bulk') }}"
+                class="js-swal-delete inline-flex"
+                data-swal-title="Eliminar todos los vehiculos del filtro?"
+                data-swal-text="Se intentara eliminar todos los vehiculos que coincidan con la busqueda actual (en todas las paginas). Los que tengan ordenes de servicio o citas se omitiran."
+                data-swal-confirm="Si, eliminar todos"
+                data-swal-cancel="Cancelar"
+                data-swal-confirm-color="#ef4444"
+                data-swal-cancel-color="#6b7280"
+            >
+                @csrf
+                <input type="hidden" name="bulk_mode" value="filter">
+                <input type="hidden" name="search" value="{{ $search ?? '' }}">
+                <x-ui.button size="md" variant="outline" type="submit" class="h-10 border-amber-200 text-amber-800 hover:bg-amber-50">
+                    <i class="ri-delete-bin-2-line"></i>
+                    <span class="ml-1">Eliminar todos (filtro actual)</span>
+                </x-ui.button>
+            </form>
+        </div>
 
         {{-- Barra de Herramientas Premium (Estilo solicitado) --}}
         <form method="GET" action="{{ route('workshop.vehicles.index') }}" class="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-white/[0.02]">
@@ -70,7 +118,10 @@
             <table class="w-full min-w-[900px]">
                 <thead>
                     <tr>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">ID</th>
+                        <th style="background-color:#1e293b" class="w-10 px-2 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">
+                            <input type="checkbox" class="h-4 w-4 rounded border-white/40 bg-white/10" @change="toggleAllVehicles($event.target.checked)" title="Seleccionar todos en esta pagina" aria-label="Seleccionar todos en esta pagina">
+                        </th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">ID</th>
                         <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Cliente</th>
                         <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Vehiculo</th>
                         <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Placa</th>
@@ -82,6 +133,9 @@
                 <tbody>
                     @forelse($vehicles as $vehicle)
                         <tr class="relative hover:z-[60] border-t border-gray-100 dark:border-gray-800">
+                            <td class="px-2 py-3 text-center align-middle">
+                                <input type="checkbox" form="vehicles-bulk-by-ids" name="ids[]" value="{{ $vehicle->id }}" data-vehicle-bulk-id class="h-4 w-4 rounded border-gray-300 text-brand-600" aria-label="Seleccionar vehiculo {{ $vehicle->plate }}">
+                            </td>
                             <td class="px-4 py-3 text-sm text-center">{{ $vehicle->id }}</td>
                             <td class="px-4 py-3 text-sm text-center uppercase">{{ $vehicle->client?->first_name }} {{ $vehicle->client?->last_name }}</td>
                             <td class="px-4 py-3 text-sm text-center uppercase">{{ $vehicle->brand }} {{ $vehicle->model }} ({{ ucfirst($vehicle->vehicleType?->name ?? $vehicle->type) }})</td>
@@ -140,7 +194,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="px-4 py-4 text-sm text-gray-500 text-center">Sin vehiculos registrados.</td></tr>
+                        <tr><td colspan="8" class="px-4 py-4 text-sm text-gray-500 text-center">Sin vehiculos registrados.</td></tr>
                     @endforelse
                 </tbody>
             </table>

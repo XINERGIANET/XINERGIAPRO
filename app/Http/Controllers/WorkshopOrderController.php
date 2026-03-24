@@ -31,6 +31,7 @@ use App\Support\WorkshopOrdersExcelImport;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -58,47 +59,82 @@ class WorkshopOrderController extends Controller
         $companyId = (int) ($branch?->company_id ?? 0);
         $search = trim((string) $request->input('search', ''));
         $perPage = (int) $request->input('per_page', 10);
-        $availableStatuses = [
-            'all',
-            'registered',
-            'draft',
-            'diagnosis',
-            'awaiting_approval',
-            'approved',
-            'in_progress',
-            'finished',
-            'delivered',
-            'cancelled',
-            'open',
-        ];
-        $selectedStatus = (string) $request->input('status', 'all');
-        if (!in_array($selectedStatus, $availableStatuses, true)) {
-            $selectedStatus = 'all';
-        }
+        $selectedStatus = $this->normalizeWorkshopOrderListStatus((string) $request->input('status', 'all'));
 
-        $orders = WorkshopMovement::query()
+        $orders = $this->workshopOrdersFilteredQuery($branchId, $companyId, $search, $selectedStatus)
             ->with([
                 'movement',
                 'vehicle',
                 'client' => fn ($query) => $query->withTrashed(),
             ])
-            ->when($companyId > 0, fn ($query) => $query->where('company_id', $companyId))
-            ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
-            ->when($selectedStatus !== 'all', fn ($query) => $query->where('status', $selectedStatus))
-            ->when($search !== '', function ($query) use ($search) {
-                $query->where(function ($inner) use ($search) {
-                    $inner->whereHas('movement', fn ($movementQuery) => $movementQuery->where('number', 'ILIKE', "%{$search}%"))
-                        ->orWhereHas('vehicle', fn ($vehicleQuery) => $vehicleQuery->where('plate', 'ILIKE', "%{$search}%"))
-                        ->orWhereHas('client', fn ($clientQuery) => $clientQuery
-                            ->where('first_name', 'ILIKE', "%{$search}%")
-                            ->orWhere('last_name', 'ILIKE', "%{$search}%"));
-                });
-            })
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
 
         return view('workshop.orders.index', compact('orders', 'search', 'perPage', 'selectedStatus'));
+    }
+
+    public function destroyBulk(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'bulk_mode' => ['required', 'string', Rule::in(['ids', 'filter'])],
+            'ids' => ['required_if:bulk_mode,ids', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+            'search' => ['nullable', 'string'],
+            'status' => ['nullable', 'string'],
+            'view_id' => ['nullable', 'string'],
+        ]);
+
+        $branchId = (int) session('branch_id');
+        $branch = $branchId > 0 ? Branch::query()->find($branchId) : null;
+        $companyId = (int) ($branch?->company_id ?? 0);
+
+        if ($validated['bulk_mode'] === 'filter') {
+            $search = trim((string) ($validated['search'] ?? ''));
+            $status = $this->normalizeWorkshopOrderListStatus((string) ($validated['status'] ?? 'all'));
+            $idList = $this->workshopOrdersFilteredQuery($branchId, $companyId, $search, $status)->pluck('id')->all();
+        } else {
+            $idList = array_values(array_unique(array_map('intval', $validated['ids'] ?? [])));
+        }
+
+        if ($idList === []) {
+            return back()->with('error', 'No hay ordenes para eliminar.');
+        }
+
+        $deleted = 0;
+        $skipped = 0;
+
+        DB::transaction(function () use ($idList, &$deleted, &$skipped) {
+            foreach (array_chunk($idList, 150) as $chunk) {
+                $orders = WorkshopMovement::query()->whereIn('id', $chunk)->get();
+                foreach ($orders as $order) {
+                    if (!$this->orderMatchesSessionScope($order)) {
+                        $skipped++;
+
+                        continue;
+                    }
+                    if ($order->sales_movement_id || $order->cash_movement_id) {
+                        $skipped++;
+
+                        continue;
+                    }
+                    $movement = Movement::query()->find($order->movement_id);
+                    $order->delete();
+                    if ($movement) {
+                        $movement->delete();
+                    }
+                    $deleted++;
+                }
+            }
+        });
+
+        $q = array_filter(['view_id' => $request->input('view_id')]);
+        $msg = "Se eliminaron {$deleted} orden(es) de servicio.";
+        if ($skipped > 0) {
+            $msg .= " Se omitieron {$skipped} (sin permiso, no encontradas o con venta/pagos vinculados).";
+        }
+
+        return redirect()->route('workshop.orders.index', $q)->with('status', $msg);
     }
 
     public function importExcel(Request $request): RedirectResponse
@@ -204,8 +240,7 @@ class WorkshopOrderController extends Controller
                         $row,
                         $companyId,
                         $branchId,
-                        $clientPerson,
-                        (int) $row['row_index']
+                        $clientPerson
                     );
 
                     if (!$this->isImportAnonymousDocument($docRaw) && (int) $vehicle->client_person_id !== (int) $clientPerson->id) {
@@ -329,10 +364,13 @@ class WorkshopOrderController extends Controller
         return false;
     }
 
-    private function uniqueGeneratedImportPlate(int $companyId, int $rowIndex): string
+    /**
+     * Placa unica cuando el Excel no trae placa valida (sin prefijos tipo IMP-).
+     */
+    private function uniqueFallbackImportPlate(int $companyId): string
     {
-        for ($i = 0; $i < 12; $i++) {
-            $candidate = 'IMP-' . $rowIndex . '-' . strtoupper(bin2hex(random_bytes(3)));
+        for ($i = 0; $i < 24; $i++) {
+            $candidate = strtoupper(bin2hex(random_bytes(5)));
             $exists = Vehicle::query()
                 ->where('company_id', $companyId)
                 ->whereRaw('UPPER(TRIM(plate)) = ?', [$candidate])
@@ -342,15 +380,14 @@ class WorkshopOrderController extends Controller
             }
         }
 
-        return 'IMP-' . $rowIndex . '-' . strtoupper(Str::random(8));
+        return strtoupper(bin2hex(random_bytes(8)));
     }
 
     private function resolveOrCreateVehicleForOrderImport(
         array $row,
         int $companyId,
         int $branchId,
-        Person $clientPerson,
-        int $rowIndex
+        Person $clientPerson
     ): Vehicle {
         $plate = (string) ($row['plate'] ?? '');
         $existing = $this->findVehicleByNormalizedPlate($plate, $companyId, $branchId);
@@ -360,7 +397,7 @@ class WorkshopOrderController extends Controller
 
         $norm = $this->normalizePlateString($plate);
         $finalPlate = $this->isPlaceholderImportPlate($norm)
-            ? $this->uniqueGeneratedImportPlate($companyId, $rowIndex)
+            ? $this->uniqueFallbackImportPlate($companyId)
             : $norm;
 
         $vehicleTypeId = 18;
@@ -1119,15 +1156,68 @@ class WorkshopOrderController extends Controller
 
     private function assertOrderScope(WorkshopMovement $order): void
     {
+        if (!$this->orderMatchesSessionScope($order)) {
+            abort(404);
+        }
+    }
+
+    private function orderMatchesSessionScope(WorkshopMovement $order): bool
+    {
         $branchId = (int) session('branch_id');
         if ($branchId > 0 && (int) $order->branch_id !== $branchId) {
-            abort(404);
+            return false;
         }
 
-        $branch = $branchId > 0 ? \App\Models\Branch::query()->find($branchId) : null;
+        $branch = $branchId > 0 ? Branch::query()->find($branchId) : null;
         if ($branch && (int) $order->company_id !== (int) $branch->company_id) {
-            abort(404);
+            return false;
         }
+
+        return true;
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\WorkshopMovement>
+     */
+    private function workshopOrdersFilteredQuery(int $branchId, int $companyId, string $search, string $selectedStatus)
+    {
+        $selectedStatus = $this->normalizeWorkshopOrderListStatus($selectedStatus);
+
+        return WorkshopMovement::query()
+            ->when($companyId > 0, fn ($query) => $query->where('company_id', $companyId))
+            ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
+            ->when($selectedStatus !== 'all', fn ($query) => $query->where('status', $selectedStatus))
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($inner) use ($search) {
+                    $inner->whereHas('movement', fn ($movementQuery) => $movementQuery->where('number', 'ILIKE', "%{$search}%"))
+                        ->orWhereHas('vehicle', fn ($vehicleQuery) => $vehicleQuery->where('plate', 'ILIKE', "%{$search}%"))
+                        ->orWhereHas('client', fn ($clientQuery) => $clientQuery
+                            ->where('first_name', 'ILIKE', "%{$search}%")
+                            ->orWhere('last_name', 'ILIKE', "%{$search}%"));
+                });
+            });
+    }
+
+    private function normalizeWorkshopOrderListStatus(string $selectedStatus): string
+    {
+        $availableStatuses = [
+            'all',
+            'registered',
+            'draft',
+            'diagnosis',
+            'awaiting_approval',
+            'approved',
+            'in_progress',
+            'finished',
+            'delivered',
+            'cancelled',
+            'open',
+        ];
+        if (!in_array($selectedStatus, $availableStatuses, true)) {
+            return 'all';
+        }
+
+        return $selectedStatus;
     }
 
     private function uploadDamagePhotos(Request $request, array $damages, int $branchId): array
