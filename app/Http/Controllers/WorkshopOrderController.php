@@ -335,7 +335,7 @@ class WorkshopOrderController extends Controller
             return null;
         }
 
-        $candidates = Vehicle::query()
+        $candidates = Vehicle::withTrashed()
             ->where('company_id', $companyId)
             ->orderByDesc('id')
             ->get();
@@ -381,6 +381,9 @@ class WorkshopOrderController extends Controller
         $plate = (string) ($row['plate'] ?? '');
         $existing = $this->findVehicleByNormalizedPlate($plate, $companyId, $branchId);
         if ($existing) {
+            if (method_exists($existing, 'trashed') && $existing->trashed()) {
+                $existing->restore();
+            }
             $updates = [];
             if ((int) $existing->branch_id !== $branchId) {
                 $updates['branch_id'] = $branchId;
