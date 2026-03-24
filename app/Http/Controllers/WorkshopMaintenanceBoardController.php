@@ -100,8 +100,7 @@ class WorkshopMaintenanceBoardController extends Controller
             })
             ->when(
                 $selectedStatus !== 'all',
-                fn ($query) => $query->where('status', $selectedStatus),
-                fn ($query) => $query->whereNotIn('status', ['delivered', 'cancelled'])
+                fn ($query) => $query->where('status', $selectedStatus)
             )
             ->orderByRaw("CASE status WHEN 'in_progress' THEN 1 WHEN 'approved' THEN 2 WHEN 'awaiting_approval' THEN 3 WHEN 'diagnosis' THEN 4 ELSE 5 END")
             ->orderByDesc('id')
@@ -510,8 +509,8 @@ class WorkshopMaintenanceBoardController extends Controller
             'service_lines.*.validity_months' => ['nullable', 'in:6,12'],
             'product_lines' => ['nullable', 'array'],
             'product_lines.*.detail_id' => ['nullable', 'integer'],
-            'product_lines.*.product_id' => ['required_with:product_lines', 'integer', 'exists:products,id'],
-            'product_lines.*.qty' => ['required_with:product_lines', 'numeric', 'gt:0'],
+            'product_lines.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'product_lines.*.qty' => ['nullable', 'numeric', 'gte:0'],
             'product_lines.*.unit_price' => ['nullable', 'numeric', 'gte:0'],
         ]);
 
@@ -608,7 +607,11 @@ class WorkshopMaintenanceBoardController extends Controller
                     continue;
                 }
 
-                $unitPrice = $this->resolveMaintenanceBoardServiceUnitPrice($service, $vehicle, $mileageForFrequency);
+                $resolvedPrice = $this->resolveMaintenanceBoardServiceUnitPrice($service, $vehicle, $mileageForFrequency);
+                $unitPrice = round((float) ($line['unit_price'] ?? $resolvedPrice), 6);
+                if ($unitPrice < 0) {
+                    $unitPrice = 0;
+                }
 
                 $this->flowService->addDetail($workshop, [
                     'line_type' => 'SERVICE',
@@ -696,8 +699,8 @@ class WorkshopMaintenanceBoardController extends Controller
             'service_lines.*.validity_months' => ['nullable', 'in:6,12'],
             'product_lines' => ['nullable', 'array'],
             'product_lines.*.detail_id' => ['nullable', 'integer'],
-            'product_lines.*.product_id' => ['required_with:product_lines', 'integer', 'exists:products,id'],
-            'product_lines.*.qty' => ['required_with:product_lines', 'numeric', 'gt:0'],
+            'product_lines.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'product_lines.*.qty' => ['nullable', 'numeric', 'gte:0'],
             'product_lines.*.unit_price' => ['nullable', 'numeric', 'gte:0'],
         ]);
 
@@ -853,13 +856,21 @@ class WorkshopMaintenanceBoardController extends Controller
                             (string) ($user?->name ?? 'Sistema')
                         );
                     } else {
+                        $unitPrice = round((float) ($line['unit_price'] ?? $resolvedPrice), 6);
+                        if ($unitPrice < 0) {
+                            $unitPrice = 0;
+                        }
                         $this->flowService->addDetail($lockedOrder, [
                             'line_type' => 'SERVICE',
                             'service_id' => $serviceId,
                             'description' => (string) $service->name,
                             'qty' => $qty,
+<<<<<<< HEAD
                             'unit_price' => $resolvedPrice,
                             'validity_months' => $line['validity_months'] ?? null,
+=======
+                            'unit_price' => $unitPrice,
+>>>>>>> 36b030889579cb5f80f34931235c1a27db7151a1
                         ]);
                     }
                 }
@@ -1350,6 +1361,11 @@ class WorkshopMaintenanceBoardController extends Controller
             ])->values())
             ->all();
 
+        $defaultDocumentTypeId = $this->getBranchDefaultSaleDocumentTypeId(
+            $branchId,
+            collect($formData['documentTypes'] ?? [])
+        );
+
         return view('workshop.maintenance-board.checkout', array_merge($formData, [
             'order' => $order,
             'pendingLines' => $pendingLines,
@@ -1360,6 +1376,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'cardOptions' => $cardOptions,
             'digitalWalletOptions' => $digitalWalletOptions,
             'paymentGatewayOptionsByMethod' => $paymentGatewayOptionsByMethod,
+            'defaultDocumentTypeId' => $defaultDocumentTypeId,
         ]));
     }
 
@@ -1386,9 +1403,9 @@ class WorkshopMaintenanceBoardController extends Controller
             'payment_methods.*.digital_wallet_id' => ['nullable', 'integer', 'exists:digital_wallets,id'],
             'payment_comment' => ['nullable', 'string'],
             'product_lines' => ['nullable', 'array'],
-            'product_lines.*.product_id' => ['required_with:product_lines', 'integer', 'exists:products,id'],
-            'product_lines.*.qty' => ['required_with:product_lines', 'numeric', 'gt:0'],
-            'product_lines.*.unit_price' => ['required_with:product_lines', 'numeric', 'gte:0'],
+            'product_lines.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'product_lines.*.qty' => ['nullable', 'numeric', 'gte:0'],
+            'product_lines.*.unit_price' => ['nullable', 'numeric', 'gte:0'],
         ]);
 
         $paymentType = strtoupper((string) ($validated['payment_type'] ?? 'CONTADO'));
@@ -1398,7 +1415,10 @@ class WorkshopMaintenanceBoardController extends Controller
             ->values()
             ->all();
 
-        if (!$isDebtCheckout && empty($validated['payment_methods'])) {
+        $orderForPaymentRule = WorkshopMovement::query()->findOrFail($order->id);
+        $amountPendingToCollect = max(0, (float) $orderForPaymentRule->total - (float) $orderForPaymentRule->paid_total);
+
+        if (!$isDebtCheckout && empty($validated['payment_methods']) && $amountPendingToCollect > 0.000001) {
             throw ValidationException::withMessages([
                 'payment_methods' => 'Debes registrar al menos un metodo de pago cuando el cobro es al contado.',
             ]);
@@ -1794,6 +1814,33 @@ class WorkshopMaintenanceBoardController extends Controller
         $branch = Branch::query()->findOrFail($branchId);
 
         return [$branchId, (int) $branch->company_id];
+    }
+
+    private function getBranchDefaultSaleDocumentTypeId(int $branchId, $documentTypes): ?int
+    {
+        $documentTypes = collect($documentTypes);
+
+        if ($branchId <= 0) {
+            return $documentTypes->first()?->id ? (int) $documentTypes->first()->id : null;
+        }
+
+        $configuredValue = DB::table('branch_parameters as bp')
+            ->join('parameters as p', 'p.id', '=', 'bp.parameter_id')
+            ->where('bp.branch_id', $branchId)
+            ->whereNull('bp.deleted_at')
+            ->whereNull('p.deleted_at')
+            ->where('p.description', 'ILIKE', '%tipo venta por defecto%')
+            ->value('bp.value');
+
+        if (is_numeric($configuredValue)) {
+            $configuredId = (int) $configuredValue;
+            $existsInSaleDocs = $documentTypes->contains(fn ($d) => (int) $d->id === $configuredId);
+            if ($existsInSaleDocs) {
+                return $configuredId;
+            }
+        }
+
+        return $documentTypes->first()?->id ? (int) $documentTypes->first()->id : null;
     }
 
     private function inferPaymentMethodKind(string $description): string

@@ -10,6 +10,8 @@ use App\Models\VehicleType;
 use App\Support\WorkshopAuthorization;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class WorkshopVehicleController extends Controller
 {
@@ -33,18 +35,8 @@ class WorkshopVehicleController extends Controller
         $search = trim((string) $request->input('search', ''));
         $perPage = (int) $request->input('per_page', 10);
 
-        $vehicles = Vehicle::query()
+        $vehicles = $this->vehiclesFilteredQuery($branchId, $companyId, $search)
             ->with(['client', 'branch', 'vehicleType'])
-            ->when($companyId > 0, fn ($query) => $query->where('company_id', $companyId))
-            ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
-            ->when($search !== '', function ($query) use ($search) {
-                $query->where(function ($inner) use ($search) {
-                    $inner->where('brand', 'ILIKE', "%{$search}%")
-                        ->orWhere('model', 'ILIKE', "%{$search}%")
-                        ->orWhere('plate', 'ILIKE', "%{$search}%")
-                        ->orWhere('vin', 'ILIKE', "%{$search}%");
-                });
-            })
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
@@ -132,17 +124,104 @@ class WorkshopVehicleController extends Controller
         return back()->with('status', 'Vehiculo eliminado correctamente.');
     }
 
+    public function destroyBulk(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'bulk_mode' => ['required', 'string', Rule::in(['ids', 'filter'])],
+            'ids' => ['required_if:bulk_mode,ids', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+            'search' => ['nullable', 'string'],
+        ]);
+
+        $branchId = (int) session('branch_id');
+        $branch = $branchId > 0 ? \App\Models\Branch::query()->find($branchId) : null;
+        $companyId = (int) ($branch?->company_id ?? 0);
+
+        if ($validated['bulk_mode'] === 'filter') {
+            $search = trim((string) ($validated['search'] ?? ''));
+            $idList = $this->vehiclesFilteredQuery($branchId, $companyId, $search)->pluck('id')->all();
+        } else {
+            $idList = array_values(array_unique(array_map('intval', $validated['ids'] ?? [])));
+        }
+
+        if ($idList === []) {
+            return back()->with('error', 'No hay vehiculos para eliminar.');
+        }
+
+        $deleted = 0;
+        $skipped = 0;
+
+        DB::transaction(function () use ($idList, &$deleted, &$skipped) {
+            foreach (array_chunk($idList, 150) as $chunk) {
+                $vehicles = Vehicle::query()->whereIn('id', $chunk)->get();
+                foreach ($vehicles as $vehicle) {
+                    if (!$this->vehicleMatchesSessionScope($vehicle)) {
+                        $skipped++;
+
+                        continue;
+                    }
+                    if ($vehicle->workshopMovements()->exists()) {
+                        $skipped++;
+
+                        continue;
+                    }
+                    if ($vehicle->appointments()->exists()) {
+                        $skipped++;
+
+                        continue;
+                    }
+                    $vehicle->delete();
+                    $deleted++;
+                }
+            }
+        });
+
+        $msg = "Se eliminaron {$deleted} vehiculo(s).";
+        if ($skipped > 0) {
+            $msg .= " Se omitieron {$skipped} (sin permiso, no encontrados, con OS o citas vinculadas).";
+        }
+
+        return back()->with('status', $msg);
+    }
+
     private function assertVehicleScope(Vehicle $vehicle): void
+    {
+        if (!$this->vehicleMatchesSessionScope($vehicle)) {
+            abort(404);
+        }
+    }
+
+    private function vehicleMatchesSessionScope(Vehicle $vehicle): bool
     {
         $branchId = (int) session('branch_id');
         if ($branchId > 0 && (int) $vehicle->branch_id !== $branchId) {
-            abort(404);
+            return false;
         }
 
         $branch = $branchId > 0 ? \App\Models\Branch::query()->find($branchId) : null;
         if ($branch && (int) $vehicle->company_id !== (int) $branch->company_id) {
-            abort(404);
+            return false;
         }
+
+        return true;
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\Vehicle>
+     */
+    private function vehiclesFilteredQuery(int $branchId, int $companyId, string $search)
+    {
+        return Vehicle::query()
+            ->when($companyId > 0, fn ($query) => $query->where('company_id', $companyId))
+            ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($inner) use ($search) {
+                    $inner->where('brand', 'ILIKE', "%{$search}%")
+                        ->orWhere('model', 'ILIKE', "%{$search}%")
+                        ->orWhere('plate', 'ILIKE', "%{$search}%")
+                        ->orWhere('vin', 'ILIKE', "%{$search}%");
+                });
+            });
     }
 }
 

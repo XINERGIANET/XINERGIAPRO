@@ -11,6 +11,9 @@
         @if ($errors->any())
             <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first() }}</div>
         @endif
+        @if (session('error'))
+            <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ session('error') }}</div>
+        @endif
 
         {{-- Barra de Herramientas Premium (Estilo solicitado) --}}
         <form method="GET" action="{{ route('workshop.vehicles.index') }}" class="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-white/[0.02]">
@@ -70,7 +73,7 @@
             <table class="w-full min-w-[900px]">
                 <thead>
                     <tr>
-                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white first:rounded-tl-xl">ID</th>
+                        <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">ID</th>
                         <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Cliente</th>
                         <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Vehiculo</th>
                         <th style="background-color:#1e293b" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Placa</th>
@@ -85,7 +88,7 @@
                             <td class="px-4 py-3 text-sm text-center">{{ $vehicle->id }}</td>
                             <td class="px-4 py-3 text-sm text-center uppercase">{{ $vehicle->client?->first_name }} {{ $vehicle->client?->last_name }}</td>
                             <td class="px-4 py-3 text-sm text-center uppercase">{{ $vehicle->brand }} {{ $vehicle->model }} ({{ ucfirst($vehicle->vehicleType?->name ?? $vehicle->type) }})</td>
-                            <td class="px-4 py-3 text-sm text-center font-bold">{{ $vehicle->plate }}</td>
+                            <td class="px-4 py-3 text-sm text-center font-bold">{{ $vehicle->plate ?: '-' }}</td>
                             <td class="px-4 py-3 text-sm text-center">{{ $vehicle->engine_displacement_cc ? number_format((int) $vehicle->engine_displacement_cc) . ' cc' : '-' }}</td>
                             <td class="px-4 py-3 text-sm text-center">{{ number_format($vehicle->current_mileage) }}</td>
                             <td class="px-4 py-3 text-sm">
@@ -140,7 +143,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="7" class="px-4 py-4 text-sm text-gray-500 text-center">Sin vehiculos registrados.</td></tr>
+                        <tr><td colspan="8" class="px-4 py-4 text-sm text-gray-500 text-center">Sin vehiculos registrados.</td></tr>
                     @endforelse
                 </tbody>
             </table>

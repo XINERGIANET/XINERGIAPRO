@@ -19,6 +19,7 @@ use App\Models\PaymentMethod;
 use App\Models\Person;
 use App\Models\Product;
 use App\Models\ProductBranch;
+use App\Models\ProductType;
 use App\Models\PurchaseMovement;
 use App\Models\PurchaseMovementDetail;
 use App\Models\Shift;
@@ -600,6 +601,25 @@ class PurchaseController extends Controller
 
         $units = Unit::query()->orderBy('description')->get(['id', 'description']);
 
+        ProductType::ensureDefaultsForBranch($branchId);
+        $productQuickCreateTypes = ProductType::query()
+            ->where('branch_id', $branchId)
+            ->where('status', true)
+            ->orderBy('name')
+            ->get();
+        $productQuickCreateCategories = Category::query()
+            ->forBranch($branchId)
+            ->orderBy('description')
+            ->get();
+        $productQuickCreateTaxRates = TaxRate::query()->where('status', true)->orderBy('order_num')->get();
+        $productQuickCreateSuppliers = Person::query()
+            ->where('branch_id', $branchId)
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name', 'document_number']);
+        $productQuickCreateCurrentBranch = Branch::query()->find($branchId);
+        $productQuickCreateNextCode = $this->nextBranchProductCodeForPurchase($branchId);
+
         $products = Product::query()
             ->join('product_branch', function ($join) use ($branchId) {
                 $join->on('product_branch.product_id', '=', 'products.id')
@@ -707,7 +727,52 @@ class PurchaseController extends Controller
             'defaultTaxRate' => $defaultTaxRate,
             'purchaseNumberPreview' => $purchaseNumberPreview,
             'purchaseCreateConfig' => $purchaseCreateConfig,
+            'productQuickCreate' => [
+                'viewId' => $request->input('view_id'),
+                'productTypes' => $productQuickCreateTypes,
+                'nextProductCode' => $productQuickCreateNextCode,
+                'currentBranch' => $productQuickCreateCurrentBranch,
+                'taxRates' => $productQuickCreateTaxRates,
+                'suppliers' => $productQuickCreateSuppliers,
+                'categories' => $productQuickCreateCategories,
+                'units' => $units,
+                'afterCreate' => 'purchase_create',
+            ],
         ];
+    }
+
+    private function nextBranchProductCodeForPurchase(int $branchId): string
+    {
+        if ($branchId <= 0) {
+            return '1';
+        }
+
+        $lastCode = Product::query()
+            ->join('product_branch', 'product_branch.product_id', '=', 'products.id')
+            ->where('product_branch.branch_id', $branchId)
+            ->whereNull('product_branch.deleted_at')
+            ->orderByDesc('products.id')
+            ->value('products.code');
+
+        if (!$lastCode) {
+            return '1';
+        }
+
+        $code = trim((string) $lastCode);
+
+        if (preg_match('/^(.*?)(\d+)$/', $code, $matches)) {
+            $prefix = $matches[1];
+            $number = $matches[2];
+            $next = (string) ((int) $number + 1);
+
+            return $prefix . str_pad($next, strlen($number), '0', STR_PAD_LEFT);
+        }
+
+        if (is_numeric($code)) {
+            return (string) ((int) $code + 1);
+        }
+
+        return '1';
     }
 
     private function resolvePurchaseMovementType(): MovementType

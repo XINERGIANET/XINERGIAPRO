@@ -18,74 +18,95 @@
     <x-common.page-breadcrumb pageTitle="Ordenes Taller" />
 
     <x-common.component-card title="Ordenes de servicio" desc="Consulta y gestiona ordenes del taller.">
-        {{-- Barra de Herramientas Premium --}}
-        <form method="GET" action="{{ route('workshop.orders.index') }}" class="mb-5 flex flex-col gap-3 xl:flex-row xl:flex-nowrap xl:items-center">
-            @if ($viewId)
-                <input type="hidden" name="view_id" value="{{ $viewId }}">
-            @endif
+        {{-- Barra de herramientas: el import NO puede ir dentro del form GET de filtros (HTML no permite formularios anidados). --}}
+        <div class="mb-5 flex flex-col gap-3 xl:flex-row xl:flex-nowrap xl:items-center">
+            <form method="GET" action="{{ route('workshop.orders.index') }}" class="flex flex-col gap-3 xl:flex-1 xl:flex-row xl:flex-nowrap xl:items-center xl:min-w-0">
+                @if ($viewId)
+                    <input type="hidden" name="view_id" value="{{ $viewId }}">
+                @endif
 
-            {{-- Selector de Registros --}}
-            <div class="w-full xl:w-32 xl:flex-none">
-                <select name="per_page" class="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none transition-all" onchange="this.form.submit()">
-                    <option value="10" @selected(($perPage ?? 10) == 10)>10 / página</option>
-                    <option value="25" @selected(($perPage ?? 10) == 25)>25 / página</option>
-                    <option value="50" @selected(($perPage ?? 10) == 50)>50 / página</option>
-                    <option value="100" @selected(($perPage ?? 10) == 100)>100 / página</option>
-                </select>
-            </div>
-
-            {{-- Buscador Principal --}}
-            <div class="relative w-full flex-1 xl:min-w-0">
-                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-                    <i class="ri-search-line text-gray-400"></i>
+                {{-- Selector de Registros --}}
+                <div class="w-full xl:w-32 xl:flex-none">
+                    <select name="per_page" class="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none transition-all" onchange="this.form.submit()">
+                        <option value="10" @selected(($perPage ?? 10) == 10)>10 / página</option>
+                        <option value="25" @selected(($perPage ?? 10) == 25)>25 / página</option>
+                        <option value="50" @selected(($perPage ?? 10) == 50)>50 / página</option>
+                        <option value="100" @selected(($perPage ?? 10) == 100)>100 / página</option>
+                    </select>
                 </div>
-                <input 
-                    name="search" 
-                    value="{{ $search }}" 
-                    class="h-11 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-4 text-sm shadow-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none placeholder:text-gray-400" 
-                    placeholder="Buscar OS, placa o cliente..."
-                >
-            </div>
 
-            <div class="w-full xl:w-[260px] xl:flex-none">
-                <select name="status" class="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none transition-all">
-                    @foreach ($statusOptions as $statusKey => $statusLabel)
-                        <option value="{{ $statusKey }}" @selected(($selectedStatus ?? 'all') === $statusKey)>{{ $statusLabel }}</option>
-                    @endforeach
-                </select>
-            </div>
+                {{-- Buscador Principal --}}
+                <div class="relative w-full flex-1 xl:min-w-0">
+                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                        <i class="ri-search-line text-gray-400"></i>
+                    </div>
+                    <input 
+                        name="search" 
+                        value="{{ $search }}" 
+                        class="h-11 w-full rounded-xl border border-gray-200 bg-white pl-11 pr-4 text-sm shadow-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none placeholder:text-gray-400" 
+                        placeholder="Buscar OS, placa o cliente..."
+                    >
+                </div>
 
-            {{-- Acciones --}}
-            <div class="flex w-full items-center gap-2 xl:w-auto xl:flex-none">
-                <x-ui.button size="md" variant="primary" type="submit" class="h-11 px-5 shadow-sm active:scale-95 transition-all" style="background-color: #334155; border-color: #334155;">
-                    <i class="ri-search-line"></i>
-                    <span>Buscar</span>
-                </x-ui.button>
-                <x-ui.link-button size="md" variant="outline" href="{{ route('workshop.orders.index', $viewId ? ['view_id' => $viewId] : []) }}" class="h-11 px-4 border-gray-200 text-gray-600 hover:bg-gray-50 transition-all active:scale-95">
-                    <i class="ri-refresh-line"></i>
-                    <span>Limpiar</span>
-                </x-ui.link-button>
-            </div>
+                <div class="w-full xl:w-[260px] xl:flex-none">
+                    <select name="status" class="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none transition-all">
+                        @foreach ($statusOptions as $statusKey => $statusLabel)
+                            <option value="{{ $statusKey }}" @selected(($selectedStatus ?? 'all') === $statusKey)>{{ $statusLabel }}</option>
+                        @endforeach
+                    </select>
+                </div>
 
-            {{-- Botones de Acción (Reportes y Nueva OS) --}}
-            <div class="flex w-full gap-2 xl:ml-auto xl:w-auto xl:flex-none">
-           
+                {{-- Acciones --}}
+                <div class="flex w-full items-center gap-2 xl:w-auto xl:flex-none">
+                    <x-ui.button size="md" variant="primary" type="submit" class="h-11 px-5 shadow-sm active:scale-95 transition-all" style="background-color: #334155; border-color: #334155;">
+                        <i class="ri-search-line"></i>
+                        <span>Buscar</span>
+                    </x-ui.button>
+                    <x-ui.link-button size="md" variant="outline" href="{{ route('workshop.orders.index', $viewId ? ['view_id' => $viewId] : []) }}" class="h-11 px-4 border-gray-200 text-gray-600 hover:bg-gray-50 transition-all active:scale-95">
+                        <i class="ri-refresh-line"></i>
+                        <span>Limpiar</span>
+                    </x-ui.link-button>
+                </div>
+            </form>
+
+            <div class="flex w-full flex-wrap items-center gap-2 xl:ml-auto xl:w-auto xl:flex-none">
+                <form method="POST" action="{{ route('workshop.orders.import-excel') }}" enctype="multipart/form-data" class="inline" data-turbo="false">
+                    @csrf
+                    @if ($viewId)
+                        <input type="hidden" name="view_id" value="{{ $viewId }}">
+                    @endif
+                    <input type="file" name="file" id="workshop-orders-excel-import-input" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" class="hidden" onchange="if (this.files.length) this.form.submit();">
+                    <x-ui.button size="md" variant="outline" type="button" class="h-11 rounded-xl border-gray-300 px-4 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-white/5"
+                        onclick="document.getElementById('workshop-orders-excel-import-input').click();">
+                        <i class="ri-file-excel-2-line"></i>
+                        <span>Importar Excel</span>
+                    </x-ui.button>
+                </form>
                 <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.maintenance-board.create', $viewId ? ['view_id' => $viewId] : []) }}" class="h-11 rounded-xl px-5 font-bold shadow-sm transition-all hover:brightness-105 active:scale-95" style="background-color: #00A389; color: #FFFFFF; border-color: #00A389;">
                     <i class="ri-add-line"></i>
                     <span>Nueva OS</span>
                 </x-ui.link-button>
             </div>
-        </form>
+        </div>
+
+        @if ($errors->has('file'))
+            <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800/50 dark:bg-red-950/30 dark:text-red-200">
+                <strong>Importación OS:</strong> {{ $errors->first('file') }}
+            </div>
+        @endif
 
         @if (session('status'))
             <div class="mb-4 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-700">{{ session('status') }}</div>
+        @endif
+        @if (session('error'))
+            <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ session('error') }}</div>
         @endif
 
         <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
             <table class="w-full">
                 <thead style="background-color: #334155; color: #FFFFFF;">
                     <tr>
-                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider first:rounded-tl-xl text-white">OS</th>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">OS</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Ingreso</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Cliente</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Vehículo</th>
@@ -207,7 +228,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="8" class="px-4 py-4 text-sm text-gray-500 text-center">Sin ordenes para el filtro.</td></tr>
+                        <tr><td colspan="9" class="px-4 py-4 text-sm text-gray-500 text-center">Sin ordenes para el filtro.</td></tr>
                     @endforelse
                 </tbody>
             </table>

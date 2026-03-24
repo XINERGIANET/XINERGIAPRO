@@ -10,6 +10,7 @@ use App\Http\Requests\Workshop\StoreWorkshopLineRequest;
 use App\Http\Requests\Workshop\StoreWorkshopOrderRequest;
 use App\Http\Requests\Workshop\UpdateWorkshopLineRequest;
 use App\Http\Requests\Workshop\UpdateWorkshopOrderRequest;
+use App\Models\Branch;
 use App\Models\CashRegister;
 use App\Models\DocumentType;
 use App\Models\Movement;
@@ -18,16 +19,25 @@ use App\Models\Person;
 use App\Models\Product;
 use App\Models\ProductBranch;
 use App\Models\TaxRate;
+use App\Models\VehicleType;
 use App\Models\WorkshopMovement;
 use App\Models\WorkshopMovementDetail;
 use App\Models\WorkshopMovementTechnician;
+use App\Models\Vehicle;
 use App\Models\WorkshopService;
 use App\Services\Workshop\WorkshopFlowService;
 use App\Support\WorkshopAuthorization;
+use App\Support\WorkshopOrdersExcelImport;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\File;
 
 class WorkshopOrderController extends Controller
 {
@@ -49,47 +59,674 @@ class WorkshopOrderController extends Controller
         $companyId = (int) ($branch?->company_id ?? 0);
         $search = trim((string) $request->input('search', ''));
         $perPage = (int) $request->input('per_page', 10);
-        $availableStatuses = [
-            'all',
-            'registered',
-            'draft',
-            'diagnosis',
-            'awaiting_approval',
-            'approved',
-            'in_progress',
-            'finished',
-            'delivered',
-            'cancelled',
-            'open',
-        ];
-        $selectedStatus = (string) $request->input('status', 'all');
-        if (!in_array($selectedStatus, $availableStatuses, true)) {
-            $selectedStatus = 'all';
-        }
+        $selectedStatus = $this->normalizeWorkshopOrderListStatus((string) $request->input('status', 'all'));
 
-        $orders = WorkshopMovement::query()
+        $orders = $this->workshopOrdersFilteredQuery($branchId, $companyId, $search, $selectedStatus)
             ->with([
                 'movement',
                 'vehicle',
                 'client' => fn ($query) => $query->withTrashed(),
             ])
-            ->when($companyId > 0, fn ($query) => $query->where('company_id', $companyId))
-            ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
-            ->when($selectedStatus !== 'all', fn ($query) => $query->where('status', $selectedStatus))
-            ->when($search !== '', function ($query) use ($search) {
-                $query->where(function ($inner) use ($search) {
-                    $inner->whereHas('movement', fn ($movementQuery) => $movementQuery->where('number', 'ILIKE', "%{$search}%"))
-                        ->orWhereHas('vehicle', fn ($vehicleQuery) => $vehicleQuery->where('plate', 'ILIKE', "%{$search}%"))
-                        ->orWhereHas('client', fn ($clientQuery) => $clientQuery
-                            ->where('first_name', 'ILIKE', "%{$search}%")
-                            ->orWhere('last_name', 'ILIKE', "%{$search}%"));
-                });
-            })
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
 
         return view('workshop.orders.index', compact('orders', 'search', 'perPage', 'selectedStatus'));
+    }
+
+    public function destroyBulk(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'bulk_mode' => ['required', 'string', Rule::in(['ids', 'filter'])],
+            'ids' => ['required_if:bulk_mode,ids', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+            'search' => ['nullable', 'string'],
+            'status' => ['nullable', 'string'],
+            'view_id' => ['nullable', 'string'],
+        ]);
+
+        $branchId = (int) session('branch_id');
+        $branch = $branchId > 0 ? Branch::query()->find($branchId) : null;
+        $companyId = (int) ($branch?->company_id ?? 0);
+
+        if ($validated['bulk_mode'] === 'filter') {
+            $search = trim((string) ($validated['search'] ?? ''));
+            $status = $this->normalizeWorkshopOrderListStatus((string) ($validated['status'] ?? 'all'));
+            $idList = $this->workshopOrdersFilteredQuery($branchId, $companyId, $search, $status)->pluck('id')->all();
+        } else {
+            $idList = array_values(array_unique(array_map('intval', $validated['ids'] ?? [])));
+        }
+
+        if ($idList === []) {
+            return back()->with('error', 'No hay ordenes para eliminar.');
+        }
+
+        $deleted = 0;
+        $skipped = 0;
+
+        DB::transaction(function () use ($idList, &$deleted, &$skipped) {
+            foreach (array_chunk($idList, 150) as $chunk) {
+                $orders = WorkshopMovement::query()->whereIn('id', $chunk)->get();
+                foreach ($orders as $order) {
+                    if (!$this->orderMatchesSessionScope($order)) {
+                        $skipped++;
+
+                        continue;
+                    }
+                    if ($order->sales_movement_id || $order->cash_movement_id) {
+                        $skipped++;
+
+                        continue;
+                    }
+                    $movement = Movement::query()->find($order->movement_id);
+                    $order->delete();
+                    if ($movement) {
+                        $movement->delete();
+                    }
+                    $deleted++;
+                }
+            }
+        });
+
+        $q = array_filter(['view_id' => $request->input('view_id')]);
+        $msg = "Se eliminaron {$deleted} orden(es) de servicio.";
+        if ($skipped > 0) {
+            $msg .= " Se omitieron {$skipped} (sin permiso, no encontradas o con venta/pagos vinculados).";
+        }
+
+        return redirect()->route('workshop.orders.index', $q)->with('status', $msg);
+    }
+
+    public function importExcel(Request $request): RedirectResponse
+    {
+        $viewId = $request->input('view_id');
+
+        $validator = Validator::make($request->all(), [
+            'file' => ['required', File::types(['xlsx', 'xls', 'csv'])->max(10240)],
+        ]);
+
+        if ($validator->fails()) {
+            $msg = (string) ($validator->errors()->first('file') ?: 'Archivo no válido. Usa .xlsx, .xls o .csv (máx. 10 MB).');
+
+            return redirect()
+                ->route('workshop.orders.index', array_filter(['view_id' => $viewId]))
+                ->withErrors($validator)
+                ->with('error', $msg);
+        }
+
+        $branchId = (int) session('branch_id');
+        $branch = $branchId > 0 ? \App\Models\Branch::query()->find($branchId) : null;
+        $companyId = (int) ($branch?->company_id ?? 0);
+
+        if ($branchId <= 0 || $companyId <= 0) {
+            return redirect()
+                ->route('workshop.orders.index', array_filter(['view_id' => $viewId]))
+                ->with('error', 'Selecciona una sucursal para importar órdenes.');
+        }
+
+        $uploaded = $request->file('file');
+        if (!$uploaded) {
+            return redirect()
+                ->route('workshop.orders.index', array_filter(['view_id' => $viewId]))
+                ->withErrors(['file' => 'No se recibió ningún archivo.'])
+                ->with('error', 'No se recibió ningún archivo.');
+        }
+
+        $ext = strtolower((string) $uploaded->getClientOriginalExtension());
+        if ($ext === '') {
+            $ext = 'xlsx';
+        }
+
+        $storedRelative = $uploaded->storeAs(
+            'temp/workshop-order-imports',
+            Str::uuid()->toString() . '.' . $ext,
+            'local'
+        );
+
+        if ($storedRelative === false) {
+            return redirect()
+                ->route('workshop.orders.index', array_filter(['view_id' => $viewId]))
+                ->withErrors(['file' => 'No se pudo guardar el archivo temporalmente.'])
+                ->with('error', 'No se pudo guardar el archivo temporalmente.');
+        }
+
+        $fullPath = Storage::disk('local')->path($storedRelative);
+
+        try {
+            $rows = WorkshopOrdersExcelImport::extractRows($fullPath);
+        } catch (\InvalidArgumentException $e) {
+            Storage::disk('local')->delete($storedRelative);
+
+            return redirect()
+                ->route('workshop.orders.index', array_filter(['view_id' => $viewId]))
+                ->withErrors(['file' => $e->getMessage()])
+                ->with('error', $e->getMessage());
+        }
+
+        Storage::disk('local')->delete($storedRelative);
+
+        $user = auth()->user();
+        $userId = (int) ($user?->id ?? 0);
+        $userName = (string) ($user?->name ?? 'Sistema');
+
+        $created = 0;
+        $rowErrors = [];
+
+        foreach ($rows as $row) {
+            try {
+                DB::transaction(function () use ($row, $branchId, $companyId, $userId, $userName) {
+                    $docRaw = trim((string) $row['document']);
+                    $clientFullName = trim((string) ($row['client_full_name'] ?? ''));
+                    $clientPhone = trim((string) ($row['client_phone'] ?? ''));
+                    $clientEmail = trim((string) ($row['client_email'] ?? ''));
+
+                    if ($this->isImportAnonymousDocument($docRaw)) {
+                        if ($clientFullName !== '') {
+                            $clientPerson = $this->createImportClientPersonDocumentZeroNamed(
+                                $clientFullName,
+                                $clientPhone,
+                                $clientEmail,
+                                $branchId,
+                                (int) $row['row_index']
+                            );
+                        } else {
+                            $clientPerson = $this->ensureImportGeneralClientPerson($branchId);
+                        }
+                    } else {
+                        $clientPerson = $this->ensureImportClientPersonByDocument($docRaw, $branchId, $companyId);
+                    }
+
+                    $vehicle = $this->resolveOrCreateVehicleForOrderImport(
+                        $row,
+                        $companyId,
+                        $branchId,
+                        $clientPerson
+                    );
+
+                    if (
+                        $this->isImportAnonymousDocument($docRaw)
+                        && $clientFullName !== ''
+                        && (int) $vehicle->client_person_id !== (int) $clientPerson->id
+                        && $this->vehicleClientCanBeReplacedFromExcelName($vehicle, $branchId)
+                    ) {
+                        $vehicle->update([
+                            'client_person_id' => (int) $clientPerson->id,
+                        ]);
+                        $vehicle->refresh();
+                    }
+
+
+                    $glosas = $row['service_descriptions'];
+                    if ($glosas === []) {
+                        throw new \RuntimeException('OBSERVACIONES sin ítems válidos después de separar por +.');
+                    }
+
+                    $intakeDate = $row['intake_date'] ?? now()->toDateString();
+
+                    $orderData = [
+                        'vehicle_id' => (int) $vehicle->id,
+                        'client_person_id' => (int) $vehicle->client_person_id,
+                        'intake_date' => $intakeDate,
+                        'mileage_in' => $row['mileage_in'],
+                        'observations' => $row['observations'],
+                        'status' => 'finished',
+                        'comment' => 'OS importada desde Excel',
+                    ];
+
+                    $order = $this->flowService->createOrder($orderData, $branchId, $userId, $userName);
+
+                    foreach ($glosas as $desc) {
+                        $this->flowService->addDetail($order, [
+                            'line_type' => 'SERVICE',
+                            'service_id' => null,
+                            'product_id' => null,
+                            'description' => $desc,
+                            'qty' => 1,
+                            'unit_price' => 0,
+                            'discount_amount' => 0,
+                            'tax_rate_id' => null,
+                        ]);
+                    }
+
+                });
+                $created++;
+            } catch (\Throwable $e) {
+                Log::warning('importExcel OS fila ' . $row['row_index'] . ': ' . $e->getMessage());
+                $rowErrors[] = 'Fila ' . $row['row_index'] . ': ' . $e->getMessage();
+            }
+        }
+
+        $msg = "Importaci�n: {$created} orden(es) creada(s) como terminada(s), con servicios en glosa.";
+        if ($rowErrors !== []) {
+            $msg .= ' Errores: ' . implode(' | ', array_slice($rowErrors, 0, 8));
+            if (count($rowErrors) > 8) {
+                $msg .= ' (+' . (count($rowErrors) - 8) . ' más)';
+            }
+        }
+
+        $redirect = redirect()
+            ->route('workshop.orders.index', array_filter(['view_id' => $viewId]));
+
+        if ($created > 0) {
+            $redirect->with('status', $msg);
+        } else {
+            $redirect->with('error', $msg);
+        }
+
+        if ($created === 0 && $rowErrors !== []) {
+            $redirect->withErrors(['file' => implode("\n", array_slice($rowErrors, 0, 5))]);
+        }
+
+        return $redirect;
+    }
+
+    private function resolveVehicleForOrderImport(string $plate, int $companyId, int $branchId): ?Vehicle
+    {
+        return $this->findVehicleByNormalizedPlate($plate, $companyId, $branchId);
+    }
+
+    private function findVehicleByNormalizedPlate(string $plate, int $companyId, int $branchId): ?Vehicle
+    {
+        $norm = $this->normalizePlateString($plate);
+        if ($norm === '') {
+            return null;
+        }
+
+        $candidates = Vehicle::withTrashed()
+            ->where('company_id', $companyId)
+            ->orderByDesc('id')
+            ->get();
+
+        foreach ($candidates as $vehicle) {
+            $p = $this->normalizePlateString((string) $vehicle->plate);
+            if ($p === $norm) {
+                return $vehicle;
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizePlateString(string $plate): string
+    {
+        return strtoupper(preg_replace('/\s+/u', '', trim($plate)) ?? '');
+    }
+
+    private function isPlaceholderImportPlate(string $normalized): bool
+    {
+        if ($normalized === '') {
+            return true;
+        }
+
+        $markers = ['-', '--', '.', '..', 'N/A', 'NA', 'S/N', 'SN', 'XXX', 'SINPLACA', '0', '00', '—', '–'];
+        foreach ($markers as $m) {
+            if ($normalized === strtoupper($m)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+
+    private function resolveOrCreateVehicleForOrderImport(
+        array $row,
+        int $companyId,
+        int $branchId,
+        Person $clientPerson
+    ): Vehicle {
+        $plate = (string) ($row['plate'] ?? '');
+        $existing = $this->findVehicleByNormalizedPlate($plate, $companyId, $branchId);
+        if ($existing) {
+            if (method_exists($existing, 'trashed') && $existing->trashed()) {
+                $existing->restore();
+            }
+            $updates = [];
+            if ((int) $existing->branch_id !== $branchId) {
+                $updates['branch_id'] = $branchId;
+            }
+            if ((int) $existing->client_person_id !== (int) $clientPerson->id && $this->isImportGeneralClientPerson($existing->client)) {
+                $updates['client_person_id'] = $clientPerson->id;
+            }
+            if ($updates !== []) {
+                $existing->update($updates);
+                $existing->refresh();
+            }
+
+            return $existing;
+        }
+
+        $norm = $this->normalizePlateString($plate);
+        $finalPlate = $this->isPlaceholderImportPlate($norm) ? null : $norm;
+
+        $vehicleTypeId = 18;
+        $vehicleType = VehicleType::query()->find(18);
+        $typeName = $vehicleType?->name ? (string) $vehicleType->name : 'moto';
+
+        $brand = trim((string) ($row['brand'] ?? ''));
+        if ($brand === '' || $this->isImportDashText($brand)) {
+            $brand = '-';
+        }
+        $model = trim((string) ($row['model'] ?? ''));
+        if ($model === '' || $this->isImportDashText($model)) {
+            $model = '-';
+        }
+
+        $mileage = array_key_exists('mileage_in', $row) && $row['mileage_in'] !== null
+            ? (int) $row['mileage_in']
+            : 0;
+        $mileage = max(0, $mileage);
+
+        $cc = $row['engine_displacement_cc'] ?? null;
+        if ($cc !== null) {
+            $cc = (int) $cc;
+            if ($cc <= 0 || $cc > 5000) {
+                $cc = null;
+            }
+        }
+
+        $color = isset($row['color']) && $row['color'] !== null && $row['color'] !== ''
+            ? mb_substr((string) $row['color'], 0, 100)
+            : null;
+
+
+        if ($finalPlate !== null) {
+            $plateLessMatch = Vehicle::query()
+                ->where('company_id', $companyId)
+                ->where('branch_id', $branchId)
+                ->where('client_person_id', $clientPerson->id)
+                ->where(function ($query) {
+                    $query->whereNull('plate')
+                        ->orWhereRaw("TRIM(COALESCE(plate, '')) = ''");
+                })
+                ->whereRaw("UPPER(TRIM(COALESCE(brand, ''))) = ?", [mb_strtoupper(trim($brand))])
+                ->whereRaw("UPPER(TRIM(COALESCE(model, ''))) = ?", [mb_strtoupper(trim($model))])
+                ->orderByDesc('id')
+                ->first();
+
+            if ($plateLessMatch) {
+                $plateLessMatch->update([
+                    'plate' => $finalPlate,
+                    'client_person_id' => $clientPerson->id,
+                    'branch_id' => $branchId,
+                    'vehicle_type_id' => $vehicleTypeId,
+                    'type' => mb_substr($typeName, 0, 30),
+                    'brand' => mb_substr($brand, 0, 255),
+                    'model' => mb_substr($model, 0, 255),
+                    'color' => $color,
+                    'engine_displacement_cc' => $cc,
+                    'current_mileage' => $mileage,
+                ]);
+
+                return $plateLessMatch->fresh();
+            }
+        }
+        return Vehicle::query()->create([
+            'company_id' => $companyId,
+            'branch_id' => $branchId,
+            'client_person_id' => $clientPerson->id,
+            'vehicle_type_id' => $vehicleTypeId,
+            'type' => mb_substr($typeName, 0, 30),
+            'brand' => mb_substr($brand, 0, 255),
+            'model' => mb_substr($model, 0, 255),
+            'color' => $color,
+            'plate' => $finalPlate,
+            'engine_displacement_cc' => $cc,
+            'current_mileage' => $mileage,
+            'status' => 'active',
+        ]);
+    }
+
+    private function isImportDashText(string $value): bool
+    {
+        $t = strtoupper(trim($value));
+
+        return $t === '-' || $t === '—' || $t === '–' || $t === 'N/A' || $t === 'S/N';
+    }
+
+    private function isImportAnonymousDocument(string $doc): bool
+    {
+        $t = trim($doc);
+        if ($t === '') {
+            return true;
+        }
+        $u = strtoupper($t);
+        if (in_array($u, ['-', 'N/A', 'S/N', 'SN', '—', '–'], true)) {
+            return true;
+        }
+        if (preg_match('/^\d+$/', $t)) {
+            return (int) $t === 0;
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private function splitImportPersonFullName(string $full): array
+    {
+        $full = preg_replace('/\s+/u', ' ', trim($full)) ?? '';
+        if ($full === '') {
+            return ['Cliente', 'Importacion'];
+        }
+        $parts = explode(' ', $full);
+        if (count($parts) === 1) {
+            return [mb_substr($parts[0], 0, 255), '-'];
+        }
+        $last = array_pop($parts);
+        $first = implode(' ', $parts);
+
+        return [mb_substr($first, 0, 255), mb_substr($last, 0, 255)];
+    }
+
+    private function normalizeImportPersonName(string $value): string
+    {
+        return mb_strtoupper(preg_replace('/\\s+/u', ' ', trim($value)) ?? '');
+    }
+
+    private function isImportGeneralClientPerson(?Person $person): bool
+    {
+        if (!$person) {
+            return false;
+        }
+
+        $document = trim((string) $person->document_number);
+        $fullName = $this->normalizeImportPersonName(
+            trim(($person->first_name ?? '') . ' ' . ($person->last_name ?? ''))
+        );
+
+        if ($fullName === '') {
+            return true;
+        }
+
+        return $document === '0' && $fullName === 'CLIENTES VARIOS';
+    }
+
+    private function vehicleClientCanBeReplacedFromExcelName(Vehicle $vehicle, int $branchId): bool
+    {
+        $currentClient = $vehicle->relationLoaded('client')
+            ? $vehicle->client
+            : Person::query()->find($vehicle->client_person_id);
+
+        return $this->isImportGeneralClientPerson($currentClient);
+    }
+
+    /**
+     * Cliente con DNI/documento 0 pero nombre propio en Excel: siempre nueva persona (no CLIENTES VARIOS).
+     */
+    private function createImportClientPersonDocumentZeroNamed(
+        string $fullName,
+        string $phone,
+        string $email,
+        int $branchId,
+        int $rowIndex
+    ): Person {
+        $branch = Branch::query()->findOrFail($branchId);
+        $districtId = (int) ($branch->location_id ?? 0);
+        if ($districtId <= 0) {
+            throw new \RuntimeException('La sucursal no tiene distrito configurado; no se puede crear el cliente de la fila «' . $fullName . '».');
+        }
+
+        [$firstName, $lastName] = $this->splitImportPersonFullName($fullName);
+
+        $normalizedFullName = $this->normalizeImportPersonName($fullName);
+        $existing = Person::query()
+            ->where('branch_id', $branchId)
+            ->whereRaw('TRIM(document_number) = ?', ['0'])
+            ->get()
+            ->first(function (Person $person) use ($normalizedFullName) {
+                $personFullName = trim(($person->first_name ?? '') . ' ' . ($person->last_name ?? ''));
+
+                return $this->normalizeImportPersonName($personFullName) === $normalizedFullName;
+            });
+
+        if ($existing) {
+            DB::table('role_person')->updateOrInsert(
+                [
+                    'role_id' => 3,
+                    'person_id' => $existing->id,
+                    'branch_id' => $branchId,
+                ],
+                [
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+
+            $updates = [];
+            $phoneNormExisting = trim($phone);
+            if (
+                $phoneNormExisting !== ''
+                && $phoneNormExisting !== '0'
+                && strtoupper($phoneNormExisting) !== 'N/A'
+                && trim((string) $existing->phone) !== $phoneNormExisting
+            ) {
+                $updates['phone'] = mb_substr($phoneNormExisting, 0, 50);
+            }
+
+            $emailNormExisting = trim($email);
+            if (
+                $emailNormExisting !== ''
+                && filter_var($emailNormExisting, FILTER_VALIDATE_EMAIL)
+                && trim((string) $existing->email) !== $emailNormExisting
+            ) {
+                $updates['email'] = mb_substr($emailNormExisting, 0, 255);
+            }
+
+            if ($updates !== []) {
+                $existing->update($updates);
+            }
+
+            return $existing->fresh();
+        }
+
+        $phoneNorm = trim((string) $phone);
+        if ($phoneNorm === '' || $phoneNorm === '0' || strtoupper($phoneNorm) === 'N/A') {
+            $phoneNorm = '0';
+        }
+        $phoneNorm = mb_substr($phoneNorm, 0, 50);
+
+        $emailNorm = trim($email);
+        if ($emailNorm === '' || strtoupper($emailNorm) === '0' || !filter_var($emailNorm, FILTER_VALIDATE_EMAIL)) {
+            $emailNorm = 'import.os.f' . $rowIndex . '.b' . $branchId . '.' . substr(sha1((string) microtime(true) . random_bytes(4)), 0, 10) . '@xinergia-import.local';
+        } else {
+            $emailNorm = mb_substr($emailNorm, 0, 255);
+        }
+
+        $person = Person::query()->create([
+            'branch_id' => $branchId,
+            'document_number' => '0',
+            'person_type' => 'DNI',
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'phone' => $phoneNorm,
+            'email' => $emailNorm,
+            'address' => '-',
+            'location_id' => $districtId,
+        ]);
+
+        DB::table('role_person')->updateOrInsert(
+            [
+                'role_id' => 3,
+                'person_id' => $person->id,
+                'branch_id' => $branchId,
+            ],
+            [
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+
+        return $person;
+    }
+
+    private function ensureImportGeneralClientPerson(int $branchId): Person
+    {
+        $branch = Branch::query()->findOrFail($branchId);
+        $person = Person::query()->firstOrCreate(
+            [
+                'branch_id' => $branchId,
+                'document_number' => '0',
+                'person_type' => 'DNI',
+            ],
+            [
+                'first_name' => 'CLIENTES VARIOS',
+                'last_name' => '',
+                'phone' => '-',
+                'email' => 'clientes.varios.' . $branchId . '@xinergia.local',
+                'address' => $branch->address ?: '-',
+                'location_id' => $branch->location_id,
+            ]
+        );
+
+        DB::table('role_person')->updateOrInsert(
+            [
+                'role_id' => 3,
+                'person_id' => $person->id,
+                'branch_id' => $branchId,
+            ],
+            [
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+
+        return $person;
+    }
+
+    private function ensureImportClientPersonByDocument(string $document, int $branchId, int $companyId): Person
+    {
+        $doc = trim($document);
+        if ($doc === '') {
+            return $this->ensureImportGeneralClientPerson($branchId);
+        }
+        if ($this->isImportAnonymousDocument($doc)) {
+            return $this->ensureImportGeneralClientPerson($branchId);
+        }
+
+        $person = Person::query()
+            ->where('branch_id', $branchId)
+            ->whereRaw('TRIM(document_number) = ?', [$doc])
+            ->first();
+
+        if ($person) {
+            DB::table('role_person')->updateOrInsert(
+                [
+                    'role_id' => 3,
+                    'person_id' => $person->id,
+                    'branch_id' => $branchId,
+                ],
+                [
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]
+            );
+
+            return $person;
+        }
+
+        return $this->ensureImportGeneralClientPerson($branchId);
     }
 
     public function create(Request $request): RedirectResponse
@@ -601,15 +1238,68 @@ class WorkshopOrderController extends Controller
 
     private function assertOrderScope(WorkshopMovement $order): void
     {
+        if (!$this->orderMatchesSessionScope($order)) {
+            abort(404);
+        }
+    }
+
+    private function orderMatchesSessionScope(WorkshopMovement $order): bool
+    {
         $branchId = (int) session('branch_id');
         if ($branchId > 0 && (int) $order->branch_id !== $branchId) {
-            abort(404);
+            return false;
         }
 
-        $branch = $branchId > 0 ? \App\Models\Branch::query()->find($branchId) : null;
+        $branch = $branchId > 0 ? Branch::query()->find($branchId) : null;
         if ($branch && (int) $order->company_id !== (int) $branch->company_id) {
-            abort(404);
+            return false;
         }
+
+        return true;
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\WorkshopMovement>
+     */
+    private function workshopOrdersFilteredQuery(int $branchId, int $companyId, string $search, string $selectedStatus)
+    {
+        $selectedStatus = $this->normalizeWorkshopOrderListStatus($selectedStatus);
+
+        return WorkshopMovement::query()
+            ->when($companyId > 0, fn ($query) => $query->where('company_id', $companyId))
+            ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
+            ->when($selectedStatus !== 'all', fn ($query) => $query->where('status', $selectedStatus))
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($inner) use ($search) {
+                    $inner->whereHas('movement', fn ($movementQuery) => $movementQuery->where('number', 'ILIKE', "%{$search}%"))
+                        ->orWhereHas('vehicle', fn ($vehicleQuery) => $vehicleQuery->where('plate', 'ILIKE', "%{$search}%"))
+                        ->orWhereHas('client', fn ($clientQuery) => $clientQuery
+                            ->where('first_name', 'ILIKE', "%{$search}%")
+                            ->orWhere('last_name', 'ILIKE', "%{$search}%"));
+                });
+            });
+    }
+
+    private function normalizeWorkshopOrderListStatus(string $selectedStatus): string
+    {
+        $availableStatuses = [
+            'all',
+            'registered',
+            'draft',
+            'diagnosis',
+            'awaiting_approval',
+            'approved',
+            'in_progress',
+            'finished',
+            'delivered',
+            'cancelled',
+            'open',
+        ];
+        if (!in_array($selectedStatus, $availableStatuses, true)) {
+            return 'all';
+        }
+
+        return $selectedStatus;
     }
 
     private function uploadDamagePhotos(Request $request, array $damages, int $branchId): array

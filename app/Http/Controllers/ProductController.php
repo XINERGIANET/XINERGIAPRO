@@ -17,11 +17,15 @@ use App\Models\DocumentType;
 use App\Models\WarehouseMovement;
 use App\Models\WarehouseMovementDetail;
 use App\Services\KardexSyncService;
+use App\Support\ProductBranchExcelImport;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\File;
 use Illuminate\Validation\ValidationException;
 
 class ProductController extends Controller
@@ -133,6 +137,177 @@ class ProductController extends Controller
         ]);
     }
 
+    public function importExcel(Request $request)
+    {
+        $viewId = $request->input('view_id');
+
+        $validator = Validator::make($request->all(), [
+            'file' => ['required', File::types(['xlsx', 'xls', 'csv'])->max(10240)],
+        ]);
+
+        if ($validator->fails()) {
+            $msg = (string) ($validator->errors()->first('file') ?: 'Archivo no válido. Usa .xlsx, .xls o .csv (máx. 10 MB).');
+
+            return redirect()
+                ->route('admin.products.index', $viewId ? ['view_id' => $viewId] : [])
+                ->withErrors($validator)
+                ->with('error', $msg);
+        }
+
+        $branchId = (int) $request->session()->get('branch_id');
+
+        if ($branchId <= 0) {
+            return redirect()
+                ->route('admin.products.index', $viewId ? ['view_id' => $viewId] : [])
+                ->with('error', 'Selecciona una sucursal para importar productos.');
+        }
+
+        $uploaded = $request->file('file');
+        if (!$uploaded) {
+            return redirect()
+                ->route('admin.products.index', $viewId ? ['view_id' => $viewId] : [])
+                ->withErrors(['file' => 'No se recibió ningún archivo.'])
+                ->with('error', 'No se recibió ningún archivo.');
+        }
+
+        $ext = strtolower((string) $uploaded->getClientOriginalExtension());
+        if ($ext === '') {
+            $ext = 'xlsx';
+        }
+
+        $storedRelative = $uploaded->storeAs(
+            'temp/product-imports',
+            Str::uuid()->toString() . '.' . $ext,
+            'local'
+        );
+
+        if ($storedRelative === false) {
+            return redirect()
+                ->route('admin.products.index', $viewId ? ['view_id' => $viewId] : [])
+                ->withErrors(['file' => 'No se pudo guardar el archivo temporalmente.'])
+                ->with('error', 'No se pudo guardar el archivo temporalmente.');
+        }
+
+        $fullPath = Storage::disk('local')->path($storedRelative);
+
+        try {
+            $rows = ProductBranchExcelImport::extractRows($fullPath);
+        } catch (\InvalidArgumentException $e) {
+            return redirect()
+                ->route('admin.products.index', $viewId ? ['view_id' => $viewId] : [])
+                ->withErrors(['file' => $e->getMessage()])
+                ->with('error', $e->getMessage());
+        } finally {
+            Storage::disk('local')->delete($storedRelative);
+        }
+
+        ProductType::ensureDefaultsForBranch($branchId);
+
+        $productType = ProductType::query()
+            ->where('branch_id', $branchId)
+            ->where('status', true)
+            ->whereIn('behavior', ['SELLABLE', 'VENDIBLE'])
+            ->orderByRaw("CASE UPPER(behavior) WHEN 'SELLABLE' THEN 0 WHEN 'VENDIBLE' THEN 1 ELSE 2 END")
+            ->orderBy('id')
+            ->first();
+
+        if (!$productType) {
+            $productType = ProductType::query()
+                ->where('branch_id', $branchId)
+                ->where('status', true)
+                ->whereRaw('LOWER(name) LIKE ?', ['%producto final%'])
+                ->orderBy('id')
+                ->first();
+        }
+
+        if (!$productType) {
+            $productType = ProductType::query()
+                ->where('branch_id', $branchId)
+                ->where('status', true)
+                ->orderBy('id')
+                ->first();
+        }
+
+        if (!$productType) {
+            return redirect()
+                ->route('admin.products.index', $viewId ? ['view_id' => $viewId] : [])
+                ->with('error', 'No hay tipo de producto activo para esta sucursal. Crea uno primero.');
+        }
+
+        $baseUnitId = (int) (Unit::query()
+            ->whereRaw('LOWER(description) LIKE ?', ['%unidad%'])
+            ->orderBy('id')
+            ->value('id') ?? Unit::query()->orderBy('id')->value('id'));
+
+        if ($baseUnitId <= 0) {
+            return redirect()
+                ->route('admin.products.index', $viewId ? ['view_id' => $viewId] : [])
+                ->with('error', 'No hay unidades de medida registradas.');
+        }
+
+        $imported = 0;
+
+        try {
+            DB::transaction(function () use ($rows, $branchId, $productType, $baseUnitId, &$imported) {
+                foreach ($rows as $row) {
+                    $category = $this->findOrCreateCategoryForBranch($row['category'], $branchId);
+                    $code = $this->nextBranchProductCode($branchId);
+
+                    $product = Product::query()->create([
+                        'code' => $code,
+                        'description' => $row['description'],
+                        'abbreviation' => $row['description'],
+                        'marca' => $row['marca'] !== '' ? $row['marca'] : null,
+                        'type' => $productType->behavior,
+                        'product_type_id' => $productType->id,
+                        'category_id' => $category->id,
+                        'base_unit_id' => $baseUnitId,
+                        'kardex' => 'S',
+                        'complement' => 'NO',
+                        'complement_mode' => '',
+                        'classification' => 'GOOD',
+                        'features' => null,
+                        'recipe' => false,
+                    ]);
+
+                    ProductBranch::query()->create([
+                        'product_id' => $product->id,
+                        'branch_id' => $branchId,
+                        'status' => 'A',
+                        'stock' => $row['stock'],
+                        'price' => 0,
+                        'purchase_price' => 0,
+                        'stock_minimum' => 0,
+                        'stock_maximum' => 0,
+                        'minimum_sell' => 0,
+                        'minimum_purchase' => 0,
+                        'favorite' => 'N',
+                        'tax_rate_id' => null,
+                        'unit_sale' => 'N',
+                        'duration_minutes' => null,
+                        'supplier_id' => null,
+                        'expiration_date' => null,
+                    ]);
+
+                    $imported++;
+                }
+            });
+        } catch (\Throwable $e) {
+            Log::error('importExcel productos: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+
+            $err = 'Error al importar: ' . $e->getMessage();
+
+            return redirect()
+                ->route('admin.products.index', $viewId ? ['view_id' => $viewId] : [])
+                ->withErrors(['file' => $err])
+                ->with('error', $err);
+        }
+
+        return redirect()
+            ->route('admin.products.index', $viewId ? ['view_id' => $viewId] : [])
+            ->with('status', "Importación lista: {$imported} producto(s) creados en esta sucursal.");
+    }
+
     public function store(Request $request)
     {
         $imagePath = null;
@@ -191,7 +366,13 @@ class ProductController extends Controller
         }
         
         $viewId = $request->input('view_id');
-        
+
+        if ($request->input('after_create') === 'purchase_create') {
+            return redirect()
+                ->route('admin.purchases.create', $viewId ? ['view_id' => $viewId] : [])
+                ->with('status', 'Producto creado correctamente. Buscalo en el catalogo para agregarlo a la compra.');
+        }
+
         return redirect()
             ->route('admin.products.index', $viewId ? ['view_id' => $viewId] : [])
             ->with('status', 'Producto creado correctamente.');
@@ -483,6 +664,7 @@ class ProductController extends Controller
             'code' => ['required', 'string', 'max:50'],
             'description' => ['required', 'string', 'max:255'],
             'abbreviation' => ['required', 'string', 'max:255'],
+            'marca' => ['nullable', 'string', 'max:120'],
             'product_type_id' => ['required', 'integer', 'exists:product_types,id'],
             'category_id' => ['required', 'integer', 'exists:categories,id'],
             'base_unit_id' => ['required', 'integer', 'exists:units,id'],
@@ -587,6 +769,41 @@ class ProductController extends Controller
             'price' => $validated['price'],
             'purchase_price' => $validated['purchase_price'],
         ];
+    }
+
+    private function findOrCreateCategoryForBranch(string $label, int $branchId): Category
+    {
+        $label = trim($label);
+        if ($label === '') {
+            $label = 'Sin categoría';
+        }
+
+        $needle = mb_strtolower($label, 'UTF-8');
+
+        $existing = Category::query()
+            ->forBranch($branchId)
+            ->whereRaw('LOWER(TRIM(description)) = ?', [$needle])
+            ->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        $category = Category::query()->create([
+            'description' => mb_substr($label, 0, 255),
+            'abbreviation' => mb_substr($label, 0, 255),
+        ]);
+
+        $category->branches()->syncWithoutDetaching([
+            $branchId => [
+                'menu_type' => 'GENERAL',
+                'status' => 'E',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        return $category;
     }
 
     private function nextBranchProductCode(int $branchId): string

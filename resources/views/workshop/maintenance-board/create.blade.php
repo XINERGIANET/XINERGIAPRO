@@ -101,6 +101,7 @@
     historyRequestToken: 0,
     selectedVehicleId: @js($vehicleIdDefault),
     vehicleSearch: '',
+    filteredVehicleList: [],
     vehicleDropdownOpen: false,
     selectedClientId: @js($clientIdDefault),
     mileageIn: @js($mileageDefault),
@@ -160,6 +161,10 @@
     editingVehicleLabel: @js($editingVehicleLabel ?? ''),
     editingClientLabel: @js($editingClientLabel ?? ''),
     selectedServiceIds: @js($selectedIdsFromLines),
+    serviceCcOverrideById: {},
+    servicePricesSeeded: false,
+    preserveCustomCatalogPriceIds: {},
+    totalsTick: 0,
     serviceLines: @js($serviceLinesForUi),
     inventoryItemsByVehicleType: @js($inventoryItemsByVehicleType ?? []),
     inventoryChecks: @js($inventoryForUi),
@@ -173,6 +178,7 @@
         this.mileageIn = selected.km ? String(selected.km) : '';
         this.vehicleSearch = selected.display_label || selected.label || '';
         this.selectedVehicleTypeId = selected.vehicle_type_id ? String(selected.vehicle_type_id) : String(this.quickVehicle.vehicle_type_id || '');
+        this.refreshVehicleFilter();
         this.syncHistoryUrl();
         this.refreshServiceLinePrices();
     },
@@ -278,16 +284,31 @@
         this.quickVehicleClientSearch = this.getQuickVehicleClientLabel(client);
         this.quickVehicleClientDropdownOpen = false;
     },
-    get filteredVehicles() {
+    compactSearchText(s) {
+        return String(s || '').toLowerCase().replace(/[\s\-_.]/g, '');
+    },
+    refreshVehicleFilter() {
         const q = String(this.vehicleSearch || '').trim().toLowerCase();
-        if (!q) return this.vehicles.slice(0, 30);
-        return this.vehicles
-            .filter(v => {
-                const vehicleText = String(v.label || '').toLowerCase();
-                const clientText = String(v.client_name || '').toLowerCase();
-                return vehicleText.includes(q) || clientText.includes(q);
-            })
-            .slice(0, 30);
+        if (!q) {
+            this.filteredVehicleList = this.vehicles.slice();
+            return;
+        }
+        const qCompact = this.compactSearchText(q);
+        this.filteredVehicleList = this.vehicles
+            .filter((v) => {
+                const label = String(v.label || '').toLowerCase();
+                const display = String(v.display_label || v.label || '').toLowerCase();
+                const client = String(v.client_name || '').toLowerCase();
+                if (label.includes(q) || display.includes(q) || client.includes(q)) {
+                    return true;
+                }
+                if (qCompact.length >= 2) {
+                    return this.compactSearchText(v.label).includes(qCompact)
+                        || this.compactSearchText(v.display_label || v.label).includes(qCompact)
+                        || this.compactSearchText(v.client_name).includes(qCompact);
+                }
+                return false;
+            });
     },
     selectVehicle(vehicle) {
         this.selectedVehicleId = String(vehicle.id);
@@ -300,6 +321,7 @@
         if (this.editingMode) {
             return;
         }
+        this.refreshVehicleFilter();
         this.vehicleDropdownOpen = true;
         if (!String(this.vehicleSearch || '').trim()) {
             this.selectedVehicleId = '';
@@ -379,9 +401,30 @@
         const selected = this.vehicles.find(v => String(v.id) === String(this.selectedVehicleId));
         return Number(selected?.engine_displacement_cc || 0);
     },
+    getServiceCcOverride(serviceId) {
+        const raw = this.serviceCcOverrideById[String(serviceId)];
+        return raw === undefined || raw === null || raw === '' ? 'auto' : String(raw);
+    },
+    setServiceCcOverride(serviceId, value) {
+        const id = String(serviceId);
+        if (this.preserveCustomCatalogPriceIds && this.preserveCustomCatalogPriceIds[id]) {
+            const rest = { ...this.preserveCustomCatalogPriceIds };
+            delete rest[id];
+            this.preserveCustomCatalogPriceIds = rest;
+        }
+        const next = { ...this.serviceCcOverrideById };
+        if (value === 'auto' || value === '' || value == null) {
+            delete next[id];
+        } else {
+            next[id] = String(value);
+        }
+        this.serviceCcOverrideById = next;
+        this.refreshServiceLinePrices();
+    },
     resolveServicePricing(service) {
         const tiers = this.orderedServiceTiers(service);
         const basePrice = Number(service?.base_price || 0);
+        const mode = this.getServiceCcOverride(service.id);
 
         if (!tiers.length) {
             return {
@@ -390,9 +433,30 @@
             };
         }
 
+        if (mode === 'base' && basePrice > 0) {
+            return {
+                price: basePrice,
+                label: 'Precio base',
+            };
+        }
+
+        if (mode.startsWith('tier:')) {
+            const rawMax = String(mode.slice(5)).trim();
+            const maxCc = Number(rawMax);
+            const tier = tiers.find((t) => String(t.max_cc) === rawMax)
+                || tiers.find((t) => Number(t.max_cc || 0) === maxCc)
+                || tiers.find((t) => Number(t.max_cc || 0) >= maxCc);
+            if (tier) {
+                return {
+                    price: Number(tier.price || 0),
+                    label: `Hasta ${Number(tier.max_cc || 0)}cc`,
+                };
+            }
+        }
+
         const vehicleCc = this.selectedVehicleCc();
         if (vehicleCc > 0) {
-            const matchedTier = tiers.find(tier => vehicleCc <= Number(tier.max_cc || 0)) || tiers[tiers.length - 1];
+            const matchedTier = tiers.find((tier) => vehicleCc <= Number(tier.max_cc || 0)) || tiers[tiers.length - 1];
             return {
                 price: Number(matchedTier?.price || 0),
                 label: `Hasta ${Number(matchedTier?.max_cc || 0)}cc`,
@@ -418,23 +482,110 @@
     servicePricingLabel(service) {
         return this.resolveServicePricing(service).label;
     },
-    refreshServiceLinePrices() {
-        this.serviceLines = this.serviceLines.map(line => {
+    autoResolvedPricing(service) {
+        const tiers = this.orderedServiceTiers(service);
+        const basePrice = Number(service?.base_price || 0);
+        if (!tiers.length) {
+            return {
+                price: basePrice,
+                label: basePrice > 0 ? 'Precio base' : 'Sin tarifa configurada',
+            };
+        }
+        const vehicleCc = this.selectedVehicleCc();
+        if (vehicleCc > 0) {
+            const matchedTier = tiers.find((tier) => vehicleCc <= Number(tier.max_cc || 0)) || tiers[tiers.length - 1];
+            return {
+                price: Number(matchedTier?.price || 0),
+                label: `Hasta ${Number(matchedTier?.max_cc || 0)}cc`,
+            };
+        }
+        if (basePrice > 0) {
+            return {
+                price: basePrice,
+                label: 'Base / sin cilindrada',
+            };
+        }
+        const firstTier = tiers[0];
+        return {
+            price: Number(firstTier?.price || 0),
+            label: `Tabla desde ${Number(firstTier?.max_cc || 0)}cc`,
+        };
+    },
+    inferCcOverrideForSavedPrice(service, saved) {
+        const p = Number(saved);
+        if (!Number.isFinite(p)) {
+            return null;
+        }
+        const tiers = this.orderedServiceTiers(service);
+        const basePrice = Number(service?.base_price || 0);
+        const eps = 0.02;
+        const autoP = Number(this.autoResolvedPricing(service).price || 0);
+        if (Math.abs(p - autoP) < eps) {
+            return null;
+        }
+        if (basePrice > 0 && Math.abs(p - basePrice) < eps) {
+            return 'base';
+        }
+        const matches = tiers.filter((t) => Math.abs(p - Number(t.price || 0)) < eps);
+        if (matches.length) {
+            matches.sort((a, b) => Number(a.max_cc) - Number(b.max_cc));
+            return 'tier:' + matches[0].max_cc;
+        }
+        return null;
+    },
+    seedServiceCcOverridesFromLines() {
+        const next = {};
+        const preserve = {};
+        const lines = Array.isArray(this.serviceLines) ? this.serviceLines : [];
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
             if (this.isGlosaLine(line)) {
-                return line;
+                continue;
             }
-            const service = this.servicesCatalog.find(item => String(item.id) === String(line.service_id));
+            const sid = String(line.service_id ?? '').trim();
+            const service = this.servicesCatalog.find((item) => String(item.id) === sid);
             if (!service) {
-                return line;
+                continue;
             }
-            if (line.detail_id) {
-                return line;
+            const p = Number(line.unit_price || 0);
+            const autoP = Number(this.autoResolvedPricing(service).price || 0);
+            const eps = 0.02;
+            const inferred = this.inferCcOverrideForSavedPrice(service, p);
+            if (inferred !== null && inferred !== 'auto') {
+                next[sid] = String(inferred);
+                continue;
             }
+            if (this.editingMode && line.detail_id && Math.abs(p - autoP) >= eps) {
+                preserve[sid] = true;
+            }
+        }
+        this.serviceCcOverrideById = next;
+        this.preserveCustomCatalogPriceIds = preserve;
+    },
+    refreshServiceLinePrices() {
+        const next = this.serviceLines.map((line) => {
+            if (this.isGlosaLine(line)) {
+                return { ...line };
+            }
+            const sid = String(line.service_id ?? '').trim();
+            const service = this.servicesCatalog.find((item) => String(item.id) === sid);
+            if (!service) {
+                return { ...line };
+            }
+            if (this.preserveCustomCatalogPriceIds && this.preserveCustomCatalogPriceIds[sid] && line.detail_id) {
+                return { ...line };
+            }
+            if (!this.servicePricesSeeded && this.editingMode && line.detail_id) {
+                return { ...line };
+            }
+            const price = this.resolveServicePrice(service);
             return {
                 ...line,
-                unit_price: this.resolveServicePrice(service),
+                unit_price: price,
             };
         });
+        this.serviceLines = next;
+        this.totalsTick = (this.totalsTick || 0) + 1;
     },
     isGlosaLine(line) {
         return line == null || line.service_id == null || String(line.service_id).trim() === '';
@@ -497,6 +648,7 @@
             })
             .filter(Boolean);
         this.serviceLines = catalogLines.concat(glosas);
+        this.refreshServiceLinePrices();
     },
     lineSubtotal(line) {
         const qty = Number(line.qty || 0);
@@ -527,6 +679,8 @@
         }, 0);
     },
     estimatedTotal() {
+        void this.serviceCcOverrideById;
+        void this.totalsTick;
         const services = this.serviceLines.reduce((sum, line) => sum + this.lineSubtotal(line), 0);
         return services + this.estimatedProductsTotal();
     },
@@ -619,6 +773,7 @@
             this.selectedClientId = payload.client_person_id ? String(payload.client_person_id) : this.selectedClientId;
             this.mileageIn = payload.km ? String(payload.km) : this.mileageIn;
             this.vehicleSearch = this.vehicles[0].display_label || payload.label || '';
+            this.refreshVehicleFilter();
             this.syncHistoryUrl();
             this.refreshServiceLinePrices();
             this.creatingVehicle = false;
@@ -817,7 +972,7 @@
             url: URL.createObjectURL(file),
         }));
     }
-})" x-init="$nextTick(() => { if (editingMode && editingVehicleLabel) { vehicleSearch = editingVehicleLabel; } if (selectedVehicleId) { syncVehicle() } ensureQuickVehicleClient(); syncHistoryUrl(); initSignaturePad(); refreshServiceLinePrices(); const __ep = @js($editingDamagePhotoPreviews ?? [0 => [], 1 => [], 2 => [], 3 => []]); [0,1,2,3].forEach((i) => { if (__ep && __ep[i] && __ep[i].length) { damagePreviews[i] = __ep[i]; } }); })">
+})" x-init="$nextTick(() => { if (editingMode && editingVehicleLabel) { vehicleSearch = editingVehicleLabel; } if (selectedVehicleId) { syncVehicle() } else { refreshVehicleFilter(); } ensureQuickVehicleClient(); syncHistoryUrl(); initSignaturePad(); seedServiceCcOverridesFromLines(); servicePricesSeeded = true; refreshServiceLinePrices(); const __ep = @js($editingDamagePhotoPreviews ?? [0 => [], 1 => [], 2 => [], 3 => []]); [0,1,2,3].forEach((i) => { if (__ep && __ep[i] && __ep[i].length) { damagePreviews[i] = __ep[i]; } }); })">
     <x-common.page-breadcrumb
         :pageTitle="$editingOrder ? 'Editar ingreso a mantenimiento' : 'Nuevo Ingreso a Mantenimiento'"
         :crumbs="[
@@ -977,8 +1132,8 @@
                             <label class="mb-1 block text-sm font-medium text-gray-700">Vehiculo</label>
                             <input
                                 x-model="vehicleSearch"
-                                @focus="!editingMode && (vehicleDropdownOpen = true)"
-                                @click="!editingMode && (vehicleDropdownOpen = true)"
+                                @focus="!editingMode && (vehicleDropdownOpen = true) && refreshVehicleFilter()"
+                                @click="!editingMode && (vehicleDropdownOpen = true) && refreshVehicleFilter()"
                                 @input="onVehicleSearchInput()"
                                 class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
                                 placeholder="Buscar vehiculo o cliente"
@@ -1017,10 +1172,10 @@
                                         Cerrar
                                     </button>
                                 </div>
-                                <template x-if="filteredVehicles.length === 0">
+                                <template x-if="filteredVehicleList.length === 0">
                                     <p class="px-3 py-2 text-sm text-gray-500">Sin resultados.</p>
                                 </template>
-                                <template x-for="vehicle in filteredVehicles" :key="`vehicle-search-${vehicle.id}`">
+                                <template x-for="vehicle in filteredVehicleList" :key="`vehicle-search-${vehicle.id}`">
                                     <button
                                         type="button"
                                         @click="selectVehicle(vehicle)"
@@ -1335,8 +1490,8 @@
                         <div>
                             <input type="hidden" :name="`service_lines[${index}][detail_id]`" :value="line.detail_id || ''">
                             <input type="hidden" :name="`service_lines[${index}][service_id]`" :value="line.service_id">
-                            <input type="hidden" :name="`service_lines[${index}][qty]`" :value="line.qty">
-                            <input type="hidden" :name="`service_lines[${index}][unit_price]`" :value="line.unit_price">
+                            <input type="hidden" :name="`service_lines[${index}][qty]`" x-model="line.qty">
+                            <input type="hidden" :name="`service_lines[${index}][unit_price]`" x-model="line.unit_price">
                             <input type="hidden" :name="`service_lines[${index}][description]`" :value="line.description || ''">
                             <template x-if="line.validity_months">
                                 <input type="hidden" :name="`service_lines[${index}][validity_months]`" :value="line.validity_months">
@@ -1346,7 +1501,7 @@
                 </template>
 
                 <div class="mt-3 border-t border-gray-200 pt-2 text-right text-sm font-semibold text-gray-800">
-                    Total estimado: S/ <span x-text="estimatedTotal().toFixed(2)"></span>
+                    Total estimado: S/ <span x-text="(totalsTick, estimatedTotal().toFixed(2))"></span>
                 </div>
             </div>
 

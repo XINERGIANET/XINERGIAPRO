@@ -205,6 +205,8 @@ Route::middleware('auth')->group(function () {
         ->names('admin.categories')
         ->parameters(['categorias' => 'category'])
         ->only(['index', 'store', 'edit', 'update', 'destroy']);
+    Route::post('/admin/herramientas/productos/import-excel', [ProductController::class, 'importExcel'])
+        ->name('admin.products.import-excel');
     Route::resource('/admin/herramientas/productos', ProductController::class)
         ->names('admin.products')
         ->parameters(['productos' => 'product'])
@@ -511,6 +513,7 @@ Route::middleware('auth')->group(function () {
         Route::post('armados/venta-masiva', [WorkshopAssemblyController::class, 'processMassiveSale'])->name('assemblies.massive_sale');
 
         Route::get('/ordenes', [WorkshopOrderController::class, 'index'])->name('orders.index');
+        Route::post('/ordenes/import-excel', [WorkshopOrderController::class, 'importExcel'])->name('orders.import-excel');
         Route::get('/ordenes/crear', [WorkshopOrderController::class, 'create'])->name('orders.create');
         Route::post('/ordenes', [WorkshopOrderController::class, 'store'])->name('orders.store');
         Route::get('/ordenes/{order}', [WorkshopOrderController::class, 'show'])->name('orders.show');
