@@ -381,6 +381,18 @@ class WorkshopOrderController extends Controller
         $plate = (string) ($row['plate'] ?? '');
         $existing = $this->findVehicleByNormalizedPlate($plate, $companyId, $branchId);
         if ($existing) {
+            $updates = [];
+            if ((int) $existing->branch_id !== $branchId) {
+                $updates['branch_id'] = $branchId;
+            }
+            if ((int) $existing->client_person_id !== (int) $clientPerson->id && $this->isImportGeneralClientPerson($existing->client)) {
+                $updates['client_person_id'] = $clientPerson->id;
+            }
+            if ($updates !== []) {
+                $existing->update($updates);
+                $existing->refresh();
+            }
+
             return $existing;
         }
 
