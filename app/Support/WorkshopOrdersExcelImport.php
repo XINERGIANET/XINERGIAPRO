@@ -423,8 +423,17 @@ class WorkshopOrdersExcelImport
     {
         $coord = Coordinate::stringFromColumnIndex($col) . $row;
         try {
+            $cell = $sheet->getCell($coord);
+            $mergeRange = $cell->getMergeRange();
+            if (is_string($mergeRange) && $mergeRange !== '' && str_contains($mergeRange, ':')) {
+                $bounds = Coordinate::rangeBoundaries($mergeRange);
+                $tl = Coordinate::stringFromColumnIndex((int) $bounds[0][0]) . (int) $bounds[0][1];
+
+                return $sheet->getCell($tl);
+            }
+
             foreach ($sheet->getMergeCells() as $mergeRange) {
-                if (Coordinate::coordinateInRange($coord, $mergeRange)) {
+                if (Coordinate::coordinateIsInsideRange($mergeRange, $coord)) {
                     $bounds = Coordinate::rangeBoundaries($mergeRange);
                     $tl = Coordinate::stringFromColumnIndex((int) $bounds[0][0]) . (int) $bounds[0][1];
 
@@ -442,6 +451,13 @@ class WorkshopOrdersExcelImport
     {
         if (is_object($cell) && method_exists($cell, 'getValue')) {
             $value = $cell->getValue();
+            if (($value === null || $value === '') && method_exists($cell, 'getCalculatedValue')) {
+                try {
+                    $value = $cell->getCalculatedValue();
+                } catch (Throwable) {
+                    $value = $cell->getValue();
+                }
+            }
         } else {
             $value = $cell;
         }
