@@ -64,9 +64,19 @@
 
         <div class="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6" x-show="detailType === 'DETALLADO'" x-cloak>
             <div class="mb-5 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                <div>
-                    <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Catálogo</p>
-                    <h3 class="mt-1 text-lg font-bold text-slate-900">Productos</h3>
+                <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Catálogo</p>
+                        <h3 class="mt-1 text-lg font-bold text-slate-900">Productos</h3>
+                    </div>
+                    <button
+                        type="button"
+                        @click="$dispatch('open-product-type-selector')"
+                        class="inline-flex h-12 shrink-0 items-center gap-2 rounded-[22px] border border-orange-200 bg-white px-5 text-sm font-bold text-orange-600 shadow-sm transition hover:bg-orange-50"
+                    >
+                        <i class="ri-add-line text-lg"></i>
+                        <span>Nuevo producto</span>
+                    </button>
                 </div>
                 <div class="flex flex-wrap gap-3">
                     <template x-for="category in catalogCategories" :key="`purchase-category-${category}`">

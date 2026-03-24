@@ -13,6 +13,10 @@
     >
         <x-common.page-breadcrumb pageTitle="Nueva compra" />
 
+        @if (session('status'))
+            <div class="mb-4 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-700">{{ session('status') }}</div>
+        @endif
+
         <x-common.component-card
             title="Compras | Nuevo"
             desc="Registra la compra, actualiza stock y, si corresponde, genera la salida de caja desde un solo flujo."
@@ -178,5 +182,7 @@
                 </div>
             </div>
         </x-ui.modal>
+
+        @include('products._modals_quick_create', $productQuickCreate ?? [])
     </div>
 @endsection

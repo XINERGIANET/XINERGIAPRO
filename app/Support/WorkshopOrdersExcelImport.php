@@ -76,8 +76,8 @@ class WorkshopOrdersExcelImport
         $out = [];
         $maxRow = (int) $sheet->getHighestDataRow();
         for ($row = $headerRow + 1; $row <= $maxRow; $row++) {
-            $plate = self::cellToString($sheet->getCell(Coordinate::stringFromColumnIndex($colPlate) . $row));
-            $obsRaw = self::cellToString($sheet->getCell(Coordinate::stringFromColumnIndex($colObs) . $row));
+            $plate = self::cellToString(self::cellForRead($sheet, $colPlate, $row));
+            $obsRaw = self::cellToString(self::cellForRead($sheet, $colObs, $row));
             if (trim($plate) === '' && trim($obsRaw) === '') {
                 continue;
             }
@@ -89,38 +89,38 @@ class WorkshopOrdersExcelImport
             }
 
             $document = $colDoc !== null
-                ? self::cellToString($sheet->getCell(Coordinate::stringFromColumnIndex($colDoc) . $row))
+                ? self::cellToString(self::cellForRead($sheet, $colDoc, $row))
                 : '';
             $intakeDate = $colFecha !== null
                 ? self::parseDateCell($sheet, $colFecha, $row)
                 : null;
             $mileage = $colKm !== null
-                ? self::parseIntCell($sheet->getCell(Coordinate::stringFromColumnIndex($colKm) . $row)->getCalculatedValue())
+                ? self::parseIntCell(self::cellForRead($sheet, $colKm, $row)->getCalculatedValue())
                 : null;
 
             $brand = $colMarca !== null
-                ? self::cellToString($sheet->getCell(Coordinate::stringFromColumnIndex($colMarca) . $row))
+                ? self::cellToString(self::cellForRead($sheet, $colMarca, $row))
                 : '';
             $model = $colModelo !== null
-                ? self::cellToString($sheet->getCell(Coordinate::stringFromColumnIndex($colModelo) . $row))
+                ? self::cellToString(self::cellForRead($sheet, $colModelo, $row))
                 : '';
             $colorRaw = $colColor !== null
-                ? self::cellToString($sheet->getCell(Coordinate::stringFromColumnIndex($colColor) . $row))
+                ? self::cellToString(self::cellForRead($sheet, $colColor, $row))
                 : '';
             $cc = $colCilindrada !== null
-                ? self::parseDisplacementCc($sheet->getCell(Coordinate::stringFromColumnIndex($colCilindrada) . $row)->getCalculatedValue())
+                ? self::parseDisplacementCc(self::cellForRead($sheet, $colCilindrada, $row)->getCalculatedValue())
                 : null;
             $tipoLabel = $colTipoVeh !== null
-                ? self::cellToString($sheet->getCell(Coordinate::stringFromColumnIndex($colTipoVeh) . $row))
+                ? self::cellToString(self::cellForRead($sheet, $colTipoVeh, $row))
                 : null;
             $clientNombre = $colClienteNombre !== null
-                ? self::cellToString($sheet->getCell(Coordinate::stringFromColumnIndex($colClienteNombre) . $row))
+                ? self::cellToString(self::cellForRead($sheet, $colClienteNombre, $row))
                 : '';
             $clientTelefono = $colClienteTelefono !== null
-                ? self::cellToString($sheet->getCell(Coordinate::stringFromColumnIndex($colClienteTelefono) . $row))
+                ? self::cellToString(self::cellForRead($sheet, $colClienteTelefono, $row))
                 : '';
             $clientEmail = $colClienteEmail !== null
-                ? self::cellToString($sheet->getCell(Coordinate::stringFromColumnIndex($colClienteEmail) . $row))
+                ? self::cellToString(self::cellForRead($sheet, $colClienteEmail, $row))
                 : '';
 
             $serviceDescriptions = self::splitObservations($obsRaw);
@@ -249,7 +249,11 @@ class WorkshopOrdersExcelImport
                     || str_contains($norm, 'clase veh')
                 ) {
                     $colTipoVeh = $c;
-                } elseif (str_contains($norm, 'cliente') && str_contains($norm, 'nombre')) {
+                } elseif (
+                    (str_contains($norm, 'cliente') && str_contains($norm, 'nombre'))
+                    || $norm === 'nombre cliente'
+                    || str_contains($norm, 'nombre del cliente')
+                ) {
                     $colClienteNombre = $c;
                 } elseif (str_contains($norm, 'cliente') && (str_contains($norm, 'telef') || str_contains($norm, 'celular') || str_contains($norm, 'movil'))) {
                     $colClienteTelefono = $c;
@@ -280,8 +284,69 @@ class WorkshopOrdersExcelImport
             }
 
             if ($colPlate !== null && $colObs !== null) {
+                $headerRow = $r;
+                $scanExtraEnd = min($headerRow + 6, $maxScanRows);
+                for ($r2 = $headerRow + 1; $r2 <= $scanExtraEnd; $r2++) {
+                    for ($c = 1; $c <= $highestColIdx; $c++) {
+                        $coord2 = Coordinate::stringFromColumnIndex($c) . $r2;
+                        $norm2 = self::normalizeHeader($sheet->getCell($coord2)->getValue());
+                        if ($norm2 === '') {
+                            continue;
+                        }
+                        if (str_contains($norm2, 'cilindr') || str_contains($norm2, 'cc ') || $norm2 === 'cc' || str_contains($norm2, 'c.c.')) {
+                            $colCilindrada ??= $c;
+                        } elseif (str_contains($norm2, 'kilomet') || str_contains($norm2, 'kilometraje')) {
+                            $colKm ??= $c;
+                        } elseif (($norm2 === 'km' || str_starts_with($norm2, 'km ')) && $colKm === null) {
+                            $colKm = $c;
+                        } elseif ($norm2 === 'marca' || str_starts_with($norm2, 'marca ')) {
+                            $colMarca ??= $c;
+                        } elseif (str_contains($norm2, 'modelo') || $norm2 === 'model' || str_starts_with($norm2, 'model ')) {
+                            $colModelo ??= $c;
+                        } elseif (str_contains($norm2, 'color')) {
+                            $colColor ??= $c;
+                        } elseif (
+                            (str_contains($norm2, 'tipo') && str_contains($norm2, 'veh'))
+                            || str_contains($norm2, 'tipo vehiculo')
+                            || str_contains($norm2, 'tipo de vehiculo')
+                            || str_contains($norm2, 'clase veh')
+                        ) {
+                            $colTipoVeh ??= $c;
+                        } elseif (
+                            (str_contains($norm2, 'cliente') && str_contains($norm2, 'nombre'))
+                            || $norm2 === 'nombre cliente'
+                            || str_contains($norm2, 'nombre del cliente')
+                        ) {
+                            $colClienteNombre ??= $c;
+                        } elseif (str_contains($norm2, 'cliente') && (str_contains($norm2, 'telef') || str_contains($norm2, 'celular') || str_contains($norm2, 'movil'))) {
+                            $colClienteTelefono ??= $c;
+                        } elseif ((str_contains($norm2, 'cliente') && (str_contains($norm2, 'mail') || str_contains($norm2, 'correo')))) {
+                            $colClienteEmail ??= $c;
+                        } elseif (
+                            str_contains($norm2, 'document')
+                            || $norm2 === 'dni'
+                            || $norm2 === 'ruc'
+                            || str_contains($norm2, 'nro doc')
+                            || str_contains($norm2, 'numero doc')
+                        ) {
+                            $colDoc ??= $c;
+                        } elseif (str_contains($norm2, 'fecha')) {
+                            if (
+                                str_contains($norm2, 'ingreso')
+                                || str_contains($norm2, 'entrada')
+                                || str_contains($norm2, 'intake')
+                                || str_contains($norm2, 'ingres')
+                            ) {
+                                $colFecha ??= $c;
+                            } elseif ($colFecha === null) {
+                                $colFecha = $c;
+                            }
+                        }
+                    }
+                }
+
                 return [
-                    'header_row' => $r,
+                    'header_row' => $headerRow,
                     'col_plate' => $colPlate,
                     'col_obs' => $colObs,
                     'col_doc' => $colDoc,
@@ -351,6 +416,28 @@ class WorkshopOrdersExcelImport
         return trim($s);
     }
 
+    /**
+     * Celda visible de un rango combinado: el valor suele estar solo en la esquina superior izquierda.
+     */
+    private static function cellForRead(Worksheet $sheet, int $col, int $row): \PhpOffice\PhpSpreadsheet\Cell\Cell
+    {
+        $coord = Coordinate::stringFromColumnIndex($col) . $row;
+        try {
+            foreach ($sheet->getMergeCells() as $mergeRange) {
+                if (Coordinate::coordinateInRange($coord, $mergeRange)) {
+                    $bounds = Coordinate::rangeBoundaries($mergeRange);
+                    $tl = Coordinate::stringFromColumnIndex((int) $bounds[0][0]) . (int) $bounds[0][1];
+
+                    return $sheet->getCell($tl);
+                }
+            }
+        } catch (Throwable) {
+            // Sin merges o API distinta: usar la coordenada pedida
+        }
+
+        return $sheet->getCell($coord);
+    }
+
     private static function cellToString(mixed $cell): string
     {
         if (is_object($cell) && method_exists($cell, 'getValue')) {
@@ -367,7 +454,7 @@ class WorkshopOrdersExcelImport
 
     private static function parseDateCell(Worksheet $sheet, int $col, int $row): ?string
     {
-        $cell = $sheet->getCell(Coordinate::stringFromColumnIndex($col) . $row);
+        $cell = self::cellForRead($sheet, $col, $row);
         $val = $cell->getValue();
 
         if ($val === null || $val === '') {

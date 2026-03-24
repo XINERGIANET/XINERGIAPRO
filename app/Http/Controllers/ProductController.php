@@ -366,7 +366,13 @@ class ProductController extends Controller
         }
         
         $viewId = $request->input('view_id');
-        
+
+        if ($request->input('after_create') === 'purchase_create') {
+            return redirect()
+                ->route('admin.purchases.create', $viewId ? ['view_id' => $viewId] : [])
+                ->with('status', 'Producto creado correctamente. Buscalo en el catalogo para agregarlo a la compra.');
+        }
+
         return redirect()
             ->route('admin.products.index', $viewId ? ['view_id' => $viewId] : [])
             ->with('status', 'Producto creado correctamente.');
@@ -658,6 +664,7 @@ class ProductController extends Controller
             'code' => ['required', 'string', 'max:50'],
             'description' => ['required', 'string', 'max:255'],
             'abbreviation' => ['required', 'string', 'max:255'],
+            'marca' => ['nullable', 'string', 'max:120'],
             'product_type_id' => ['required', 'integer', 'exists:product_types,id'],
             'category_id' => ['required', 'integer', 'exists:categories,id'],
             'base_unit_id' => ['required', 'integer', 'exists:units,id'],
