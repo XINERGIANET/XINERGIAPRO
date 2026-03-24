@@ -1023,39 +1023,39 @@ class PurchaseController extends Controller
         return compact('subtotal', 'tax', 'total');
     }
 
-    private function incrementBranchStock(int , int , float ): void
+    private function incrementBranchStock(int $branchId, int $productId, float $quantity): void
     {
-         = ->ensureProductBranchRecord(, );
+        $pb = $this->ensureProductBranchRecord($branchId, $productId);
 
-        ->update([
-            'stock' => round(((float) ->stock) + , 4),
+        $pb->update([
+            'stock' => round(((float) $pb->stock) + $quantity, 4),
         ]);
     }
 
-    private function decrementBranchStock(int , int , float ): void
+    private function decrementBranchStock(int $branchId, int $productId, float $quantity): void
     {
-         = ->ensureProductBranchRecord(, );
+        $pb = $this->ensureProductBranchRecord($branchId, $productId);
 
-        ->update([
-            'stock' => round(((float) ->stock) - , 4),
+        $pb->update([
+            'stock' => round(((float) $pb->stock) - $quantity, 4),
         ]);
     }
 
-    private function ensureProductBranchRecord(int , int ): ProductBranch
+    private function ensureProductBranchRecord(int $branchId, int $productId): ProductBranch
     {
-         = ProductBranch::query()
-            ->where('branch_id', )
-            ->where('product_id', )
+        $pb = ProductBranch::query()
+            ->where('branch_id', $branchId)
+            ->where('product_id', $productId)
             ->lockForUpdate()
             ->first();
 
-        if () {
-            return ;
+        if ($pb) {
+            return $pb;
         }
 
         return ProductBranch::query()->create([
-            'product_id' => ,
-            'branch_id' => ,
+            'product_id' => $productId,
+            'branch_id' => $branchId,
             'status' => 'A',
             'stock' => 0,
             'price' => 0,
@@ -1449,4 +1449,5 @@ class PurchaseController extends Controller
         }
     }
 }
+
 
