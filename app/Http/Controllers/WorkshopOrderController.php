@@ -417,6 +417,38 @@ class WorkshopOrderController extends Controller
             ? mb_substr((string) $row['color'], 0, 100)
             : null;
 
+
+        if ($finalPlate !== null) {
+            $plateLessMatch = Vehicle::query()
+                ->where('company_id', $companyId)
+                ->where('branch_id', $branchId)
+                ->where('client_person_id', $clientPerson->id)
+                ->where(function ($query) {
+                    $query->whereNull('plate')
+                        ->orWhereRaw("TRIM(COALESCE(plate, '')) = ''");
+                })
+                ->whereRaw("UPPER(TRIM(COALESCE(brand, ''))) = ?", [mb_strtoupper(trim($brand))])
+                ->whereRaw("UPPER(TRIM(COALESCE(model, ''))) = ?", [mb_strtoupper(trim($model))])
+                ->orderByDesc('id')
+                ->first();
+
+            if ($plateLessMatch) {
+                $plateLessMatch->update([
+                    'plate' => $finalPlate,
+                    'client_person_id' => $clientPerson->id,
+                    'branch_id' => $branchId,
+                    'vehicle_type_id' => $vehicleTypeId,
+                    'type' => mb_substr($typeName, 0, 30),
+                    'brand' => mb_substr($brand, 0, 255),
+                    'model' => mb_substr($model, 0, 255),
+                    'color' => $color,
+                    'engine_displacement_cc' => $cc,
+                    'current_mileage' => $mileage,
+                ]);
+
+                return $plateLessMatch->fresh();
+            }
+        }
         return Vehicle::query()->create([
             'company_id' => $companyId,
             'branch_id' => $branchId,
