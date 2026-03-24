@@ -1259,6 +1259,57 @@ class WorkshopMaintenanceBoardController extends Controller
         return back()->with('status', 'Servicio finalizado. Puede continuar con cobro y entrega.');
     }
 
+    public function quickDeliver(WorkshopMovement $order): RedirectResponse
+    {
+        $this->assertOrderScope($order);
+
+        if ((string) $order->status !== 'finished') {
+            return back()->withErrors(['error' => 'Solo se pueden entregar rapidamente OS terminadas.']);
+        }
+
+        WorkshopMovement::query()
+            ->where('id', $order->id)
+            ->update([
+                'status' => 'delivered',
+                'updated_at' => now(),
+            ]);
+
+        return back()->with('status', 'OS entregada correctamente.');
+    }
+
+    public function quickDeliverBulk(Request $request): RedirectResponse
+    {
+        [$branchId, $companyId] = $this->branchScope();
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+        ]);
+
+        $ids = collect($validated['ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return back()->withErrors(['error' => 'No se seleccionaron OS para entregar.']);
+        }
+
+        $updated = WorkshopMovement::query()
+            ->where('branch_id', $branchId)
+            ->where('company_id', $companyId)
+            ->where('status', 'finished')
+            ->whereIn('id', $ids->all())
+            ->update([
+                'status' => 'delivered',
+                'updated_at' => now(),
+            ]);
+
+        return back()->with('status', $updated > 0
+            ? "Se entregaron {$updated} OS."
+            : 'No se encontraron OS terminadas para entregar.');
+    }
+
     public function checkoutPage(WorkshopMovement $order): \Illuminate\View\View|RedirectResponse
     {
         $this->assertOrderScope($order);

@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div x-data="{}">
+<div x-data="{ selectedFinishedIds: [] }">
     <x-common.page-breadcrumb pageTitle="Tablero de Mantenimiento" />
 
     <x-common.component-card title="Tablero Circular de Servicios" desc="Inicia y finaliza mantenimientos con visual de moto y cliente en tiempo real.">
@@ -11,6 +11,19 @@
         @if ($errors->any())
             <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first() }}</div>
         @endif
+
+        <form method="POST" action="{{ route('workshop.maintenance-board.deliver-bulk') }}" class="mb-4 flex flex-wrap items-center gap-2" x-show="selectedFinishedIds.length > 0">
+            @csrf
+            <template x-for="id in selectedFinishedIds" :key="`deliver-${id}`">
+                <input type="hidden" name="ids[]" :value="id">
+            </template>
+            <x-ui.button size="sm" variant="primary" type="submit" className="h-10 whitespace-nowrap px-4" style="background-color:#0f766e;border-color:#0f766e;color:#fff">
+                <i class="ri-truck-line"></i><span>Entregar seleccionadas</span>
+            </x-ui.button>
+            <button type="button" class="h-10 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50" @click="selectedFinishedIds = []">
+                Limpiar selección
+            </button>
+        </form>
 
         <div class="mb-6 flex flex-col gap-3 xl:flex-row xl:items-center">
             <div class="flex flex-wrap items-center gap-2 whitespace-nowrap xl:shrink-0">
@@ -110,6 +123,14 @@
                     [$statusLabel, $statusClass] = $statusMap[$status] ?? [strtoupper($status), 'bg-gray-100 text-gray-700 border-gray-200'];
                 @endphp
                 <div class="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg">
+                    @if($card->status === 'finished')
+                        <label class="absolute right-4 top-4 z-20 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm">
+                            <input type="checkbox" class="h-4 w-4 rounded border-slate-300 text-emerald-600"
+                                   :checked="selectedFinishedIds.includes({{ (int) $card->id }})"
+                                   @change="if ($event.target.checked) { if (!selectedFinishedIds.includes({{ (int) $card->id }})) selectedFinishedIds.push({{ (int) $card->id }}); } else { selectedFinishedIds = selectedFinishedIds.filter(id => id !== {{ (int) $card->id }}); }">
+                            Seleccionar
+                        </label>
+                    @endif
                     <div class="absolute -right-14 -top-14 h-40 w-40 rounded-full bg-gradient-to-br from-amber-300/20 to-indigo-300/20 blur-xl"></div>
                     <div class="absolute -left-8 bottom-0 h-24 w-24 rounded-full bg-gradient-to-tr from-orange-300/20 to-transparent blur-lg"></div>
 
@@ -181,6 +202,12 @@
                             <form method="POST" action="{{ route('workshop.maintenance-board.finish', $card) }}">
                                 @csrf
                                 <button class="rounded-xl bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-800">Finalizar servicio</button>
+                            </form>
+                        @endif
+                        @if($card->status === 'finished')
+                            <form method="POST" action="{{ route('workshop.maintenance-board.deliver-quick', $card) }}">
+                                @csrf
+                                <button class="rounded-xl bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-teal-800">Entregar</button>
                             </form>
                         @endif
                         @if($canQuoteCard)

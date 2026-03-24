@@ -457,6 +457,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/tablero-mantenimiento/clientes', [WorkshopMaintenanceBoardController::class, 'storeClientQuick'])->name('maintenance-board.clients.store');
         Route::post('/tablero-mantenimiento/{order}/iniciar', [WorkshopMaintenanceBoardController::class, 'start'])->name('maintenance-board.start');
         Route::post('/tablero-mantenimiento/{order}/finalizar', [WorkshopMaintenanceBoardController::class, 'finish'])->name('maintenance-board.finish');
+        Route::post('/tablero-mantenimiento/{order}/entregar-rapido', [WorkshopMaintenanceBoardController::class, 'quickDeliver'])->name('maintenance-board.deliver-quick');
+        Route::post('/tablero-mantenimiento/entregar-masivo', [WorkshopMaintenanceBoardController::class, 'quickDeliverBulk'])->name('maintenance-board.deliver-bulk');
         Route::post('/tablero-mantenimiento/{order}/cotizacion', [WorkshopMaintenanceBoardController::class, 'quotation'])->name('maintenance-board.quotation');
         Route::get('/tablero-mantenimiento/{order}/venta-cobro', [WorkshopMaintenanceBoardController::class, 'checkoutPage'])->name('maintenance-board.checkout.page');
         Route::post('/tablero-mantenimiento/{order}/venta-cobro', [WorkshopMaintenanceBoardController::class, 'checkout'])->name('maintenance-board.checkout');
