@@ -291,11 +291,6 @@ class WorkshopOrderController extends Controller
                         ]);
                     }
 
-                    $order = WorkshopMovement::query()->findOrFail($order->id);
-                    $this->flowService->updateOrder($order, [
-                        'status' => 'delivered',
-                        'comment' => 'Entregada por importación histórica',
-                    ]);
                 });
                 $created++;
             } catch (\Throwable $e) {
@@ -304,7 +299,7 @@ class WorkshopOrderController extends Controller
             }
         }
 
-        $msg = "Importación: {$created} orden(es) creada(s) como entregada(s), con servicios en glosa.";
+        $msg = "Importaci�n: {$created} orden(es) creada(s) como terminada(s), con servicios en glosa.";
         if ($rowErrors !== []) {
             $msg .= ' Errores: ' . implode(' | ', array_slice($rowErrors, 0, 8));
             if (count($rowErrors) > 8) {
@@ -376,24 +371,6 @@ class WorkshopOrderController extends Controller
         return false;
     }
 
-    /**
-     * Placa unica cuando el Excel no trae placa valida (sin prefijos tipo IMP-).
-     */
-    private function uniqueFallbackImportPlate(int $companyId): string
-    {
-        for ($i = 0; $i < 24; $i++) {
-            $candidate = strtoupper(bin2hex(random_bytes(5)));
-            $exists = Vehicle::query()
-                ->where('company_id', $companyId)
-                ->whereRaw('UPPER(TRIM(plate)) = ?', [$candidate])
-                ->exists();
-            if (!$exists) {
-                return $candidate;
-            }
-        }
-
-        return strtoupper(bin2hex(random_bytes(8)));
-    }
 
     private function resolveOrCreateVehicleForOrderImport(
         array $row,
@@ -408,9 +385,7 @@ class WorkshopOrderController extends Controller
         }
 
         $norm = $this->normalizePlateString($plate);
-        $finalPlate = $this->isPlaceholderImportPlate($norm)
-            ? $this->uniqueFallbackImportPlate($companyId)
-            : $norm;
+        $finalPlate = $this->isPlaceholderImportPlate($norm) ? null : $norm;
 
         $vehicleTypeId = 18;
         $vehicleType = VehicleType::query()->find(18);
