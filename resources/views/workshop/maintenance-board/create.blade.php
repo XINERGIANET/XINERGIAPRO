@@ -157,6 +157,8 @@
     editingClientLabel: @js($editingClientLabel ?? ''),
     selectedServiceIds: @js($selectedIdsFromLines),
     serviceCcOverrideById: {},
+    servicePricesSeeded: false,
+    preserveCustomCatalogPriceIds: {},
     totalsTick: 0,
     serviceLines: @js($serviceLinesForUi),
     inventoryItemsByVehicleType: @js($inventoryItemsByVehicleType ?? []),
@@ -401,6 +403,11 @@
     },
     setServiceCcOverride(serviceId, value) {
         const id = String(serviceId);
+        if (this.preserveCustomCatalogPriceIds && this.preserveCustomCatalogPriceIds[id]) {
+            const rest = { ...this.preserveCustomCatalogPriceIds };
+            delete rest[id];
+            this.preserveCustomCatalogPriceIds = rest;
+        }
         const next = { ...this.serviceCcOverrideById };
         if (value === 'auto' || value === '' || value == null) {
             delete next[id];
@@ -471,6 +478,86 @@
     servicePricingLabel(service) {
         return this.resolveServicePricing(service).label;
     },
+    autoResolvedPricing(service) {
+        const tiers = this.orderedServiceTiers(service);
+        const basePrice = Number(service?.base_price || 0);
+        if (!tiers.length) {
+            return {
+                price: basePrice,
+                label: basePrice > 0 ? 'Precio base' : 'Sin tarifa configurada',
+            };
+        }
+        const vehicleCc = this.selectedVehicleCc();
+        if (vehicleCc > 0) {
+            const matchedTier = tiers.find((tier) => vehicleCc <= Number(tier.max_cc || 0)) || tiers[tiers.length - 1];
+            return {
+                price: Number(matchedTier?.price || 0),
+                label: `Hasta ${Number(matchedTier?.max_cc || 0)}cc`,
+            };
+        }
+        if (basePrice > 0) {
+            return {
+                price: basePrice,
+                label: 'Base / sin cilindrada',
+            };
+        }
+        const firstTier = tiers[0];
+        return {
+            price: Number(firstTier?.price || 0),
+            label: `Tabla desde ${Number(firstTier?.max_cc || 0)}cc`,
+        };
+    },
+    inferCcOverrideForSavedPrice(service, saved) {
+        const p = Number(saved);
+        if (!Number.isFinite(p)) {
+            return null;
+        }
+        const tiers = this.orderedServiceTiers(service);
+        const basePrice = Number(service?.base_price || 0);
+        const eps = 0.02;
+        const autoP = Number(this.autoResolvedPricing(service).price || 0);
+        if (Math.abs(p - autoP) < eps) {
+            return null;
+        }
+        if (basePrice > 0 && Math.abs(p - basePrice) < eps) {
+            return 'base';
+        }
+        const matches = tiers.filter((t) => Math.abs(p - Number(t.price || 0)) < eps);
+        if (matches.length) {
+            matches.sort((a, b) => Number(a.max_cc) - Number(b.max_cc));
+            return 'tier:' + matches[0].max_cc;
+        }
+        return null;
+    },
+    seedServiceCcOverridesFromLines() {
+        const next = {};
+        const preserve = {};
+        const lines = Array.isArray(this.serviceLines) ? this.serviceLines : [];
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            if (this.isGlosaLine(line)) {
+                continue;
+            }
+            const sid = String(line.service_id ?? '').trim();
+            const service = this.servicesCatalog.find((item) => String(item.id) === sid);
+            if (!service) {
+                continue;
+            }
+            const p = Number(line.unit_price || 0);
+            const autoP = Number(this.autoResolvedPricing(service).price || 0);
+            const eps = 0.02;
+            const inferred = this.inferCcOverrideForSavedPrice(service, p);
+            if (inferred !== null && inferred !== 'auto') {
+                next[sid] = String(inferred);
+                continue;
+            }
+            if (this.editingMode && line.detail_id && Math.abs(p - autoP) >= eps) {
+                preserve[sid] = true;
+            }
+        }
+        this.serviceCcOverrideById = next;
+        this.preserveCustomCatalogPriceIds = preserve;
+    },
     refreshServiceLinePrices() {
         const next = this.serviceLines.map((line) => {
             if (this.isGlosaLine(line)) {
@@ -481,7 +568,10 @@
             if (!service) {
                 return { ...line };
             }
-            if (line.detail_id) {
+            if (this.preserveCustomCatalogPriceIds && this.preserveCustomCatalogPriceIds[sid] && line.detail_id) {
+                return { ...line };
+            }
+            if (!this.servicePricesSeeded && this.editingMode && line.detail_id) {
                 return { ...line };
             }
             const price = this.resolveServicePrice(service);
@@ -866,7 +956,7 @@
             url: URL.createObjectURL(file),
         }));
     }
-})" x-init="$nextTick(() => { if (editingMode && editingVehicleLabel) { vehicleSearch = editingVehicleLabel; } if (selectedVehicleId) { syncVehicle() } else { refreshVehicleFilter(); } ensureQuickVehicleClient(); syncHistoryUrl(); initSignaturePad(); refreshServiceLinePrices(); const __ep = @js($editingDamagePhotoPreviews ?? [0 => [], 1 => [], 2 => [], 3 => []]); [0,1,2,3].forEach((i) => { if (__ep && __ep[i] && __ep[i].length) { damagePreviews[i] = __ep[i]; } }); })">
+})" x-init="$nextTick(() => { if (editingMode && editingVehicleLabel) { vehicleSearch = editingVehicleLabel; } if (selectedVehicleId) { syncVehicle() } else { refreshVehicleFilter(); } ensureQuickVehicleClient(); syncHistoryUrl(); initSignaturePad(); seedServiceCcOverridesFromLines(); servicePricesSeeded = true; refreshServiceLinePrices(); const __ep = @js($editingDamagePhotoPreviews ?? [0 => [], 1 => [], 2 => [], 3 => []]); [0,1,2,3].forEach((i) => { if (__ep && __ep[i] && __ep[i].length) { damagePreviews[i] = __ep[i]; } }); })">
     <x-common.page-breadcrumb
         :pageTitle="$editingOrder ? 'Editar ingreso a mantenimiento' : 'Nuevo Ingreso a Mantenimiento'"
         :crumbs="[
