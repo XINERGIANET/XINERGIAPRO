@@ -482,6 +482,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/tipos-vehiculo/{vehicleType}/inventario', [WorkshopVehicleTypeController::class, 'inventoryEdit'])->name('vehicle-types.inventory.edit');
     Route::post('/tipos-vehiculo/{vehicleType}/inventario', [WorkshopVehicleTypeController::class, 'inventoryUpdate'])->name('vehicle-types.inventory.update');
         Route::get('/clientes/{person}/historial', [WorkshopClientController::class, 'show'])->name('clients.history');
+        Route::get('/vehiculos/{vehicle}/historial', [WorkshopVehicleController::class, 'show'])->name('vehicles.history');
         Route::get('/armados/ubicaciones', [WorkshopAssemblyLocationController::class, 'index'])->name('assembly-locations.index');
         Route::post('/armados/ubicaciones', [WorkshopAssemblyLocationController::class, 'store'])->name('assembly-locations.store');
         Route::put('/armados/ubicaciones/{assemblyLocation}', [WorkshopAssemblyLocationController::class, 'update'])->name('assembly-locations.update');

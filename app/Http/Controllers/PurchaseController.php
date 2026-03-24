@@ -334,10 +334,7 @@ class PurchaseController extends Controller
         $this->assertValidPurchaseMovement($purchase);
         $purchase->load(['purchaseMovement.details']);
 
-        return view('purchases.edit', array_merge(
-            $this->getFormData($request),
-            ['purchase' => $purchase]
-        ));
+        return view('purchases.create', $this->getFormData($request, $purchase));
     }
 
     public function update(Request $request, Movement $purchase)
@@ -440,6 +437,33 @@ class PurchaseController extends Controller
                 if ($validated['affects_kardex'] === 'S' && $product) {
                     $this->incrementBranchStock($branchId, $product->id, $quantity);
                 }
+            }
+
+            $this->deletePurchaseFinancialRecords($purchase);
+
+            if (($validated['payment_type'] ?? 'CONTADO') === 'CREDITO') {
+                $dueDate = $this->resolvePurchaseDueDate($validated, $person);
+                $this->registerPurchaseDebt(
+                    movement: $purchase,
+                    person: $person,
+                    validated: $validated,
+                    total: (float) $totals['total'],
+                    branchId: $branchId,
+                    user: $user,
+                    dueDate: $dueDate,
+                );
+            } elseif (
+                ($validated['payment_type'] ?? 'CONTADO') === 'CONTADO'
+                && ($validated['affects_cash'] ?? 'N') === 'S'
+            ) {
+                $this->registerPurchaseCashOutflow(
+                    movement: $purchase,
+                    person: $person,
+                    validated: $validated,
+                    total: (float) $totals['total'],
+                    branchId: $branchId,
+                    user: $user
+                );
             }
 
             app(KardexSyncService::class)->syncMovement($purchase);
@@ -546,7 +570,7 @@ class PurchaseController extends Controller
         return $validated;
     }
 
-    private function getFormData(Request $request): array
+    private function getFormData(Request $request, ?Movement $purchase = null): array
     {
         $branchId = (int) session('branch_id');
         $movementType = $this->resolvePurchaseMovementType();
@@ -652,6 +676,41 @@ class PurchaseController extends Controller
         $purchaseNumberPreview = $documentTypes->isNotEmpty()
             ? $this->generatePurchaseNumber((int) $documentTypes->first()->id, $branchId)
             : '00000001';
+        $purchaseMovement = $purchase?->purchaseMovement;
+        $purchaseCashMovement = $purchase
+            ? CashMovements::query()
+                ->with('details')
+                ->whereHas('movement', fn ($query) => $query->where('parent_movement_id', $purchase->id))
+                ->latest('id')
+                ->first()
+            : null;
+        $purchaseCashDetails = $purchaseCashMovement?->details ?? collect();
+        $isEditing = $purchase !== null;
+        $initialItems = old('items', $isEditing
+            ? $purchaseMovement?->details->map(fn ($detail) => [
+                'product_id' => $detail->product_id,
+                'unit_id' => $detail->unit_id,
+                'description' => (string) ($detail->description ?? ''),
+                'quantity' => (float) ($detail->quantity ?? 1),
+                'amount' => (float) ($detail->amount ?? 0),
+                'comment' => (string) ($detail->comment ?? ''),
+            ])->values()->all()
+            : []);
+        $initialPaymentRows = old('payment_methods', $isEditing
+            ? $purchaseCashDetails->map(fn ($detail) => [
+                'payment_method_id' => $detail->payment_method_id,
+                'amount' => (float) ($detail->amount ?? 0),
+                'payment_gateway_id' => $detail->payment_gateway_id,
+                'card_id' => $detail->card_id,
+                'digital_wallet_id' => $detail->digital_wallet_id,
+            ])->values()->all()
+            : []);
+        $initialTaxRate = (float) old(
+            'tax_rate_percent',
+            ($isEditing && (float) ($purchaseMovement?->subtotal ?? 0) > 0)
+                ? round((((float) ($purchaseMovement?->tax ?? 0)) / ((float) $purchaseMovement->subtotal)) * 100, 2)
+                : $defaultTaxRate
+        );
 
         $purchaseCreateConfig = [
             'products' => $products->map(fn ($p) => [
@@ -684,21 +743,23 @@ class PurchaseController extends Controller
             'paymentGateways' => $paymentGateways->values(),
             'cards' => $cards->values(),
             'digitalWallets' => $digitalWallets->values(),
-            'initialProviderId' => (int) old('person_id', 0),
-            'initialItems' => old('items', []),
-            'initialPaymentType' => (string) old('payment_type', 'CONTADO'),
-            'initialDueDate' => (string) old('due_date', ''),
-            'initialDocumentTypeId' => (int) old('document_type_id', $documentTypes->first()->id ?? 0),
-            'initialCashRegisterId' => (int) old('cash_register_id', $defaultCashRegisterId ?? 0),
-            'initialRows' => old('payment_methods', []),
-            'initialDetailType' => (string) old('detail_type', 'DETALLADO'),
-            'initialAffectsKardex' => (string) old('affects_kardex', 'S'),
-            'initialTaxRate' => (float) old('tax_rate_percent', $defaultTaxRate),
-            'initialIncludesTax' => (string) old('includes_tax', 'S'),
-            'initialCurrency' => (string) old('currency', 'PEN'),
-            'initialExchangeRate' => (float) old('exchange_rate', 3.5),
-            'initialMovedAt' => (string) old('moved_at', now()->format('Y-m-d H:i')),
-            'purchaseNumberPreview' => (string) $purchaseNumberPreview,
+            'initialProviderId' => (int) old('person_id', $purchase?->person_id ?? 0),
+            'initialItems' => $initialItems,
+            'initialPaymentType' => (string) old('payment_type', $purchaseMovement?->payment_type ?? 'CONTADO'),
+            'initialDueDate' => (string) old('due_date', optional($purchaseCashDetails->first()?->due_at)->format('Y-m-d') ?? ''),
+            'initialDocumentTypeId' => (int) old('document_type_id', $purchase?->document_type_id ?? ($documentTypes->first()->id ?? 0)),
+            'initialCashRegisterId' => (int) old('cash_register_id', $purchaseCashMovement?->cash_register_id ?? ($defaultCashRegisterId ?? 0)),
+            'initialRows' => $initialPaymentRows,
+            'initialDetailType' => (string) old('detail_type', $purchaseMovement?->detail_type ?? 'DETALLADO'),
+            'initialAffectsCash' => (string) old('affects_cash', $purchaseMovement?->affects_cash ?? 'N'),
+            'initialAffectsKardex' => (string) old('affects_kardex', $purchaseMovement?->affects_kardex ?? 'S'),
+            'initialTaxRate' => $initialTaxRate,
+            'initialIncludesTax' => (string) old('includes_tax', $purchaseMovement?->includes_tax ?? 'S'),
+            'initialCurrency' => (string) old('currency', $purchaseMovement?->currency ?? 'PEN'),
+            'initialExchangeRate' => (float) old('exchange_rate', $purchaseMovement?->exchange_rate ?? 3.5),
+            'initialMovedAt' => (string) old('moved_at', optional($purchase?->moved_at)->format('Y-m-d H:i') ?? now()->format('Y-m-d H:i')),
+            'initialSeries' => (string) old('series', $purchaseMovement?->series ?? '001'),
+            'purchaseNumberPreview' => (string) old('number', $purchase?->number ?? $purchaseNumberPreview),
             'quickProviderStoreUrl' => route('admin.purchases.providers.store'),
             'reniecApiUrl' => route('api.reniec'),
             'rucApiUrl' => route('api.ruc'),
@@ -711,6 +772,7 @@ class PurchaseController extends Controller
             'branchDepartmentName' => (string) ($department->name ?? ''),
             'branchProvinceName' => (string) ($province->name ?? ''),
             'branchDistrictName' => (string) ($district->name ?? ''),
+            'isEditing' => $isEditing,
         ];
 
         return [
@@ -738,6 +800,7 @@ class PurchaseController extends Controller
                 'units' => $units,
                 'afterCreate' => 'purchase_create',
             ],
+            'purchase' => $purchase,
         ];
     }
 
@@ -1210,6 +1273,22 @@ class PurchaseController extends Controller
 
         return \Carbon\Carbon::parse((string) $validated['moved_at'])
             ->addDays((int) ($person->credit_days ?? 0));
+    }
+
+    private function deletePurchaseFinancialRecords(Movement $purchase): void
+    {
+        $cashMovements = CashMovements::query()
+            ->with(['details', 'movement'])
+            ->whereHas('movement', fn ($query) => $query->where('parent_movement_id', $purchase->id))
+            ->get();
+
+        foreach ($cashMovements as $cashMovement) {
+            app(AccountReceivablePayableService::class)->removeDebtAccountByCashMovementId((int) $cashMovement->id);
+            $cashMovement->details()->delete();
+            $cashMovementMovement = $cashMovement->movement;
+            $cashMovement->delete();
+            $cashMovementMovement?->delete();
+        }
     }
 
     private function resolveCashMovementTypeId(): int

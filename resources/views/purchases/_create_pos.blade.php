@@ -1,5 +1,5 @@
 <input type="hidden" name="person_id" :value="selectedProviderId" required>
-<input type="hidden" name="affects_cash" :value="paymentType === 'CONTADO' ? 'S' : 'N'">
+<input type="hidden" name="affects_cash" :value="affectsCash">
 <div class="hidden">
     <template x-for="(item, idx) in items" :key="`hidden-item-${idx}`">
         <div>
@@ -53,7 +53,7 @@
                 </div>
                 <div class="xl:col-span-2">
                     <label class="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Serie</label>
-                    <input type="text" name="series" value="{{ old('series', '001') }}" class="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700" placeholder="001">
+                    <input type="text" name="series" value="{{ old('series', $purchaseCreateConfig['initialSeries']) }}" class="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700" placeholder="001">
                 </div>
                 <div class="xl:col-span-2">
                     <label class="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Numero</label>
@@ -448,6 +448,19 @@
                                     inputClass="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
                                 />
                             </div>
+                            <div>
+                                <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Afecta caja</label>
+                                <x-form.select-autocomplete-inline
+                                    fieldKey="purchase_ac"
+                                    valueVar="affectsCash"
+                                    optionsListExpr="affectsCashOptions"
+                                    optionLabel="label"
+                                    optionValue="value"
+                                    emptyText="Afecta caja"
+                                    pickExpr="affectsCash = opt.value; onAffectsCashChange()"
+                                    inputClass="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
+                                />
+                            </div>
                         </div>
                         <div x-show="paymentType==='CREDITO'" class="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
                             <p>Esta compra se registrara como deuda y se enviara a cuentas por pagar.</p>
@@ -479,7 +492,7 @@
                     </div>
                 </div>
 
-                <div x-show="paymentType==='CONTADO'" class="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                <div x-show="paymentType==='CONTADO' && affectsCash==='S'" class="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
                     <div class="mb-3 flex items-center justify-between"><p class="text-sm font-bold text-slate-900">Métodos de pago</p><button type="button" @click="addPaymentRow()" class="inline-flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-bold text-white shadow-theme-xs" style="background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff;box-shadow:0 10px 20px rgba(249,115,22,.18);"><i class="ri-add-line"></i><span>Agregar</span></button></div>
                     <div class="space-y-3">
                         <template x-for="(row, idx) in paymentRows" :key="`payment-${idx}`">

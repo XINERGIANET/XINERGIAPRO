@@ -94,7 +94,7 @@
     serviceTypeFilter: '',
     serviceKmFilterMode: 'all',
     serviceFilterKmLocal: '',
-    historyBase: @js(route('workshop.clients.history', ['person' => '__PERSON__'])),
+    historyBase: @js(route('workshop.vehicles.history', ['vehicle' => '__VEHICLE__'])),
     historyUrl: '',
     historyHtml: '',
     historyLoading: false,
@@ -188,7 +188,7 @@
         return items;
     },
     async openClientHistory() {
-        if (!String(this.selectedClientId || '').trim()) return;
+        if (!String(this.selectedVehicleId || '').trim()) return;
         this.syncHistoryUrl();
         const requestToken = ++this.historyRequestToken;
         this.historyLoading = true;
@@ -204,10 +204,10 @@
             });
             const html = await response.text();
             if (requestToken !== this.historyRequestToken) return;
-            this.historyHtml = response.ok ? html : `<div class='p-6 text-sm text-red-600'>No se pudo cargar el historial del cliente.</div>`;
+            this.historyHtml = response.ok ? html : `<div class='p-6 text-sm text-red-600'>No se pudo cargar el historial del vehiculo.</div>`;
         } catch (error) {
             if (requestToken !== this.historyRequestToken) return;
-            this.historyHtml = `<div class='p-6 text-sm text-red-600'>No se pudo cargar el historial del cliente.</div>`;
+            this.historyHtml = `<div class='p-6 text-sm text-red-600'>No se pudo cargar el historial del vehiculo.</div>`;
         } finally {
             if (requestToken === this.historyRequestToken) {
                 this.historyLoading = false;
@@ -216,8 +216,8 @@
         }
     },
     syncHistoryUrl() {
-        this.historyUrl = this.selectedClientId
-            ? `${this.historyBase.replace('__PERSON__', this.selectedClientId)}?modal=1&_=${Date.now()}`
+        this.historyUrl = this.selectedVehicleId
+            ? `${this.historyBase.replace('__VEHICLE__', this.selectedVehicleId)}?modal=1&_=${Date.now()}`
             : '';
     },
     resolveDefaultClientId() {
@@ -1646,7 +1646,7 @@
         <div x-ref="historyViewport" class="flex max-h-full min-h-0 flex-col p-4 sm:p-5" style="height: min(78vh, calc(100vh - 5rem), calc(100dvh - 5rem)); max-height: min(78vh, calc(100vh - 5rem), calc(100dvh - 5rem));">
             <div class="mb-3 flex shrink-0 items-center justify-between gap-3">
                 <div>
-                    <h3 class="text-lg font-semibold text-gray-800">Historial del cliente</h3>
+                    <h3 class="text-lg font-semibold text-gray-800">Historial del vehiculo</h3>
                     <p class="mt-1 text-sm text-gray-500">Incluye fecha del servicio, tecnico responsable, observaciones y vehiculo.</p>
                 </div>
                 <button type="button" @click="close()" class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
