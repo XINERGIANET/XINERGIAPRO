@@ -405,11 +405,11 @@ class WorkshopOrderController extends Controller
 
         $brand = trim((string) ($row['brand'] ?? ''));
         if ($brand === '' || $this->isImportDashText($brand)) {
-            $brand = 'Importación';
+            $brand = '-';
         }
         $model = trim((string) ($row['model'] ?? ''));
         if ($model === '' || $this->isImportDashText($model)) {
-            $model = 'Excel';
+            $model = '-';
         }
 
         $mileage = array_key_exists('mileage_in', $row) && $row['mileage_in'] !== null
@@ -726,39 +726,7 @@ class WorkshopOrderController extends Controller
             return $person;
         }
 
-        $branch = Branch::query()->findOrFail($branchId);
-        $districtId = (int) ($branch->location_id ?? 0);
-        if ($districtId <= 0) {
-            throw new \RuntimeException('La sucursal no tiene distrito configurado; no se puede crear el cliente para documento «' . $doc . '».');
-        }
-
-        $personType = preg_match('/^\d{11}$/', $doc) ? 'RUC' : 'DNI';
-
-        $person = Person::query()->create([
-            'branch_id' => $branchId,
-            'document_number' => $doc,
-            'person_type' => $personType,
-            'first_name' => 'Cliente',
-            'last_name' => 'Importación Excel',
-            'phone' => '-',
-            'email' => '',
-            'address' => '-',
-            'location_id' => $districtId,
-        ]);
-
-        DB::table('role_person')->updateOrInsert(
-            [
-                'role_id' => 3,
-                'person_id' => $person->id,
-                'branch_id' => $branchId,
-            ],
-            [
-                'updated_at' => now(),
-                'created_at' => now(),
-            ]
-        );
-
-        return $person;
+        return $this->ensureImportGeneralClientPerson($branchId);
     }
 
     public function create(Request $request): RedirectResponse
