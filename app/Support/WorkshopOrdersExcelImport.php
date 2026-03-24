@@ -13,7 +13,20 @@ use Throwable;
 class WorkshopOrdersExcelImport
 {
     /**
-     * @return list<array{row_index: int, plate: string, document: string, observations: string, service_descriptions: list<string>, intake_date: ?string, mileage_in: ?int}>
+     * @return list<array{
+     *   row_index: int,
+     *   plate: string,
+     *   document: string,
+     *   observations: string,
+     *   service_descriptions: list<string>,
+     *   intake_date: ?string,
+     *   mileage_in: ?int,
+     *   brand: string,
+     *   model: string,
+     *   color: ?string,
+     *   engine_displacement_cc: ?int,
+     *   vehicle_type_label: ?string
+     * }>
      */
     public static function extractRows(string $absolutePath): array
     {
@@ -42,7 +55,17 @@ class WorkshopOrdersExcelImport
             );
         }
 
-        [$headerRow, $colPlate, $colObs, $colDoc, $colFecha, $colKm] = $detected;
+        $headerRow = $detected['header_row'];
+        $colPlate = $detected['col_plate'];
+        $colObs = $detected['col_obs'];
+        $colDoc = $detected['col_doc'];
+        $colFecha = $detected['col_fecha'];
+        $colKm = $detected['col_km'];
+        $colMarca = $detected['col_marca'];
+        $colModelo = $detected['col_modelo'];
+        $colColor = $detected['col_color'];
+        $colCilindrada = $detected['col_cilindrada'];
+        $colTipoVeh = $detected['col_tipo_vehiculo'];
 
         $out = [];
         $maxRow = (int) $sheet->getHighestDataRow();
@@ -69,6 +92,22 @@ class WorkshopOrdersExcelImport
                 ? self::parseIntCell($sheet->getCell(Coordinate::stringFromColumnIndex($colKm) . $row)->getCalculatedValue())
                 : null;
 
+            $brand = $colMarca !== null
+                ? self::cellToString($sheet->getCell(Coordinate::stringFromColumnIndex($colMarca) . $row))
+                : '';
+            $model = $colModelo !== null
+                ? self::cellToString($sheet->getCell(Coordinate::stringFromColumnIndex($colModelo) . $row))
+                : '';
+            $colorRaw = $colColor !== null
+                ? self::cellToString($sheet->getCell(Coordinate::stringFromColumnIndex($colColor) . $row))
+                : '';
+            $cc = $colCilindrada !== null
+                ? self::parseDisplacementCc($sheet->getCell(Coordinate::stringFromColumnIndex($colCilindrada) . $row)->getCalculatedValue())
+                : null;
+            $tipoLabel = $colTipoVeh !== null
+                ? self::cellToString($sheet->getCell(Coordinate::stringFromColumnIndex($colTipoVeh) . $row))
+                : null;
+
             $serviceDescriptions = self::splitObservations($obsRaw);
 
             $out[] = [
@@ -79,6 +118,11 @@ class WorkshopOrdersExcelImport
                 'service_descriptions' => $serviceDescriptions,
                 'intake_date' => $intakeDate,
                 'mileage_in' => $mileage,
+                'brand' => trim($brand),
+                'model' => trim($model),
+                'color' => self::normalizeColorCell($colorRaw),
+                'engine_displacement_cc' => $cc,
+                'vehicle_type_label' => $tipoLabel !== null && trim($tipoLabel) !== '' ? trim($tipoLabel) : null,
             ];
         }
 
@@ -116,7 +160,19 @@ class WorkshopOrdersExcelImport
     }
 
     /**
-     * @return array{0:int,1:int,2:int,3:int|null,4:int|null,5:int|null}|null
+     * @return array{
+     *   header_row: int,
+     *   col_plate: int,
+     *   col_obs: int,
+     *   col_doc: int|null,
+     *   col_fecha: int|null,
+     *   col_km: int|null,
+     *   col_marca: int|null,
+     *   col_modelo: int|null,
+     *   col_color: int|null,
+     *   col_cilindrada: int|null,
+     *   col_tipo_vehiculo: int|null
+     * }|null
      */
     private static function detectColumns(Worksheet $sheet): ?array
     {
@@ -133,6 +189,11 @@ class WorkshopOrdersExcelImport
             $colDoc = null;
             $colFecha = null;
             $colKm = null;
+            $colMarca = null;
+            $colModelo = null;
+            $colColor = null;
+            $colCilindrada = null;
+            $colTipoVeh = null;
 
             for ($c = 1; $c <= $highestColIdx; $c++) {
                 $coord = Coordinate::stringFromColumnIndex($c) . $r;
@@ -145,6 +206,25 @@ class WorkshopOrdersExcelImport
                     $colObs = $c;
                 } elseif ($norm === 'placa' || str_contains($norm, 'patente') || str_contains($norm, 'placa')) {
                     $colPlate = $c;
+                } elseif (str_contains($norm, 'cilindr') || str_contains($norm, 'cc ') || $norm === 'cc' || str_contains($norm, 'c.c.')) {
+                    $colCilindrada = $c;
+                } elseif (str_contains($norm, 'kilomet') || str_contains($norm, 'kilometraje')) {
+                    $colKm = $c;
+                } elseif (($norm === 'km' || str_starts_with($norm, 'km ')) && $colKm === null) {
+                    $colKm = $c;
+                } elseif ($norm === 'marca' || str_starts_with($norm, 'marca ')) {
+                    $colMarca = $c;
+                } elseif (str_contains($norm, 'modelo') || $norm === 'model' || str_starts_with($norm, 'model ')) {
+                    $colModelo = $c;
+                } elseif (str_contains($norm, 'color')) {
+                    $colColor = $c;
+                } elseif (
+                    (str_contains($norm, 'tipo') && str_contains($norm, 'veh'))
+                    || str_contains($norm, 'tipo vehiculo')
+                    || str_contains($norm, 'tipo de vehiculo')
+                    || str_contains($norm, 'clase veh')
+                ) {
+                    $colTipoVeh = $c;
                 } elseif (
                     str_contains($norm, 'document')
                     || $norm === 'dni'
@@ -164,17 +244,62 @@ class WorkshopOrdersExcelImport
                     } elseif ($colFecha === null) {
                         $colFecha = $c;
                     }
-                } elseif (str_contains($norm, 'kilomet') || str_contains($norm, 'kilometraje') || $norm === 'km' || str_starts_with($norm, 'km ')) {
-                    $colKm = $c;
                 }
             }
 
             if ($colPlate !== null && $colObs !== null) {
-                return [$r, $colPlate, $colObs, $colDoc, $colFecha, $colKm];
+                return [
+                    'header_row' => $r,
+                    'col_plate' => $colPlate,
+                    'col_obs' => $colObs,
+                    'col_doc' => $colDoc,
+                    'col_fecha' => $colFecha,
+                    'col_km' => $colKm,
+                    'col_marca' => $colMarca,
+                    'col_modelo' => $colModelo,
+                    'col_color' => $colColor,
+                    'col_cilindrada' => $colCilindrada,
+                    'col_tipo_vehiculo' => $colTipoVeh,
+                ];
             }
         }
 
         return null;
+    }
+
+    private static function normalizeColorCell(string $raw): ?string
+    {
+        $t = trim($raw);
+        if ($t === '' || $t === '-' || $t === '—' || $t === '–') {
+            return null;
+        }
+
+        return mb_substr($t, 0, 100);
+    }
+
+    private static function parseDisplacementCc(mixed $raw): ?int
+    {
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+        if (is_numeric($raw)) {
+            $n = max(0, (int) round((float) $raw));
+            if ($n <= 0 || $n > 5000) {
+                return null;
+            }
+
+            return $n;
+        }
+        $s = preg_replace('/[^\d]/', '', (string) $raw) ?? '';
+        if ($s === '') {
+            return null;
+        }
+        $n = (int) $s;
+        if ($n <= 0 || $n > 5000) {
+            return null;
+        }
+
+        return $n;
     }
 
     private static function normalizeHeader(mixed $value): string

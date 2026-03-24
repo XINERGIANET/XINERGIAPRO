@@ -19,6 +19,7 @@ use App\Models\Person;
 use App\Models\Product;
 use App\Models\ProductBranch;
 use App\Models\TaxRate;
+use App\Models\VehicleType;
 use App\Models\WorkshopMovement;
 use App\Models\WorkshopMovementDetail;
 use App\Models\WorkshopMovementTechnician;
@@ -186,7 +187,7 @@ class WorkshopOrderController extends Controller
                     }
 
                     $vehicle = $this->resolveOrCreateVehicleForOrderImport(
-                        $row['plate'],
+                        $row,
                         $companyId,
                         $branchId,
                         $clientPerson,
@@ -331,12 +332,13 @@ class WorkshopOrderController extends Controller
     }
 
     private function resolveOrCreateVehicleForOrderImport(
-        string $plate,
+        array $row,
         int $companyId,
         int $branchId,
         Person $clientPerson,
         int $rowIndex
     ): Vehicle {
+        $plate = (string) ($row['plate'] ?? '');
         $existing = $this->findVehicleByNormalizedPlate($plate, $companyId, $branchId);
         if ($existing) {
             return $existing;
@@ -347,17 +349,57 @@ class WorkshopOrderController extends Controller
             ? $this->uniqueGeneratedImportPlate($companyId, $rowIndex)
             : $norm;
 
+        $vehicleTypeId = 18;
+        $vehicleType = VehicleType::query()->find(18);
+        $typeName = $vehicleType?->name ? (string) $vehicleType->name : 'moto';
+
+        $brand = trim((string) ($row['brand'] ?? ''));
+        if ($brand === '' || $this->isImportDashText($brand)) {
+            $brand = 'Importación';
+        }
+        $model = trim((string) ($row['model'] ?? ''));
+        if ($model === '' || $this->isImportDashText($model)) {
+            $model = 'Excel';
+        }
+
+        $mileage = array_key_exists('mileage_in', $row) && $row['mileage_in'] !== null
+            ? (int) $row['mileage_in']
+            : 0;
+        $mileage = max(0, $mileage);
+
+        $cc = $row['engine_displacement_cc'] ?? null;
+        if ($cc !== null) {
+            $cc = (int) $cc;
+            if ($cc <= 0 || $cc > 5000) {
+                $cc = null;
+            }
+        }
+
+        $color = isset($row['color']) && $row['color'] !== null && $row['color'] !== ''
+            ? mb_substr((string) $row['color'], 0, 100)
+            : null;
+
         return Vehicle::query()->create([
             'company_id' => $companyId,
             'branch_id' => $branchId,
             'client_person_id' => $clientPerson->id,
-            'type' => 'moto',
-            'brand' => 'Importación',
-            'model' => 'Excel',
+            'vehicle_type_id' => $vehicleTypeId,
+            'type' => mb_substr($typeName, 0, 30),
+            'brand' => mb_substr($brand, 0, 255),
+            'model' => mb_substr($model, 0, 255),
+            'color' => $color,
             'plate' => $finalPlate,
-            'current_mileage' => 0,
+            'engine_displacement_cc' => $cc,
+            'current_mileage' => $mileage,
             'status' => 'active',
         ]);
+    }
+
+    private function isImportDashText(string $value): bool
+    {
+        $t = strtoupper(trim($value));
+
+        return $t === '-' || $t === '—' || $t === '–' || $t === 'N/A' || $t === 'S/N';
     }
 
     private function ensureImportGeneralClientPerson(int $branchId): Person

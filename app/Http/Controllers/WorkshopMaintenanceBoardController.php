@@ -508,8 +508,8 @@ class WorkshopMaintenanceBoardController extends Controller
             'service_lines.*.unit_price' => ['nullable', 'numeric'],
             'product_lines' => ['nullable', 'array'],
             'product_lines.*.detail_id' => ['nullable', 'integer'],
-            'product_lines.*.product_id' => ['required_with:product_lines', 'integer', 'exists:products,id'],
-            'product_lines.*.qty' => ['required_with:product_lines', 'numeric', 'gt:0'],
+            'product_lines.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'product_lines.*.qty' => ['nullable', 'numeric', 'gte:0'],
             'product_lines.*.unit_price' => ['nullable', 'numeric', 'gte:0'],
         ]);
 
@@ -692,8 +692,8 @@ class WorkshopMaintenanceBoardController extends Controller
             'service_lines.*.unit_price' => ['nullable', 'numeric'],
             'product_lines' => ['nullable', 'array'],
             'product_lines.*.detail_id' => ['nullable', 'integer'],
-            'product_lines.*.product_id' => ['required_with:product_lines', 'integer', 'exists:products,id'],
-            'product_lines.*.qty' => ['required_with:product_lines', 'numeric', 'gt:0'],
+            'product_lines.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'product_lines.*.qty' => ['nullable', 'numeric', 'gte:0'],
             'product_lines.*.unit_price' => ['nullable', 'numeric', 'gte:0'],
         ]);
 
@@ -1380,9 +1380,9 @@ class WorkshopMaintenanceBoardController extends Controller
             'payment_methods.*.digital_wallet_id' => ['nullable', 'integer', 'exists:digital_wallets,id'],
             'payment_comment' => ['nullable', 'string'],
             'product_lines' => ['nullable', 'array'],
-            'product_lines.*.product_id' => ['required_with:product_lines', 'integer', 'exists:products,id'],
-            'product_lines.*.qty' => ['required_with:product_lines', 'numeric', 'gt:0'],
-            'product_lines.*.unit_price' => ['required_with:product_lines', 'numeric', 'gte:0'],
+            'product_lines.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'product_lines.*.qty' => ['nullable', 'numeric', 'gte:0'],
+            'product_lines.*.unit_price' => ['nullable', 'numeric', 'gte:0'],
         ]);
 
         $paymentType = strtoupper((string) ($validated['payment_type'] ?? 'CONTADO'));
