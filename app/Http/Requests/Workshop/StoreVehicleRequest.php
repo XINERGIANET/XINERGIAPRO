@@ -58,6 +58,8 @@ class StoreVehicleRequest extends FormRequest
             'serial_number' => ['nullable', 'string', 'max:255'],
             'current_mileage' => ['nullable', 'integer', 'min:0'],
             'engine_displacement_cc' => ['nullable', 'integer', 'min:1', 'max:5000'],
+            'soat_vencimiento' => ['nullable', 'date'],
+            'revision_tecnica_vencimiento' => ['nullable', 'date'],
             'status' => ['nullable', 'string', 'max:30'],
         ];
     }

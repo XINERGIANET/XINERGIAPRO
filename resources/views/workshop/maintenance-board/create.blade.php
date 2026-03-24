@@ -66,8 +66,10 @@
             'client_name' => $clientName,
             'label' => trim($v->brand . ' ' . $v->model . ' ' . ($v->plate ? ('- ' . $v->plate) : '')),
             'display_label' => trim($v->brand . ' ' . $v->model . ' ' . ($v->plate ? ('- ' . $v->plate) : '')) . ($clientName !== '' ? ' (Cliente: ' . $clientName . ')' : ''),
-            'km' => (int) ($v->current_mileage ?? 0),
+            'current_mileage' => $v->current_mileage ?? '',
             'engine_displacement_cc' => $v->engine_displacement_cc ? (int) $v->engine_displacement_cc : null,
+            'soat_vencimiento' => $v->soat_vencimiento ? $v->soat_vencimiento->format('Y-m-d') : null,
+            'revision_tecnica_vencimiento' => $v->revision_tecnica_vencimiento ? $v->revision_tecnica_vencimiento->format('Y-m-d') : null,
         ];
     })),
     clientsList: @js($clients->map(fn($c) => ['id' => $c->id, 'first_name' => $c->first_name, 'last_name' => $c->last_name, 'person_type' => $c->person_type, 'document_number' => $c->document_number, 'label' => trim($c->first_name . ' ' . $c->last_name . ' - ' . $c->person_type . ' ' . $c->document_number)])),
@@ -80,6 +82,7 @@
         'name' => $s->name,
         'base_price' => (float) $s->base_price,
         'type' => $s->type !== null && $s->type !== '' ? strtolower(trim((string) $s->type)) : null,
+        'has_validity' => (bool) $s->has_validity,
         'frequency_enabled' => (bool) $s->frequency_enabled,
         'frequency_each_km' => $s->frequency_each_km !== null ? (int) $s->frequency_each_km : null,
         'frequency_kms' => $s->frequencies->map(fn ($f) => (int) $f->km)->filter(fn ($k) => $k > 0)->values()->all(),
@@ -121,7 +124,9 @@
         chassis_number: '',
         serial_number: '',
         current_mileage: '',
-        engine_displacement_cc: ''
+        engine_displacement_cc: '',
+        soat_vencimiento: '',
+        revision_tecnica_vencimiento: ''
     },
     quickClient: {
         person_type: 'DNI',
@@ -487,6 +492,7 @@
                     description: '',
                     qty: 1,
                     unit_price: this.resolveServicePrice(service),
+                    validity_months: service.has_validity ? (prev?.validity_months || '') : null,
                 };
             })
             .filter(Boolean);
@@ -623,6 +629,17 @@
         } finally {
             this.creatingVehicleLoading = false;
         }
+    },
+    getDocumentStatus(date) {
+        if (!date) return { label: 'NORMAL', color: 'bg-green-100 text-green-700', icon: 'ri-checkbox-circle-line' };
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const venc = new Date(date + 'T12:00:00'); // Use noon to avoid TZ issues
+        venc.setHours(0, 0, 0, 0);
+        const diff = Math.ceil((venc - today) / (1000 * 60 * 60 * 24));
+        if (diff < 0) return { label: 'VENCIDO', color: 'bg-red-100 text-red-700', icon: 'ri-error-warning-line' };
+        if (diff <= 30) return { label: 'POR VENCER', color: 'bg-yellow-100 text-yellow-700', icon: 'ri-time-line' };
+        return { label: 'NORMAL', color: 'bg-green-100 text-green-700', icon: 'ri-checkbox-circle-line' };
     },
     async saveQuickClient() {
         this.quickClientError = '';
@@ -931,6 +948,14 @@
                         <label class="mb-1 block text-sm font-medium text-gray-700">Cilindrada (cc)</label>
                         <input x-model="quickVehicle.engine_displacement_cc" type="number" min="1" max="5000" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Cilindrada (cc)">
                     </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">SOAT Vencimiento</label>
+                        <input x-model="quickVehicle.soat_vencimiento" type="date" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Rev. Técnica Vencimiento</label>
+                        <input x-model="quickVehicle.revision_tecnica_vencimiento" type="date" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                    </div>
                 </div>
 
                 <div class="mt-3 flex items-center gap-2">
@@ -961,6 +986,26 @@
                                 :readonly="editingMode"
                                 required
                             >
+                            <div class="mt-2 flex flex-wrap gap-2" x-show="selectedVehicleId" x-cloak>
+                                <template x-if="vehicles.find(v => String(v.id) === String(selectedVehicleId))">
+                                    <div class="flex flex-wrap gap-2">
+                                        <div class="flex items-center gap-1 overflow-hidden rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider shadow-sm"
+                                            :class="getDocumentStatus(vehicles.find(v => String(v.id) === String(selectedVehicleId)).soat_vencimiento).color">
+                                            <i :class="getDocumentStatus(vehicles.find(v => String(v.id) === String(selectedVehicleId)).soat_vencimiento).icon"></i>
+                                            <span>SOAT:</span>
+                                            <span x-text="getDocumentStatus(vehicles.find(v => String(v.id) === String(selectedVehicleId)).soat_vencimiento).label"></span>
+                                            <span class="opacity-75" x-text="vehicles.find(v => String(v.id) === String(selectedVehicleId)).soat_vencimiento || '-'"></span>
+                                        </div>
+                                        <div class="flex items-center gap-1 overflow-hidden rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider shadow-sm"
+                                            :class="getDocumentStatus(vehicles.find(v => String(v.id) === String(selectedVehicleId)).revision_tecnica_vencimiento).color">
+                                            <i :class="getDocumentStatus(vehicles.find(v => String(v.id) === String(selectedVehicleId)).revision_tecnica_vencimiento).icon"></i>
+                                            <span>REV. TÉCNICA:</span>
+                                            <span x-text="getDocumentStatus(vehicles.find(v => String(v.id) === String(selectedVehicleId)).revision_tecnica_vencimiento).label"></span>
+                                            <span class="opacity-75" x-text="vehicles.find(v => String(v.id) === String(selectedVehicleId)).revision_tecnica_vencimiento || '-'"></span>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
                             <div
                                 x-show="vehicleDropdownOpen && !editingMode"
                                 x-cloak
@@ -1219,22 +1264,38 @@
 
                 <div class="grid grid-cols-1 gap-x-6 gap-y-2 md:grid-cols-3">
                     <template x-for="service in filteredServicesCatalog()" :key="`service-check-${service.id}`">
-                        <label class="inline-flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 hover:border-indigo-300">
-                            <div class="min-w-0 flex-1">
-                                <span class="block truncate font-medium" x-text="service.name"></span>
-                                <span class="block text-[10px] font-semibold uppercase tracking-wide text-slate-500" x-text="String(service.type || '') === 'preventivo' ? 'Preventivo' : (String(service.type || '') === 'correctivo' ? 'Correctivo' : (service.type || ''))"></span>
-                                <span class="block text-xs text-gray-500" x-text="servicePricingLabel(service)"></span>
-                            </div>
-                            <div class="flex items-center gap-3">
-                                <span class="whitespace-nowrap text-xs font-bold text-emerald-600" x-text="`S/ ${resolveServicePrice(service).toFixed(2)}`"></span>
-                                <input
-                                    type="checkbox"
-                                    :checked="isServiceSelected(service.id)"
-                                    @change="toggleService(service.id)"
-                                    class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                                >
-                            </div>
-                        </label>
+                        <div class="rounded-lg border border-gray-200 bg-white p-3 hover:border-indigo-300">
+                            <label class="flex items-center justify-between gap-3 text-sm text-gray-800 cursor-pointer">
+                                <div class="min-w-0 flex-1">
+                                    <span class="block truncate font-medium" x-text="service.name"></span>
+                                    <span class="block text-[10px] font-semibold uppercase tracking-wide text-slate-500" x-text="String(service.type || '') === 'preventivo' ? 'Preventivo' : (String(service.type || '') === 'correctivo' ? 'Correctivo' : (service.type || ''))"></span>
+                                    <span class="block text-xs text-gray-500" x-text="servicePricingLabel(service)"></span>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="whitespace-nowrap text-xs font-bold text-emerald-600" x-text="`S/ ${resolveServicePrice(service).toFixed(2)}`"></span>
+                                    <input
+                                        type="checkbox"
+                                        :checked="isServiceSelected(service.id)"
+                                        @change="toggleService(service.id)"
+                                        class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                    >
+                                </div>
+                            </label>
+                            <template x-if="service.has_validity && isServiceSelected(service.id)">
+                                <div class="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between">
+                                    <span class="text-[11px] font-medium text-emerald-700">Vigencia próx. servicio:</span>
+                                    <select 
+                                        :value="(serviceLines.find(l => String(l.service_id) === String(service.id)) || {}).validity_months || ''"
+                                        @change="let sl = serviceLines.find(l => String(l.service_id) === String(service.id)); if(sl) sl.validity_months = $event.target.value;"
+                                        class="h-8 rounded border border-emerald-300 bg-emerald-50 px-2 text-xs text-emerald-800 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                                    >
+                                        <option value="">No definir</option>
+                                        <option value="6">En 6 meses</option>
+                                        <option value="12">En 1 año</option>
+                                    </select>
+                                </div>
+                            </template>
+                        </div>
                     </template>
                 </div>
 
@@ -1277,6 +1338,9 @@
                             <input type="hidden" :name="`service_lines[${index}][qty]`" :value="line.qty">
                             <input type="hidden" :name="`service_lines[${index}][unit_price]`" :value="line.unit_price">
                             <input type="hidden" :name="`service_lines[${index}][description]`" :value="line.description || ''">
+                            <template x-if="line.validity_months">
+                                <input type="hidden" :name="`service_lines[${index}][validity_months]`" :value="line.validity_months">
+                            </template>
                         </div>
                     </template>
                 </template>

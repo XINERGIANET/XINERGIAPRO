@@ -239,6 +239,14 @@
                     <label class="mb-1 block text-sm font-medium text-gray-700">Cilindrada (cc)</label>
                     <input name="engine_displacement_cc" type="number" min="1" max="5000" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Ej: 250" value="{{ old('engine_displacement_cc') }}">
                 </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Vencimiento SOAT</label>
+                    <input type="date" name="soat_vencimiento" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm text-gray-700" value="{{ old('soat_vencimiento') }}">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Vencimiento Rev. Técnica</label>
+                    <input type="date" name="revision_tecnica_vencimiento" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm text-gray-700" value="{{ old('revision_tecnica_vencimiento') }}">
+                </div>
                 <div class="md:col-span-4 mt-2 flex gap-2">
                     <x-ui.button type="submit" size="md" variant="primary"><i class="ri-save-line"></i><span>Guardar</span></x-ui.button>
                     <x-ui.button type="button" size="md" variant="outline" @click="open = false"><i class="ri-close-line"></i><span>Cancelar</span></x-ui.button>
@@ -325,6 +333,14 @@
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">Cilindrada (cc)</label>
                         <input name="engine_displacement_cc" type="number" min="1" max="5000" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" value="{{ old('engine_displacement_cc', $vehicle->engine_displacement_cc) }}" placeholder="Ej: 250">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Vencimiento SOAT</label>
+                        <input type="date" name="soat_vencimiento" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm text-gray-700" value="{{ old('soat_vencimiento', $vehicle->soat_vencimiento?->format('Y-m-d')) }}">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Vencimiento Rev. Técnica</label>
+                        <input type="date" name="revision_tecnica_vencimiento" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm text-gray-700" value="{{ old('revision_tecnica_vencimiento', $vehicle->revision_tecnica_vencimiento?->format('Y-m-d')) }}">
                     </div>
                     <div class="md:col-span-4 mt-2 flex gap-2">
                         <x-ui.button type="submit" size="md" variant="primary"><i class="ri-save-line"></i><span>Guardar cambios</span></x-ui.button>

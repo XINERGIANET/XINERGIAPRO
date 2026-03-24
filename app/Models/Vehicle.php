@@ -27,6 +27,8 @@ class Vehicle extends Model
         'serial_number',
         'current_mileage',
         'engine_displacement_cc',
+        'soat_vencimiento',
+        'revision_tecnica_vencimiento',
         'status',
     ];
 
@@ -34,7 +36,27 @@ class Vehicle extends Model
         'year' => 'integer',
         'current_mileage' => 'integer',
         'engine_displacement_cc' => 'integer',
+        'soat_vencimiento' => 'date',
+        'revision_tecnica_vencimiento' => 'date',
     ];
+
+    public function getDocumentStatus($date)
+    {
+        if (!$date) return ['label' => 'AL DIA', 'color' => 'success', 'icon' => 'ri-checkbox-circle-line'];
+        
+        $today = now()->startOfDay();
+        $date = \Illuminate\Support\Carbon::parse($date)->startOfDay();
+        
+        if ($date->lt($today)) {
+            return ['label' => 'VENCIDO', 'color' => 'danger', 'icon' => 'ri-error-warning-line'];
+        }
+        
+        if ($date->diffInDays($today) <= 30) {
+            return ['label' => 'POR VENCER', 'color' => 'warning', 'icon' => 'ri-alert-line'];
+        }
+        
+        return ['label' => 'AL DIA', 'color' => 'success', 'icon' => 'ri-checkbox-circle-line'];
+    }
 
     public function company()
     {

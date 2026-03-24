@@ -19,6 +19,8 @@ class WorkshopService extends Model
         'frequency_each_km',
         'frequency_enabled',
         'estimated_minutes',
+        'has_validity',
+        'validity_type',
         'active',
     ];
 
@@ -26,6 +28,7 @@ class WorkshopService extends Model
         'base_price' => 'decimal:6',
         'frequency_each_km' => 'integer',
         'frequency_enabled' => 'boolean',
+        'has_validity' => 'boolean',
         'active' => 'boolean',
     ];
 

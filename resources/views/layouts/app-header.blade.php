@@ -32,8 +32,25 @@
 
             @php
                 $branchName = null;
+                $branchId = null;
                 if (session()->has('branch_id')) {
-                    $branchName = optional(\App\Models\Branch::find(session('branch_id')))->legal_name;
+                    $branchId = (int) session('branch_id');
+                    $branchName = optional(\App\Models\Branch::find($branchId))->legal_name;
+                }
+                
+                $expiringVehiclesQuery = \App\Models\Vehicle::query()
+                    ->with('client')
+                    ->when($branchId > 0, fn($q) => $q->where('branch_id', $branchId))
+                    ->whereNotNull('revision_tecnica_vencimiento')
+                    ->where('revision_tecnica_vencimiento', '<=', now()->addDays(30))
+                    ->orderBy('revision_tecnica_vencimiento', 'asc')
+                    ->limit(10);
+                    
+                // Safe query handling in case table is not migrated yet
+                try {
+                    $expiringVehicles = collect($expiringVehiclesQuery->get());
+                } catch (\Throwable $e) {
+                    $expiringVehicles = collect([]);
                 }
             @endphp
 
@@ -104,8 +121,89 @@
                     </div>
                 @endif
 
+                <!-- Notification Button -->
+                <div class="relative group" x-data="{ open: false }" @click.away="open = false">
+                    <button
+                        @click="open = !open"
+                        class="relative flex items-center justify-center text-white transition-all bg-white/10 border border-white/10 rounded-full hover:text-white h-11 w-11 hover:bg-white/20"
+                        aria-label="Notificaciones"
+                    >
+                        <i class="ri-notification-3-line text-lg"></i>
+                        @if($expiringVehicles->count() > 0)
+                            <span class="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-md">{{ $expiringVehicles->count() }}</span>
+                        @endif
+                    </button>
+                    <span x-show="!open" class="pointer-events-none absolute left-1/2 top-full z-50 mt-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-black/80 px-2 py-1 text-[11px] font-semibold text-white shadow-lg group-hover:block">
+                        Notificaciones
+                    </span>
+                    
+                    <!-- Dropdown Menu -->
+                    <div x-show="open" 
+                         x-transition:enter="transition ease-out duration-200"
+                         x-transition:enter-start="opacity-0 translate-y-2"
+                         x-transition:enter-end="opacity-100 translate-y-0"
+                         x-transition:leave="transition ease-in duration-150"
+                         x-transition:leave-start="opacity-100 translate-y-0"
+                         x-transition:leave-end="opacity-0 translate-y-2"
+                         class="absolute right-0 top-full mt-3 w-80 sm:w-80 rounded-2xl bg-white shadow-2xl border border-gray-100 dark:bg-gray-800 dark:border-gray-700 z-50 overflow-hidden"
+                         style="display: none;">
+                         
+                        <div class="bg-gray-50 px-4 py-3 border-b border-gray-100 dark:bg-gray-800/50 dark:border-gray-700 flex justify-between items-center">
+                            <h3 class="text-xs font-bold uppercase tracking-wide text-gray-800 dark:text-gray-100">Próximos a Vencer</h3>
+                            <span class="text-[10px] font-bold text-blue-800 bg-blue-100 px-2 py-0.5 rounded-full ring-1 ring-inset ring-blue-600/20">{{ $expiringVehicles->count() }} Rev. Técnica</span>
+                        </div>
+                        
+                        <div class="max-h-[320px] overflow-y-auto overscroll-contain">
+                            @if($expiringVehicles->count() > 0)
+                                <div class="divide-y divide-gray-100 dark:divide-gray-700">
+                                    @foreach($expiringVehicles as $veh)
+                                        @php
+                                            $days = (int) now()->startOfDay()->diffInDays($veh->revision_tecnica_vencimiento->copy()->startOfDay(), false);
+                                            $isExpired = $days < 0;
+                                        @endphp
+                                        <a href="{{ route('workshop.maintenance-board.create', ['search' => $veh->plate]) }}" class="block px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                            <div class="flex items-start justify-between gap-2">
+                                                <div class="min-w-0">
+                                                    <p class="text-sm font-bold text-gray-800 dark:text-gray-200 truncate">
+                                                        {{ $veh->plate }}
+                                                    </p>
+                                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                                                        {{ $veh->client?->first_name }} {{ $veh->client?->last_name }}
+                                                    </p>
+                                                </div>
+                                                <div class="text-right whitespace-nowrap shrink-0">
+                                                    @if($isExpired)
+                                                        <span class="inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-[10px] font-bold text-red-700 ring-1 ring-inset ring-red-600/10">VENCIDO</span>
+                                                    @else
+                                                        <span class="inline-flex items-center rounded-md bg-yellow-50 px-2 py-1 text-[10px] font-bold text-yellow-800 ring-1 ring-inset ring-yellow-600/20">En {{ $days }} días</span>
+                                                    @endif
+                                                    <p class="text-[10px] font-medium text-gray-400 mt-1">{{ $veh->revision_tecnica_vencimiento->format('d/m/Y') }}</p>
+                                                </div>
+                                            </div>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="px-4 py-10 text-center flex flex-col items-center justify-center">
+                                    <div class="h-10 w-10 rounded-full bg-green-50 flex items-center justify-center mb-3 ring-4 ring-green-50/50">
+                                        <i class="ri-check-double-line text-xl text-green-500"></i>
+                                    </div>
+                                    <h4 class="text-sm font-bold text-gray-800">¡Todo al día!</h4>
+                                    <p class="text-xs text-gray-500 mt-1">No hay revisiones próximas a vencer.</p>
+                                </div>
+                            @endif
+                        </div>
+                        
+                        <div class="bg-gray-50 dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 p-2 text-center">
+                            <a href="{{ route('workshop.vehicles.index') }}" class="inline-block w-full py-2 text-xs font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors dark:text-blue-400 dark:hover:bg-gray-800">
+                                Ver todos los vehículos
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Back Button -->
-                <div class="relative">
+                <div class="relative group">
                     <button
                         onclick="window.history.back()"
                         class="relative flex items-center justify-center text-white transition-all bg-white/10 border border-white/10 rounded-full hover:text-white h-11 w-11 hover:bg-white/20"
@@ -115,6 +213,9 @@
                             <path d="M15 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                     </button>
+                    <span class="pointer-events-none absolute left-1/2 top-full z-50 mt-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-black/80 px-2 py-1 text-[11px] font-semibold text-white shadow-lg group-hover:block">
+                        Regresar
+                    </span>
                 </div>
             </div>
 

@@ -180,6 +180,7 @@ class WorkshopMaintenanceBoardController extends Controller
                 'description' => (string) ($d->description ?? ''),
                 'qty' => (float) $d->qty,
                 'unit_price' => (float) $d->unit_price,
+                'validity_months' => $d->validity_months,
             ])
             ->all();
 
@@ -268,7 +269,7 @@ class WorkshopMaintenanceBoardController extends Controller
             ->where('branch_id', $branchId)
             ->orderBy('brand')
             ->orderBy('model')
-            ->get(['id', 'client_person_id', 'vehicle_type_id', 'brand', 'model', 'plate', 'current_mileage', 'engine_displacement_cc']);
+            ->get(['id', 'client_person_id', 'vehicle_type_id', 'brand', 'model', 'plate', 'current_mileage', 'engine_displacement_cc', 'soat_vencimiento', 'revision_tecnica_vencimiento']);
 
         $vehicleTypes = VehicleType::query()
             ->where(function ($query) use ($companyId, $branchId) {
@@ -311,7 +312,7 @@ class WorkshopMaintenanceBoardController extends Controller
                 $query->whereNull('branch_id')->orWhere('branch_id', $branchId);
             })
             ->orderBy('name')
-            ->get(['id', 'name', 'base_price', 'type', 'frequency_enabled', 'frequency_each_km']);
+            ->get(['id', 'name', 'base_price', 'type', 'frequency_enabled', 'frequency_each_km', 'has_validity']);
 
         $saleMovementTypeId = (int) \App\Models\MovementType::query()
             ->where('description', 'ILIKE', '%venta%')
@@ -506,6 +507,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'service_lines.*.description' => ['nullable', 'string', 'max:255'],
             'service_lines.*.qty' => ['nullable', 'numeric'],
             'service_lines.*.unit_price' => ['nullable', 'numeric'],
+            'service_lines.*.validity_months' => ['nullable', 'in:6,12'],
             'product_lines' => ['nullable', 'array'],
             'product_lines.*.detail_id' => ['nullable', 'integer'],
             'product_lines.*.product_id' => ['required_with:product_lines', 'integer', 'exists:products,id'],
@@ -614,6 +616,7 @@ class WorkshopMaintenanceBoardController extends Controller
                     'description' => (string) $service->name,
                     'qty' => $qty,
                     'unit_price' => $unitPrice,
+                    'validity_months' => $line['validity_months'] ?? null,
                 ]);
             }
 
@@ -690,6 +693,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'service_lines.*.description' => ['nullable', 'string', 'max:255'],
             'service_lines.*.qty' => ['nullable', 'numeric'],
             'service_lines.*.unit_price' => ['nullable', 'numeric'],
+            'service_lines.*.validity_months' => ['nullable', 'in:6,12'],
             'product_lines' => ['nullable', 'array'],
             'product_lines.*.detail_id' => ['nullable', 'integer'],
             'product_lines.*.product_id' => ['required_with:product_lines', 'integer', 'exists:products,id'],
@@ -805,6 +809,7 @@ class WorkshopMaintenanceBoardController extends Controller
                                     'qty' => $qty,
                                     'unit_price' => $line['unit_price'],
                                     'description' => $line['description'],
+                                    'validity_months' => $line['validity_months'] ?? null,
                                 ],
                                 $branchId,
                                 (int) ($user?->id ?? 0),
@@ -817,6 +822,7 @@ class WorkshopMaintenanceBoardController extends Controller
                                 'description' => $line['description'],
                                 'qty' => $qty,
                                 'unit_price' => $line['unit_price'],
+                                'validity_months' => $line['validity_months'] ?? null,
                             ]);
                         }
                         continue;
@@ -840,6 +846,7 @@ class WorkshopMaintenanceBoardController extends Controller
                             [
                                 'qty' => $qty,
                                 'unit_price' => round((float) ($line['unit_price'] ?? $resolvedPrice), 6),
+                                'validity_months' => $line['validity_months'] ?? null,
                             ],
                             $branchId,
                             (int) ($user?->id ?? 0),
@@ -852,6 +859,7 @@ class WorkshopMaintenanceBoardController extends Controller
                             'description' => (string) $service->name,
                             'qty' => $qty,
                             'unit_price' => $resolvedPrice,
+                            'validity_months' => $line['validity_months'] ?? null,
                         ]);
                     }
                 }
@@ -1075,6 +1083,8 @@ class WorkshopMaintenanceBoardController extends Controller
             'serial_number' => ['nullable', 'string', 'max:255'],
             'current_mileage' => ['nullable', 'integer', 'min:0'],
             'engine_displacement_cc' => ['nullable', 'integer', 'min:1', 'max:5000'],
+            'soat_vencimiento' => ['nullable', 'date'],
+            'revision_tecnica_vencimiento' => ['nullable', 'date'],
         ]);
 
         $hasClientRole = Person::query()
@@ -1121,6 +1131,8 @@ class WorkshopMaintenanceBoardController extends Controller
             'label' => trim($vehicle->brand . ' ' . $vehicle->model . ' ' . ($vehicle->plate ? ('- ' . $vehicle->plate) : '')),
             'km' => (int) ($vehicle->current_mileage ?? 0),
             'engine_displacement_cc' => $vehicle->engine_displacement_cc ? (int) $vehicle->engine_displacement_cc : null,
+            'soat_vencimiento' => $vehicle->soat_vencimiento ? $vehicle->soat_vencimiento->format('Y-m-d') : null,
+            'revision_tecnica_vencimiento' => $vehicle->revision_tecnica_vencimiento ? $vehicle->revision_tecnica_vencimiento->format('Y-m-d') : null,
         ]);
     }
 
@@ -1681,6 +1693,8 @@ class WorkshopMaintenanceBoardController extends Controller
             $detailId = isset($row['detail_id']) && $row['detail_id'] !== '' && $row['detail_id'] !== null
                 ? (int) $row['detail_id']
                 : 0;
+            $valRaw = mb_strtolower(trim((string) ($row['validity_months'] ?? '')), 'UTF-8');
+            $validityMonths = ($valRaw === '6' || $valRaw === '12') ? (int) $valRaw : null;
 
             if ($qty <= 0) {
                 continue;
@@ -1699,6 +1713,7 @@ class WorkshopMaintenanceBoardController extends Controller
                     'description' => $desc,
                     'qty' => $qty,
                     'unit_price' => $unitPrice,
+                    'validity_months' => $validityMonths,
                 ];
                 continue;
             }

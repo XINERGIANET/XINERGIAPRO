@@ -131,6 +131,8 @@ class WorkshopServiceCatalogController extends Controller
                 'estimated_minutes' => $validated['estimated_minutes'],
                 'frequency_each_km' => $validated['frequency_each_km'] ?? null,
                 'frequency_enabled' => (bool) ($validated['frequency_enabled'] ?? false),
+                'has_validity' => (bool) ($validated['has_validity'] ?? false),
+                'validity_type' => !empty($validated['has_validity']) ? ($validated['validity_type'] ?? null) : null,
                 'active' => (bool) ($validated['active'] ?? true),
             ]);
 
@@ -157,6 +159,8 @@ class WorkshopServiceCatalogController extends Controller
                 'estimated_minutes' => $validated['estimated_minutes'],
                 'frequency_each_km' => $validated['frequency_each_km'] ?? null,
                 'frequency_enabled' => (bool) ($validated['frequency_enabled'] ?? false),
+                'has_validity' => (bool) ($validated['has_validity'] ?? false),
+                'validity_type' => !empty($validated['has_validity']) ? ($validated['validity_type'] ?? null) : null,
                 'active' => (bool) ($validated['active'] ?? false),
             ]);
 
@@ -329,6 +333,8 @@ class WorkshopServiceCatalogController extends Controller
             'base_price' => ['nullable', 'numeric', 'min:0'],
             'estimated_minutes' => ['required', 'integer', 'min:0'],
             'active' => ['nullable', 'boolean'],
+            'has_validity' => ['nullable', 'boolean'],
+            'validity_type' => ['nullable', 'string', 'in:soat_vencimiento,revision_tecnica_vencimiento'],
             'frequency_each_km' => ['nullable', 'integer', 'min:1'],
             'frequency_enabled' => ['nullable', 'boolean'],
             'price_tiers' => ['nullable', 'array'],

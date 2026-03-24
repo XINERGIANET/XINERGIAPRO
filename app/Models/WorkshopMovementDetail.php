@@ -26,6 +26,7 @@ class WorkshopMovementDetail extends Model
         'tax',
         'total',
         'technician_person_id',
+        'validity_months',
         'warehouse_movement_id',
         'sales_movement_id',
         'stock_consumed',

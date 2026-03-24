@@ -348,6 +348,25 @@
                         <span>Usar multiplicador por km</span>
                     </label>
                 </div>
+                <div x-data="{ hasValidity: {{ old('has_validity') ? 'true' : 'false' }} }" class="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-5 rounded-2xl border border-gray-200 bg-emerald-50/30 p-4">
+                    <div>
+                        <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">¿Tiene vigencia?</label>
+                        <p class="mb-2 text-xs text-gray-500">Permite registrar si el próximo servicio es en 6 meses o 1 año.</p>
+                        <label class="inline-flex items-center gap-2 text-sm text-gray-700 mt-1">
+                            <input type="checkbox" name="has_validity" value="1" x-model="hasValidity" class="h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500">
+                            <span>Solicitar vigencia en tablero</span>
+                        </label>
+                    </div>
+                    <div x-show="hasValidity" x-cloak x-transition>
+                        <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Actualizar fecha de:</label>
+                        <p class="mb-2 text-xs text-gray-500">Elige qué campo del vehículo se actualizará.</p>
+                        <select name="validity_type" class="h-11 w-full rounded-xl border border-emerald-200 bg-white px-4 text-sm transition-all focus:border-emerald-500 focus:ring-emerald-500/10 focus:outline-none" :required="hasValidity">
+                            <option value="">Selecciona fecha vinculada</option>
+                            <option value="soat_vencimiento" @selected(old('validity_type') === 'soat_vencimiento')>SOAT Vencimiento</option>
+                            <option value="revision_tecnica_vencimiento" @selected(old('validity_type') === 'revision_tecnica_vencimiento')>Rev. Técnica Vencimiento</option>
+                        </select>
+                    </div>
+                </div>
                 <div class="md:col-span-3 rounded-2xl border border-gray-200 bg-gray-50/60 p-4">
                     <div class="mb-3 flex items-center justify-between gap-3">
                         <div>
@@ -441,6 +460,25 @@
                             <input type="checkbox" name="frequency_enabled" value="1" @checked((bool) $service->frequency_enabled) class="h-4 w-4 rounded border-gray-300 text-indigo-600">
                             <span>Usar multiplicador por km</span>
                         </label>
+                    </div>
+                    <div x-data="{ hasValidity: {{ $service->has_validity ? 'true' : 'false' }} }" class="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-5 rounded-2xl border border-gray-200 bg-emerald-50/30 p-4">
+                        <div>
+                            <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">¿Tiene vigencia?</label>
+                            <p class="mb-2 text-xs text-gray-500">Permite registrar si el próximo servicio es en 6 meses o 1 año.</p>
+                            <label class="inline-flex items-center gap-2 text-sm text-gray-700 mt-1">
+                                <input type="checkbox" name="has_validity" value="1" x-model="hasValidity" class="h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500">
+                                <span>Solicitar vigencia en tablero</span>
+                            </label>
+                        </div>
+                        <div x-show="hasValidity" x-cloak x-transition>
+                            <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Actualizar fecha de:</label>
+                            <p class="mb-2 text-xs text-gray-500">Elige qué campo del vehículo se actualizará.</p>
+                            <select name="validity_type" class="h-11 w-full rounded-xl border border-emerald-200 bg-white px-4 text-sm transition-all focus:border-emerald-500 focus:ring-emerald-500/10 focus:outline-none" :required="hasValidity">
+                                <option value="">Selecciona fecha vinculada</option>
+                                <option value="soat_vencimiento" @selected($service->validity_type === 'soat_vencimiento')>SOAT Vencimiento</option>
+                                <option value="revision_tecnica_vencimiento" @selected($service->validity_type === 'revision_tecnica_vencimiento')>Rev. Técnica Vencimiento</option>
+                            </select>
+                        </div>
                     </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Estado</label>

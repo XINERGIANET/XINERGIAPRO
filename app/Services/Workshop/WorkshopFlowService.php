@@ -294,6 +294,7 @@ class WorkshopFlowService
                 'tax' => round($tax, 6),
                 'total' => round($net, 6),
                 'technician_person_id' => $data['technician_person_id'] ?? null,
+                'validity_months' => $data['validity_months'] ?? null,
             ]);
 
             $this->recalculateOrderTotals($order);
@@ -394,6 +395,7 @@ class WorkshopFlowService
                 'tax' => round($tax, 6),
                 'total' => round($net, 6),
                 'technician_person_id' => $data['technician_person_id'] ?? $detail->technician_person_id,
+                'validity_months' => array_key_exists('validity_months', $data) ? $data['validity_months'] : $detail->validity_months,
             ]);
 
             $this->recalculateOrderTotals($order);
@@ -1639,6 +1641,8 @@ class WorkshopFlowService
         if ($nextStatus === 'delivered') {
             $updates['delivery_date'] = $order->delivery_date ?: now();
             $updates['locked_at'] = $order->locked_at ?: now();
+            
+            $this->applyServiceValidityToVehicle($order);
         }
 
         if ($isReopenByAdmin) {
@@ -1647,6 +1651,65 @@ class WorkshopFlowService
 
         $order->update($updates);
         $this->recordStatusChange((int) $order->id, $currentStatus, $nextStatus, $userId, $note);
+    }
+
+    private function applyServiceValidityToVehicle(WorkshopMovement $order): void
+    {
+        $detailsWithValidity = $order->details()
+            ->whereNotNull('validity_months')
+            ->where('validity_months', '>', 0)
+            ->get();
+
+        if ($detailsWithValidity->isEmpty()) {
+            return;
+        }
+
+        $vehicle = \App\Models\Vehicle::query()->find($order->vehicle_id);
+        if (!$vehicle) {
+            return;
+        }
+
+        $updates = [];
+        foreach ($detailsWithValidity as $detail) {
+            $service = \App\Models\WorkshopService::query()->find($detail->service_id);
+            if (!$service) {
+                continue;
+            }
+
+            $months = (int) $detail->validity_months;
+            $newDate = now()->addMonths($months);
+
+            if ($service->has_validity && $service->validity_type) {
+                $field = $service->validity_type;
+                if (!isset($updates[$field]) || $newDate->greaterThan($updates[$field])) {
+                    $updates[$field] = $newDate;
+                }
+            } else {
+                $serviceNameUpper = mb_strtoupper(trim((string) $service->name));
+                $isRevision = str_contains($serviceNameUpper, 'REV');
+                $isTecnica = str_contains($serviceNameUpper, 'TEC') || str_contains($serviceNameUpper, 'TÉC');
+
+                if ($isRevision && $isTecnica) {
+                    if (!isset($updates['revision_tecnica_vencimiento']) || $newDate->greaterThan($updates['revision_tecnica_vencimiento'])) {
+                        $updates['revision_tecnica_vencimiento'] = $newDate;
+                    }
+                } elseif (str_contains($serviceNameUpper, 'SOAT')) {
+                    if (!isset($updates['soat_vencimiento']) || $newDate->greaterThan($updates['soat_vencimiento'])) {
+                        $updates['soat_vencimiento'] = $newDate;
+                    }
+                }
+            }
+        }
+
+        \Illuminate\Support\Facades\Log::info('WorkshopFlowService::applyServiceValidityToVehicle', [
+            'order_id' => $order->id,
+            'vehicle_id' => $vehicle->id,
+            'updates_generated' => $updates,
+        ]);
+
+        if (!empty($updates)) {
+            $vehicle->update($updates);
+        }
     }
 
     private function ensureOrderAllowsLineChanges(WorkshopMovement $order): void

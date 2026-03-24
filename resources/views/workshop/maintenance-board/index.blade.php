@@ -130,7 +130,26 @@
                             </div>
                             <div class="min-w-0">
                                 <p class="truncate text-lg font-bold leading-tight">{{ trim(($card->vehicle?->brand ?? '') . ' ' . ($card->vehicle?->model ?? '')) ?: 'Vehiculo en mantenimiento' }}</p>
-                                <p class="truncate text-xs tracking-wide text-slate-200">Placa {{ $card->vehicle?->plate ?: 'S/PLACA' }}</p>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <p class="truncate text-xs tracking-wide text-slate-200">Placa {{ $card->vehicle?->plate ?: 'S/PLACA' }}</p>
+                                    @if($card->vehicle)
+                                        @php
+                                            $soat = $card->vehicle->getDocumentStatus($card->vehicle->soat_vencimiento);
+                                            $rev = $card->vehicle->getDocumentStatus($card->vehicle->revision_tecnica_vencimiento);
+                                            $colorMapIndex = [
+                                                'success' => 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+                                                'warning' => 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+                                                'danger' => 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+                                            ];
+                                        @endphp
+                                        <span class="flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider {{ $colorMapIndex[$soat['color']] }}" title="SOAT: {{ $card->vehicle->soat_vencimiento }}">
+                                            <i class="ri-shield-check-line"></i> SOAT
+                                        </span>
+                                        <span class="flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider {{ $colorMapIndex[$rev['color']] }}" title="Rev. Técnica: {{ $card->vehicle->revision_tecnica_vencimiento }}">
+                                            <i class="ri-rest-time-line"></i> REV
+                                        </span>
+                                    @endif
+                                </div>
                             </div>
                         </div>
                     </div>
