@@ -402,7 +402,7 @@
                 <p class="mt-1 text-xs text-sky-800">No se registran medios de pago. Elige el documento de venta y confirma para facturar (si aplica) y marcar la OS como entregada.</p>
             </div>
 
-            <div x-show="!isDebtPaymentSelected() && !nothingToCollect()" x-cloak class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div x-show="!isDebtPaymentSelected() && !nothingToCollect()" x-cloak data-gsa-skip="true" class="overflow-visible rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div class="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 md:flex-row md:items-center md:justify-between">
                     <div>
                         <p class="text-sm font-semibold text-slate-800">Desglose de cobro</p>
