@@ -85,7 +85,35 @@ class WorkshopMaintenanceBoardController extends Controller
             ->when($search !== '', function ($query) use ($search) {
                 $needle = mb_strtolower($search, 'UTF-8');
                 $query->where(function ($inner) use ($needle) {
-                    $inner->whereHas('client', function ($clientQuery) use ($needle) {
+                    $inner->whereHas('movement', function ($movementQuery) use ($needle) {
+                        $movementQuery
+                            ->whereRaw('LOWER(COALESCE(number, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(comment, \'\')) LIKE ?', ["%{$needle}%"]);
+                    })->orWhereHas('client', function ($clientQuery) use ($needle) {
+                        $clientQuery
+                            ->whereRaw('LOWER(COALESCE(first_name, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(last_name, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(TRIM(COALESCE(first_name, \'\') || \' \' || COALESCE(last_name, \'\'))) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(document_number, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(person_type, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(phone, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(email, \'\')) LIKE ?', ["%{$needle}%"]);
+                    })->orWhereHas('vehicle', function ($vehicleQuery) use ($needle) {
+                        $vehicleQuery
+                            ->whereRaw('LOWER(COALESCE(type, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(brand, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(model, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(TRIM(COALESCE(brand, \'\') || \' \' || COALESCE(model, \'\'))) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(plate, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(vin, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(engine_number, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(chassis_number, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(serial_number, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('CAST(COALESCE(engine_displacement_cc, 0) AS TEXT) LIKE ?', ["%{$needle}%"]);
+                    })->orWhereHas('details', function ($detailQuery) use ($needle) {
+                        $detailQuery
+                            ->whereRaw('LOWER(COALESCE(description, \'\')) LIKE ?', ["%{$needle}%"]);
+                    })->orWhereHas('client', function ($clientQuery) use ($needle) {
                         $clientQuery
                             ->whereRaw('LOWER(COALESCE(first_name, \'\')) LIKE ?', ["%{$needle}%"])
                             ->orWhereRaw('LOWER(COALESCE(last_name, \'\')) LIKE ?', ["%{$needle}%"])
