@@ -1276,10 +1276,15 @@ class WorkshopOrderController extends Controller
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($inner) use ($search) {
                     $inner->whereHas('movement', fn ($movementQuery) => $movementQuery->where('number', 'ILIKE', "%{$search}%"))
-                        ->orWhereHas('vehicle', fn ($vehicleQuery) => $vehicleQuery->where('plate', 'ILIKE', "%{$search}%"))
+                        ->orWhereHas('vehicle', fn ($vehicleQuery) => $vehicleQuery
+                            ->where('plate', 'ILIKE', "%{$search}%")
+                            ->orWhere('brand', 'ILIKE', "%{$search}%")
+                            ->orWhere('model', 'ILIKE', "%{$search}%"))
                         ->orWhereHas('client', fn ($clientQuery) => $clientQuery
-                            ->where('first_name', 'ILIKE', "%{$search}%")
-                            ->orWhere('last_name', 'ILIKE', "%{$search}%"));
+                            ->where('document_number', 'ILIKE', "%{$search}%")
+                            ->orWhere('first_name', 'ILIKE', "%{$search}%")
+                            ->orWhere('last_name', 'ILIKE', "%{$search}%")
+                            ->orWhereRaw("TRIM(COALESCE(first_name, '') || ' ' || COALESCE(last_name, '')) ILIKE ?", ["%{$search}%"]));
                 });
             });
     }
