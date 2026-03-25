@@ -140,6 +140,20 @@ class SalesController extends Controller
             ->with(['branch', 'person', 'movementType', 'documentType', 'salesMovement.details.unit'])
             ->where('movement_type_id', 2) //2 es venta
             ->when($branchId, fn ($query) => $query->where('movements.branch_id', $branchId))
+            ->when($selectedBoxId, function ($query) use ($selectedBoxId) {
+                $query->where(function ($inner) use ($selectedBoxId) {
+                    $inner->whereHas('cashMovement', fn ($cashQuery) => $cashQuery->where('cash_register_id', $selectedBoxId))
+                        ->orWhereExists(function ($subQuery) use ($selectedBoxId) {
+                            $subQuery->select(DB::raw(1))
+                                ->from('movements as cash_entry_movement')
+                                ->join('cash_movements', 'cash_movements.movement_id', '=', 'cash_entry_movement.id')
+                                ->whereColumn('cash_entry_movement.parent_movement_id', 'movements.id')
+                                ->where('cash_movements.cash_register_id', $selectedBoxId)
+                                ->whereNull('cash_entry_movement.deleted_at')
+                                ->whereNull('cash_movements.deleted_at');
+                        });
+                });
+            })
             ->when($selectedShiftRelation, function ($query) use ($selectedShiftRelation) {
                 $query->where('moved_at', '>=', $selectedShiftRelation->started_at);
                 if ($selectedShiftRelation->ended_at !== null) {
@@ -1474,7 +1488,7 @@ class SalesController extends Controller
                 'message' => 'Venta procesada correctamente',
                 'data' => [
                     'movement_id' => $movement->id,
-                    'cash_movement_id' => $cashEntryMovement->id,
+                    'cash_movement_id' => $cashEntryMovement?->id ?? $cashMovement?->id,
                     'number' => $number,
                     'total' => $total,
                 ]
