@@ -883,6 +883,18 @@ class SalesController extends Controller
             ], 422);
         }
 
+        foreach ((array) ($validated['items'] ?? []) as $index => $item) {
+            $productId = (int) ($item['pId'] ?? 0);
+            $name = trim((string) ($item['name'] ?? ''));
+            if ($productId <= 0 && $name === '') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error de validación',
+                    'errors' => ["items.{$index}.name" => ['La glosa o detalle manual debe tener una descripción.']],
+                ], 422);
+            }
+        }
+
         try {
             DB::beginTransaction();
 
@@ -1179,63 +1191,85 @@ class SalesController extends Controller
 
             // Crear SalesMovementDetails y actualizar stock (nota por producto en comment)
             foreach (array_values($validated['items']) as $index => $item) {
-                $product = Product::with('baseUnit')->findOrFail($item['pId']);
-                
-                // Bloquear el registro para evitar condiciones de carrera
-                $productBranch = ProductBranch::with('taxRate')
-                    ->where('product_id', $item['pId'])
-                    ->where('branch_id', $branchId)
-                    ->lockForUpdate()
-                    ->first();
-
-                if (!$productBranch) {
-                    throw new \Exception("Producto {$product->description} no disponible en esta sucursal");
-                }
-
-                // Validar stock disponible
-                $quantityToSell = (int) $item['qty'];
-                $currentStock = (int) ($productBranch->stock ?? 0);
-                
-                // if ($currentStock < $quantityToSell) {
-                //     throw new \Exception(
-                //         "Stock insuficiente para el producto {$product->description}. " .
-                //         "Stock disponible: {$currentStock}, Cantidad solicitada: {$quantityToSell}"
-                //     );
-                // }
-
-                $unit = $product->baseUnit;
-                if (!$unit) {
-                    throw new \Exception("El producto {$product->description} no tiene una unidad base configurada");
-                }
-
-                $taxRate = $productBranch->taxRate;
+                $productId = (int) ($item['pId'] ?? 0);
                 $lineCalculated = $calculated['lines'][$index] ?? null;
                 if (!$lineCalculated) {
-                    throw new \Exception("No se pudo calcular el descuento del producto {$product->description}");
+                    throw new \Exception('No se pudo calcular el descuento de una línea de la venta');
                 }
 
-                // Nota por producto (compatibilidad note/comment) y normalización
                 $detailNoteRaw = data_get($item, 'note', data_get($item, 'comment'));
                 $detailNote = $detailNoteRaw === null ? null : trim((string) $detailNoteRaw);
                 $detailNote = ($detailNote !== '') ? $detailNote : null;
+
+                if ($productId > 0) {
+                    $product = Product::with('baseUnit')->findOrFail($productId);
+
+                    $productBranch = ProductBranch::with('taxRate')
+                        ->where('product_id', $productId)
+                        ->where('branch_id', $branchId)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (!$productBranch) {
+                        throw new \Exception("Producto {$product->description} no disponible en esta sucursal");
+                    }
+
+                    $quantityToSell = (int) $item['qty'];
+                    $currentStock = (int) ($productBranch->stock ?? 0);
+                    $unit = $product->baseUnit;
+                    if (!$unit) {
+                        throw new \Exception("El producto {$product->description} no tiene una unidad base configurada");
+                    }
+
+                    $taxRate = $productBranch->taxRate;
+                    SalesMovementDetail::create([
+                        'detail_type' => 'DETAILED',
+                        'sales_movement_id' => $salesMovement->id,
+                        'code' => $product->code,
+                        'description' => $product->description,
+                        'product_id' => $product->id,
+                        'product_snapshot' => [
+                            'id' => $product->id,
+                            'code' => $product->code,
+                            'description' => $product->description,
+                            'marca' => $product->marca,
+                        ],
+                        'unit_id' => $unit->id,
+                        'tax_rate_id' => $taxRate?->id,
+                        'tax_rate_snapshot' => $taxRate ? [
+                            'id' => $taxRate->id,
+                            'description' => $taxRate->description,
+                            'tax_rate' => $taxRate->tax_rate,
+                        ] : null,
+                        'quantity' => $item['qty'],
+                        'amount' => $lineCalculated['discounted_gross_total'],
+                        'discount_percentage' => $calculated['discount_percentage'],
+                        'original_amount' => $lineCalculated['net_total'],
+                        'comment' => $detailNote,
+                        'parent_detail_id' => null,
+                        'complements' => [],
+                        'status' => 'A',
+                        'branch_id' => $branchId,
+                    ]);
+
+                    $productBranch->update([
+                        'stock' => $currentStock - $quantityToSell
+                    ]);
+                    continue;
+                }
+
                 SalesMovementDetail::create([
                     'detail_type' => 'DETAILED',
                     'sales_movement_id' => $salesMovement->id,
-                    'code' => $product->code,
-                    'description' => $product->description,
-                    'product_id' => $product->id,
-                    'product_snapshot' => [
-                        'id' => $product->id,
-                        'code' => $product->code,
-                        'description' => $product->description,
-                        'marca' => $product->marca,
-                    ],
-                    'unit_id' => $unit->id,
-                    'tax_rate_id' => $taxRate?->id,
-                    'tax_rate_snapshot' => $taxRate ? [
-                        'id' => $taxRate->id,
-                        'description' => $taxRate->description,
-                        'tax_rate' => $taxRate->tax_rate,
+                    'code' => '',
+                    'description' => trim((string) ($item['name'] ?? '')) ?: 'Detalle',
+                    'product_id' => null,
+                    'product_snapshot' => null,
+                    'unit_id' => null,
+                    'tax_rate_id' => null,
+                    'tax_rate_snapshot' => $lineCalculated['tax_rate_value'] > 0 ? [
+                        'description' => 'Manual',
+                        'tax_rate' => round($lineCalculated['tax_rate_value'] * 100, 6),
                     ] : null,
                     'quantity' => $item['qty'],
                     'amount' => $lineCalculated['discounted_gross_total'],
@@ -1246,12 +1280,6 @@ class SalesController extends Controller
                     'complements' => [],
                     'status' => 'A',
                     'branch_id' => $branchId,
-                ]);
-
-                // Restar el stock del producto en la sucursal
-                $newStock = $currentStock - $quantityToSell;
-                $productBranch->update([
-                    'stock' => $newStock
                 ]);
             }
             
@@ -1514,6 +1542,18 @@ class SalesController extends Controller
             ], 422);
         }
 
+        foreach ((array) ($validated['items'] ?? []) as $index => $item) {
+            $productId = (int) ($item['pId'] ?? 0);
+            $name = trim((string) ($item['name'] ?? ''));
+            if ($productId <= 0 && $name === '') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error de validación',
+                    'errors' => ["items.{$index}.name" => ['La glosa o detalle manual debe tener una descripción.']],
+                ], 422);
+            }
+        }
+
         try {
             DB::beginTransaction();
 
@@ -1638,50 +1678,77 @@ class SalesController extends Controller
 
             // Crear SalesMovementDetails (sin restar stock porque es borrador; nota por producto en comment)
             foreach (array_values($validated['items']) as $index => $item) {
-                $product = Product::with('baseUnit')->findOrFail($item['pId']);
-                $productBranch = ProductBranch::with('taxRate')
-                    ->where('product_id', $item['pId'])
-                    ->where('branch_id', $branchId)
-                    ->first();
-
-                if (!$productBranch) {
-                    throw new \Exception("Producto {$product->description} no disponible en esta sucursal");
-                }
-
-                $unit = $product->baseUnit;
-                if (!$unit) {
-                    throw new \Exception("El producto {$product->description} no tiene una unidad base configurada");
-                }
-
-                $taxRate = $productBranch->taxRate;
+                $productId = (int) ($item['pId'] ?? 0);
                 $lineCalculated = $calculated['lines'][$index] ?? null;
                 if (!$lineCalculated) {
-                    throw new \Exception("No se pudo calcular el descuento del producto {$product->description}");
+                    throw new \Exception('No se pudo calcular el descuento de una línea del borrador');
                 }
 
-                // Nota por producto (compatibilidad note/comment) y normalización
                 $detailNoteRaw = data_get($item, 'note', data_get($item, 'comment'));
                 $detailNote = $detailNoteRaw === null ? null : trim((string) $detailNoteRaw);
                 $detailNote = ($detailNote !== '') ? $detailNote : null;
 
+                if ($productId > 0) {
+                    $product = Product::with('baseUnit')->findOrFail($productId);
+                    $productBranch = ProductBranch::with('taxRate')
+                        ->where('product_id', $productId)
+                        ->where('branch_id', $branchId)
+                        ->first();
+
+                    if (!$productBranch) {
+                        throw new \Exception("Producto {$product->description} no disponible en esta sucursal");
+                    }
+
+                    $unit = $product->baseUnit;
+                    if (!$unit) {
+                        throw new \Exception("El producto {$product->description} no tiene una unidad base configurada");
+                    }
+
+                    $taxRate = $productBranch->taxRate;
+                    SalesMovementDetail::create([
+                        'detail_type' => 'DETAILED',
+                        'sales_movement_id' => $salesMovement->id,
+                        'code' => $product->code,
+                        'description' => $product->description,
+                        'product_id' => $product->id,
+                        'product_snapshot' => [
+                            'id' => $product->id,
+                            'code' => $product->code,
+                            'description' => $product->description,
+                            'marca' => $product->marca,
+                        ],
+                        'unit_id' => $unit->id,
+                        'tax_rate_id' => $taxRate?->id,
+                        'tax_rate_snapshot' => $taxRate ? [
+                            'id' => $taxRate->id,
+                            'description' => $taxRate->description,
+                            'tax_rate' => $taxRate->tax_rate,
+                        ] : null,
+                        'quantity' => $item['qty'],
+                        'amount' => $lineCalculated['discounted_gross_total'],
+                        'discount_percentage' => $calculated['discount_percentage'],
+                        'original_amount' => $lineCalculated['net_total'],
+                        'comment' => $detailNote,
+                        'parent_detail_id' => null,
+                        'complements' => [],
+                        'status' => 'A',
+                        'branch_id' => $branchId,
+                    ]);
+                    continue;
+                }
+
                 SalesMovementDetail::create([
                     'detail_type' => 'DETAILED',
                     'sales_movement_id' => $salesMovement->id,
-                    'code' => $product->code,
-                    'description' => $product->description,
-                    'product_id' => $product->id,
-                    'product_snapshot' => [
-                        'id' => $product->id,
-                        'code' => $product->code,
-                        'description' => $product->description,
-                        'marca' => $product->marca,
-                    ],
-                    'unit_id' => $unit->id,
-                    'tax_rate_id' => $taxRate?->id,
-                    'tax_rate_snapshot' => $taxRate ? [
-                        'id' => $taxRate->id,
-                        'description' => $taxRate->description,
-                        'tax_rate' => $taxRate->tax_rate,
+                    'code' => '',
+                    'description' => trim((string) ($item['name'] ?? '')) ?: 'Detalle',
+                    'product_id' => null,
+                    'product_snapshot' => null,
+                    'unit_id' => null,
+                    'tax_rate_id' => null,
+                    'tax_rate_snapshot' => $lineCalculated['tax_rate_value'] > 0 ? [
+                        'description' => 'Manual',
+                        'tax_rate' => round($lineCalculated['tax_rate_value'] * 100, 6),
                     ] : null,
                     'quantity' => $item['qty'],
                     'amount' => $lineCalculated['discounted_gross_total'],
