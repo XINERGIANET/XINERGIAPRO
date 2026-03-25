@@ -375,7 +375,9 @@
                                 </td>
                                 <td class="px-5 py-4 sm:px-6 text-center">
                                     <div class="flex flex-col items-center">
-                                     
+                                        <p class="font-bold text-gray-800 text-theme-sm dark:text-white/90">
+                                            {{ $sale->salesDocumentCode() }}
+                                        </p>
                                         <p class="text-[11px] text-gray-500 dark:text-gray-400 uppercase font-medium">
                                             {{ $sale->documentType?->name ?? '-' }}
                                         </p>
