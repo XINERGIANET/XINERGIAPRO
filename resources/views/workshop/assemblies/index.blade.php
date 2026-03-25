@@ -19,10 +19,10 @@
         return !this.costs.some(c => c.vehicle_type === this.selectedType);
     },
 
-    // Devuelve las marcas disponibles filtradas por el tipo de vehÃƒÂ­culo
+    // Devuelve las marcas disponibles filtradas por el tipo de vehÃƒÆ’Ã‚Â­culo
     get availableBrands() {
         if (!this.selectedType) {
-            // Si no hay tipo, mostrar todas las marcas ÃƒÂºnicas
+            // Si no hay tipo, mostrar todas las marcas ÃƒÆ’Ã‚Âºnicas
             return this.costs.map(c => c.brand_company).filter((v, i, a) => a.indexOf(v) === i);
         }
         // Mostrar solo las marcas que tienen configurado el tipo seleccionado
@@ -91,7 +91,7 @@
                 }
                 
                 this.$dispatch('close-quick-cost-modal');
-                // Notificar ÃƒÂ©xito (opcional, el cambio en el select es visualmente claro)
+                // Notificar ÃƒÆ’Ã‚Â©xito (opcional, el cambio en el select es visualmente claro)
             }
         } catch (e) {
             console.error('Error configurando costo:', e);
@@ -123,7 +123,7 @@
                 <i class="ri-file-excel-2-line"></i><span>Exportar CSV</span>
             </x-ui.link-button>
 
-            {{-- BotÃƒÂ³n para Generar Venta Masiva --}}
+            {{-- BotÃƒÆ’Ã‚Â³n para Generar Venta Masiva --}}
             <template x-if="selectedAssemblies.length > 0">
                 <form method="GET" action="{{ route('workshop.assemblies.checkout.page') }}" class="inline-block">
                     <template x-for="id in selectedAssemblies" :key="id">
@@ -165,7 +165,7 @@
                 </div>
             </div>
             
-            <div x-show="viewMode === 'cards'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+            <div x-show="viewMode === 'cards'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 @forelse($assemblies as $assembly)
                     @php
                         $statusText = 'En proceso';
@@ -181,21 +181,21 @@
                             $statusClass = 'bg-white/10 text-white border border-white/20';
                         }
                     @endphp
-                    <div class="relative flex h-full flex-col overflow-hidden rounded-[32px] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-1 hover:shadow-[0_24px_60px_rgba(15,23,42,0.14)]">
-                        <div class="mb-4 flex items-start justify-between gap-3">
+                    <div class="relative flex h-full flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_16px_38px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-1 hover:shadow-[0_22px_50px_rgba(15,23,42,0.14)]">
+                        <div class="mb-3 flex items-start justify-between gap-3">
                             <div class="min-w-0 flex-1">
                                 <span class="text-[10px] font-bold uppercase tracking-[0.28em] text-slate-400">Orden de armado</span>
-                                <div class="mt-1 flex flex-wrap items-center gap-2">
-                                    <h3 class="text-[28px] font-black leading-none tracking-tight text-slate-900">#{{ str_pad($assembly->id, 8, '0', STR_PAD_LEFT) }}</h3>
-                                    <span class="rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wide {{ $statusClass }}">
+                                <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                                    <h3 class="text-[22px] font-black leading-none tracking-tight text-slate-900">#{{ str_pad($assembly->id, 8, '0', STR_PAD_LEFT) }}</h3>
+                                    <span class="rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide {{ $statusClass }}">
                                         {{ $statusText }}
                                     </span>
                                     @if($assembly->sales_movement_id)
-                                        <span class="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                                        <span class="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide text-emerald-700">
                                             <i class="ri-checkbox-circle-fill"></i> Pagado
                                         </span>
                                     @else
-                                        <span class="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-700">
+                                        <span class="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide text-amber-700">
                                             <i class="ri-error-warning-fill"></i> Deuda
                                         </span>
                                     @endif
@@ -204,13 +204,13 @@
                             <input type="checkbox" :value="{{ $assembly->id }}" x-model="selectedAssemblies" class="mt-1 h-5 w-5 rounded border-slate-300 text-[#244BB3] focus:ring-[#244BB3]">
                         </div>
 
-                        <div class="mb-4 flex items-center gap-4 rounded-[26px] bg-slate-800 px-4 py-4 text-white shadow-lg">
-                            <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
-                                <i class="ri-motorbike-line text-3xl text-[#ffb15c]"></i>
+                        <div class="mb-3 flex items-center gap-3 rounded-[24px] bg-slate-800 px-3.5 py-3 text-white shadow-lg">
+                            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+                                <i class="ri-motorbike-line text-[28px] text-[#ffb15c]"></i>
                             </div>
                             <div class="min-w-0 flex-1">
-                                <div class="truncate text-[26px] font-black uppercase leading-none tracking-tight">{{ $assembly->model ?: 'Sin modelo' }}</div>
-                                <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-200">
+                                <div class="truncate text-[18px] font-black uppercase leading-none tracking-tight">{{ $assembly->model ?: 'Sin modelo' }}</div>
+                                <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-slate-200">
                                     <span class="font-semibold uppercase">{{ $assembly->brand_company ?: 'Sin marca' }}</span>
                                     <span class="text-slate-400">{{ $assembly->vehicle_type ?: 'Sin tipo' }}</span>
                                     <span class="truncate font-mono text-slate-300">{{ $assembly->vin ?: 'No asignado' }}</span>
@@ -218,18 +218,18 @@
                             </div>
                         </div>
 
-                        <div class="mb-4 grid grid-cols-2 gap-3">
-                            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div class="mb-3 grid grid-cols-2 gap-2.5">
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5">
                                 <div class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Ingreso</div>
-                                <div class="mt-1 text-base font-black text-slate-900">{{ optional($assembly->entry_at)->format('d/m/y H:i') ?: '--' }}</div>
+                                <div class="mt-1 text-[15px] font-black text-slate-900">{{ optional($assembly->entry_at)->format('d/m/y H:i') ?: '--' }}</div>
                             </div>
-                            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5">
                                 <div class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Marca</div>
-                                <div class="mt-1 truncate text-base font-black uppercase text-slate-900">{{ $assembly->brand_company ?: '--' }}</div>
+                                <div class="mt-1 truncate text-[15px] font-black uppercase text-slate-900">{{ $assembly->brand_company ?: '--' }}</div>
                             </div>
-                            <div class="col-span-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <div class="col-span-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5">
                                 <div class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Ubicacion / tecnico</div>
-                                <div class="mt-1 text-base font-black leading-tight text-slate-900">
+                                <div class="mt-1 truncate text-[15px] font-black leading-tight text-slate-900">
                                     {{ $assembly->location?->name ?: 'Sin ubicacion' }}
                                     @if($assembly->responsibleTechnician)
                                          -  {{ trim(($assembly->responsibleTechnician->first_name ?? '') . ' ' . ($assembly->responsibleTechnician->last_name ?? '')) }}
@@ -238,42 +238,41 @@
                             </div>
                         </div>
 
-                        <div class="mb-4 grid grid-cols-3 gap-3">
-                            <div class="rounded-2xl border border-slate-200 px-3 py-3 text-center">
+                        <div class="mb-2.5 grid grid-cols-3 gap-2.5">
+                            <div class="rounded-2xl border border-slate-200 px-2.5 py-2.5 text-center">
                                 <div class="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Cant</div>
-                                <div class="mt-1 text-2xl font-black text-slate-900">{{ $assembly->quantity }}</div>
+                                <div class="mt-1 text-xl font-black text-slate-900">{{ $assembly->quantity }}</div>
                             </div>
-                            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-center">
+                            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-2.5 py-2.5 text-center">
                                 <div class="text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-600">Unit</div>
-                                <div class="mt-1 text-2xl font-black text-emerald-700">S/{{ number_format($assembly->unit_cost, 0) }}</div>
+                                <div class="mt-1 text-xl font-black text-emerald-700">S/{{ number_format($assembly->unit_cost, 0) }}</div>
                             </div>
-                            <div class="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-center">
+                            <div class="rounded-2xl border border-amber-200 bg-amber-50 px-2.5 py-2.5 text-center">
                                 <div class="text-[11px] font-bold uppercase tracking-[0.22em] text-amber-600">Total</div>
-                                <div class="mt-1 text-2xl font-black text-amber-700">S/{{ number_format($assembly->total_cost, 0) }}</div>
+                                <div class="mt-1 text-xl font-black text-amber-700">S/{{ number_format($assembly->total_cost, 0) }}</div>
                             </div>
                         </div>
 
-                        <div class="mb-5 grid grid-cols-3 gap-3">
-                            <div class="rounded-2xl border border-blue-200 bg-blue-50 px-3 py-3 text-center">
+                        <div class="mb-4 grid grid-cols-3 gap-2.5">
+                            <div class="rounded-2xl border border-blue-200 bg-blue-50 px-2.5 py-2.5 text-center">
                                 <div class="text-[11px] font-bold uppercase tracking-[0.22em] text-blue-600">Estimado</div>
-                                <div class="mt-1 text-base font-black text-slate-900">{{ (int) $assembly->estimated_minutes }} min</div>
+                                <div class="mt-1 text-sm font-black text-slate-900">{{ (int) $assembly->estimated_minutes }} min</div>
                             </div>
-                            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-center">
+                            <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-2.5 py-2.5 text-center">
                                 <div class="text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-600">Real</div>
-                                <div class="mt-1 text-base font-black text-slate-900">{{ $assembly->actual_repair_minutes !== null ? $assembly->actual_repair_minutes . ' min' : '--' }}</div>
+                                <div class="mt-1 text-sm font-black text-slate-900">{{ $assembly->actual_repair_minutes !== null ? $assembly->actual_repair_minutes . ' min' : '--' }}</div>
                             </div>
-                            <div class="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-center">
+                            <div class="rounded-2xl border border-amber-200 bg-amber-50 px-2.5 py-2.5 text-center">
                                 <div class="text-[11px] font-bold uppercase tracking-[0.22em] text-amber-600">Variacion</div>
-                                <div class="mt-1 text-base font-black text-slate-900">{{ $assembly->estimated_vs_real_minutes !== null ? ($assembly->estimated_vs_real_minutes > 0 ? '+' : '') . $assembly->estimated_vs_real_minutes . ' min' : '--' }}</div>
+                                <div class="mt-1 text-sm font-black text-slate-900">{{ $assembly->estimated_vs_real_minutes !== null ? ($assembly->estimated_vs_real_minutes > 0 ? '+' : '') . $assembly->estimated_vs_real_minutes . ' min' : '--' }}</div>
                             </div>
                         </div>
 
-                        <!-- Action Bar -->
                         <div class="mt-auto flex flex-wrap items-center gap-2">
                             @if(!$assembly->started_at)
                                 <form method="POST" action="{{ route('workshop.armados.start', $assembly) }}" class="flex-1">
                                     @csrf
-                                    <button class="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-[11px] font-bold text-white shadow-lg transition-all hover:brightness-110 active:scale-95" style="background: linear-gradient(135deg, #10B981 0%, #059669 100%);">
+                                    <button class="flex w-full items-center justify-center gap-2 rounded-xl py-2 text-[11px] font-bold text-white shadow-lg transition-all hover:brightness-110 active:scale-95" style="background: linear-gradient(135deg, #10B981 0%, #059669 100%);">
                                         <i class="ri-play-fill"></i>
                                         <span>Iniciar</span>
                                     </button>
@@ -281,7 +280,7 @@
                             @elseif(!$assembly->finished_at)
                                 <form method="POST" action="{{ route('workshop.armados.finish', $assembly) }}" class="flex-1">
                                     @csrf
-                                    <button class="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-[11px] font-bold text-white shadow-lg transition-all hover:brightness-110 active:scale-95" style="background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);">
+                                    <button class="flex w-full items-center justify-center gap-2 rounded-xl py-2 text-[11px] font-bold text-white shadow-lg transition-all hover:brightness-110 active:scale-95" style="background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);">
                                         <i class="ri-check-line"></i>
                                         <span>Finalizar</span>
                                     </button>
@@ -289,7 +288,7 @@
                             @elseif(!$assembly->exit_at)
                                 <form method="POST" action="{{ route('workshop.armados.exit', $assembly) }}" class="flex-1">
                                     @csrf
-                                    <button class="flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-[11px] font-bold text-white shadow-lg transition-all hover:brightness-110 active:scale-95" style="background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);">
+                                    <button class="flex w-full items-center justify-center gap-2 rounded-xl py-2 text-[11px] font-bold text-white shadow-lg transition-all hover:brightness-110 active:scale-95" style="background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);">
                                         <i class="ri-external-link-line"></i>
                                         <span>Salida</span>
                                     </button>
@@ -297,7 +296,7 @@
                             @endif
 
                             @if(!$assembly->sales_movement_id)
-                                <button type="button" class="flex-1 rounded-xl py-2.5 text-[11px] font-bold text-white transition-all hover:brightness-110 shadow-lg" style="background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);" @click="$dispatch('open-massive-sale-modal'); selectedAssemblies = [{{ $assembly->id }}]">
+                                <button type="button" class="flex-1 rounded-xl py-2 text-[11px] font-bold text-white transition-all hover:brightness-110 shadow-lg" style="background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);" @click="$dispatch('open-massive-sale-modal'); selectedAssemblies = [{{ $assembly->id }}]">
                                     <i class="ri-shopping-cart-line mr-1"></i>Venta
                                 </button>
                             @endif
@@ -306,7 +305,7 @@
                                 @csrf
                                 @method('DELETE')
                                 <div class="relative group">
-                                    <button type="submit" class="flex h-10 w-10 items-center justify-center rounded-xl border transition-all hover:bg-red-600 hover:text-white hover:border-red-600" style="background-color: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); color: #94A3B8;">
+                                    <button type="submit" class="flex h-9 w-9 items-center justify-center rounded-xl border transition-all hover:bg-red-600 hover:text-white hover:border-red-600" style="background-color: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); color: #94A3B8;">
                                         <i class="ri-delete-bin-line text-lg"></i>
                                     </button>
                                     <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
@@ -333,8 +332,8 @@
                     <thead>
                         <tr class="bg-gray-50/50 dark:bg-gray-800/50">
                             <th class="px-5 py-4 font-bold text-gray-700 dark:text-gray-300">Orden</th>
-                            <th class="px-5 py-4 font-bold text-gray-700 dark:text-gray-300">VehÃƒÂ­culo / Marca</th>
-                            <th class="px-5 py-4 font-bold text-gray-700 dark:text-gray-300">TÃƒÂ©cnico / UbicaciÃƒÂ³n</th>
+                            <th class="px-5 py-4 font-bold text-gray-700 dark:text-gray-300">VehÃƒÆ’Ã‚Â­culo / Marca</th>
+                            <th class="px-5 py-4 font-bold text-gray-700 dark:text-gray-300">TÃƒÆ’Ã‚Â©cnico / UbicaciÃƒÆ’Ã‚Â³n</th>
                             <th class="px-5 py-4 font-bold text-gray-700 dark:text-gray-300 text-center">Cant.</th>
                             <th class="px-5 py-4 font-bold text-gray-700 dark:text-gray-300 text-center">Estado</th>
                             <th class="px-5 py-4 font-bold text-gray-700 dark:text-gray-300">Acciones</th>
@@ -355,15 +354,15 @@
                                 <td class="px-5 py-4">
                                     <div class="flex flex-col">
                                         <span class="font-bold text-gray-800 dark:text-gray-200 uppercase">{{ $assembly->model ?: 'Sin modelo' }}</span>
-                                        <span class="text-xs text-gray-500 uppercase">{{ $assembly->brand_company }} Ã‚ -  {{ $assembly->vehicle_type }}</span>
+                                        <span class="text-xs text-gray-500 uppercase">{{ $assembly->brand_company }} Ãƒâ€š -  {{ $assembly->vehicle_type }}</span>
                                     </div>
                                 </td>
                                 <td class="px-5 py-4">
                                     <div class="flex flex-col">
                                         <span class="font-medium text-gray-700 dark:text-gray-300">
-                                            {{ trim(($assembly->responsibleTechnician->first_name ?? '') . ' ' . ($assembly->responsibleTechnician->last_name ?? '')) ?: 'Sin tÃƒÂ©cnico' }}
+                                            {{ trim(($assembly->responsibleTechnician->first_name ?? '') . ' ' . ($assembly->responsibleTechnician->last_name ?? '')) ?: 'Sin tÃƒÆ’Ã‚Â©cnico' }}
                                         </span>
-                                        <span class="text-xs text-gray-500 italic">{{ $assembly->location?->name ?: 'Sin ubicaciÃƒÂ³n' }}</span>
+                                        <span class="text-xs text-gray-500 italic">{{ $assembly->location?->name ?: 'Sin ubicaciÃƒÆ’Ã‚Â³n' }}</span>
                                     </div>
                                 </td>
                                 <td class="px-5 py-4 text-center font-bold">{{ $assembly->quantity }}</td>
@@ -403,7 +402,7 @@
                                             </button>
                                         @endif
 
-                                        <form method="POST" action="{{ route('workshop.assemblies.destroy', $assembly) }}" onsubmit="return confirm('Ã‚Â¿Eliminar?')">
+                                        <form method="POST" action="{{ route('workshop.assemblies.destroy', $assembly) }}" onsubmit="return confirm('Ãƒâ€šÃ‚Â¿Eliminar?')">
                                             @csrf @method('DELETE')
                                             <button class="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"><i class="ri-delete-bin-line text-lg"></i></button>
                                         </form>
@@ -439,7 +438,7 @@
                     <i class="ri-error-warning-fill text-xl"></i>
                     <div>
                         <span class="font-bold">Aviso:</span> El tipo <span class="font-bold" x-text="selectedType"></span> no tiene costos registrados.
-                        <p class="text-[11px] mt-0.5 opacity-80 italic">Ã‚Â¿Deseas configurar uno ahora mismo?</p>
+                        <p class="text-[11px] mt-0.5 opacity-80 italic">¿Deseas configurar uno ahora mismo?</p>
                     </div>
                 </div>
                 <x-ui.button type="button" size="xs" variant="primary" style="background-color:#D97706" @click="openQuickConfig()">
@@ -450,7 +449,7 @@
             <form method="POST" action="{{ route('workshop.assemblies.store') }}" class="grid grid-cols-1 gap-4 md:grid-cols-2">
                 @csrf
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">Tipo de VehÃƒÂ­culo</label>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Tipo de Vehículo</label>
                     <select name="vehicle_type" x-model="selectedType" @change="updateUnitCost()" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
                         <option value="">Seleccione tipo...</option>
                         <template x-for="type in allVehicleTypes" :key="type.id">
@@ -480,8 +479,8 @@
                     <input name="color" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Ej: GRIS">
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">VIN / CÃƒÂ³digo Motor</label>
-                    <input name="vin" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Ingrese VIN o cÃƒÂ³digo">
+                    <label class="mb-1 block text-sm font-medium text-gray-700">VIN / Código Motor</label>
+                    <input name="vin" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Ingrese VIN o código">
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Cantidad</label>
@@ -490,21 +489,21 @@
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Costo Unitario</label>
                     <input type="number" min="0" step="0.01" name="unit_cost" x-model="unitCost" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm bg-gray-50" readonly placeholder="0.00">
-                    <p class="mt-1 text-[10px] text-gray-500 italic">* SegÃƒÂºn marca/tipo.</p>
+                    <p class="mt-1 text-[10px] text-gray-500 italic">* Según marca/tipo.</p>
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">UbicaciÃƒÂ³n del armado</label>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Ubicación del armado</label>
                     <select name="workshop_assembly_location_id" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm">
-                        <option value="">Seleccione ubicaciÃƒÂ³n...</option>
+                        <option value="">Seleccione ubicación...</option>
                         @foreach($assemblyLocations as $location)
                             <option value="{{ $location->id }}">{{ $location->name }}</option>
                         @endforeach
                     </select>
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">TÃƒÂ©cnico responsable</label>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Técnico responsable</label>
                     <select name="responsible_technician_person_id" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm">
-                        <option value="">Seleccione tÃƒÂ©cnico...</option>
+                        <option value="">Seleccione técnico...</option>
                         @foreach($technicians as $technician)
                             <option value="{{ $technician->id }}">{{ trim(($technician->first_name ?? '') . ' ' . ($technician->last_name ?? '')) }}</option>
                         @endforeach
@@ -578,7 +577,7 @@
     </x-ui.modal>
 
 
-    {{-- Modal rÃƒÂ¡pido para configuraciÃƒÂ³n de costos --}}
+    {{-- Modal rÃƒÆ’Ã‚Â¡pido para configuraciÃƒÆ’Ã‚Â³n de costos --}}
     <x-ui.modal 
         x-data="{ open: false }" 
         @open-quick-cost-modal.window="open = true" 
