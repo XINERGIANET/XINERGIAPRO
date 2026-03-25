@@ -190,15 +190,15 @@
                             collect($paymentConceptsForFilter ?? [])->map(fn($c) => ['value' => (string)$c->id, 'label' => $c->description])
                         )->values()->all();
                     @endphp
-                    {{-- Fila 1: Por pÃ¡gina, Buscar (crece), Caja, Turno (crece) --}}
+                    {{-- Fila 1: Por página, Buscar (crece), Caja, Turno (crece) --}}
                     <div class="flex flex-wrap items-end gap-3 xl:flex-nowrap">
                         <div class="w-full sm:w-[140px] sm:flex-shrink-0">
-                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Por pÃ¡gina</label>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Por página</label>
                             <x-form.select-autocomplete
                                 name="per_page"
                                 :value="$perPage ?? 10"
-                                :options="collect([10, 20, 50, 100])->map(fn($n) => ['value' => $n, 'label' => $n . ' / pÃ¡gina'])->values()->all()"
-                                placeholder="Por pÃ¡gina"
+                                :options="collect([10, 20, 50, 100])->map(fn($n) => ['value' => $n, 'label' => $n . ' / página'])->values()->all()"
+                                placeholder="Por página"
                                 :submit-on-change="true"
                                 inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                             />
@@ -461,7 +461,7 @@
                                     <p class="font-semibold text-white text-theme-xs uppercase">Turno</p>
                                 </th>
                                 <th style="background-color: #334155; color: #FFFFFF;" class="px-3 py-3 text-center">
-                                    <p class="font-semibold text-white text-theme-xs uppercase">SituaciÃ³n</p>
+                                    <p class="font-semibold text-white text-theme-xs uppercase">Situación</p>
                                 </th>
                                 <th style="background-color: #334155; color: #FFFFFF;" class="px-3 py-3 text-center last:rounded-tr-xl">
                                     <p class="font-semibold text-white text-theme-xs uppercase">Operaciones</p>

@@ -283,7 +283,7 @@
 
             <div class="overflow-hidden rounded-xl border border-slate-200">
                 <div class="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
-                    Servicios y lineas pendientes a cobrar
+                    Servicios y líneas pendientes a cobrar
                 </div>
                 <table class="w-full">
                     <thead class="bg-slate-800 text-white">
@@ -297,7 +297,7 @@
                     <tbody class="divide-y divide-slate-100 bg-white">
                         <template x-if="pendingLines.length === 0">
                             <tr>
-                                <td colspan="4" class="px-3 py-5 text-center text-sm text-slate-500">No hay lineas pendientes.</td>
+                                <td colspan="4" class="px-3 py-5 text-center text-sm text-slate-500">No hay líneas pendientes.</td>
                             </tr>
                         </template>
                         <template x-for="line in pendingLines" :key="`pending-${line.detail_id}`">
@@ -381,7 +381,7 @@
                     <input type="text" x-model="saleHeaderNumber" readonly tabindex="-1" class="h-11 w-full rounded-lg border border-gray-300 bg-slate-50 px-3 text-sm font-semibold text-slate-700">
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">CondiciÃ³n</label>
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Condición</label>
                     <select x-model="paymentType" @change="onPaymentTypeChange()" name="payment_type" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
                         <option value="CONTADO">Contado</option>
                         <option value="DEUDA" x-bind:disabled="nothingToCollect()">Deuda</option>
@@ -400,7 +400,7 @@
             </div>
 
             <div x-show="isDebtPaymentSelected()" x-cloak class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-                Esta venta se registrarÃ¡ como deuda y se enviarÃ¡ a cuentas por cobrar.
+                Esta venta se registrará como deuda y se enviará a cuentas por cobrar.
             </div>
 
             <div x-show="isInvoiceDocumentSelected()" x-cloak class="grid grid-cols-1 gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4 md:grid-cols-3">
@@ -446,7 +446,7 @@
                 <div class="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 md:flex-row md:items-center md:justify-between">
                     <div>
                         <p class="text-sm font-semibold text-slate-800">Desglose de cobro</p>
-                        <p class="text-xs text-slate-500">Puedes combinar uno o varios mÃ©todos de pago en la misma entrega.</p>
+                        <p class="text-xs text-slate-500">Puedes combinar uno o varios métodos de pago en la misma entrega.</p>
                     </div>
                     <button
                         type="button"
@@ -454,7 +454,7 @@
                         class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
                     >
                         <i class="ri-add-line text-base normal-case"></i>
-                        Agregar mÃ©todo
+                        Agregar método
                     </button>
                 </div>
 
@@ -465,7 +465,7 @@
                                 <div class="flex items-center gap-3">
                                     <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold text-white" x-text="index + 1"></div>
                                     <div>
-                                        <p class="text-sm font-semibold text-slate-800">MÃ©todo de pago</p>
+                                        <p class="text-sm font-semibold text-slate-800">Método de pago</p>
                                         <p class="text-xs text-slate-500" x-text="row.kind === 'card' ? 'Requiere tarjeta y puede usar pasarela.' : (row.kind === 'wallet' ? 'Requiere seleccionar la billetera digital.' : 'No requiere detalles adicionales.')"></p>
                                     </div>
                                 </div>
@@ -475,7 +475,7 @@
                                     class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-rose-200 bg-white text-rose-500 transition hover:bg-rose-50"
                                     :disabled="paymentRows.length === 1"
                                     :class="{ 'cursor-not-allowed opacity-50': paymentRows.length === 1 }"
-                                    title="Quitar mÃ©todo"
+                                    title="Quitar método"
                                 >
                                     <i class="ri-delete-bin-line text-lg"></i>
                                 </button>
@@ -488,7 +488,7 @@
                                     : 'grid-template-columns:minmax(260px,2.8fr) minmax(150px,1.3fr) minmax(220px,1.8fr) minmax(260px,2.1fr);'"
                             >
                                 <div class="min-w-0">
-                                    <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">MÃ©todo</label>
+                                    <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Método</label>
                                     <select
                                         x-model="row.payment_method_id"
                                         @change="onPaymentMethodChange(index)"
@@ -550,7 +550,7 @@
                                 <div class="min-w-0" x-show="row.kind !== 'card' && row.kind !== 'wallet'">
                                     <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Detalle</label>
                                     <div class="flex h-10 items-center rounded-xl border border-dashed border-slate-300 bg-white px-3 text-sm text-slate-400">
-                                        Sin selecciÃ³n adicional
+                                        Sin selección adicional
                                     </div>
                                 </div>
 
@@ -576,7 +576,7 @@
                                         x-model="row.reference"
                                         :name="`payment_methods[${index}][reference]`"
                                         class="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
-                                        placeholder="OperaciÃ³n, voucher, celular o nota"
+                                        placeholder="Operación, voucher, celular o nota"
                                     >
                                 </div>
                             </div>
