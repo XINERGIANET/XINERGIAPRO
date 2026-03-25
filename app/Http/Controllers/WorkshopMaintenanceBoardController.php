@@ -1332,6 +1332,26 @@ class WorkshopMaintenanceBoardController extends Controller
         return back()->with('status', 'Servicio finalizado. Puede continuar con cobro y entrega.');
     }
 
+    public function deliver(WorkshopMovement $order): RedirectResponse
+    {
+        $this->assertOrderScope($order);
+
+        if ((string) $order->status !== 'finished') {
+            return back()->withErrors(['error' => 'Solo se puede entregar una OS terminada.']);
+        }
+
+        try {
+            $this->flowService->updateOrder($order, [
+                'status' => 'delivered',
+                'comment' => 'Entrega rápida desde tablero',
+            ]);
+        } catch (\Throwable $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+
+        return back()->with('status', 'OS marcada como entregada.');
+    }
+
     public function checkoutPage(WorkshopMovement $order): \Illuminate\View\View|RedirectResponse
     {
         $this->assertOrderScope($order);

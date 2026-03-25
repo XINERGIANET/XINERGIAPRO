@@ -215,6 +215,14 @@
                                 Venta y cobro
                             </a>
                         @endif
+                        @if($card->status === 'finished')
+                            <form method="POST" action="{{ route('workshop.maintenance-board.deliver', $card) }}">
+                                @csrf
+                                <button class="rounded-xl bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-800">
+                                    Entregar
+                                </button>
+                            </form>
+                        @endif
                         @if($canEditBoardCard)
                             <a href="{{ route('workshop.maintenance-board.edit', $card) }}"
                                class="rounded-xl bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-amber-700">
