@@ -823,6 +823,13 @@ class SalesController extends Controller
             ], 422);
         }
 
+        $request->merge([
+            'items' => collect((array) $request->input('items', []))
+                ->filter(fn ($item) => (int) data_get($item, 'pId', 0) > 0)
+                ->values()
+                ->all(),
+        ]);
+
         try {
             $validated = $request->validate([
                 'items' => 'required|array|min:1',
@@ -852,6 +859,7 @@ class SalesController extends Controller
                 'discount_type' => 'nullable|string|in:NONE,PERCENTAGE,AMOUNT',
                 'discount_value' => 'nullable|numeric|min:0',
                 'notes' => 'nullable|string',
+                'number' => 'nullable|string|max:255',
                 'movement_id' => 'nullable|integer|exists:movements,id', // ID del borrador a completar
                 'moved_at' => 'nullable|string|max:32',
                 'credit_days' => 'nullable|integer|min:0|max:3650',
@@ -1035,12 +1043,13 @@ class SalesController extends Controller
                     throw new \Exception('No se encontró el movimiento de venta');
                 }
                 
-                $number = $movement->number;
+                $number = trim((string) ($validated['number'] ?? '')) ?: $movement->number;
                 
                 $previousMovementStatus = (string) $movement->status;
 
                 // Actualizar el movimiento - siempre se completa el pago completo
                 $movement->update([
+                    'number' => $number,
                     'comment' => $request->notes ?? ($isDebtSale ? 'Venta registrada como deuda' : 'Venta completada desde punto de venta'),
                     'status' => 'A', // Siempre Activo (pago completo)
                     'document_type_id' => $documentType->id,
@@ -1448,6 +1457,13 @@ class SalesController extends Controller
     // Guardar venta como borrador/pendiente (sin pago)
     public function saveDraft(Request $request)
     {
+        $request->merge([
+            'items' => collect((array) $request->input('items', []))
+                ->filter(fn ($item) => (int) data_get($item, 'pId', 0) > 0)
+                ->values()
+                ->all(),
+        ]);
+
         try {
             $validated = $request->validate([
                 'items' => 'required|array|min:1',

@@ -65,9 +65,9 @@
                             </div>
                             <div class="xl:col-span-2">
                                 <label for="sale-header-number" class="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Numero <span class="text-red-500">*</span></label>
-                                <input type="text" id="sale-header-number" readonly tabindex="-1"
+                                <input type="text" id="sale-header-number" @if(!$isEditMode) readonly tabindex="-1" @endif
                                     value="{{ $saleNumberPreview ?? '00000001' }}"
-                                    class="h-12 w-full cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-100 px-4 text-sm font-semibold text-slate-600"
+                                    class="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-semibold {{ $isEditMode ? 'bg-white text-slate-700 focus:border-orange-400 focus:ring-4 focus:ring-orange-100 outline-none' : 'cursor-not-allowed bg-slate-100 text-slate-600' }}"
                                     autocomplete="off">
                             </div>
                         </div>
@@ -736,12 +736,15 @@
             let currentSale = isEditMode && initialSaleData
                 ? {
                     id: Number(initialSaleData.id || 0) || null,
+                    number: String(initialSaleData.number || ''),
                     clientId: initialSaleData.clientId ? Number(initialSaleData.clientId) : (defaultClient ? defaultClient.id : null),
                     clientName: initialSaleData.clientName || (defaultClient ? defaultClient.label : 'Publico General'),
                     status: 'editing',
                     notes: String(initialSaleData.notes || ''),
                     items: Array.isArray(initialSaleData.items)
-                        ? initialSaleData.items.map((item) => ({
+                        ? initialSaleData.items
+                            .filter((item) => Number(item?.pId || 0) > 0)
+                            .map((item) => ({
                             pId: Number(item.pId || 0),
                             name: String(item.name || ''),
                             qty: Number(item.qty || 0),
@@ -2388,7 +2391,7 @@ const total = subtotalBase + tax - discount;
                 }
 
                 const payload = {
-    items: currentSale.items.map((item) => ({
+    items: currentSale.items.filter((item) => Number(item.pId || 0) > 0).map((item) => ({
         pId: Number(item.pId),
         qty: Number(item.qty),
         price: Number(item.price),
@@ -2412,6 +2415,7 @@ const total = subtotalBase + tax - discount;
     })),
 
     notes: document.getElementById('sale-notes')?.value || '',
+    number: String(document.getElementById('sale-header-number')?.value || '').trim(),
     moved_at: String(document.getElementById('sale-moved-at')?.value || '').trim(),
     ...(isDebtSaleSelected() ? {
         credit_days: Math.max(0, parseInt(currentSale.credit_days, 10) || 0),
@@ -2508,7 +2512,7 @@ const total = subtotalBase + tax - discount;
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
                     },
                     body: JSON.stringify({
-                        items: currentSale.items.map((item) => ({ pId: item.pId, qty: Number(item.qty), price: Number(item.price), note: item.note || '' })),
+                        items: currentSale.items.filter((item) => Number(item.pId || 0) > 0).map((item) => ({ pId: item.pId, qty: Number(item.qty), price: Number(item.price), note: item.note || '' })),
                         payment_type: currentSale.payment_type || 'CONTADO',
                         document_type_id: Number(document.getElementById('document-type-select')?.value || 0) || null,
                         billing_status: isInvoiceDocumentSelected() ? currentSale.billing_status : 'NOT_APPLICABLE',
