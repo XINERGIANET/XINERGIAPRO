@@ -1062,6 +1062,24 @@ class WorkshopMaintenanceBoardController extends Controller
     {
         [$branchId, $companyId] = $this->branchScope();
 
+        $normalizeVehicleIdentifier = static function ($value): ?string {
+            $normalized = trim((string) $value);
+
+            if ($normalized === '' || $normalized === '-' || $normalized === '--') {
+                return null;
+            }
+
+            return $normalized;
+        };
+
+        $request->merge([
+            'plate' => $normalizeVehicleIdentifier($request->input('plate')),
+            'vin' => $normalizeVehicleIdentifier($request->input('vin')),
+            'engine_number' => $normalizeVehicleIdentifier($request->input('engine_number')),
+            'chassis_number' => $normalizeVehicleIdentifier($request->input('chassis_number')),
+            'serial_number' => $normalizeVehicleIdentifier($request->input('serial_number')),
+        ]);
+
         $validated = $request->validate([
             'client_person_id' => [
                 'required',
