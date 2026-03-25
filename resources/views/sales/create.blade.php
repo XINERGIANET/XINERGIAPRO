@@ -2403,7 +2403,7 @@ const total = subtotalBase + tax - discount;
 
     payment_type: currentSale.payment_type || 'CONTADO',
     document_type_id: Number(document.getElementById('document-type-select')?.value || 0),
-    cash_register_id: Number(document.getElementById('cash-register-select')?.value || 0),
+    cash_register_id: Number(currentSale.cash_register_id || document.getElementById('cash-register-select')?.value || 0),
     person_id: currentSale.clientId ? Number(currentSale.clientId) : null,
 
     payment_methods: isDebtSaleSelected() ? [] : paymentRows.map((row) => ({

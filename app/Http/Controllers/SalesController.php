@@ -1247,11 +1247,14 @@ class SalesController extends Controller
             
             app(KardexSyncService::class)->syncMovement($movement);
 
-            // Crear/actualizar movimiento de caja separado del movimiento de venta
+            // Crear/actualizar movimiento de caja separado del movimiento de venta.
+            // Compatibilidad: algunas ventas antiguas guardaron el cash_movement directamente en el movement de venta.
+            $legacyDirectCashMovement = CashMovements::query()
+                ->where('movement_id', $movement->id)
+                ->first();
             $cashEntryMovement = $this->resolveCashEntryMovementBySaleMovement($movement->id);
-         
 
-            if (!$cashEntryMovement) {
+            if (!$cashEntryMovement && !$legacyDirectCashMovement) {
                 $cashEntryMovement = Movement::create([
                     'number' => $this->generateCashMovementNumber(
                         (int) $branchId,
@@ -1274,7 +1277,7 @@ class SalesController extends Controller
                     'branch_id' => $branchId,
                     'parent_movement_id' => $movement->id,
                 ]);
-            } else {
+            } elseif ($cashEntryMovement) {
                 $cashEntryMovement->update([
                     'moved_at' => now(),
                     'person_id' => $selectedPerson?->id,
@@ -1289,7 +1292,11 @@ class SalesController extends Controller
             }
 
             // Crear o actualizar CashMovement (entrada de dinero)
-            $cashMovement = CashMovements::where('movement_id', $cashEntryMovement->id)->first();
+            $cashMovement = $legacyDirectCashMovement;
+            if (!$cashMovement && $cashEntryMovement) {
+                $cashMovement = CashMovements::where('movement_id', $cashEntryMovement->id)->first();
+            }
+            $cashReferenceNumber = $cashEntryMovement?->number ?: $movement->number;
 
             if ($cashMovement) {
                 $cashMovement->update([
@@ -1340,7 +1347,7 @@ class SalesController extends Controller
                     'paid_at' => null,
                     'payment_method_id' => $debtPaymentMethod->id,
                     'payment_method' => $debtPaymentMethod->description ?? 'Deuda',
-                    'number' => $cashEntryMovement->number,
+                    'number' => $cashReferenceNumber,
                     'card_id' => null,
                     'card' => '',
                     'bank_id' => null,
@@ -1398,7 +1405,7 @@ class SalesController extends Controller
                     'paid_at' => now(),
                     'payment_method_id' => $paymentMethod->id,
                     'payment_method' => $paymentMethod->description ?? '',
-                    'number' => $cashEntryMovement->number,
+                    'number' => $cashReferenceNumber,
                     'card_id' => $card?->id,
                     'card' => $card?->description ?? '',
                     'bank_id' => null,
