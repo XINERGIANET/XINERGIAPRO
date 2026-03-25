@@ -859,7 +859,7 @@ class SalesController extends Controller
                 'payment_type' => 'required|string|in:CONTADO,DEUDA',
                 'payment_methods' => 'nullable|array',
                 'payment_methods.*.payment_method_id' => 'nullable|integer|exists:payment_methods,id',
-                'payment_methods.*.amount' => 'nullable|numeric|min:0.01',
+                'payment_methods.*.amount' => 'nullable|numeric|min:0',
                 'payment_methods.*.payment_gateway_id' => 'nullable|integer|exists:payment_gateways,id',
                 'payment_methods.*.card_id' => 'nullable|integer|exists:cards,id',
                 'payment_methods.*.digital_wallet_id' => 'nullable|integer|exists:digital_wallets,id',
