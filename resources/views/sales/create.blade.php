@@ -58,9 +58,9 @@
                             </div>
                             <div class="xl:col-span-2">
                                 <label for="sale-header-series" class="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Serie</label>
-                                <input type="text" id="sale-header-series" readonly tabindex="-1"
+                                <input type="text" id="sale-header-series" @if(!$isEditMode) readonly tabindex="-1" @endif
                                     value="{{ $saleSeriesPreview ?? '001' }}"
-                                    class="h-12 w-full cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-100 px-4 text-sm font-semibold text-slate-600"
+                                    class="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-semibold {{ $isEditMode ? 'bg-white text-slate-700 focus:border-orange-400 focus:ring-4 focus:ring-orange-100 outline-none' : 'cursor-not-allowed bg-slate-100 text-slate-600' }}"
                                     autocomplete="off">
                             </div>
                             <div class="xl:col-span-2">
@@ -2443,6 +2443,7 @@ const total = subtotalBase + tax - discount;
     })),
 
     notes: document.getElementById('sale-notes')?.value || '',
+    series: String(document.getElementById('sale-header-series')?.value || '').trim(),
     number: String(document.getElementById('sale-header-number')?.value || '').trim(),
     moved_at: String(document.getElementById('sale-moved-at')?.value || '').trim(),
     ...(isDebtSaleSelected() ? {

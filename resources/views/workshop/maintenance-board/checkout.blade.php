@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('content')
 <div
@@ -8,6 +8,8 @@
         productLines: @js(array_values(old('product_lines', []))),
         documentTypeOptions: @js(collect($documentTypes ?? collect())->map(fn ($doc) => ['id' => (int) $doc->id, 'name' => (string) ($doc->name ?? '')])->values()->all()),
         selectedDocumentTypeId: @js((string) old('document_type_id', $defaultDocumentTypeId ?? optional(($documentTypes ?? collect())->first())->id)),
+        saleHeaderSeries: @js('001'),
+        saleHeaderNumber: @js('00000001'),
         billingStatus: @js((string) old('billing_status', 'PENDING')),
         invoiceSeries: @js((string) old('invoice_series', '001')),
         invoiceNumber: @js((string) old('invoice_number', '')),
@@ -38,6 +40,7 @@
             }
             this.syncInvoiceBillingFields();
             this.syncAmount();
+            this.refreshSaleHeaderPreview();
         },
         currentDocumentType() {
             return this.documentTypeOptions.find((item) => String(item.id) === String(this.selectedDocumentTypeId || '')) || null;
@@ -67,6 +70,35 @@
 
             if (this.billingStatus === 'PENDING') {
                 this.invoiceNumber = '';
+            }
+        },
+        async refreshSaleHeaderPreview() {
+            const docId = Number(this.selectedDocumentTypeId || 0);
+            const cashId = Number(this.$refs.cashRegisterSelect?.value || 0);
+            if (!docId || !cashId) return;
+
+            const url = new URL(@js(route('admin.sales.preview.header')), window.location.origin);
+            url.searchParams.set('document_type_id', String(docId));
+            url.searchParams.set('cash_register_id', String(cashId));
+
+            try {
+                const res = await fetch(url.toString(), {
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data?.series != null) {
+                    this.saleHeaderSeries = String(data.series);
+                }
+                if (data?.number != null) {
+                    this.saleHeaderNumber = String(data.number);
+                }
+                if (this.isInvoiceDocumentSelected() && this.billingStatus === 'INVOICED') {
+                    this.invoiceSeries = this.saleHeaderSeries || '001';
+                    this.invoiceNumber = this.saleHeaderNumber || '';
+                }
+            } catch (e) {
+                /* ignorar */
             }
         },
         lineSubtotal(line) {
@@ -203,7 +235,7 @@
         $checkoutOsLabel = 'OS ' . ($order->movement?->number ?? ('#' . $order->id));
     @endphp
     <x-common.page-breadcrumb
-        :pageTitle="'Venta y cobro · ' . $checkoutOsLabel"
+        :pageTitle="'Venta y cobro Â· ' . $checkoutOsLabel"
         :crumbs="[
             ['label' => 'Tablero de Mantenimiento', 'url' => route('workshop.maintenance-board.index')],
             ['label' => $checkoutOsLabel . ' | Venta y cobro'],
@@ -329,10 +361,10 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-5">
                 <div>
                     <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Documento de venta</label>
-                    <select x-model="selectedDocumentTypeId" @change="syncInvoiceBillingFields()" name="document_type_id" required class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                    <select x-model="selectedDocumentTypeId" @change="syncInvoiceBillingFields(); refreshSaleHeaderPreview()" name="document_type_id" required class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
                         @foreach(($documentTypes ?? collect()) as $doc)
                             <option value="{{ $doc->id }}">
                                 {{ $doc->name }}
@@ -341,7 +373,15 @@
                     </select>
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Condición</label>
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Serie</label>
+                    <input type="text" x-model="saleHeaderSeries" readonly tabindex="-1" class="h-11 w-full rounded-lg border border-gray-300 bg-slate-50 px-3 text-sm font-semibold text-slate-700">
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Correlativo</label>
+                    <input type="text" x-model="saleHeaderNumber" readonly tabindex="-1" class="h-11 w-full rounded-lg border border-gray-300 bg-slate-50 px-3 text-sm font-semibold text-slate-700">
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">CondiciÃ³n</label>
                     <select x-model="paymentType" @change="onPaymentTypeChange()" name="payment_type" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
                         <option value="CONTADO">Contado</option>
                         <option value="DEUDA" x-bind:disabled="nothingToCollect()">Deuda</option>
@@ -349,7 +389,7 @@
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Caja</label>
-                    <select name="cash_register_id" required class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                    <select x-ref="cashRegisterSelect" @change="refreshSaleHeaderPreview()" name="cash_register_id" required class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
                         @foreach(($cashRegisters ?? collect()) as $cash)
                             <option value="{{ $cash->id }}" @selected(old('cash_register_id', optional(($cashRegisters ?? collect())->first())->id) == $cash->id)>
                                 Caja {{ $cash->number }}
@@ -360,13 +400,13 @@
             </div>
 
             <div x-show="isDebtPaymentSelected()" x-cloak class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-                Esta venta se registrará como deuda y se enviará a cuentas por cobrar.
+                Esta venta se registrarÃ¡ como deuda y se enviarÃ¡ a cuentas por cobrar.
             </div>
 
             <div x-show="isInvoiceDocumentSelected()" x-cloak class="grid grid-cols-1 gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4 md:grid-cols-3">
                 <div>
                     <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Estado de factura</label>
-                    <select x-model="billingStatus" @change="syncInvoiceBillingFields()" name="billing_status" class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm">
+                    <select x-model="billingStatus" @change="syncInvoiceBillingFields(); refreshSaleHeaderPreview()" name="billing_status" class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm">
                         <option value="INVOICED">Facturado</option>
                         <option value="PENDING">Por facturar</option>
                     </select>
@@ -406,7 +446,7 @@
                 <div class="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 md:flex-row md:items-center md:justify-between">
                     <div>
                         <p class="text-sm font-semibold text-slate-800">Desglose de cobro</p>
-                        <p class="text-xs text-slate-500">Puedes combinar uno o varios métodos de pago en la misma entrega.</p>
+                        <p class="text-xs text-slate-500">Puedes combinar uno o varios mÃ©todos de pago en la misma entrega.</p>
                     </div>
                     <button
                         type="button"
@@ -414,7 +454,7 @@
                         class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
                     >
                         <i class="ri-add-line text-base normal-case"></i>
-                        Agregar método
+                        Agregar mÃ©todo
                     </button>
                 </div>
 
@@ -425,7 +465,7 @@
                                 <div class="flex items-center gap-3">
                                     <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold text-white" x-text="index + 1"></div>
                                     <div>
-                                        <p class="text-sm font-semibold text-slate-800">Método de pago</p>
+                                        <p class="text-sm font-semibold text-slate-800">MÃ©todo de pago</p>
                                         <p class="text-xs text-slate-500" x-text="row.kind === 'card' ? 'Requiere tarjeta y puede usar pasarela.' : (row.kind === 'wallet' ? 'Requiere seleccionar la billetera digital.' : 'No requiere detalles adicionales.')"></p>
                                     </div>
                                 </div>
@@ -435,7 +475,7 @@
                                     class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-rose-200 bg-white text-rose-500 transition hover:bg-rose-50"
                                     :disabled="paymentRows.length === 1"
                                     :class="{ 'cursor-not-allowed opacity-50': paymentRows.length === 1 }"
-                                    title="Quitar método"
+                                    title="Quitar mÃ©todo"
                                 >
                                     <i class="ri-delete-bin-line text-lg"></i>
                                 </button>
@@ -448,7 +488,7 @@
                                     : 'grid-template-columns:minmax(260px,2.8fr) minmax(150px,1.3fr) minmax(220px,1.8fr) minmax(260px,2.1fr);'"
                             >
                                 <div class="min-w-0">
-                                    <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Método</label>
+                                    <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">MÃ©todo</label>
                                     <select
                                         x-model="row.payment_method_id"
                                         @change="onPaymentMethodChange(index)"
@@ -510,7 +550,7 @@
                                 <div class="min-w-0" x-show="row.kind !== 'card' && row.kind !== 'wallet'">
                                     <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Detalle</label>
                                     <div class="flex h-10 items-center rounded-xl border border-dashed border-slate-300 bg-white px-3 text-sm text-slate-400">
-                                        Sin selección adicional
+                                        Sin selecciÃ³n adicional
                                     </div>
                                 </div>
 
@@ -536,7 +576,7 @@
                                         x-model="row.reference"
                                         :name="`payment_methods[${index}][reference]`"
                                         class="h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-slate-500"
-                                        placeholder="Operación, voucher, celular o nota"
+                                        placeholder="OperaciÃ³n, voucher, celular o nota"
                                     >
                                 </div>
                             </div>
@@ -591,3 +631,4 @@
     </x-common.component-card>
 </div>
 @endsection
+

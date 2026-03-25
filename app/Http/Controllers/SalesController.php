@@ -883,6 +883,7 @@ class SalesController extends Controller
                 'discount_type' => 'nullable|string|in:NONE,PERCENTAGE,AMOUNT',
                 'discount_value' => 'nullable|numeric|min:0',
                 'notes' => 'nullable|string',
+                'series' => 'nullable|string|max:20',
                 'number' => 'nullable|string|max:255',
                 'movement_id' => 'nullable|integer|exists:movements,id', // ID del borrador a completar
                 'moved_at' => 'nullable|string|max:32',
@@ -967,6 +968,7 @@ class SalesController extends Controller
                     $debtDueAt = $movedAt->copy()->addDays(max(0, (int) ($validated['credit_days'] ?? 0)));
                 }
             }
+            $headerSeries = trim((string) ($validated['series'] ?? ''));
             $invoiceSeries = $isInvoiceDocument
                 ? trim((string) ($validated['invoice_series'] ?? '001'))
                 : '001';
@@ -1080,6 +1082,9 @@ class SalesController extends Controller
                 }
                 
                 $number = trim((string) ($validated['number'] ?? '')) ?: $movement->number;
+                $headerSeries = $headerSeries !== ''
+                    ? $headerSeries
+                    : trim((string) ($movement->salesMovement?->series ?? ''));
                 
                 $previousMovementStatus = (string) $movement->status;
 
@@ -1169,7 +1174,9 @@ class SalesController extends Controller
                 // Actualizar el SalesMovement existente
                 $salesMovement = $movement->salesMovement;
                 $salesMovement->update([
-                    'series' => $invoiceSeries !== '' ? $invoiceSeries : ($salesMovement->series ?: '001'),
+                    'series' => $isInvoiceDocument
+                        ? ($invoiceSeries !== '' ? $invoiceSeries : ($salesMovement->series ?: '001'))
+                        : ($headerSeries !== '' ? $headerSeries : ($salesMovement->series ?: ($cashRegister->series ?: '001'))),
                     'billing_status' => $billingStatus,
                     'billing_number' => $invoiceNumber,
                     'payment_type' => $isDebtSale ? 'CREDITO' : 'CONTADO',
@@ -1184,7 +1191,9 @@ class SalesController extends Controller
                         'id' => $branch->id,
                         'legal_name' => $branch->legal_name,
                     ],
-                    'series' => $invoiceSeries !== '' ? $invoiceSeries : '001',
+                    'series' => $isInvoiceDocument
+                        ? ($invoiceSeries !== '' ? $invoiceSeries : '001')
+                        : ($headerSeries !== '' ? $headerSeries : ($cashRegister->series ?: '001')),
                     'billing_status' => $billingStatus,
                     'billing_number' => $invoiceNumber,
                     'year' => Carbon::now()->year,
