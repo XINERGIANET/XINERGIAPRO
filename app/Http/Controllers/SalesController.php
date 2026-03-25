@@ -601,10 +601,12 @@ class SalesController extends Controller
                     : $baseNetLineTotal;
 
                 return [
+                    'kind' => $detail->product_id ? 'product' : 'glosa',
                     'pId' => (int) ($detail->product_id ?? 0),
                     'name' => $detail->product->description ?? $detail->description ?? ('Producto #' . $detail->product_id),
                     'qty' => $quantity,
                     'price' => $quantity > 0 ? ($baseGrossLineTotal / $quantity) : 0,
+                    'tax_rate' => $taxRatePct,
                     'note' => (string) ($detail->comment ?? ''),
                 ];
             })
@@ -763,8 +765,9 @@ class SalesController extends Controller
                         $quantity = (float) $detail->quantity ?: 1;
                         $priceWithTax = $quantity > 0 ? $amountWithTax / $quantity : 0;
                         return [
+                            'kind' => $detail->product_id ? 'product' : 'glosa',
                             'pId' => $detail->product_id,
-                            'name' => $detail->product->description ?? 'Producto #' . $detail->product_id,
+                            'name' => $detail->product->description ?? $detail->description ?? 'Detalle',
                             'qty' => $quantity,
                             'price' => $priceWithTax,
                             'tax_rate' => $taxRatePct,
@@ -825,7 +828,11 @@ class SalesController extends Controller
 
         $request->merge([
             'items' => collect((array) $request->input('items', []))
-                ->filter(fn ($item) => (int) data_get($item, 'pId', 0) > 0)
+                ->filter(function ($item) {
+                    $productId = (int) data_get($item, 'pId', 0);
+                    $name = trim((string) data_get($item, 'name', ''));
+                    return $productId > 0 || $name !== '';
+                })
                 ->values()
                 ->all(),
         ]);
@@ -833,12 +840,15 @@ class SalesController extends Controller
         try {
             $validated = $request->validate([
                 'items' => 'required|array|min:1',
-                'items.*.pId' => 'required|integer|exists:products,id',
+                'items.*.kind' => 'nullable|string|in:product,glosa',
+                'items.*.pId' => 'nullable|integer|exists:products,id',
+                'items.*.name' => 'nullable|string|max:255',
                 'items.*.qty' => 'required|numeric|min:0.000001',
                 'items.*.price' => 'required|numeric|min:0',
                 'items.*.note' => 'nullable|string|max:65535',
                 // Compatibilidad: algunos flujos pueden enviar `comment` en lugar de `note`
                 'items.*.comment' => 'nullable|string|max:65535',
+                'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
                 'document_type_id' => 'required|integer|exists:document_types,id',
                 'cash_register_id' => [
                     'required',
@@ -1466,7 +1476,11 @@ class SalesController extends Controller
     {
         $request->merge([
             'items' => collect((array) $request->input('items', []))
-                ->filter(fn ($item) => (int) data_get($item, 'pId', 0) > 0)
+                ->filter(function ($item) {
+                    $productId = (int) data_get($item, 'pId', 0);
+                    $name = trim((string) data_get($item, 'name', ''));
+                    return $productId > 0 || $name !== '';
+                })
                 ->values()
                 ->all(),
         ]);
@@ -1474,12 +1488,15 @@ class SalesController extends Controller
         try {
             $validated = $request->validate([
                 'items' => 'required|array|min:1',
-                'items.*.pId' => 'required|integer|exists:products,id',
+                'items.*.kind' => 'nullable|string|in:product,glosa',
+                'items.*.pId' => 'nullable|integer|exists:products,id',
+                'items.*.name' => 'nullable|string|max:255',
                 'items.*.qty' => 'required|numeric|min:0.000001',
                 'items.*.price' => 'required|numeric|min:0',
                 'items.*.note' => 'nullable|string|max:65535',
                 // Compatibilidad: algunos flujos pueden enviar `comment` en lugar de `note`
                 'items.*.comment' => 'nullable|string|max:65535',
+                'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
                 'document_type_id' => 'nullable|integer|exists:document_types,id',
                 'payment_type' => 'nullable|string|in:CONTADO,DEUDA',
                 'billing_status' => 'nullable|string|in:PENDING,INVOICED,NOT_APPLICABLE',
@@ -1968,13 +1985,21 @@ class SalesController extends Controller
         $grossTotal = 0.0;
 
         foreach ($items as $index => $item) {
-            $productBranch = ProductBranch::with('taxRate')
-                ->where('product_id', $item['pId'])
-                ->where('branch_id', $branchId)
-                ->first();
+            $productId = (int) ($item['pId'] ?? 0);
+            $manualTaxRate = max(0, (float) ($item['tax_rate'] ?? 0));
+            $taxRateValue = $defaultTaxPct;
 
-            $taxRate = $productBranch?->taxRate;
-            $taxRateValue = $taxRate ? ($taxRate->tax_rate / 100) : $defaultTaxPct;
+            if ($productId > 0) {
+                $productBranch = ProductBranch::with('taxRate')
+                    ->where('product_id', $productId)
+                    ->where('branch_id', $branchId)
+                    ->first();
+
+                $taxRate = $productBranch?->taxRate;
+                $taxRateValue = $taxRate ? ($taxRate->tax_rate / 100) : $defaultTaxPct;
+            } elseif ($manualTaxRate > 0) {
+                $taxRateValue = $manualTaxRate / 100;
+            }
 
             $itemGrossTotal = max(0, (float) ($item['qty'] ?? 0) * (float) ($item['price'] ?? 0));
             $itemNetTotal = $taxRateValue > 0 ? ($itemGrossTotal / (1 + $taxRateValue)) : $itemGrossTotal;
