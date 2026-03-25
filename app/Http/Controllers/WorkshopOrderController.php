@@ -68,6 +68,9 @@ class WorkshopOrderController extends Controller
                 'movement',
                 'vehicle',
                 'client' => fn ($query) => $query->withTrashed(),
+                'details.service',
+                'details.product',
+                'details.technician' => fn ($query) => $query->withTrashed(),
             ])
             ->orderByDesc('id')
             ->paginate($perPage)

@@ -14,7 +14,7 @@
 @endphp
 
 @section('content')
-<div x-data="{}">
+<div x-data="{ openRow: null }">
     <x-common.page-breadcrumb pageTitle="Ordenes Taller" />
 
     <x-common.component-card title="Ordenes de servicio" desc="Consulta y gestiona ordenes del taller.">
@@ -124,6 +124,7 @@
             <table class="w-full">
                 <thead style="background-color: #334155; color: #FFFFFF;">
                     <tr>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider first:rounded-tl-xl text-white"></th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">OS</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Ingreso</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Cliente</th>
@@ -136,11 +137,25 @@
                 </thead>
                 <tbody>
                     @forelse($orders as $order)
+                        @php
+                            $clientName = trim(((string) ($order->client?->first_name ?? '')) . ' ' . ((string) ($order->client?->last_name ?? '')));
+                            $vehicleLabel = trim(((string) ($order->vehicle?->brand ?? '')) . ' ' . ((string) ($order->vehicle?->model ?? '')));
+                        @endphp
                         <tr class="relative hover:z-[60] border-t border-gray-100 dark:border-gray-800 transition hover:bg-gray-50 dark:hover:bg-white/5">
+                            <td class="px-3 py-3 text-center align-middle">
+                                <button
+                                    type="button"
+                                    @click="openRow === {{ $order->id }} ? openRow = null : openRow = {{ $order->id }}"
+                                    class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-white transition hover:bg-brand-600"
+                                >
+                                    <i class="ri-add-line" x-show="openRow !== {{ $order->id }}"></i>
+                                    <i class="ri-subtract-line" x-show="openRow === {{ $order->id }}"></i>
+                                </button>
+                            </td>
                             <td class="px-3 py-3 text-sm text-center align-middle font-medium text-gray-800 dark:text-white/90">{{ $order->movement?->number }}</td>
                             <td class="px-3 py-3 text-sm text-center align-middle whitespace-nowrap">{{ $order->intake_date?->format('j/m/Y H:i A') }}</td>
                             <td class="px-3 py-3 text-sm text-center align-middle">
-                                {{ trim(((string) ($order->client?->first_name ?? '')) . ' ' . ((string) ($order->client?->last_name ?? ''))) ?: ((string) ($order->client?->document_number ?? '-') ) }}
+                                {{ $clientName ?: ((string) ($order->client?->document_number ?? '-') ) }}
                             </td>
                             <td class="px-3 py-3 text-sm text-center align-middle">{{ $order->vehicle?->brand }} {{ $order->vehicle?->model }} <span class="text-xs text-gray-500">({{ $order->vehicle?->plate }})</span></td>
                             <td class="px-3 py-3 text-sm text-center align-middle">
@@ -242,6 +257,79 @@
                                             <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
                                         </span>
                                     </form>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr x-show="openRow === {{ $order->id }}" x-cloak class="border-t border-gray-100 bg-gray-50/70 dark:border-gray-800 dark:bg-gray-800/40">
+                            <td colspan="9" class="px-6 py-4">
+                                <div class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                                    <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                        <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Documento</p>
+                                        <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $order->client?->document_number ?: '-' }}</p>
+                                    </div>
+                                    <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                        <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Teléfono</p>
+                                        <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $order->client?->phone ?: '-' }}</p>
+                                    </div>
+                                    <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                        <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Vehículo</p>
+                                        <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $vehicleLabel ?: '-' }}</p>
+                                    </div>
+                                    <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                        <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Placa</p>
+                                        <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $order->vehicle?->plate ?: '-' }}</p>
+                                    </div>
+                                    <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                        <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Kilometraje</p>
+                                        <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $order->mileage_in !== null ? number_format((float) $order->mileage_in, 0) : '-' }}</p>
+                                    </div>
+                                </div>
+
+                                <div class="mb-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                    <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Observaciones</p>
+                                    <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">{{ $order->observations ?: 'Sin observaciones.' }}</p>
+                                </div>
+
+                                <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
+                                    <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+                                        <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">Detalle de la orden</p>
+                                        <span class="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">{{ $order->details->count() }} línea(s)</span>
+                                    </div>
+                                    <div class="overflow-x-auto">
+                                        <table class="min-w-full">
+                                            <thead class="bg-gray-50 dark:bg-gray-800/70">
+                                                <tr>
+                                                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-300">Tipo</th>
+                                                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-300">Descripción</th>
+                                                    <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-300">Cant.</th>
+                                                    <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-300">Técnico</th>
+                                                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-300">Total</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @forelse ($order->details as $detail)
+                                                    @php
+                                                        $detailDescription = $detail->description
+                                                            ?: $detail->service?->name
+                                                            ?: $detail->product?->description
+                                                            ?: '-';
+                                                        $technicianName = trim(((string) ($detail->technician?->first_name ?? '')) . ' ' . ((string) ($detail->technician?->last_name ?? '')));
+                                                    @endphp
+                                                    <tr class="border-t border-gray-100 dark:border-gray-800">
+                                                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{{ $detail->line_type === 'product' ? 'Producto' : 'Servicio' }}</td>
+                                                        <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{{ $detailDescription }}</td>
+                                                        <td class="px-4 py-3 text-center text-sm text-gray-700 dark:text-gray-300">{{ number_format((float) $detail->qty, 2) }}</td>
+                                                        <td class="px-4 py-3 text-center text-sm text-gray-700 dark:text-gray-300">{{ $technicianName ?: '-' }}</td>
+                                                        <td class="px-4 py-3 text-right text-sm font-semibold text-gray-800 dark:text-gray-200">S/ {{ number_format((float) $detail->total, 2) }}</td>
+                                                    </tr>
+                                                @empty
+                                                    <tr>
+                                                        <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">Sin detalle.</td>
+                                                    </tr>
+                                                @endforelse
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </td>
                         </tr>
