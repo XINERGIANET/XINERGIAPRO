@@ -1258,14 +1258,19 @@ class SalesController extends Controller
                     continue;
                 }
 
+                $defaultUnitId = Unit::query()->value('id');
+                if (!$defaultUnitId) {
+                    throw new \Exception('No existen unidades registradas para guardar la glosa de la venta.');
+                }
+
                 SalesMovementDetail::create([
-                    'detail_type' => 'DETAILED',
+                    'detail_type' => 'GLOSA',
                     'sales_movement_id' => $salesMovement->id,
                     'code' => '',
                     'description' => trim((string) ($item['name'] ?? '')) ?: 'Detalle',
                     'product_id' => null,
                     'product_snapshot' => null,
-                    'unit_id' => null,
+                    'unit_id' => $defaultUnitId,
                     'tax_rate_id' => null,
                     'tax_rate_snapshot' => $lineCalculated['tax_rate_value'] > 0 ? [
                         'description' => 'Manual',
@@ -1737,14 +1742,19 @@ class SalesController extends Controller
                     continue;
                 }
 
+                $defaultUnitId = Unit::query()->value('id');
+                if (!$defaultUnitId) {
+                    throw new \Exception('No existen unidades registradas para guardar la glosa del borrador.');
+                }
+
                 SalesMovementDetail::create([
-                    'detail_type' => 'DETAILED',
+                    'detail_type' => 'GLOSA',
                     'sales_movement_id' => $salesMovement->id,
                     'code' => '',
                     'description' => trim((string) ($item['name'] ?? '')) ?: 'Detalle',
                     'product_id' => null,
                     'product_snapshot' => null,
-                    'unit_id' => null,
+                    'unit_id' => $defaultUnitId,
                     'tax_rate_id' => null,
                     'tax_rate_snapshot' => $lineCalculated['tax_rate_value'] > 0 ? [
                         'description' => 'Manual',
