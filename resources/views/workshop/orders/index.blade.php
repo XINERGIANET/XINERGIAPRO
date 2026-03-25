@@ -109,7 +109,7 @@
         </div>
         @if ($errors->has('file'))
             <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-800/50 dark:bg-red-950/30 dark:text-red-200">
-                <strong>ImportaciÃ³n OS:</strong> {{ $errors->first('file') }}
+                <strong>Importación OS:</strong> {{ $errors->first('file') }}
             </div>
         @endif
 
@@ -128,7 +128,7 @@
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">OS</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Ingreso</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Cliente</th>
-                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">VehÃ­culo</th>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Vehículo</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Estado</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Total</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Pagado</th>
@@ -216,7 +216,7 @@
                                         <x-ui.link-button
                                             size="icon"
                                             variant="edit"
-                                            href="{{ route('workshop.orders.show', $order) }}"
+                                            href="{{ route('workshop.maintenance-board.edit', array_merge([$order], $viewId ? ['view_id' => $viewId] : [])) }}"
                                             className="rounded-xl"
                                             style="background-color: #FBBF24; color: #111827;"
                                             aria-label="Editar"
@@ -340,7 +340,7 @@
             </table>
         </div>
 
-        {{-- PAGINACIÃ“N INFERIOR --}}
+        {{-- PAGINACIÓN INFERIOR --}}
         <div class="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="text-sm text-gray-500 dark:text-gray-400">
                 Mostrando
