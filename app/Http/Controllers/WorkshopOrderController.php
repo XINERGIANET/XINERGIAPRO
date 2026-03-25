@@ -60,8 +60,10 @@ class WorkshopOrderController extends Controller
         $search = trim((string) $request->input('search', ''));
         $perPage = (int) $request->input('per_page', 10);
         $selectedStatus = $this->normalizeWorkshopOrderListStatus((string) $request->input('status', 'all'));
+        $dateFrom = $this->normalizeWorkshopOrderListDate((string) $request->input('date_from', ''));
+        $dateTo = $this->normalizeWorkshopOrderListDate((string) $request->input('date_to', ''));
 
-        $orders = $this->workshopOrdersFilteredQuery($branchId, $companyId, $search, $selectedStatus)
+        $orders = $this->workshopOrdersFilteredQuery($branchId, $companyId, $search, $selectedStatus, $dateFrom, $dateTo)
             ->with([
                 'movement',
                 'vehicle',
@@ -1269,6 +1271,8 @@ class WorkshopOrderController extends Controller
             ->when($companyId > 0, fn ($query) => $query->where('company_id', $companyId))
             ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
             ->when($selectedStatus !== 'all', fn ($query) => $query->where('status', $selectedStatus))
+            ->when($dateFrom, fn ($query) => $query->whereDate('intake_date', '>=', $dateFrom))
+            ->when($dateTo, fn ($query) => $query->whereDate('intake_date', '<=', $dateTo))
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($inner) use ($search) {
                     $inner->whereHas('movement', fn ($movementQuery) => $movementQuery->where('number', 'ILIKE', "%{$search}%"))
