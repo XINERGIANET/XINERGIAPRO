@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @php
     use Illuminate\Support\HtmlString;
@@ -119,7 +119,7 @@
         listIngresos: {{ Js::from($conceptsIngreso) }},
         listEgresos: {{ Js::from($conceptsEgreso) }},
         currentConcepts: []
-    }" {{-- LÓGICA DEL EVENTO --}}
+    }" {{-- LÃ“GICA DEL EVENTO --}}
         @open-movement-modal.window="
         let conceptText = $event.detail.concept || ''; 
         let receivedId = String($event.detail.docId);
@@ -130,7 +130,7 @@
         formConceptId = ''; 
         formDocId = receivedId;
 
-        // Filtrar listas según si es Ingreso o Egreso
+        // Filtrar listas segÃºn si es Ingreso o Egreso
         if (receivedId === refIngresoId) {
             
             if (conceptText === 'Apertura de caja') {
@@ -163,7 +163,7 @@
 
         <x-common.page-breadcrumb pageTitle="Movimientos de Caja" />
 
-        <x-common.component-card title="Gestión de Movimientos" desc="Control de ingresos, egresos y traslados de fondos.">
+        <x-common.component-card title="GestiÃ³n de Movimientos" desc="Control de ingresos, egresos y traslados de fondos.">
 
             <div class="flex flex-col gap-5">
                 {{-- FILTROS (misma estructura que kardex: grid en 2 filas) --}}
@@ -190,15 +190,15 @@
                             collect($paymentConceptsForFilter ?? [])->map(fn($c) => ['value' => (string)$c->id, 'label' => $c->description])
                         )->values()->all();
                     @endphp
-                    {{-- Fila 1: Por página, Buscar (crece), Caja, Turno (crece) --}}
+                    {{-- Fila 1: Por pÃ¡gina, Buscar (crece), Caja, Turno (crece) --}}
                     <div class="flex flex-wrap items-end gap-3 xl:flex-nowrap">
                         <div class="w-full sm:w-[140px] sm:flex-shrink-0">
-                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Por página</label>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Por pÃ¡gina</label>
                             <x-form.select-autocomplete
                                 name="per_page"
                                 :value="$perPage ?? 10"
-                                :options="collect([10, 20, 50, 100])->map(fn($n) => ['value' => $n, 'label' => $n . ' / página'])->values()->all()"
-                                placeholder="Por página"
+                                :options="collect([10, 20, 50, 100])->map(fn($n) => ['value' => $n, 'label' => $n . ' / pÃ¡gina'])->values()->all()"
+                                placeholder="Por pÃ¡gina"
                                 :submit-on-change="true"
                                 inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                             />
@@ -448,6 +448,9 @@
                                 <th style="background-color: #334155; color: #FFFFFF;" class="px-3 py-3 text-left">
                                     <p class="font-semibold text-white text-theme-xs uppercase">Fecha</p>
                                 </th>
+                                <th style="background-color: #334155; color: #FFFFFF;" class="px-3 py-3 text-left">
+                                    <p class="font-semibold text-white text-theme-xs uppercase">Métodos de pago</p>
+                                </th>
                                 <th style="background-color: #334155; color: #FFFFFF;" class="hidden px-3 py-3 text-left">
                                     <p class="font-semibold text-white text-theme-xs uppercase">Usuario</p>
                                 </th>
@@ -458,7 +461,7 @@
                                     <p class="font-semibold text-white text-theme-xs uppercase">Turno</p>
                                 </th>
                                 <th style="background-color: #334155; color: #FFFFFF;" class="px-3 py-3 text-center">
-                                    <p class="font-semibold text-white text-theme-xs uppercase">Situación</p>
+                                    <p class="font-semibold text-white text-theme-xs uppercase">SituaciÃ³n</p>
                                 </th>
                                 <th style="background-color: #334155; color: #FFFFFF;" class="px-3 py-3 text-center last:rounded-tr-xl">
                                     <p class="font-semibold text-white text-theme-xs uppercase">Operaciones</p>
@@ -504,6 +507,9 @@
                                              <p class="text-gray-800 text-[11px] font-medium dark:text-white/90">{{ $movement->moved_at ? $movement->moved_at->format('j/m/Y') : '-' }}</p>
                                              <p class="text-gray-500 text-[10px] dark:text-gray-400">{{ $movement->moved_at ? $movement->moved_at->format('h:i:s A') : '' }}</p>
                                          </div>
+                                    </td>
+                                    <td class="px-3 py-3 align-middle">
+                                        <p class="max-w-[280px] truncate text-[11px] font-medium text-gray-700 dark:text-gray-200" title="{{ $paymentSummary ?: '-' }}">{{ $paymentSummary ?: '-' }}</p>
                                     </td>
                                     <td class="hidden px-3 py-3 align-middle">
                                         <p class="text-gray-800 text-[11px] font-bold dark:text-white/90">{{ $movement->user_name ?: '-' }}</p>
@@ -561,7 +567,7 @@
                                         </div>
                                     </td>
                                 <tr x-show="openRow === {{ $movement->id }}" x-cloak class="border-b border-gray-100 bg-gray-50/70 dark:bg-gray-800/40 dark:border-gray-800 transition-all duration-300">
-                                    <td colspan="12" class="px-6 py-4">
+                                    <td colspan="13" class="px-6 py-4">
                                         <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6 mb-2 max-w-6xl">
                                             <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50">
                                                 <p class="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Persona</p>
@@ -605,10 +611,7 @@
                                                 <p class="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Turno</p>
                                                 <p class="mt-0.5 text-sm font-semibold text-gray-700 dark:text-gray-200">{{ $movement->cashMovement?->shift?->name ?: '-' }}</p>
                                             </div>
-                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50 lg:col-span-3">
-                                                <p class="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Métodos de Pago</p>
-                                                <p class="mt-0.5 truncate text-sm font-semibold text-gray-700 dark:text-gray-200" title="{{ $paymentSummary ?: '-' }}">{{ $paymentSummary ?: '-' }}</p>
-                                            </div>
+
                                             <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50 lg:col-span-6">
                                                 <p class="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Comentario</p>
                                                 <p class="mt-0.5 text-sm font-semibold text-gray-700 dark:text-gray-200">{{ $movement->comment ?: '-' }}</p>
@@ -620,7 +623,7 @@
                             @empty
                                 <tbody>
                                     <tr>
-                                        <td colspan="12" class="px-6 py-12">
+                                        <td colspan="13" class="px-6 py-12">
                                             <div class="flex flex-col items-center gap-3 text-center text-sm text-gray-500">
                                                 <div class="rounded-full bg-gray-100 p-3 text-gray-400 dark:bg-gray-800 dark:text-gray-300">
                                                     <i class="ri-inbox-2-line"></i>
@@ -655,7 +658,7 @@
                 <div class="mb-4 flex items-center justify-between">
                     <div>
                         <p class="text-[10px] uppercase tracking-[0.2em] text-gray-400">
-                            <span x-text="formDocId == ingresoId ? 'Operación de Ingreso' : 'Operación de Egreso'"></span>
+                            <span x-text="formDocId == ingresoId ? 'OperaciÃ³n de Ingreso' : 'OperaciÃ³n de Egreso'"></span>
                         </p>
                         <h3 class="mt-1 text-base font-semibold text-gray-800 dark:text-white/90"
                             x-text="formDocId == ingresoId ? 'Registrar Ingreso' : 'Registrar Egreso'">
@@ -688,3 +691,6 @@
 
     </div>
 @endsection
+
+
+
