@@ -738,7 +738,7 @@ class WorkshopMaintenanceBoardController extends Controller
         $user = auth()->user();
 
         try {
-            DB::transaction(function () use ($order, $request, $validated, $branchId, $vehicle, $parsedServiceLines, $user) {
+            DB::transaction(function () use ($order, $request, $validated, $branchId, $vehicle, $clientPersonId, $parsedServiceLines, $user) {
                 $lockedOrder = WorkshopMovement::query()
                     ->where('id', $order->id)
                     ->lockForUpdate()
