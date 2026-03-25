@@ -677,6 +677,8 @@ class WorkshopMaintenanceBoardController extends Controller
         [$branchId, $companyId] = $this->branchScope();
 
         $validated = $request->validate([
+            'vehicle_id' => ['required', 'integer', 'exists:vehicles,id'],
+            'client_person_id' => ['nullable', 'integer', 'exists:people,id'],
             'mileage_in' => ['nullable', 'integer', 'min:0'],
             'tow_in' => ['nullable', 'boolean'],
             'diagnosis_text' => ['nullable', 'string'],
@@ -705,10 +707,22 @@ class WorkshopMaintenanceBoardController extends Controller
         ]);
 
         $vehicle = Vehicle::query()
-            ->where('id', (int) $order->vehicle_id)
+            ->where('id', (int) $validated['vehicle_id'])
             ->where('company_id', $companyId)
             ->where('branch_id', $branchId)
             ->firstOrFail();
+
+        $clientPersonId = isset($validated['client_person_id']) && (int) $validated['client_person_id'] > 0
+            ? (int) $validated['client_person_id']
+            : (int) $vehicle->client_person_id;
+
+        if ($clientPersonId <= 0) {
+            return back()->withErrors(['error' => 'El vehiculo seleccionado no tiene cliente asociado.']);
+        }
+
+        if ((int) $vehicle->client_person_id !== $clientPersonId) {
+            return back()->withErrors(['error' => 'El vehiculo no pertenece al cliente seleccionado.']);
+        }
 
         try {
             $parsedServiceLines = $this->parseMaintenanceBoardServiceLines((array) ($validated['service_lines'] ?? []));
@@ -731,6 +745,8 @@ class WorkshopMaintenanceBoardController extends Controller
                     ->firstOrFail();
 
                 $this->flowService->updateOrder($lockedOrder, [
+                    'vehicle_id' => (int) $validated['vehicle_id'],
+                    'client_person_id' => $clientPersonId,
                     'mileage_in' => $validated['mileage_in'] ?? null,
                     'tow_in' => (bool) ($validated['tow_in'] ?? false),
                     'diagnosis_text' => $validated['diagnosis_text'] ?? null,

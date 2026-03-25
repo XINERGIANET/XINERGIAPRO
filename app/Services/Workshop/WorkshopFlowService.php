@@ -210,6 +210,8 @@ class WorkshopFlowService
             }
 
             $updateData = [
+                'vehicle_id' => $data['vehicle_id'] ?? $order->vehicle_id,
+                'client_person_id' => $data['client_person_id'] ?? $order->client_person_id,
                 'intake_date' => $data['intake_date'] ?? $order->intake_date,
                 'delivery_date' => $data['delivery_date'] ?? $order->delivery_date,
                 'mileage_in' => $data['mileage_in'] ?? $order->mileage_in,
