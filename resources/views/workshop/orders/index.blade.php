@@ -56,6 +56,24 @@
                     </select>
                 </div>
 
+                <div class="w-full sm:w-[180px] xl:flex-none">
+                    <input
+                        type="date"
+                        name="date_from"
+                        value="{{ $dateFrom ?? '' }}"
+                        class="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm shadow-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none"
+                    >
+                </div>
+
+                <div class="w-full sm:w-[180px] xl:flex-none">
+                    <input
+                        type="date"
+                        name="date_to"
+                        value="{{ $dateTo ?? '' }}"
+                        class="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm shadow-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none"
+                    >
+                </div>
+
                 {{-- Acciones --}}
                 <div class="flex w-full items-center gap-2 xl:w-auto xl:flex-none">
                     <x-ui.button size="md" variant="primary" type="submit" class="h-11 px-5 shadow-sm active:scale-95 transition-all" style="background-color: #334155; border-color: #334155;">

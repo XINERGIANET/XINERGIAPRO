@@ -525,7 +525,12 @@ const createGlobalSelectAutocomplete = (select) => {
     if (select.classList.contains('sr-only') || select.getAttribute('aria-hidden') === 'true') {
         return;
     }
-    if (select.closest('[data-gsa-skip="true"]') || select.closest('.gsa-wrap')) {
+    if (
+        select.closest('[data-gsa-skip="true"]')
+        || select.closest('.gsa-wrap')
+        || select.closest('.swal2-container')
+        || select.closest('.swal2-popup')
+    ) {
         return;
     }
 

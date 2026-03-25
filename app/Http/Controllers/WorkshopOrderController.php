@@ -71,7 +71,7 @@ class WorkshopOrderController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
-        return view('workshop.orders.index', compact('orders', 'search', 'perPage', 'selectedStatus'));
+        return view('workshop.orders.index', compact('orders', 'search', 'perPage', 'selectedStatus', 'dateFrom', 'dateTo'));
     }
 
     public function destroyBulk(Request $request): RedirectResponse
@@ -1261,7 +1261,7 @@ class WorkshopOrderController extends Controller
     /**
      * @return \Illuminate\Database\Eloquent\Builder<\App\Models\WorkshopMovement>
      */
-    private function workshopOrdersFilteredQuery(int $branchId, int $companyId, string $search, string $selectedStatus)
+    private function workshopOrdersFilteredQuery(int $branchId, int $companyId, string $search, string $selectedStatus, ?string $dateFrom = null, ?string $dateTo = null)
     {
         $selectedStatus = $this->normalizeWorkshopOrderListStatus($selectedStatus);
 
@@ -1278,6 +1278,20 @@ class WorkshopOrderController extends Controller
                             ->orWhere('last_name', 'ILIKE', "%{$search}%"));
                 });
             });
+    }
+
+    private function normalizeWorkshopOrderListDate(string $value): ?string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+
+        try {
+            return \Carbon\Carbon::createFromFormat('Y-m-d', $value)->format('Y-m-d');
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     private function normalizeWorkshopOrderListStatus(string $selectedStatus): string
