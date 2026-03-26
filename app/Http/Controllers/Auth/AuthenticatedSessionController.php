@@ -75,7 +75,30 @@ class AuthenticatedSessionController extends Controller
                 }
             }
 
-            return redirect()->intended($defaultAfterLogin);
+            $intendedUrl = (string) $request->session()->get('url.intended', '');
+            $dashboardUrl = route('dashboard');
+            $loginUrl = route('login');
+            $normalizeUrlPath = static function (?string $url): string {
+                $path = (string) parse_url((string) $url, PHP_URL_PATH);
+                $path = '/' . ltrim($path, '/');
+                return rtrim($path, '/') ?: '/';
+            };
+
+            $intendedPath = $normalizeUrlPath($intendedUrl);
+            $dashboardPath = $normalizeUrlPath($dashboardUrl);
+            $loginPath = $normalizeUrlPath($loginUrl);
+
+            $shouldUseDefaultAfterLogin = $intendedUrl === ''
+                || $intendedPath === '/'
+                || $intendedPath === $dashboardPath
+                || $intendedPath === $loginPath;
+
+            if ($shouldUseDefaultAfterLogin) {
+                $request->session()->forget('url.intended');
+                return redirect()->to($defaultAfterLogin);
+            }
+
+            return redirect()->to($intendedUrl);
         }
 
         return back()->withErrors([
