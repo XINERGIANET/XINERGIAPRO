@@ -698,6 +698,9 @@
             });
 
             let selectedCategory = 'General';
+            let selectedDetailType = String(initialSaleData?.detail_type || db[activeKey]?.detail_type || 'PRODUCTOS').toUpperCase() === 'GLOSA'
+                ? 'GLOSA'
+                : 'PRODUCTOS';
             let productSearch = '';
             let productSearchTimer = null;
             let clientQuery = '';
@@ -791,6 +794,7 @@
             currentSale.invoice_number = String(currentSale.invoice_number || '');
             currentSale.credit_days = Math.max(0, parseInt(currentSale.credit_days, 10) || 0);
             currentSale.debt_due_date = String(currentSale.debt_due_date || '').trim();
+            currentSale.detail_type = selectedDetailType;
             paymentRows = Array.isArray(currentSale.payment_methods)
                 ? currentSale.payment_methods.map((row) => ({
                     payment_method_id: Number(row.payment_method_id || row.methodId || paymentMethods[0]?.id || 0),
@@ -2097,6 +2101,48 @@
                 if (label) label.textContent = selectedCategory;
             }
 
+            function renderDetailTypeFilters() {
+                const container = document.getElementById('sale-detail-type-filters');
+                if (!container) return;
+                container.innerHTML = '';
+
+                [
+                    { value: 'PRODUCTOS', label: 'Productos' },
+                    { value: 'GLOSA', label: 'Glosa' },
+                ].forEach((option) => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'inline-flex h-12 items-center justify-center rounded-[22px] border px-6 text-sm font-bold transition';
+                    const isActive = option.value === selectedDetailType;
+                    button.className += isActive
+                        ? ' border-transparent text-white shadow-theme-xs'
+                        : ' border-slate-200 bg-white text-slate-800 hover:border-orange-300 hover:text-orange-700';
+                    button.style.background = isActive ? 'linear-gradient(90deg,#ff7a00,#ff4d00)' : '';
+                    button.style.color = isActive ? '#fff' : '';
+                    button.style.boxShadow = isActive ? '0 12px 24px rgba(249,115,22,0.22)' : '';
+                    button.textContent = option.label;
+                    button.addEventListener('click', () => {
+                        selectedDetailType = option.value;
+                        currentSale.detail_type = selectedDetailType;
+                        saveDB();
+                        renderDetailTypeFilters();
+                        renderCatalogMode();
+                    });
+                    container.appendChild(button);
+                });
+            }
+
+            function renderCatalogMode() {
+                const productsPanel = document.getElementById('sale-products-panel');
+                const glosaPanel = document.getElementById('sale-glosa-panel');
+                const categoryFilters = document.getElementById('category-filters');
+                const showProducts = selectedDetailType !== 'GLOSA';
+
+                if (productsPanel) productsPanel.classList.toggle('hidden', !showProducts);
+                if (glosaPanel) glosaPanel.classList.toggle('hidden', showProducts);
+                if (categoryFilters) categoryFilters.classList.toggle('hidden', !showProducts);
+            }
+
             function renderProducts() {
                 const grid = document.getElementById('products-grid');
                 const catalogCount = document.getElementById('catalog-count');
@@ -2200,6 +2246,26 @@
                     showNotice((prod.name || 'Producto') + ': agregado aunque no tenga stock.');
                 }
                 showNotification(prod.name || 'Producto');
+            }
+
+            function addGlosaLine() {
+                currentSale.items.push({
+                    kind: 'glosa',
+                    pId: null,
+                    name: '',
+                    qty: 1,
+                    price: 0,
+                    tax_rate: defaultTaxPct,
+                    note: '',
+                });
+                saveDB();
+                setAsideTab('summary');
+                renderTicket();
+                window.setTimeout(() => {
+                    const nameInputs = document.querySelectorAll('[data-role="line-name"]');
+                    const lastInput = nameInputs[nameInputs.length - 1];
+                    lastInput?.focus();
+                }, 30);
             }
 
             function updateQty(index, delta) {
@@ -2379,6 +2445,7 @@ const total = subtotalBase + tax - discount;
             function clearSale() {
                 currentSale.items = [];
                 currentSale.notes = '';
+                currentSale.detail_type = selectedDetailType;
                 currentSale.payment_type = 'CONTADO';
                 currentSale.credit_days = 0;
                 currentSale.debt_due_date = '';
@@ -2395,7 +2462,7 @@ const total = subtotalBase + tax - discount;
 
             function processSaleNow() {
                 if (!currentSale.items.length) {
-                    showNotice('Agrega al menos un producto antes de cobrar.');
+                    showNotice('Agrega al menos un ítem antes de cobrar.');
                     return;
                 }
 
@@ -2513,6 +2580,7 @@ const total = subtotalBase + tax - discount;
                             payment_type: 'CONTADO',
                             document_type_id: defaultDocumentTypeId,
                             cash_register_id: defaultCashRegisterId,
+                            detail_type: selectedDetailType,
                             billing_status: 'NOT_APPLICABLE',
                             invoice_series: '001',
                             invoice_number: '',
@@ -2595,6 +2663,7 @@ const total = subtotalBase + tax - discount;
                 window.clearTimeout(productSearchTimer);
                 tryAutoAddProductByCode(event.target.value || '');
             });
+            document.getElementById('add-glosa-button')?.addEventListener('click', addGlosaLine);
             document.getElementById('clear-sale-button')?.addEventListener('click', clearSale);
             document.getElementById('add-payment-row-button')?.addEventListener('click', () => addPaymentRow());
             document.getElementById('summary-tab-button')?.addEventListener('click', () => setAsideTab('summary'));
@@ -2797,7 +2866,9 @@ document.getElementById('sale-discount-save-button')?.addEventListener('click', 
 
             syncQuickClientPersonTypeUI();
             setQuickClientLocation(branchDepartmentId, branchProvinceId, branchDistrictId);
+            renderDetailTypeFilters();
             renderCategoryFilters();
+            renderCatalogMode();
             renderProducts();
             renderTicket();
             renderPaymentRows();
