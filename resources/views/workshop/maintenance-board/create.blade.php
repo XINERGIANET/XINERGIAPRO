@@ -1444,13 +1444,12 @@
                                 </div>
                             </label>
                             <template x-if="orderedServiceTiers(service).length > 0">
-                                <div class="mt-2 border-t border-gray-100 pt-2">
-                                    <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">Tarifa por cilindrada</label>
+                                <div class="mt-1.5 flex justify-end">
                                     <select
                                         :value="getServiceCcOverride(service.id)"
                                         @click.stop
                                         @change="setServiceCcOverride(service.id, $event.target.value)"
-                                        class="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-xs text-gray-700"
+                                        class="h-7 max-w-[150px] rounded-md border border-gray-200 bg-gray-50 px-2 text-[11px] text-gray-600"
                                     >
                                         <template x-for="option in servicePriceOptions(service)" :key="`${service.id}-${option.value}`">
                                             <option :value="option.value" x-text="option.label"></option>
