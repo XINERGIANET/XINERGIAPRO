@@ -64,7 +64,7 @@
             })
             .catch(() => {
                 this.isSearchingDocument = false;
-                this.clientError = 'Error de conexiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n con RENIEC/SUNAT.';
+                this.clientError = 'Error de conexión con RENIEC/SUNAT.';
             });
     },
 
@@ -97,7 +97,7 @@
         })
         .catch(err => {
             this.isSavingClient = false;
-            this.clientError = 'Error de conexiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n. Intente de nuevo.';
+            this.clientError = 'Error de conexión. Intente de nuevo.';
         });
     },
 
@@ -216,8 +216,8 @@
     },
     cardTypeLabel(type) {
         const c = String(type || '').trim().toUpperCase();
-        if (c === 'C') return 'CrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©dito';
-        if (c === 'D') return 'DÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©bito';
+        if (c === 'C') return 'Crédito';
+        if (c === 'D') return 'Débito';
         return '';
     },
     get paymentMethodVariants() {
@@ -450,10 +450,10 @@
                             </select>
                         </div>
                         <div>
-                            <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">CondiciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n</label>
+                            <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">Condición</label>
                             <select x-model="paymentType" @change="onPaymentTypeChange()" name="payment_type" class="w-full h-11 rounded-xl border-gray-200 bg-white text-sm shadow-sm focus:border-purple-500 focus:ring-purple-500">
                                 <option value="CONTADO">Contado</option>
-                                <option value="DEUDA">Deuda / CrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©dito</option>
+                                <option value="DEUDA">Deuda / Crédito</option>
                             </select>
                         </div>
                     </div>
@@ -502,7 +502,7 @@
                         <template x-for="(row, index) in paymentRows" :key="`payment-row-${index}`">
                             <div class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
                                 <div class="mb-2 flex items-center justify-between">
-                                    <span class="text-xs font-bold text-slate-500">MÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©todo <span x-text="index + 1"></span></span>
+                                    <span class="text-xs font-bold text-slate-500">Método <span x-text="index + 1"></span></span>
                                     <button type="button" @click="removePaymentRow(index)" class="text-red-500 hover:text-red-700" :disabled="paymentRows.length === 1" :class="{ 'opacity-50 cursor-not-allowed': paymentRows.length === 1 }">
                                         <i class="ri-delete-bin-line"></i>
                                     </button>
@@ -513,7 +513,7 @@
                                 
                                 <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                                     <div :class="row.kind === 'card' ? 'md:col-span-4' : 'md:col-span-5'">
-                                        <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">MÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©todo</label>
+                                        <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Método</label>
                                         <select x-model="row.method_variant_key" @change="applyPaymentVariant(index)" required class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
                                             <template x-for="variant in paymentMethodVariants" :key="variant.key"><option :value="variant.key" x-text="variant.label"></option></template>
                                         </select>
@@ -573,10 +573,6 @@
                     </div>
                     <p class="mt-3 text-center text-lg font-black text-rose-900" x-text="`S/ ${massTotal.toFixed(2)}`"></p>
                 </div>
-                    <h4 class="text-sm font-bold text-rose-800">Venta al CrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©dito</h4>
-                    <p class="mt-1 text-xs text-rose-600">Esta venta se enviarÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ a Cuentas por Cobrar. No se registrarÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ ingreso de dinero a tu caja.</p>
-                    <p class="mt-2 text-lg font-black text-rose-900" x-text="`S/ ${massTotal.toFixed(2)}`"></p>
-                </div>
 
                 <div class="rounded-2xl border border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-white/5">
                     <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">Observaciones Venta</label>
@@ -590,7 +586,7 @@
                     <span>Confirmar y Procesar Venta</span>
                 </button>
                 <p class="mt-3 text-center text-xs text-gray-400">
-                    <i class="ri-information-line"></i> Esta acciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n actualizarÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ los registros de armado y crearÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ un nuevo movimiento de venta en el registro mensual.
+                    <i class="ri-information-line"></i> Esta acción actualizará los registros de armado y creará un nuevo movimiento de venta en el registro mensual.
                 </p>
             </div>
         </form>

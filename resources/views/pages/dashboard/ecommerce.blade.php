@@ -153,72 +153,7 @@
             </div>
         </header>
         
-        <!-- GRÁFICO DE TENDENCIA (SOLO PARA LA PRIMERA HOJA DEL PDF) -->
-        <article class="hidden print:flex bg-white rounded-[2rem] border-2 border-slate-200 p-8 flex-col relative overflow-hidden mb-10 trend-chart-article" style="min-height: 450px !important;">
-            <div class="flex items-start justify-between mb-8 px-8 pt-6 relative z-10">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-lg bg-[#F4F6FA] border border-slate-100 flex items-center justify-center shadow-sm">
-                        <i class="ri-line-chart-line text-blue-600 text-xl"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-lg font-bold text-slate-900 leading-tight">Tendencia de Ingresos</h3>
-                        <p class="text-sm text-slate-500">Resumen - Últimos 7 días</p>
-                    </div>
-                </div>
-                <div class="text-right bg-[#F4F6FA] px-4 py-3 rounded-xl border border-slate-100">
-                    <p class="text-[10px] text-blue-600 font-bold uppercase tracking-wider mb-1">Total Semana</p>
-                    <p class="text-2xl font-bold text-blue-700 leading-none">S/ {{ number_format((float) ($incomeByDay->sum('amount')), 2) }}</p>
-                </div>
-            </div>
-            <!-- Contenedor del Gráfico -->
-            <div class="flex-1 flex flex-col min-h-[320px] px-8 pb-6">
-                <div class="flex flex-1 items-stretch">
-                    <!-- Eje Y (Labels) -->
-                    <div class="flex flex-col justify-between text-[11px] text-slate-400 font-medium pr-6 mb-8 mt-1">
-                        @foreach($ticks as $tick)
-                            <span>{{ number_format($tick, 0) }}</span>
-                        @endforeach
-                    </div>
-
-                    <!-- Área del Gráfico -->
-                    <div class="relative flex-1 mb-8" style="height: 250px !important;">
-                        <!-- Grid Lines -->
-                        <div class="absolute inset-0 flex flex-col justify-between h-full pointer-events-none">
-                            @foreach($ticks as $tick)
-                                <div class="w-full h-[1px] border-t border-dashed border-slate-100"></div>
-                            @endforeach
-                        </div>
-
-                        <!-- SVG del Gráfico -->
-                        <div class="absolute inset-0 h-full">
-                            <svg viewBox="0 0 1000 100" preserveAspectRatio="none" class="w-full h-full overflow-visible">
-                                <defs>
-                                    <linearGradient id="colorValuePrint" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stop-color="#3b82f6" stop-opacity="0.4"/>
-                                        <stop offset="95%" stop-color="#3b82f6" stop-opacity="0.05"/>
-                                    </linearGradient>
-                                </defs>
-                                <path d="{{ $areaPath }}" fill="url(#colorValuePrint)" />
-                                <path d="{{ $path }}" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                                
-                                @foreach($points as $p)
-                                    <circle cx="{{ $p['x'] }}" cy="{{ $p['y'] }}" r="3" fill="#2563eb" stroke="white" stroke-width="2" />
-                                @endforeach
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Eje X (Dates) -->
-                <div class="flex justify-between pl-[40px] border-t border-slate-50 pt-4">
-                    @foreach($incomeByDay as $row)
-                        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{{ $row['label'] }}</span>
-                    @endforeach
-                </div>
-            </div>
-        </article>
-
-        <!-- KPI CARDS Y ANEXOS DETALLADOS -->
+        <!-- KPI CARDS Y ANEXOS DETALLES (AHORA AL PRINCIPIO) -->
         <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8 hero-kpi-grid print:grid-cols-2 print:gap-4 print:mb-6">
             <!-- Ingreso Hoy -->
             <article class="bg-white p-6 rounded-[1.5rem] border border-slate-100 transition-all hover:bg-slate-50/50">
@@ -285,6 +220,115 @@
                     <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Mantenimientos</p>
                     <p class="text-3xl font-black text-slate-900 leading-none mb-1">{{ number_format((int) ($d['maintenancesWeek'] ?? 0)) }}</p>
                     <p class="text-[10px] font-bold text-slate-400">Esta semana</p>
+                </div>
+            </article>
+        </section>
+
+        <!-- MAIN GRID: TRENDS & BIRTHDAYS -->
+        <section class="grid grid-cols-1 gap-6 xl:grid-cols-12 mb-6 main-trend-grid">
+            <article class="bg-white rounded-[1.5rem] border border-slate-100 p-8 xl:col-span-8 flex flex-col relative overflow-hidden transition-all hover:shadow-md trend-chart-article">
+                <!-- Header del gráfico -->
+                <div class="flex items-start justify-between mb-8 px-8 pt-6 relative z-10">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-[#F4F6FA] border border-slate-100 flex items-center justify-center shadow-sm">
+                            <i class="ri-line-chart-line text-blue-600 text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-900 leading-tight">Tendencia de Ingresos</h3>
+                            <p class="text-sm text-slate-500">Últimos 7 días</p>
+                        </div>
+                    </div>
+                    <div class="text-right bg-[#F4F6FA] px-4 py-3 rounded-xl border border-slate-100">
+                        <p class="text-[10px] text-blue-600 font-bold uppercase tracking-wider mb-1">Total Semana</p>
+                        <p class="text-2xl font-bold text-blue-700 leading-none">S/ {{ number_format((float) ($incomeByDay->sum('amount')), 2) }}</p>
+                    </div>
+                </div>
+                <!-- Contenedor del Gráfico -->
+                <div class="flex-1 flex flex-col min-h-[320px] px-8 pb-6">
+                    <div class="flex flex-1 items-stretch">
+
+                        <!-- Eje Y (Labels) -->
+                        <div class="flex flex-col justify-between text-[11px] text-slate-400 font-medium pr-6 mb-8 mt-1">
+                            @foreach($ticks as $tick)
+                                <span>{{ number_format($tick, 0) }}</span>
+                            @endforeach
+                        </div>
+
+                        <!-- Área del Gráfico -->
+                        <div class="relative flex-1 mb-8" style="height: 250px !important;">
+                            <!-- Grid Lines -->
+                            <div class="absolute inset-0 flex flex-col justify-between h-full pointer-events-none">
+                                @foreach($ticks as $tick)
+                                    <div class="w-full h-[1px] border-t border-dashed border-slate-100"></div>
+                                @endforeach
+                            </div>
+
+                            <!-- SVG del Gráfico -->
+                            <div class="absolute inset-0 h-full">
+                                <svg viewBox="0 0 1000 100" preserveAspectRatio="none" class="w-full h-full overflow-visible">
+                                    <defs>
+                                        <linearGradient id="colorValueMain" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stop-color="#3b82f6" stop-opacity="0.4"/>
+                                            <stop offset="95%" stop-color="#3b82f6" stop-opacity="0.05"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <path d="{{ $areaPath }}" fill="url(#colorValueMain)" />
+                                    <path d="{{ $path }}" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                    
+                                    @foreach($points as $p)
+                                        <circle cx="{{ $p['x'] }}" cy="{{ $p['y'] }}" r="3" fill="#2563eb" stroke="white" stroke-width="2" />
+                                    @endforeach
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Eje X (Dates) -->
+                    <div class="flex justify-between pl-[40px] border-t border-slate-50 pt-4">
+                        @foreach($incomeByDay as $row)
+                            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{{ $row['label'] }}</span>
+                        @endforeach
+                    </div>
+                </div>
+            </article>
+
+            <!-- CUMPLEAÑOS -->
+            <article class="rounded-[1.5rem] border border-slate-100 bg-white p-6 xl:col-span-4 h-full flex flex-col overflow-hidden">
+                <div class="mb-8 flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-orange-600 text-white flex items-center justify-center shadow-lg shadow-orange-600/20">
+                        <i class="ri-cake-2-fill text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-black text-slate-900 leading-tight">Cumpleaños</h3>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Esta semana</p>
+                    </div>
+                </div>
+                
+                <div class="space-y-4 overflow-y-auto pr-1 custom-scrollbar flex-1">
+                    @forelse($birthdays as $bday)
+                        <div class="flex items-center justify-between p-4 rounded-2xl border border-transparent birthday-hover-row cursor-pointer transition-all group/item">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-full text-white flex items-center justify-center font-black text-sm shadow-lg shadow-blue-500/20" style="background-color: #2563eb !important;">
+                                    {{ substr($bday->first_name, 0, 1) }}{{ substr($bday->last_name, 0, 1) }}
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <h4 class="font-black text-slate-800 uppercase text-sm leading-tight mb-1 whitespace-normal break-words">{{ $bday->first_name }} {{ $bday->last_name }}</h4>
+                                    <p class="text-[10px] font-black text-slate-400 flex items-center gap-1 uppercase">
+                                        <i class="ri-cake-2-line text-orange-400"></i>
+                                        {{ \Carbon\Carbon::parse($bday->fecha_nacimiento)->translatedFormat('d \d\e M') }}
+                                    </p>
+                                </div>
+                            </div>
+                            <a href="https://wa.me/{{ preg_replace('/\D/', '', $bday->phone) }}" target="_blank" class="w-11 h-11 rounded-[1.2rem] text-white flex items-center justify-center hover:scale-110 transition-all shrink-0 shadow-lg shadow-emerald-500/20" style="background-color: #25D366 !important;">
+                                <i class="ri-whatsapp-line text-xl"></i>
+                            </a>
+                        </div>
+                    @empty
+                        <div class="h-full flex flex-col items-center justify-center py-10 opacity-30">
+                            <i class="ri-cake-2-line text-3xl mb-2 text-slate-300"></i>
+                            <p class="text-xs font-bold italic">Sin cumpleaños</p>
+                        </div>
+                    @endforelse
                 </div>
             </article>
         </section>
@@ -549,114 +593,7 @@
                 </div>
             </article>
         </section>
-        <!-- MAIN GRID: TRENDS & BIRTHDAYS -->
-        <section class="grid grid-cols-1 gap-6 xl:grid-cols-12 mb-6">
-            <article class="bg-white rounded-[1.5rem] border border-slate-100 p-8 xl:col-span-8 flex flex-col relative overflow-hidden transition-all hover:shadow-md trend-chart-article print:hidden">
-                <!-- Header del gráfico -->
-                <div class="flex items-start justify-between mb-8 px-8 pt-6 relative z-10">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-lg bg-[#F4F6FA] border border-slate-100 flex items-center justify-center shadow-sm">
-                            <i class="ri-line-chart-line text-blue-600 text-xl"></i>
-                        </div>
-                        <div>
-                            <h3 class="text-lg font-bold text-slate-900 leading-tight">Tendencia de Ingresos</h3>
-                            <p class="text-sm text-slate-500">Últimos 7 días</p>
-                        </div>
-                    </div>
-                    <div class="text-right bg-[#F4F6FA] px-4 py-3 rounded-xl border border-slate-100">
-                        <p class="text-[10px] text-blue-600 font-bold uppercase tracking-wider mb-1">Total Semana</p>
-                        <p class="text-2xl font-bold text-blue-700 leading-none">S/ {{ number_format((float) ($incomeByDay->sum('amount')), 2) }}</p>
-                    </div>
-                </div>
-                <!-- Contenedor del Gráfico -->
-                <div class="flex-1 flex flex-col min-h-[320px] px-8 pb-6">
-                    <div class="flex flex-1 items-stretch">
 
-                        <!-- Eje Y (Labels) -->
-                        <div class="flex flex-col justify-between text-[11px] text-slate-400 font-medium pr-6 mb-8 mt-1">
-                            @foreach($ticks as $tick)
-                                <span>{{ number_format($tick, 0) }}</span>
-                            @endforeach
-                        </div>
-
-                        <!-- Área del Gráfico -->
-                        <div class="relative flex-1 mb-8" style="height: 250px !important;">
-                            <!-- Grid Lines -->
-                            <div class="absolute inset-0 flex flex-col justify-between h-full pointer-events-none">
-                                @foreach($ticks as $tick)
-                                    <div class="w-full h-[1px] border-t border-dashed border-slate-100"></div>
-                                @endforeach
-                            </div>
-
-                            <!-- SVG del Gráfico -->
-                            <div class="absolute inset-0 h-full">
-                                <svg viewBox="0 0 1000 100" preserveAspectRatio="none" class="w-full h-full overflow-visible">
-                                    <defs>
-                                        <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stop-color="#3b82f6" stop-opacity="0.4"/>
-                                            <stop offset="95%" stop-color="#3b82f6" stop-opacity="0.05"/>
-                                        </linearGradient>
-                                    </defs>
-                                    <path d="{{ $areaPath }}" fill="url(#colorValue)" />
-                                    <path d="{{ $path }}" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                                    
-                                    @foreach($points as $p)
-                                        <circle cx="{{ $p['x'] }}" cy="{{ $p['y'] }}" r="3" fill="#2563eb" stroke="white" stroke-width="2" />
-                                    @endforeach
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Eje X (Dates) -->
-                    <div class="flex justify-between pl-[40px] border-t border-slate-50 pt-4">
-                        @foreach($incomeByDay as $row)
-                            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{{ $row['label'] }}</span>
-                        @endforeach
-                    </div>
-                </div>
-            </article>
-
-            <!-- CUMPLEAÑOS -->
-            <article class="rounded-[1.5rem] border border-slate-100 bg-white p-6 xl:col-span-4 h-full flex flex-col overflow-hidden">
-                <div class="mb-8 flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-orange-600 text-white flex items-center justify-center shadow-lg shadow-orange-600/20">
-                        <i class="ri-cake-2-fill text-xl"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-lg font-black text-slate-900 leading-tight">Cumpleaños</h3>
-                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Esta semana</p>
-                    </div>
-                </div>
-                
-                <div class="space-y-4 overflow-y-auto pr-1 custom-scrollbar flex-1">
-                    @forelse($birthdays as $bday)
-                        <div class="flex items-center justify-between p-4 rounded-2xl border border-transparent birthday-hover-row cursor-pointer transition-all group/item">
-                            <div class="flex items-center gap-4">
-                                <div class="w-12 h-12 rounded-full text-white flex items-center justify-center font-black text-sm shadow-lg shadow-blue-500/20" style="background-color: #2563eb !important;">
-                                    {{ substr($bday->first_name, 0, 1) }}{{ substr($bday->last_name, 0, 1) }}
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <h4 class="font-black text-slate-800 uppercase text-sm leading-tight mb-1 whitespace-normal break-words">{{ $bday->first_name }} {{ $bday->last_name }}</h4>
-                                    <p class="text-[10px] font-black text-slate-400 flex items-center gap-1 uppercase">
-                                        <i class="ri-cake-2-line text-orange-400"></i>
-                                        {{ \Carbon\Carbon::parse($bday->fecha_nacimiento)->translatedFormat('d \d\e M') }}
-                                    </p>
-                                </div>
-                            </div>
-                            <a href="https://wa.me/{{ preg_replace('/\D/', '', $bday->phone) }}" target="_blank" class="w-11 h-11 rounded-[1.2rem] text-white flex items-center justify-center hover:scale-110 transition-all shrink-0 shadow-lg shadow-emerald-500/20" style="background-color: #25D366 !important;">
-                                <i class="ri-whatsapp-line text-xl"></i>
-                            </a>
-                        </div>
-                    @empty
-                        <div class="h-full flex flex-col items-center justify-center py-10 opacity-30">
-                            <i class="ri-cake-2-line text-3xl mb-2 text-slate-300"></i>
-                            <p class="text-xs font-bold italic">Sin cumpleaños</p>
-                        </div>
-                    @endforelse
-                </div>
-            </article>
-        </section>
 
 
         <!-- BOTTOM GRID: TOP SERVICES & RECENT ORDERS -->
