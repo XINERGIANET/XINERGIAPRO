@@ -38,6 +38,8 @@ class WorkshopParameterSeeder extends Seeder
             ['description' => 'WS_REQUIRED_CHECKLIST_TYPES', 'value' => 'PDI,OS_INTAKE'],
             ['description' => 'Mostrar inventario', 'value' => 'Si'],
             ['description' => 'Mostrar daños preexistentes', 'value' => 'Si'],
+            ['description' => 'Meses para notificar próximo servicio', 'value' => '2'],
+            ['description' => 'Días para notificar próximo servicio', 'value' => '0'],
         ];
 
         $parameterIds = [];

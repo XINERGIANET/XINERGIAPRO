@@ -45,7 +45,12 @@
                                 $isCashRegisterParameter = str_contains($parameterDescription, 'caja ventas del') || str_contains($parameterDescription, 'caja factur');
                                 $isMaintenanceDaysParameter = str_contains($parameterDescription, 'periodo de mantenimiento')
                                     || str_contains($parameterDescription, 'dias previos de recordatorio')
-                                    || str_contains($parameterDescription, 'días previos de recordatorio');
+                                    || str_contains($parameterDescription, 'días previos de recordatorio')
+                                    || str_contains($parameterDescription, 'notificar próximo servicio');
+                                    
+                                if ($isMaintenanceDaysParameter) {
+                                    $isBoolean = false;
+                                }
                                 $type = is_numeric($currentValue) ? 'number' : 'text';
                             @endphp
                             <div class="rounded-xl border border-gray-200 bg-white p-4">
