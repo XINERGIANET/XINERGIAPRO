@@ -19,10 +19,10 @@
         return !this.costs.some(c => c.vehicle_type === this.selectedType);
     },
 
-    // Devuelve las marcas disponibles filtradas por el tipo de vehÃƒÆ’Ã‚Â­culo
+    // Devuelve las marcas disponibles filtradas por el tipo de vehículo
     get availableBrands() {
         if (!this.selectedType) {
-            // Si no hay tipo, mostrar todas las marcas ÃƒÆ’Ã‚Âºnicas
+            // Si no hay tipo, mostrar todas las marcas únicas
             return this.costs.map(c => c.brand_company).filter((v, i, a) => a.indexOf(v) === i);
         }
         // Mostrar solo las marcas que tienen configurado el tipo seleccionado
@@ -91,7 +91,7 @@
                 }
                 
                 this.$dispatch('close-quick-cost-modal');
-                // Notificar ÃƒÆ’Ã‚Â©xito (opcional, el cambio en el select es visualmente claro)
+                // Notificar éxito (opcional, el cambio en el select es visualmente claro)
             }
         } catch (e) {
             console.error('Error configurando costo:', e);
@@ -123,7 +123,7 @@
                 <i class="ri-file-excel-2-line"></i><span>Exportar CSV</span>
             </x-ui.link-button>
 
-            {{-- BotÃƒÆ’Ã‚Â³n para Generar Venta Masiva --}}
+            {{-- Botón para Generar Venta Masiva --}}
             <template x-if="selectedAssemblies.length > 0">
                 <form method="GET" action="{{ route('workshop.assemblies.checkout.page') }}" class="inline-block">
                     <template x-for="id in selectedAssemblies" :key="id">
@@ -201,7 +201,9 @@
                                     @endif
                                 </div>
                             </div>
-                            <input type="checkbox" :value="{{ $assembly->id }}" x-model="selectedAssemblies" class="mt-1 h-5 w-5 rounded border-slate-300 text-[#244BB3] focus:ring-[#244BB3]">
+                            @if(!$assembly->sales_movement_id)
+                                <input type="checkbox" :value="{{ $assembly->id }}" x-model="selectedAssemblies" class="mt-1 h-5 w-5 rounded border-slate-300 text-[#244BB3] focus:ring-[#244BB3]">
+                            @endif
                         </div>
 
                         <div class="mb-3 flex items-center gap-3 rounded-[24px] bg-slate-800 px-3.5 py-3 text-white shadow-lg">
@@ -332,8 +334,8 @@
                     <thead>
                         <tr class="bg-gray-50/50 dark:bg-gray-800/50">
                             <th class="px-5 py-4 font-bold text-gray-700 dark:text-gray-300">Orden</th>
-                            <th class="px-5 py-4 font-bold text-gray-700 dark:text-gray-300">VehÃƒÆ’Ã‚Â­culo / Marca</th>
-                            <th class="px-5 py-4 font-bold text-gray-700 dark:text-gray-300">TÃƒÆ’Ã‚Â©cnico / UbicaciÃƒÆ’Ã‚Â³n</th>
+                            <th class="px-5 py-4 font-bold text-gray-700 dark:text-gray-300">Vehículo / Marca</th>
+                            <th class="px-5 py-4 font-bold text-gray-700 dark:text-gray-300">Técnico / Ubicación</th>
                             <th class="px-5 py-4 font-bold text-gray-700 dark:text-gray-300 text-center">Cant.</th>
                             <th class="px-5 py-4 font-bold text-gray-700 dark:text-gray-300 text-center">Estado</th>
                             <th class="px-5 py-4 font-bold text-gray-700 dark:text-gray-300">Acciones</th>
@@ -344,7 +346,13 @@
                             <tr class="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
                                 <td class="px-5 py-4">
                                     <div class="flex items-center gap-3">
-                                        <input type="checkbox" :value="{{ $assembly->id }}" x-model="selectedAssemblies" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                        @if($assembly->sales_movement_id)
+                                            <div title="Venta generada" class="flex h-4 w-4 items-center justify-center rounded bg-emerald-100 text-emerald-600">
+                                                <i class="ri-check-line text-xs font-bold"></i>
+                                            </div>
+                                        @else
+                                            <input type="checkbox" :value="{{ $assembly->id }}" x-model="selectedAssemblies" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                        @endif
                                         <div class="flex flex-col">
                                             <span class="font-bold text-gray-900 dark:text-white">#{{ str_pad($assembly->id, 6, '0', STR_PAD_LEFT) }}</span>
                                             <span class="text-[10px] text-gray-500">{{ optional($assembly->entry_at)->format('d/m/y') }}</span>
@@ -354,15 +362,15 @@
                                 <td class="px-5 py-4">
                                     <div class="flex flex-col">
                                         <span class="font-bold text-gray-800 dark:text-gray-200 uppercase">{{ $assembly->model ?: 'Sin modelo' }}</span>
-                                        <span class="text-xs text-gray-500 uppercase">{{ $assembly->brand_company }} Ãƒâ€š -  {{ $assembly->vehicle_type }}</span>
+                                        <span class="text-xs text-gray-500 uppercase">{{ $assembly->brand_company }} -  {{ $assembly->vehicle_type }}</span>
                                     </div>
                                 </td>
                                 <td class="px-5 py-4">
                                     <div class="flex flex-col">
                                         <span class="font-medium text-gray-700 dark:text-gray-300">
-                                            {{ trim(($assembly->responsibleTechnician->first_name ?? '') . ' ' . ($assembly->responsibleTechnician->last_name ?? '')) ?: 'Sin tÃƒÆ’Ã‚Â©cnico' }}
+                                            {{ trim(($assembly->responsibleTechnician->first_name ?? '') . ' ' . ($assembly->responsibleTechnician->last_name ?? '')) ?: 'Sin técnico' }}
                                         </span>
-                                        <span class="text-xs text-gray-500 italic">{{ $assembly->location?->name ?: 'Sin ubicaciÃƒÆ’Ã‚Â³n' }}</span>
+                                        <span class="text-xs text-gray-500 italic">{{ $assembly->location?->name ?: 'Sin ubicación' }}</span>
                                     </div>
                                 </td>
                                 <td class="px-5 py-4 text-center font-bold">{{ $assembly->quantity }}</td>
@@ -402,7 +410,7 @@
                                             </button>
                                         @endif
 
-                                        <form method="POST" action="{{ route('workshop.assemblies.destroy', $assembly) }}" onsubmit="return confirm('Ãƒâ€šÃ‚Â¿Eliminar?')">
+                                        <form method="POST" action="{{ route('workshop.assemblies.destroy', $assembly) }}" onsubmit="return confirm('¿Eliminar?')">
                                             @csrf @method('DELETE')
                                             <button class="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"><i class="ri-delete-bin-line text-lg"></i></button>
                                         </form>
@@ -577,7 +585,7 @@
     </x-ui.modal>
 
 
-    {{-- Modal rÃƒÆ’Ã‚Â¡pido para configuraciÃƒÆ’Ã‚Â³n de costos --}}
+    {{-- Modal rápido para configuración de costos --}}
     <x-ui.modal 
         x-data="{ open: false }" 
         @open-quick-cost-modal.window="open = true" 

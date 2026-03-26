@@ -2,8 +2,11 @@
 
 @section('content')
 <div x-data="{
+    ...(typeof formAutocompleteHelpers === 'function' ? formAutocompleteHelpers() : {}),
+    clientsOptions: @js($clients->map(fn($c) => ['id' => $c->id, 'name' => trim($c->first_name . ' ' . $c->last_name)])->values()->all()),
+    selectedClientId: '',
+
     allAssembliesData: @js($assemblies->map(fn($a) => ['id' => $a->id, 'total_cost' => $a->total_cost])->values()->all()),
-    
     // Payment Logic
     documentTypeOptions: @js(collect($documentTypes ?? collect())->map(fn ($doc) => ['id' => (int) $doc->id, 'name' => (string) ($doc->name ?? '')])->values()->all()),
     selectedDocumentTypeId: @js((string) old('document_type_id', optional(($documentTypes ?? collect())->first())->id)),
@@ -259,12 +262,18 @@
             <div class="space-y-4">
                 <div class="rounded-2xl border border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-white/5">
                     <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">Datos del Cliente</label>
-                    <select name="client_person_id" class="w-full h-11 rounded-xl border-gray-200 bg-white text-sm shadow-sm focus:border-purple-500 focus:ring-purple-500" required>
-                        <option value="">Seleccione un cliente...</option>
-                        @foreach($clients as $client)
-                            <option value="{{ $client->id }}">{{ $client->first_name }} {{ $client->last_name }}</option>
-                        @endforeach
-                    </select>
+                    <x-form.select-autocomplete-inline
+                        fieldKey="ms_client"
+                        name="client_person_id"
+                        valueVar="selectedClientId"
+                        optionsListExpr="clientsOptions"
+                        optionLabel="name"
+                        optionValue="id"
+                        emptyText="Seleccione un cliente..."
+                        placeholderSearch="Buscar cliente por nombre..."
+                        :required="true"
+                        inputClass="w-full h-11 rounded-xl border-gray-200 bg-white text-sm shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                    />
                 </div>
 
                 <div class="rounded-2xl border border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-white/5">

@@ -512,6 +512,7 @@ Route::middleware('auth')->group(function () {
         Route::post('armados/{assembly}/exit', [WorkshopAssemblyController::class, 'registerExit'])->name('armados.exit');
         Route::get('armados/venta-masiva', [WorkshopAssemblyController::class, 'checkoutPage'])->name('assemblies.checkout.page');
         Route::post('armados/venta-masiva', [WorkshopAssemblyController::class, 'processMassiveSale'])->name('assemblies.massive_sale');
+        Route::post('armados/venta-masiva/clientes', [WorkshopAssemblyController::class, 'storeClientQuick'])->name('assemblies.massive_sale.clients.store');
 
         Route::get('/ordenes', [WorkshopOrderController::class, 'index'])->name('orders.index');
         Route::post('/ordenes/import-excel', [WorkshopOrderController::class, 'importExcel'])->name('orders.import-excel');

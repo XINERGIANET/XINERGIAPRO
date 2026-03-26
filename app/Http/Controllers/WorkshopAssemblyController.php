@@ -29,7 +29,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use App\Services\Accounting\AccountReceivablePayableService;
+use App\Services\AccountReceivablePayableService;
 
 class WorkshopAssemblyController extends Controller
 {
@@ -635,7 +635,7 @@ class WorkshopAssemblyController extends Controller
                 // 2. Crear SalesMovement
                 $sale = SalesMovement::create([
                     'branch_snapshot' => ['id' => $branchId, 'company_id' => $companyId],
-                    'series' => $isInvoice && $billingStatus === 'INVOICED' ? $invoiceSeries : '001',
+                    'series' => ($isInvoice && $billingStatus === 'INVOICED' && !empty($invoiceSeries)) ? $invoiceSeries : '001',
                     'year' => (string) now()->year,
                     'detail_type' => 'DETALLADO',
                     'payment_type' => $paymentType,
@@ -648,8 +648,7 @@ class WorkshopAssemblyController extends Controller
                     'branch_id' => $branchId,
                     'status' => $billingStatus === 'INVOICED' ? 'F' : 'N', // Facturado o Pendiente
                     'billing_status' => $billingStatus,
-                    'invoice_series' => $isInvoice ? $invoiceSeries : null,
-                    'invoice_number' => $isInvoice ? $invoiceNumber : null,
+                    'billing_number' => ($isInvoice && $billingStatus === 'INVOICED' && !empty($invoiceNumber)) ? $invoiceNumber : null,
                 ]);
 
                 $unit = Unit::where('abbreviation', 'NIU')->first() ?: Unit::first();
@@ -680,7 +679,7 @@ class WorkshopAssemblyController extends Controller
 
                 // 3. Registrar Pago o Cuenta por Cobrar
                 if ($paymentType === 'DEUDA') {
-                    $arpService->createFromSalesMovement($sale, session('company_id'));
+                    $this->registerMassiveDebt($sale, $data['cash_register_id'] ?? null, $branchId, $userId, $userName);
                 } elseif (!empty($data['payment_methods']) && !empty($data['cash_register_id'])) {
                     $this->registerMassiveMultiplePayments($sale, $data['cash_register_id'], $data['payment_methods'], $branchId, $userId, $userName);
                 }
@@ -690,6 +689,85 @@ class WorkshopAssemblyController extends Controller
         } catch (\Exception $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
         }
+    }
+
+    private function registerMassiveDebt($sale, $cashRegisterId, $branchId, $userId, $userName)
+    {
+        $shift = Shift::where('branch_id', $branchId)->orderBy('id')->first();
+        if (!$shift) {
+            throw new \RuntimeException('No hay un turno/shift configurado para esta sucursal.');
+        }
+
+        $paymentConceptId = DB::table('payment_concepts')
+            ->where('type', 'I')
+            ->where(function($q) {
+                $q->where('description', 'ILIKE', '%venta%')
+                  ->orWhere('description', 'ILIKE', '%cliente%');
+            })
+            ->value('id') ?: 1;
+
+        $cashMovementEntity = Movement::create([
+            'number' => $this->generateMovementNumber($branchId, 9),
+            'moved_at' => now(),
+            'user_id' => $userId,
+            'user_name' => $userName,
+            'person_id' => $sale->movement->person_id,
+            'person_name' => $sale->movement->person_name,
+            'responsible_id' => $userId,
+            'responsible_name' => $userName,
+            'comment' => 'Deuda de venta masiva armados',
+            'status' => '1',
+            'movement_type_id' => 4,
+            'document_type_id' => 9,
+            'branch_id' => $branchId,
+            'parent_movement_id' => $sale->movement_id,
+        ]);
+
+        $cashRegisterStr = 'Caja Principal';
+        if ($cashRegisterId) {
+            $cashRegisterStr = CashRegister::find($cashRegisterId)?->number ?? 'Caja Principal';
+        }
+
+        $cashMovement = CashMovements::create([
+            'payment_concept_id' => $paymentConceptId,
+            'currency' => 'PEN',
+            'exchange_rate' => 1,
+            'total' => $sale->total,
+            'cash_register_id' => $cashRegisterId,
+            'cash_register' => $cashRegisterStr,
+            'shift_id' => $shift->id,
+            'shift_snapshot' => [
+                'name' => $shift->name,
+                'start_time' => $shift->start_time,
+                'end_time' => $shift->end_time,
+            ],
+            'movement_id' => $cashMovementEntity->id,
+            'branch_id' => $branchId,
+        ]);
+
+        $debtPaymentMethod = PaymentMethod::where('description', 'ILIKE', '%deuda%')->first() 
+            ?? PaymentMethod::where('description', 'ILIKE', '%credito%')->first()
+            ?? PaymentMethod::first();
+
+        CashMovementDetail::create([
+            'cash_movement_id' => $cashMovement->id,
+            'type' => 'DEUDA',
+            'due_at' => now(),
+            'paid_at' => null,
+            'payment_method_id' => $debtPaymentMethod->id,
+            'payment_method' => $debtPaymentMethod->description ?? 'Deuda',
+            'number' => $cashMovementEntity->number,
+            'amount' => $sale->total,
+            'comment' => 'Deuda por armados',
+            'status' => 'A',
+            'branch_id' => $branchId,
+        ]);
+
+        app(AccountReceivablePayableService::class)->syncDebtAccount(
+            $cashMovement,
+            AccountReceivablePayableService::TYPE_RECEIVABLE,
+            now()
+        );
     }
 
     private function registerMassiveMultiplePayments($sale, $cashRegisterId, array $paymentMethodsData, $branchId, $userId, $userName)
@@ -809,5 +887,89 @@ class WorkshopAssemblyController extends Controller
         if ((int) $assembly->branch_id !== $branchId || (int) $assembly->company_id !== $companyId) {
             abort(404);
         }
+    }
+
+    public function storeClientQuick(Request $request)
+    {
+        [$branchId, $companyId] = $this->resolveContext();
+        $branch = Branch::query()->findOrFail($branchId);
+
+        $validated = $request->validate([
+            'person_type' => ['required', 'in:DNI,RUC,CARNET DE EXTRANGERIA,PASAPORTE'],
+            'document_number' => ['required', 'string', 'max:50'],
+            'first_name' => ['required', 'string', 'max:255'],
+            'last_name' => ['required', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'location_id' => ['nullable', 'integer', 'exists:locations,id'],
+            'genero' => ['nullable', 'string', 'max:30'],
+            'fecha_nacimiento' => ['nullable', 'date'],
+        ]);
+
+        $branchDistrictId = (int) ($branch->location_id ?? 0);
+        if ($branchDistrictId <= 0) {
+            return response()->json([
+                'message' => 'La sucursal no tiene distrito configurado.',
+            ], 422); // Note: 422 triggers the catch block in the frontend
+        }
+
+        $existingPerson = Person::query()
+            ->join('branches', 'branches.id', '=', 'people.branch_id')
+            ->select('people.*')
+            ->where('branches.company_id', $companyId)
+            ->where('people.document_number', (string) $validated['document_number'])
+            ->whereNull('people.deleted_at')
+            ->first();
+
+        if ($existingPerson) {
+            $existingPerson->roles()->syncWithoutDetaching([
+                3 => ['branch_id' => $branchId], // Cliente
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'client' => [
+                    'id' => (int) $existingPerson->id,
+                    'person_type' => (string) $existingPerson->person_type,
+                    'document_number' => (string) $existingPerson->document_number,
+                    'first_name' => (string) $existingPerson->first_name,
+                    'last_name' => (string) ($existingPerson->last_name ?? ''),
+                    'name' => trim(((string) $existingPerson->first_name) . ' ' . ((string) $existingPerson->last_name)),
+                    'label' => trim(((string) $existingPerson->first_name) . ' ' . ((string) $existingPerson->last_name) . ' - ' . ((string) $existingPerson->person_type) . ' ' . ((string) $existingPerson->document_number)),
+                ]
+            ]);
+        }
+
+        $validated['phone'] = (string) ($validated['phone'] ?? '');
+        $validated['email'] = (string) ($validated['email'] ?? '');
+        $validated['address'] = trim((string) ($validated['address'] ?? '')) ?: '-';
+        $validated['location_id'] = $branchDistrictId;
+
+        $person = DB::transaction(function () use ($validated, $branchId) {
+            $person = Person::query()->create(array_merge(
+                $validated,
+                ['branch_id' => $branchId]
+            ));
+
+            $person->roles()->syncWithoutDetaching([
+                3 => ['branch_id' => $branchId], // Cliente
+            ]);
+
+            return $person;
+        });
+
+        return response()->json([
+            'success' => true,
+            'client' => [
+                'id' => (int) $person->id,
+                'person_type' => (string) $person->person_type,
+                'document_number' => (string) $person->document_number,
+                'first_name' => (string) $person->first_name,
+                'last_name' => (string) ($person->last_name ?? ''),
+                'name' => trim(((string) $person->first_name) . ' ' . ((string) $person->last_name)),
+                'label' => trim(((string) $person->first_name) . ' ' . ((string) $person->last_name) . ' - ' . ((string) $person->person_type) . ' ' . ((string) $person->document_number)),
+            ]
+        ]);
     }
 }

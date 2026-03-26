@@ -908,12 +908,8 @@ class WorkshopMaintenanceBoardController extends Controller
                             'line_type' => 'SERVICE',
                             'service_id' => $serviceId,
                             'description' => (string) $service->name,
-<<<<<<< HEAD
-                            'unit_price' => $unitPrice,
-=======
                             'qty' => $qty,
-                            'unit_price' => $resolvedPrice,
->>>>>>> d6255291b4fa2905a927e1f54a4b248a45c23311
+                            'unit_price' => $unitPrice,
                             'validity_months' => $line['validity_months'] ?? null,
                         ]);
                     }
