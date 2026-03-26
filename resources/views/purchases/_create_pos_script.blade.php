@@ -48,6 +48,8 @@ function purchaseCreateForm(c) {
             location_id: String(c.branchDistrictId || ''),
         },
         documentTypeId: Number(c.initialDocumentTypeId || 0),
+        standardCashRegisterId: Number(c.standardCashRegisterId || 0),
+        invoiceCashRegisterId: Number(c.invoiceCashRegisterId || 0),
         paymentType: c.initialPaymentType || 'CONTADO',
         affectsCash: c.initialAffectsCash || 'N',
         dueDate: c.initialDueDate || '',
@@ -125,6 +127,10 @@ function purchaseCreateForm(c) {
                 this.bindMovedAtInput();
                 this.syncCreditDueDate(false);
             });
+
+            if (!c.isEditing) {
+                this.syncCashRegisterByDocumentType();
+            }
 
             if (String(this.quickProvider.person_type).toUpperCase() === 'RUC') {
                 this.quickProvider.last_name = '';
@@ -297,6 +303,35 @@ function purchaseCreateForm(c) {
                 return Number(this.selectedProvider.credit_days || 0);
             }
             return Number(this.manualCreditDays ?? 0);
+        },
+
+        currentDocumentType() {
+            return this.documentTypes.find((item) => Number(item.id || 0) === Number(this.documentTypeId || 0)) || null;
+        },
+
+        isInvoiceDocumentSelected() {
+            const name = String(this.currentDocumentType()?.name || '').toLowerCase();
+            return name.includes('factura');
+        },
+
+        preferredCashRegisterIdForCurrentDocument() {
+            const preferredId = this.isInvoiceDocumentSelected()
+                ? this.invoiceCashRegisterId
+                : this.standardCashRegisterId;
+
+            return Number(preferredId || 0) || 0;
+        },
+
+        syncCashRegisterByDocumentType() {
+            const preferredId = this.preferredCashRegisterIdForCurrentDocument();
+            if (preferredId > 0) {
+                this.cashRegisterId = preferredId;
+            }
+        },
+
+        setDocumentType(value) {
+            this.documentTypeId = Number(value || 0);
+            this.syncCashRegisterByDocumentType();
         },
 
         get filteredProviders() {

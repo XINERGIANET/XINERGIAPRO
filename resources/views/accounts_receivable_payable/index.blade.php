@@ -6,7 +6,7 @@
         $baseRoute = $type === 'COBRAR' ? 'admin.cash-accounts.receivables' : 'admin.cash-accounts.payables';
         $settlementErrors = $errors->getBag('settlement');
         $settlementHasErrors = $settlementErrors->any();
-        $defaultCashRegisterId = (string) (optional(($cashRegisters ?? collect())->first())->id ?? '');
+        $defaultCashRegisterId = (string) ($defaultCashRegisterId ?? optional(($cashRegisters ?? collect())->first())->id ?? '');
         $defaultPaymentMethodId = (string) data_get(collect($paymentMethodOptions ?? collect())->first(), 'id', '');
         $modalTitle = $type === 'COBRAR' ? 'Registrar cobro' : 'Registrar pago';
         $modalButtonLabel = $type === 'COBRAR' ? 'Guardar cobro' : 'Guardar pago';
@@ -19,7 +19,7 @@
             account: @js($settlementDraftRecord),
             formAction: @js($settlementDraftRecord['action'] ?? ''),
             settlementAccountId: @js((string) old('settlement_account_id', $settlementDraftRecord['id'] ?? '')),
-            cashRegisterId: @js((string) old('cash_register_id', $defaultCashRegisterId)),
+            cashRegisterId: @js((string) old('cash_register_id', $settlementDraftRecord['preferred_cash_register_id'] ?? $defaultCashRegisterId)),
             paymentMethodId: @js((string) old('payment_method_id', $defaultPaymentMethodId)),
             amount: @js((string) old('amount', isset($settlementDraftRecord['pending']) ? number_format((float) $settlementDraftRecord['pending'], 2, '.', '') : '')),
             reference: @js((string) old('reference', '')),
@@ -63,7 +63,7 @@
                 this.account = payload;
                 this.formAction = payload.action;
                 this.settlementAccountId = String(payload.id || '');
-                this.cashRegisterId = this.defaultCashRegisterId;
+                this.cashRegisterId = String(payload.preferred_cash_register_id || this.defaultCashRegisterId || '');
                 this.paymentMethodId = this.defaultPaymentMethodId;
                 this.amount = this.normalizeMoney(payload.pending || 0);
                 this.reference = '';
@@ -194,6 +194,9 @@
                                     'total' => $total,
                                     'paid' => $paid,
                                     'pending' => $pending,
+                                    'preferred_cash_register_id' => str_contains(mb_strtolower(trim((string) ($sourceMovement?->documentType?->name ?? '')), 'UTF-8'), 'factura')
+                                        ? ($invoiceCashRegisterId ?? $defaultCashRegisterId)
+                                        : ($defaultCashRegisterId ?? ''),
                                 ];
                             @endphp
                             <tr class="border-b border-gray-100 transition hover:bg-gray-50">

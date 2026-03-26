@@ -614,7 +614,12 @@ class PurchaseController extends Controller
             ->orderByRaw("CASE WHEN status = 'A' THEN 0 ELSE 1 END")
             ->orderBy('number')
             ->get(['id', 'number', 'status']);
-        $defaultCashRegisterId = $this->getBranchConfiguredCashRegisterId($branchId, $cashRegisters, 'caja factur');
+        $standardCashRegisterId = $cashRegisters->firstWhere('status', 'A')->id ?? $cashRegisters->first()->id ?? null;
+        $invoiceCashRegisterId = $this->getBranchConfiguredCashRegisterId($branchId, $cashRegisters, 'caja factur')
+            ?: $standardCashRegisterId;
+        $defaultCashRegisterId = $this->isInvoiceDocumentTypeId((int) ($documentTypes->first()->id ?? 0), $documentTypes)
+            ? $invoiceCashRegisterId
+            : $standardCashRegisterId;
 
         $paymentMethods = PaymentMethod::query()
             ->where('status', true)
@@ -761,6 +766,8 @@ class PurchaseController extends Controller
             ])->values(),
             'documentTypes' => $documentTypes->values(),
             'cashRegisters' => $cashRegisters->values(),
+            'standardCashRegisterId' => (int) ($standardCashRegisterId ?? 0),
+            'invoiceCashRegisterId' => (int) ($invoiceCashRegisterId ?? 0),
             'paymentMethods' => $paymentMethods->values(),
             'paymentGateways' => $paymentGateways->values(),
             'cards' => $cards->values(),
@@ -905,6 +912,18 @@ class PurchaseController extends Controller
         }
 
         return $cashRegisters->firstWhere('status', 'A')->id ?? $cashRegisters->first()->id ?? null;
+    }
+
+    private function isInvoiceDocumentTypeId(?int $documentTypeId, $documentTypes): bool
+    {
+        if ((int) $documentTypeId <= 0) {
+            return false;
+        }
+
+        $documentType = collect($documentTypes)->first(fn ($item) => (int) ($item->id ?? 0) === (int) $documentTypeId);
+        $name = mb_strtolower(trim((string) ($documentType->name ?? '')), 'UTF-8');
+
+        return str_contains($name, 'factura');
     }
 
     private function getLocationData(?int $defaultLocationId = null): array

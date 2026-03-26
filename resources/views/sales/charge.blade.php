@@ -443,6 +443,9 @@
             const documentTypeInput = document.getElementById('document-type-id');
             const clientInput = document.getElementById('client-id');
             const cashRegisterInput = document.getElementById('cash-register-id');
+            const standardCashRegisterId = Number(@json($standardCashRegisterId ?? $defaultCashRegisterId ?? 0)) || 0;
+            const invoiceCashRegisterId = Number(@json($invoiceCashRegisterId ?? $defaultCashRegisterId ?? 0)) || 0;
+            const invoiceDocumentIds = new Set(@json(collect($documentTypes ?? collect())->filter(fn ($doc) => str_contains(mb_strtolower((string) ($doc->name ?? ''), 'UTF-8'), 'factura'))->pluck('id')->map(fn ($id) => (int) $id)->values()->all()));
             const paymentMethodsList = document.getElementById('payment-methods-list');
             const addPaymentMethodBtn = document.getElementById('add-payment-method-btn');
             const paymentMethodSelectionModal = document.getElementById('payment-method-selection-modal');
@@ -465,6 +468,17 @@
             // Función para formatear dinero
             function fmtMoney(n) {
                 return 'S/' + (Number(n) || 0).toFixed(2);
+            }
+
+            function syncCashRegisterForDocumentType(docTypeId) {
+                if (!cashRegisterInput) return;
+                const numericDocTypeId = Number(docTypeId || 0);
+                const preferredCashRegisterId = invoiceDocumentIds.has(numericDocTypeId)
+                    ? invoiceCashRegisterId
+                    : standardCashRegisterId;
+                if (preferredCashRegisterId > 0) {
+                    cashRegisterInput.value = String(preferredCashRegisterId);
+                }
             }
 
             // Función para calcular el total pagado
@@ -996,6 +1010,7 @@
                     const docId = this.dataset.docId;
                     if (docId && documentTypeInput) {
                         documentTypeInput.value = docId;
+                        syncCashRegisterForDocumentType(docId);
                     }
                 });
             });

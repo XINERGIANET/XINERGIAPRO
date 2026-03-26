@@ -21,7 +21,7 @@
         <x-common.page-breadcrumb :pageTitle="$pageTitle" />
 
         <x-common.component-card title="Punto de Venta"
-            desc="Interfaz de venta rápida. Puedes seguir agregando productos aunque el stock mostrado sea 0.">
+            desc="Interfaz de venta rÃ¡pida. Puedes seguir agregando productos aunque el stock mostrado sea 0.">
             <div class="flex items-start gap-6" style="display:flex; align-items:flex-start; gap:1.5rem;">
                 <section class="min-w-0 space-y-5" style="flex: 0 0 60%; max-width: 60%; width: 60%;">
 
@@ -79,7 +79,7 @@
                                 <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
                                     <i class="ri-search-line text-lg"></i>
                                 </span>
-                                <input id="product-search-legacy" type="text" placeholder="Buscar por nombre o categoría"
+                                <input id="product-search-legacy" type="text" placeholder="Buscar por nombre o categorÃ­a"
                                     class="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-12 pr-4 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100">
                             </div>
                             <div class="flex flex-wrap gap-2">
@@ -100,27 +100,45 @@
                     <div class="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                         <div class="mb-5 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                             <div>
-                                <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Catálogo</p>
+                                <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Catalogo</p>
                                 <h3 class="mt-1 text-lg font-bold text-slate-900">Productos</h3>
                             </div>
                             <div id="category-filters" class="flex flex-wrap gap-3"></div>
                         </div>
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-stretch">
-                            <div class="relative min-w-0 flex-1">
-                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-800">
-                                    <i class="ri-search-line text-[22px]"></i>
-                                </span>
-                                <input id="product-search" type="text"
-                                    placeholder="Buscar por codigo de barras, nombre o categoria"
-                                    class="h-14 w-full rounded-[22px] border border-slate-200 bg-slate-50 pl-14 pr-4 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100">
+                        <div id="sale-products-panel" class="space-y-3">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-stretch">
+                                <div class="relative min-w-0 flex-1">
+                                    <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-800">
+                                        <i class="ri-search-line text-[22px]"></i>
+                                    </span>
+                                    <input id="product-search" type="text"
+                                        placeholder="Buscar por codigo de barras, nombre o categoria"
+                                        class="h-14 w-full rounded-[22px] border border-slate-200 bg-slate-50 pl-14 pr-4 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100">
+                                </div>
+                                <button type="button" id="clear-sale-button"
+                                    class="inline-flex h-14 shrink-0 items-center justify-center gap-2 rounded-[22px] border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 sm:px-5">
+                                    <i class="ri-delete-bin-6-line"></i>
+                                    <span>Limpiar orden</span>
+                                </button>
                             </div>
-                            <button type="button" id="clear-sale-button"
-                                class="inline-flex h-14 shrink-0 items-center justify-center gap-2 rounded-[22px] border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 sm:px-5">
-                                <i class="ri-delete-bin-6-line"></i>
-                                <span>Limpiar orden</span>
-                            </button>
+                            <div id="products-grid" class="mt-5 grid gap-4"></div>
                         </div>
-                        <div id="products-grid" class="mt-5 grid gap-4"></div>
+                        <div id="sale-glosa-panel" class="hidden rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Detalle</p>
+                                    <h4 class="text-base font-bold text-slate-900">Venta por glosa</h4>
+                                    <p class="mt-1 text-sm text-slate-500">Registra conceptos manuales sin obligar un producto del catalogo.</p>
+                                </div>
+                                <button type="button" id="add-glosa-button"
+                                    class="inline-flex h-11 items-center gap-2 rounded-2xl px-4 text-sm font-bold text-white shadow-theme-xs"
+                                    style="background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff;box-shadow:0 12px 24px rgba(249,115,22,.24);">
+                                    <i class="ri-add-line"></i>
+                                    <span>Agregar glosa</span>
+                                </button>
+                            </div>
+                            <div id="sale-glosa-items" class="mt-4 space-y-3"></div>
+                        </div>
                     </div>
                 </section>
 
@@ -144,6 +162,15 @@
 
 
                         <div id="summary-tab-panel">
+                            <div class="border-b border-slate-200 bg-slate-50 p-4">
+                                <div class="rounded-2xl border border-slate-200 bg-white p-4">
+                                    <label for="sale-detail-type-select" class="mb-2 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Tipo detalle</label>
+                                    <select id="sale-detail-type-select" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100" data-gsa-skip="true">
+                                        <option value="DETALLADO">DETALLADO</option>
+                                        <option value="GLOSA">GLOSA</option>
+                                    </select>
+                                </div>
+                            </div>
 
                             <div id="cart-container" class="max-h-[52vh] overflow-y-auto p-4"></div>
 
@@ -291,7 +318,7 @@
                                 <div id="payment-methods-section">
                                     <div class="mb-3 flex items-center justify-between">
                                         <div>
-                                            <p class="mt-1 text-sm font-bold text-slate-900">Métodos de pago</p>
+                                            <p class="mt-1 text-sm font-bold text-slate-900">MÃ©todos de pago</p>
                                         </div>
                                         <button type="button" id="add-payment-row-button"
                                             class="inline-flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-bold text-white shadow-theme-xs"
@@ -682,6 +709,7 @@
             const paymentGateways = Array.isArray(@json($paymentGateways ?? [])) ? @json($paymentGateways ?? []) : [];
             const cards = Array.isArray(@json($cards ?? [])) ? @json($cards ?? []) : [];
             const digitalWallets = Array.isArray(@json($digitalWallets ?? [])) ? @json($digitalWallets ?? []) : [];
+            const units = Array.isArray(@json($units ?? [])) ? @json($units ?? []) : [];
 
             const priceByProductId = new Map();
             const taxRateByProductId = new Map();
@@ -710,8 +738,13 @@
             const invoiceMode = Boolean(@json($invoiceMode ?? false));
             const isEditMode = posMode === 'edit';
             const initialSaleData = @json($initialSaleData ?? null);
+            let selectedDetailType = String(initialSaleData?.detail_type || 'DETALLADO').toUpperCase() === 'GLOSA'
+                ? 'GLOSA'
+                : 'DETALLADO';
             const defaultDocumentTypeId = Number(@json($defaultDocumentTypeId ?? 0)) || null;
             const defaultCashRegisterId = Number(@json($defaultCashRegisterId ?? 0)) || null;
+            const standardCashRegisterId = Number(@json($standardCashRegisterId ?? $defaultCashRegisterId ?? 0)) || null;
+            const invoiceCashRegisterId = Number(@json($invoiceCashRegisterId ?? $defaultCashRegisterId ?? 0)) || null;
             const invoiceDocumentIds = new Set(
                 documentTypes
                     .filter((documentType) => String(documentType.name || '').toLowerCase().includes('factura'))
@@ -751,6 +784,7 @@
                             qty: Number(item.qty || 0),
                             price: Number(item.price || 0),
                             tax_rate: Number(item.tax_rate || 0),
+                            unit_id: item.unit_id ? Number(item.unit_id) : null,
                             note: String(item.note || ''),
                         }))
                         : [],
@@ -758,6 +792,7 @@
                     payment_type: String(initialSaleData.payment_type || 'CONTADO'),
                     document_type_id: Number(initialSaleData.document_type_id || defaultDocumentTypeId || 0) || null,
                     cash_register_id: Number(initialSaleData.cash_register_id || defaultCashRegisterId || 0) || null,
+                    detail_type: String(initialSaleData.detail_type || selectedDetailType || 'DETALLADO').toUpperCase() === 'GLOSA' ? 'GLOSA' : 'DETALLADO',
                     billing_status: String(initialSaleData.billing_status || 'NOT_APPLICABLE'),
                     invoice_series: String(initialSaleData.invoice_series || '001'),
                     invoice_number: String(initialSaleData.invoice_number || ''),
@@ -775,6 +810,7 @@
                     payment_type: 'CONTADO',
                     document_type_id: defaultDocumentTypeId,
                     cash_register_id: defaultCashRegisterId,
+                    detail_type: selectedDetailType,
                     billing_status: 'NOT_APPLICABLE',
                     invoice_series: '001',
                     invoice_number: '',
@@ -783,6 +819,8 @@
                 });
             currentSale.document_type_id = Number(currentSale.document_type_id || defaultDocumentTypeId || 0) || null;
             currentSale.cash_register_id = Number(currentSale.cash_register_id || defaultCashRegisterId || 0) || null;
+            currentSale.detail_type = String(currentSale.detail_type || selectedDetailType || 'DETALLADO').toUpperCase() === 'GLOSA' ? 'GLOSA' : 'DETALLADO';
+            selectedDetailType = currentSale.detail_type;
             currentSale.payment_type = String(currentSale.payment_type || 'CONTADO').toUpperCase() === 'DEUDA' ? 'DEUDA' : 'CONTADO';
             currentSale.billing_status = String(currentSale.billing_status || 'NOT_APPLICABLE');
             currentSale.invoice_series = String(currentSale.invoice_series || '001');
@@ -1290,6 +1328,25 @@
                 localStorage.setItem('restaurantDB', JSON.stringify(db));
             };
             const isInvoiceDocumentSelected = () => invoiceDocumentIds.has(Number(currentSale.document_type_id || 0));
+            const preferredCashRegisterIdForCurrentDocument = () => {
+                const preferredId = isInvoiceDocumentSelected() ? invoiceCashRegisterId : standardCashRegisterId;
+                return Number(preferredId || 0) || null;
+            };
+            const syncCashRegisterForCurrentDocumentType = () => {
+                const preferredId = preferredCashRegisterIdForCurrentDocument();
+                if (!preferredId) {
+                    return;
+                }
+                currentSale.cash_register_id = preferredId;
+                const cashRegisterSelect = document.getElementById('cash-register-select');
+                if (cashRegisterSelect) {
+                    cashRegisterSelect.value = String(preferredId);
+                    syncAutocompleteDisplay(cashRegisterSelect);
+                }
+            };
+            if (!isEditMode) {
+                syncCashRegisterForCurrentDocumentType();
+            }
             const isDebtSaleSelected = () => String(currentSale.payment_type || 'CONTADO') === 'DEUDA';
             let saleMovedAtDebtListenerBound = false;
             let saleDebtFieldsBound = false;
@@ -1603,8 +1660,8 @@
             };
             const cardTypeLabel = (type) => {
                 const c = String(type || '').trim().toUpperCase();
-                if (c === 'C') return 'Crédito';
-                if (c === 'D') return 'Débito';
+                if (c === 'C') return 'CrÃ©dito';
+                if (c === 'D') return 'DÃ©bito';
                 return '';
             };
             const buildPaymentMethodVariants = () => paymentMethods.flatMap((method) => {
@@ -2076,6 +2133,121 @@
                 if (label) label.textContent = selectedCategory;
             }
 
+            function ensureInitialGlosaLine() {
+                if (selectedDetailType !== 'GLOSA') return;
+                if (currentSale.items.length) return;
+                addGlosaLine();
+            }
+
+            function defaultGlosaUnitId() {
+                const exact = units.find((unit) => String(unit.description || '').trim().toLowerCase() === 'unidad(es)');
+                if (exact) return Number(exact.id || 0) || null;
+                const startsUnidad = units.find((unit) => /^unidad/i.test(String(unit.description || '').trim()));
+                return Number((startsUnidad || units[0])?.id || 0) || null;
+            }
+
+            function renderDetailTypeSelect() {
+                const select = document.getElementById('sale-detail-type-select');
+                if (!select) return;
+                select.value = selectedDetailType;
+            }
+
+            function renderGlosaPanel() {
+                const container = document.getElementById('sale-glosa-items');
+                if (!container) return;
+
+                const glosaItems = currentSale.items;
+                container.innerHTML = '';
+
+                glosaItems.forEach((item, index) => {
+                    const unitOptions = units.map((unit) => `
+                        <option value="${Number(unit.id || 0)}" ${Number(item.unit_id || 0) === Number(unit.id || 0) ? 'selected' : ''}>
+                            ${String(unit.description || 'Unidad')}
+                        </option>
+                    `).join('');
+
+                    const row = document.createElement('div');
+                    row.className = 'rounded-2xl border border-slate-200 bg-white p-4';
+                    row.innerHTML = `
+                        <div class="grid gap-3 md:grid-cols-12">
+                            <div class="md:col-span-4">
+                                <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Descripcion</label>
+                                <input data-role="glosa-name" data-index="${index}" type="text" value="${String(item.name || '').replace(/"/g, '&quot;')}" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700" placeholder="Ej. Venta administrativa, traslado, ajuste, servicio externo">
+                            </div>
+                            <div class="md:col-span-3">
+                                <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Unidad</label>
+                                <select data-role="glosa-unit" data-index="${index}" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100" data-gsa-skip="true">
+                                    ${unitOptions}
+                                </select>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Cantidad</label>
+                                <input data-role="glosa-qty" data-index="${index}" type="number" min="0.0001" step="0.0001" value="${Number(item.qty || 1)}" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Monto</label>
+                                <input data-role="glosa-amount" data-index="${index}" type="number" min="0" step="0.01" value="${Number(item.price || 0)}" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold" style="color:#f97316;">
+                            </div>
+                            <div class="md:col-span-1 flex items-end">
+                                <button type="button" data-role="glosa-remove" data-index="${index}" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 hover:bg-rose-50" title="Eliminar">
+                                    <i class="ri-delete-bin-line"></i>
+                                </button>
+                            </div>
+                            <div class="md:col-span-12">
+                                <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Comentario</label>
+                                <input data-role="glosa-note" data-index="${index}" type="text" value="${String(item.note || '').replace(/"/g, '&quot;')}" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700" placeholder="Observacion opcional del concepto">
+                            </div>
+                        </div>
+                    `;
+
+                    row.querySelector('[data-role="glosa-name"]')?.addEventListener('input', (event) => {
+                        currentSale.items[index].name = String(event.currentTarget.value || '');
+                        saveDB();
+                        renderTicket();
+                    });
+                    row.querySelector('[data-role="glosa-unit"]')?.addEventListener('change', (event) => {
+                        currentSale.items[index].unit_id = Number(event.currentTarget.value || 0) || null;
+                        saveDB();
+                    });
+                    row.querySelector('[data-role="glosa-qty"]')?.addEventListener('input', (event) => {
+                        currentSale.items[index].qty = Math.max(0.0001, Number(event.currentTarget.value || 0) || 1);
+                        saveDB();
+                        renderTicket();
+                    });
+                    row.querySelector('[data-role="glosa-amount"]')?.addEventListener('input', (event) => {
+                        currentSale.items[index].price = sanitizeLineMoney(event.currentTarget.value);
+                        saveDB();
+                        renderTicket();
+                    });
+                    row.querySelector('[data-role="glosa-note"]')?.addEventListener('input', (event) => {
+                        currentSale.items[index].note = String(event.currentTarget.value || '');
+                        saveDB();
+                    });
+                    row.querySelector('[data-role="glosa-remove"]')?.addEventListener('click', () => {
+                        currentSale.items.splice(index, 1);
+                        saveDB();
+                        renderGlosaPanel();
+                        renderTicket();
+                    });
+
+                    container.appendChild(row);
+                });
+            }
+
+            function renderCatalogMode() {
+                const productsPanel = document.getElementById('sale-products-panel');
+                const glosaPanel = document.getElementById('sale-glosa-panel');
+                const categoryFilters = document.getElementById('category-filters');
+                const showProducts = selectedDetailType === 'DETALLADO';
+
+                if (productsPanel) productsPanel.classList.toggle('hidden', !showProducts);
+                if (glosaPanel) glosaPanel.classList.toggle('hidden', showProducts);
+                if (categoryFilters) categoryFilters.classList.toggle('hidden', !showProducts);
+                renderDetailTypeSelect();
+                ensureInitialGlosaLine();
+                renderGlosaPanel();
+            }
+
             function renderProducts() {
                 const grid = document.getElementById('products-grid');
                 const catalogCount = document.getElementById('catalog-count');
@@ -2181,6 +2353,28 @@
                 showNotification(prod.name || 'Producto');
             }
 
+            function addGlosaLine() {
+                currentSale.items.push({
+                    kind: 'glosa',
+                    pId: null,
+                    name: '',
+                    qty: 1,
+                    price: 0,
+                    tax_rate: defaultTaxPct,
+                    unit_id: defaultGlosaUnitId(),
+                    note: '',
+                });
+                saveDB();
+                setAsideTab('summary');
+                renderGlosaPanel();
+                renderTicket();
+                window.setTimeout(() => {
+                    const nameInputs = document.querySelectorAll('[data-role="glosa-name"]');
+                    const lastInput = nameInputs[nameInputs.length - 1];
+                    lastInput?.focus();
+                }, 30);
+            }
+
             function updateQty(index, delta) {
                 if (!currentSale.items[index]) return;
                 currentSale.items[index].qty += delta;
@@ -2234,7 +2428,7 @@
                 let totalItems = 0;
 
                 if (!currentSale.items.length) {
-                    container.innerHTML = '<div class="flex min-h-[240px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-center"><div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-sm"><i class="ri-shopping-bag-3-line text-3xl"></i></div><p class="mt-4 text-base font-bold text-slate-800">Sin productos en la orden</p><p class="mt-1 text-sm text-slate-500">Agrega productos desde el catálogo.</p></div>';
+                    container.innerHTML = '<div class="flex min-h-[240px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-center"><div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-sm"><i class="ri-shopping-bag-3-line text-3xl"></i></div><p class="mt-4 text-base font-bold text-slate-800">Sin productos en la orden</p><p class="mt-1 text-sm text-slate-500">Agrega productos desde el catÃ¡logo.</p></div>';
                 } else {
                     currentSale.items.forEach((item, index) => {
                         const isManualLine = Number(item.pId || 0) <= 0 || String(item.kind || '') === 'glosa';
@@ -2358,6 +2552,8 @@ const total = subtotalBase + tax - discount;
             function clearSale() {
                 currentSale.items = [];
                 currentSale.notes = '';
+                currentSale.detail_type = 'DETALLADO';
+                selectedDetailType = 'DETALLADO';
                 currentSale.payment_type = 'CONTADO';
                 currentSale.credit_days = 0;
                 currentSale.debt_due_date = '';
@@ -2367,6 +2563,8 @@ const total = subtotalBase + tax - discount;
                 const notesInput = document.getElementById('sale-notes');
                 if (notesInput) notesInput.value = '';
                 syncPaymentTypeUI();
+                renderDetailTypeSelect();
+                renderCatalogMode();
                 renderPaymentRows();
                 renderTicket();
                 showNotice('La orden actual fue limpiada.');
@@ -2423,12 +2621,14 @@ const total = subtotalBase + tax - discount;
         qty: Number(item.qty),
         price: Number(item.price),
         tax_rate: Number(item.tax_rate || 0),
+        unit_id: Number(item.unit_id || 0) || null,
         note: item.note || '',
     })),
 
     discount_type: currentSale.discount?.percent ? 'PERCENTAGE' : 'AMOUNT',
     discount_value: currentSale.discount?.percent || currentSale.discount?.amount || 0,
 
+    detail_type: selectedDetailType,
     payment_type: currentSale.payment_type || 'CONTADO',
     document_type_id: Number(document.getElementById('document-type-select')?.value || 0),
     cash_register_id: Number(currentSale.cash_register_id || document.getElementById('cash-register-select')?.value || 0),
@@ -2541,7 +2741,8 @@ const total = subtotalBase + tax - discount;
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
                     },
                     body: JSON.stringify({
-                        items: currentSale.items.filter((item) => Number(item.pId || 0) > 0 || String(item.name || '').trim() !== '').map((item) => ({ kind: String(item.kind || (Number(item.pId || 0) > 0 ? 'product' : 'glosa')), pId: Number(item.pId || 0) || null, name: String(item.name || '').trim(), qty: Number(item.qty), price: Number(item.price), tax_rate: Number(item.tax_rate || 0), note: item.note || '' })),
+                        detail_type: selectedDetailType,
+                        items: currentSale.items.filter((item) => Number(item.pId || 0) > 0 || String(item.name || '').trim() !== '').map((item) => ({ kind: String(item.kind || (Number(item.pId || 0) > 0 ? 'product' : 'glosa')), pId: Number(item.pId || 0) || null, name: String(item.name || '').trim(), qty: Number(item.qty), price: Number(item.price), tax_rate: Number(item.tax_rate || 0), unit_id: Number(item.unit_id || 0) || null, note: item.note || '' })),
                         payment_type: currentSale.payment_type || 'CONTADO',
                         document_type_id: Number(document.getElementById('document-type-select')?.value || 0) || null,
                         billing_status: isInvoiceDocumentSelected() ? currentSale.billing_status : 'NOT_APPLICABLE',
@@ -2574,7 +2775,16 @@ const total = subtotalBase + tax - discount;
                 window.clearTimeout(productSearchTimer);
                 tryAutoAddProductByCode(event.target.value || '');
             });
+            document.getElementById('sale-detail-type-select')?.addEventListener('change', (event) => {
+                selectedDetailType = String(event.target.value || 'DETALLADO').toUpperCase() === 'GLOSA' ? 'GLOSA' : 'DETALLADO';
+                currentSale.detail_type = selectedDetailType;
+                currentSale.items = [];
+                saveDB();
+                renderCatalogMode();
+                renderTicket();
+            });
             document.getElementById('clear-sale-button')?.addEventListener('click', clearSale);
+            document.getElementById('add-glosa-button')?.addEventListener('click', addGlosaLine);
             document.getElementById('add-payment-row-button')?.addEventListener('click', () => addPaymentRow());
             document.getElementById('summary-tab-button')?.addEventListener('click', () => setAsideTab('summary'));
             document.getElementById('payment-tab-button')?.addEventListener('click', () => setAsideTab('payment'));
@@ -2584,6 +2794,7 @@ const total = subtotalBase + tax - discount;
             });
             document.getElementById('document-type-select')?.addEventListener('change', (event) => {
                 currentSale.document_type_id = Number(event.target.value || 0) || null;
+                syncCashRegisterForCurrentDocumentType();
                 normalizeBillingState();
                 syncInvoiceBillingFields();
                 saveDB();
@@ -2737,7 +2948,7 @@ document.getElementById('sale-discount-save-button')?.addEventListener('click', 
     saveDB();
 
     renderTicket();
-    updatePaymentSummary(); // 🔴 IMPORTANTE
+    updatePaymentSummary(); // ðŸ”´ IMPORTANTE
 
     document.getElementById('sale-discount-modal')?.classList.add('hidden');
 
@@ -2775,7 +2986,9 @@ document.getElementById('sale-discount-save-button')?.addEventListener('click', 
 
             syncQuickClientPersonTypeUI();
             setQuickClientLocation(branchDepartmentId, branchProvinceId, branchDistrictId);
+            renderDetailTypeSelect();
             renderCategoryFilters();
+            renderCatalogMode();
             renderProducts();
             renderTicket();
             renderPaymentRows();

@@ -27,6 +27,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use App\Services\AccountReceivablePayableService;
@@ -163,6 +164,13 @@ class WorkshopAssemblyController extends Controller
             )
             ->orderBy('number')
             ->get();
+        $standardCashRegisterId = $this->getBranchConfiguredCashRegisterId($branchId, $cashRegisters, 'caja ventas');
+        $invoiceCashRegisterId = $this->getBranchConfiguredCashRegisterId($branchId, $cashRegisters, 'caja factur')
+            ?: $standardCashRegisterId;
+        $defaultDocumentTypeId = (int) (optional($documentTypes->first())->id ?? 0);
+        $defaultCashRegisterId = $this->isInvoiceDocumentTypeId($defaultDocumentTypeId, $documentTypes)
+            ? $invoiceCashRegisterId
+            : $standardCashRegisterId;
 
         $paymentMethodsRaw = PaymentMethod::query()->where('status', true)->orderBy('order_num')->get();
 
@@ -210,6 +218,9 @@ class WorkshopAssemblyController extends Controller
             'clients',
             'documentTypes',
             'cashRegisters',
+            'defaultCashRegisterId',
+            'standardCashRegisterId',
+            'invoiceCashRegisterId',
             'paymentMethodOptions',
             'digitalWalletOptions',
             'cardOptions',
@@ -237,6 +248,45 @@ class WorkshopAssemblyController extends Controller
         }
 
         return 'other';
+    }
+
+    private function getBranchConfiguredCashRegisterId(int $branchId, $cashRegisters, string $needle): ?int
+    {
+        $cashRegisters = collect($cashRegisters);
+
+        if ($branchId <= 0) {
+            return $cashRegisters->firstWhere('status', 'A')->id ?? $cashRegisters->first()->id ?? null;
+        }
+
+        $configuredValue = DB::table('branch_parameters as bp')
+            ->join('parameters as p', 'p.id', '=', 'bp.parameter_id')
+            ->where('bp.branch_id', $branchId)
+            ->whereNull('bp.deleted_at')
+            ->whereNull('p.deleted_at')
+            ->where('p.description', 'ILIKE', '%' . $needle . '%')
+            ->value('bp.value');
+
+        if (is_numeric($configuredValue)) {
+            $configuredId = (int) $configuredValue;
+            $exists = $cashRegisters->contains(fn ($cashRegister) => (int) ($cashRegister->id ?? 0) === $configuredId);
+            if ($exists) {
+                return $configuredId;
+            }
+        }
+
+        return $cashRegisters->firstWhere('status', 'A')->id ?? $cashRegisters->first()->id ?? null;
+    }
+
+    private function isInvoiceDocumentTypeId(?int $documentTypeId, $documentTypes): bool
+    {
+        if ((int) $documentTypeId <= 0) {
+            return false;
+        }
+
+        $documentType = collect($documentTypes)->first(fn ($item) => (int) ($item->id ?? 0) === (int) $documentTypeId);
+        $name = mb_strtolower(trim((string) ($documentType->name ?? '')), 'UTF-8');
+
+        return str_contains($name, 'factura');
     }
 
     public function store(Request $request): RedirectResponse
@@ -562,6 +612,8 @@ class WorkshopAssemblyController extends Controller
             'client_person_id' => ['required', 'integer', 'exists:people,id'],
             'document_type_id' => ['required', 'integer', 'exists:document_types,id'],
             'payment_type' => ['required', 'string', 'in:CONTADO,DEUDA'],
+            'credit_days' => ['nullable', 'integer', 'min:0', 'max:3650'],
+            'debt_due_date' => ['nullable', 'date_format:Y-m-d'],
             'billing_status' => ['nullable', 'string', 'in:PENDING,INVOICED,NOT_APPLICABLE'],
             'invoice_series' => ['nullable', 'string', 'max:10'],
             'invoice_number' => ['nullable', 'string', 'max:20'],
@@ -679,7 +731,14 @@ class WorkshopAssemblyController extends Controller
 
                 // 3. Registrar Pago o Cuenta por Cobrar
                 if ($paymentType === 'DEUDA') {
-                    $this->registerMassiveDebt($sale, $data['cash_register_id'] ?? null, $branchId, $userId, $userName);
+                    $dueDate = null;
+                    $dueDateStr = trim((string) ($data['debt_due_date'] ?? ''));
+                    if ($dueDateStr !== '') {
+                        $dueDate = Carbon::createFromFormat('Y-m-d', $dueDateStr)->startOfDay();
+                    } else {
+                        $dueDate = now()->startOfDay()->addDays(max(0, (int) ($data['credit_days'] ?? 0)));
+                    }
+                    $this->registerMassiveDebt($sale, $data['cash_register_id'] ?? null, $branchId, $userId, $userName, $dueDate);
                 } elseif (!empty($data['payment_methods']) && !empty($data['cash_register_id'])) {
                     $this->registerMassiveMultiplePayments($sale, $data['cash_register_id'], $data['payment_methods'], $branchId, $userId, $userName);
                 }
@@ -691,7 +750,7 @@ class WorkshopAssemblyController extends Controller
         }
     }
 
-    private function registerMassiveDebt($sale, $cashRegisterId, $branchId, $userId, $userName)
+    private function registerMassiveDebt($sale, $cashRegisterId, $branchId, $userId, $userName, ?Carbon $dueDate = null)
     {
         $shift = Shift::where('branch_id', $branchId)->orderBy('id')->first();
         if (!$shift) {
@@ -752,7 +811,7 @@ class WorkshopAssemblyController extends Controller
         CashMovementDetail::create([
             'cash_movement_id' => $cashMovement->id,
             'type' => 'DEUDA',
-            'due_at' => now(),
+            'due_at' => $dueDate ?? now(),
             'paid_at' => null,
             'payment_method_id' => $debtPaymentMethod->id,
             'payment_method' => $debtPaymentMethod->description ?? 'Deuda',
@@ -766,7 +825,7 @@ class WorkshopAssemblyController extends Controller
         app(AccountReceivablePayableService::class)->syncDebtAccount(
             $cashMovement,
             AccountReceivablePayableService::TYPE_RECEIVABLE,
-            now()
+            $dueDate ?? now()
         );
     }
 

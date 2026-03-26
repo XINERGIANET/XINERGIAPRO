@@ -20,7 +20,7 @@ class StoreWorkshopClientRequest extends FormRequest
             'person_type' => ['required', 'in:DNI,RUC,CARNET DE EXTRANGERIA,PASAPORTE'],
             'document_number' => ['required', 'string', 'max:50'],
             'first_name' => ['required', 'string', 'max:255'],
-            'last_name' => ['required', 'string', 'max:255'],
+            'last_name' => ['required_unless:person_type,RUC', 'nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:255'],
             'address' => ['nullable', 'string', 'max:255'],
@@ -58,6 +58,10 @@ class StoreWorkshopClientRequest extends FormRequest
     {
         $branchId = (int) session('branch_id');
         $branch = Branch::query()->find($branchId);
+
+        if (strtoupper((string) $this->input('person_type')) === 'RUC') {
+            $this->merge(['last_name' => '']);
+        }
 
         if ($branch && !$this->filled('location_id')) {
             $this->merge(['location_id' => $branch->location_id]);

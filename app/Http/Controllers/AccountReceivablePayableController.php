@@ -197,6 +197,12 @@ class AccountReceivablePayableController extends Controller
             ->orderByRaw("CASE WHEN status IN ('A', '1') THEN 0 ELSE 1 END")
             ->orderBy('number')
             ->get(['id', 'number', 'status']);
+        $standardCashRegisterId = $cashRegisters->firstWhere('status', 'A')->id
+            ?? $cashRegisters->firstWhere('status', '1')->id
+            ?? $cashRegisters->first()->id
+            ?? null;
+        $invoiceCashRegisterId = $this->getBranchConfiguredCashRegisterId($branchId, $cashRegisters, 'caja factur')
+            ?: $standardCashRegisterId;
 
         $paymentMethodOptions = PaymentMethod::query()
             ->where('status', true)
@@ -266,6 +272,8 @@ class AccountReceivablePayableController extends Controller
             'totalPending' => (float) $totalPending,
             'operaciones' => $this->resolveOperations($viewId, $branchId),
             'cashRegisters' => $cashRegisters,
+            'defaultCashRegisterId' => $standardCashRegisterId,
+            'invoiceCashRegisterId' => $invoiceCashRegisterId,
             'paymentMethodOptions' => $paymentMethodOptions,
             'cardOptions' => $cardOptions,
             'digitalWalletOptions' => $digitalWalletOptions,
@@ -383,6 +391,68 @@ class AccountReceivablePayableController extends Controller
             'total' => $total,
             'paid' => $paid,
             'pending' => $pending,
+            'preferred_cash_register_id' => $this->preferredCashRegisterIdForSettlement($record),
         ];
+    }
+
+    private function preferredCashRegisterIdForSettlement(AccountReceivablePayable $record): ?int
+    {
+        $branchId = (int) ($record->branch_id ?? 0);
+        if ($branchId <= 0) {
+            return null;
+        }
+
+        $cashRegisters = CashRegister::query()
+            ->where('branch_id', $branchId)
+            ->orderByRaw("CASE WHEN status IN ('A', '1') THEN 0 ELSE 1 END")
+            ->orderBy('number')
+            ->get(['id', 'number', 'status']);
+
+        $standardCashRegisterId = $cashRegisters->firstWhere('status', 'A')->id
+            ?? $cashRegisters->firstWhere('status', '1')->id
+            ?? $cashRegisters->first()->id
+            ?? null;
+        $invoiceCashRegisterId = $this->getBranchConfiguredCashRegisterId($branchId, $cashRegisters, 'caja factur')
+            ?: $standardCashRegisterId;
+
+        $cashMovement = $record->cashMovement;
+        $cashEntryMovement = $cashMovement?->movement;
+        $sourceMovement = $cashEntryMovement?->parentMovement ?: $cashEntryMovement;
+        $documentName = mb_strtolower(trim((string) ($sourceMovement?->documentType?->name ?? '')), 'UTF-8');
+
+        return str_contains($documentName, 'factura') ? $invoiceCashRegisterId : $standardCashRegisterId;
+    }
+
+    private function getBranchConfiguredCashRegisterId(int $branchId, $cashRegisters, string $needle): ?int
+    {
+        $cashRegisters = collect($cashRegisters);
+
+        if ($branchId <= 0) {
+            return $cashRegisters->firstWhere('status', 'A')->id
+                ?? $cashRegisters->firstWhere('status', '1')->id
+                ?? $cashRegisters->first()->id
+                ?? null;
+        }
+
+        $configuredValue = DB::table('branch_parameters as bp')
+            ->join('parameters as p', 'p.id', '=', 'bp.parameter_id')
+            ->where('bp.branch_id', $branchId)
+            ->whereNull('bp.deleted_at')
+            ->whereNull('p.deleted_at')
+            ->where('p.description', 'ILIKE', '%' . $needle . '%')
+            ->value('bp.value');
+
+        if (is_numeric($configuredValue)) {
+            $configuredId = (int) $configuredValue;
+            $exists = $cashRegisters->contains(fn ($cashRegister) => (int) ($cashRegister->id ?? 0) === $configuredId);
+            if ($exists) {
+                return $configuredId;
+            }
+        }
+
+        return $cashRegisters->firstWhere('status', 'A')->id
+            ?? $cashRegisters->firstWhere('status', '1')->id
+            ?? $cashRegisters->first()->id
+            ?? null;
     }
 }

@@ -47,7 +47,7 @@
                         emptyText="Documento"
                         :numeric="true"
                         :required="true"
-                        pickExpr="documentTypeId = Number(opt.id)"
+                        pickExpr="setDocumentType(opt.id)"
                         inputClass="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700"
                     />
                 </div>
