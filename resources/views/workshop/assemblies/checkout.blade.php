@@ -3,6 +3,87 @@
 @section('content')
 <div x-data="{
     ...(typeof formAutocompleteHelpers === 'function' ? formAutocompleteHelpers() : {}),
+    openQuickClientModal: false,
+    isSavingClient: false,
+    isSearchingDocument: false,
+    clientError: '',
+    newClient: { 
+        person_type: 'DNI', document_number: '', first_name: '', last_name: '', 
+        phone: '', email: '', address: '', genero: '', fecha_nacimiento: '', 
+        location_id: '' 
+    },
+    
+    searchDocument() {
+        if (!this.newClient.document_number) return;
+        this.isSearchingDocument = true;
+        
+        let url = '';
+        if (this.newClient.person_type === 'DNI') {
+            url = `{{ route('api.reniec') }}?dni=${this.newClient.document_number}`;
+        } else if (this.newClient.person_type === 'RUC') {
+            url = `{{ route('api.ruc') }}?ruc=${this.newClient.document_number}`;
+        } else {
+            this.isSearchingDocument = false;
+            return;
+        }
+
+        fetch(url)
+            .then(res => res.json())
+            .then(data => {
+                this.isSearchingDocument = false;
+                if(data.success === false) {
+                    this.clientError = data.message || 'Error al buscar documento.';
+                    return;
+                }
+                this.clientError = '';
+                if (this.newClient.person_type === 'DNI') {
+                    this.newClient.first_name = data.nombres || '';
+                    this.newClient.last_name = (data.apellido_paterno ? data.apellido_paterno + ' ' : '') + (data.apellido_materno || '');
+                } else if (this.newClient.person_type === 'RUC') {
+                    this.newClient.first_name = data.razon_social || '';
+                    this.newClient.last_name = '';
+                    this.newClient.address = data.direccion || '';
+                }
+            })
+            .catch(() => {
+                this.isSearchingDocument = false;
+                this.clientError = 'Error de conexión con RENIEC/SUNAT.';
+            });
+    },
+
+    saveQuickClient() {
+        if (!this.newClient.document_number || (!this.newClient.first_name && this.newClient.person_type !== 'RUC')) {
+            this.clientError = 'Complete los campos requeridos (Documento y Nombres).';
+            return;
+        }
+        this.clientError = '';
+        this.isSavingClient = true;
+        
+        fetch('{{ route('workshop.assemblies.massive_sale.clients.store') }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+            body: JSON.stringify(this.newClient)
+        })
+        .then(res => res.json().then(data => ({ status: res.status, ok: res.ok, data })))
+        .then(res => {
+            this.isSavingClient = false;
+            if (!res.ok) {
+                this.clientError = res.data.message || 'Error al guardar el cliente.';
+                return;
+            }
+            // Agrega cliente a las opciones y lo selecciona
+            this.clientsOptions.push({ id: res.data.client.id, name: res.data.client.name });
+            this.selectedClientId = String(res.data.client.id);
+            
+            this.openQuickClientModal = false;
+            this.newClient = { person_type: 'DNI', document_number: '', first_name: '', last_name: '', phone: '', email: '', address: '', genero: '', fecha_nacimiento: '', location_id: '' };
+        })
+        .catch(err => {
+            this.isSavingClient = false;
+            this.clientError = 'Error de conexión. Intente de nuevo.';
+        });
+    },
+
     clientsOptions: @js($clients->map(fn($c) => ['id' => $c->id, 'name' => trim($c->first_name . ' ' . $c->last_name)])->values()->all()),
     selectedClientId: '',
 
@@ -261,19 +342,26 @@
 
             <div class="space-y-4">
                 <div class="rounded-2xl border border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-white/5">
-                    <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">Datos del Cliente</label>
-                    <x-form.select-autocomplete-inline
-                        fieldKey="ms_client"
-                        name="client_person_id"
-                        valueVar="selectedClientId"
-                        optionsListExpr="clientsOptions"
-                        optionLabel="name"
-                        optionValue="id"
-                        emptyText="Seleccione un cliente..."
-                        placeholderSearch="Buscar cliente por nombre..."
-                        :required="true"
-                        inputClass="w-full h-11 rounded-xl border-gray-200 bg-white text-sm shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                    />
+                    <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">Datos del Cliente *</label>
+                    <div class="flex items-start gap-2">
+                        <div class="flex-1">
+                            <x-form.select-autocomplete-inline
+                                fieldKey="ms_client"
+                                name="client_person_id"
+                                valueVar="selectedClientId"
+                                optionsListExpr="clientsOptions"
+                                optionLabel="name"
+                                optionValue="id"
+                                emptyText="Seleccione un cliente..."
+                                placeholderSearch="Buscar cliente por nombre..."
+                                :required="true"
+                                inputClass="w-full h-11 rounded-xl border-gray-200 bg-white text-sm shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                            />
+                        </div>
+                        <button type="button" @click="openQuickClientModal = true" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-sm transition hover:scale-105" style="background:linear-gradient(90deg,#ff7a00,#ff4d00);" title="Nuevo Cliente">
+                            <i class="ri-user-add-line text-lg"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="rounded-2xl border border-gray-100 bg-gray-50/50 p-4 dark:border-gray-800 dark:bg-white/5">
@@ -418,5 +506,118 @@
             </div>
         </form>
     </x-common.component-card>
+
+    <div x-show="openQuickClientModal" class="fixed inset-0 z-[100000] overflow-hidden p-3 sm:p-6" style="display: none;">
+        <div class="fixed inset-0 h-full w-full bg-gray-400/30 backdrop-blur-[32px]" @click="openQuickClientModal = false"></div>
+        <div class="relative flex min-h-full items-center justify-center">
+            <div class="w-full max-w-4xl rounded-[28px] bg-white shadow-2xl" @click.stop>
+                <div class="flex items-center justify-between border-b border-slate-200 px-6 py-5 sm:px-8">
+                    <h3 class="text-lg font-semibold text-gray-800">Registrar cliente</h3>
+                    <button type="button" @click="openQuickClientModal = false" class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
+                        <i class="ri-close-line text-xl"></i>
+                    </button>
+                </div>
+
+                <div class="p-6 sm:p-8">
+                    <div x-show="clientError" class="mb-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700" x-text="clientError" style="display: none;"></div>
+
+                    <form @submit.prevent="saveQuickClient" class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Tipo de persona <span class="text-red-500">*</span></label>
+                            <select x-model="newClient.person_type" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:ring-brand-500">
+                                <option value="DNI">DNI</option>
+                                <option value="RUC">RUC</option>
+                                <option value="CARNET DE EXTRANGERIA">CARNET DE EXTRANGERIA</option>
+                                <option value="PASAPORTE">PASAPORTE</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Documento <span class="text-red-500">*</span></label>
+                            <div class="flex items-center gap-2">
+                                <input x-model="newClient.document_number" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:ring-brand-500" placeholder="Documento" required>
+                                <button type="button" @click="searchDocument()" :disabled="isSearchingDocument" class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-[#334155] px-4 text-sm font-medium text-white hover:bg-[#1f3f98] disabled:opacity-60 text-lg">
+                                    <i class="ri-search-line" x-show="!isSearchingDocument"></i>
+                                    <i class="ri-loader-4-line animate-spin" x-show="isSearchingDocument" style="display: none;"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Nombres <span class="text-red-500">*</span></label>
+                            <input x-model="newClient.first_name" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:ring-brand-500" placeholder="Nombres / Razon social" required>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Apellidos <span class="text-red-500">*</span></label>
+                            <input x-model="newClient.last_name" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:ring-brand-500" placeholder="Apellidos" :required="newClient.person_type !== 'RUC'">
+                        </div>
+
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Fecha de nacimiento</label>
+                            <input x-model="newClient.fecha_nacimiento" type="date" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:ring-brand-500">
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Genero</label>
+                            <select x-model="newClient.genero" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:ring-brand-500">
+                                <option value="">Seleccione genero</option>
+                                <option value="MASCULINO">MASCULINO</option>
+                                <option value="FEMENINO">FEMENINO</option>
+                                <option value="OTRO">OTRO</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Telefono</label>
+                            <input x-model="newClient.phone" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:ring-brand-500" placeholder="Ingrese el telefono">
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Email</label>
+                            <input x-model="newClient.email" type="email" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:ring-brand-500" placeholder="Ingrese el email">
+                        </div>
+
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Direccion</label>
+                            <input x-model="newClient.address" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:ring-brand-500" placeholder="Direccion (opcional)">
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Departamento</label>
+                            <select class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:ring-brand-500 text-gray-600" disabled>
+                                <option value="">Por defecto de sucursal</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Provincia</label>
+                            <select class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:ring-brand-500 text-gray-600" disabled>
+                                <option value="">Por defecto de sucursal</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Distrito</label>
+                            <select class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:ring-brand-500 text-gray-600" disabled>
+                                <option value="">Por defecto de sucursal</option>
+                            </select>
+                        </div>
+
+                        <div class="md:col-span-4 mt-2">
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Roles</label>
+                            <div class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                                <input type="checkbox" checked disabled class="h-4 w-4 rounded border-gray-300 text-brand-500">
+                                <span>Cliente</span>
+                            </div>
+                        </div>
+
+                        <div class="md:col-span-4 mt-2 flex gap-2">
+                            <button type="submit" :disabled="isSavingClient" class="inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold text-white" style="background-color:#00A389;color:#fff;" :class="isSavingClient && 'opacity-70 cursor-wait'">
+                                <i class="ri-save-line" x-show="!isSavingClient"></i>
+                                <i class="ri-loader-4-line animate-spin" x-show="isSavingClient" style="display: none;"></i>
+                                <span x-text="isSavingClient ? 'Guardando...' : 'Guardar cliente'"></span>
+                            </button>
+                            <button type="button" @click="openQuickClientModal = false" :disabled="isSavingClient" class="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                                <i class="ri-close-line"></i>
+                                <span>Cancelar</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 @endsection
