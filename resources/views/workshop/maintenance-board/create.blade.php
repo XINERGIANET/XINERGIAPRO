@@ -1449,6 +1449,7 @@
                                         :value="getServiceCcOverride(service.id)"
                                         @click.stop
                                         @change="setServiceCcOverride(service.id, $event.target.value)"
+                                        data-gsa-skip="true"
                                         class="h-7 w-[126px] rounded-md border border-gray-200 bg-gray-50 px-2 text-[11px] text-gray-600"
                                     >
                                         <template x-for="option in servicePriceOptions(service)" :key="`${service.id}-${option.value}`">
