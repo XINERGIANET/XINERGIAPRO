@@ -45,7 +45,7 @@ class WorkshopAssemblyLocationController extends Controller
         return view('workshop.assembly_locations.index', compact('locations', 'search'));
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request)
     {
         [$branchId, $companyId] = $this->scope();
         $validated = $request->validate([
@@ -55,13 +55,20 @@ class WorkshopAssemblyLocationController extends Controller
             'apply_to_all_branches' => ['nullable', 'boolean'],
         ]);
 
-        WorkshopAssemblyLocation::query()->create([
+        $location = WorkshopAssemblyLocation::query()->create([
             'company_id' => $companyId,
             'branch_id' => empty($validated['apply_to_all_branches']) ? $branchId : null,
             'name' => $validated['name'],
             'address' => $validated['address'] ?? null,
             'active' => (bool) ($validated['active'] ?? true),
         ]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'status' => 'success',
+                'location' => $location
+            ]);
+        }
 
         return back()->with('status', 'Ubicación creada correctamente.');
     }

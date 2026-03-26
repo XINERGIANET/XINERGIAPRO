@@ -58,7 +58,11 @@ class DashboardController extends Controller
         $ordersPendingApproval = (clone $baseQuery)->where('status', 'awaiting_approval')->count();
         $vehiclesInWorkshop = (clone $baseQuery)->whereNotIn('status', array_merge($closedStatuses, $cancelledStatuses))->count();
 
-        $todayInvoiced = (clone $baseQuery)->whereDate('updated_at', $today)->sum('paid_total');
+        $todayInvoiced = SalesMovement::query()
+            ->where('branch_id', $branchId)
+            ->whereHas('movement', fn ($query) => $query->whereDate('moved_at', $today))
+            ->sum('total');
+            
         $pendingCollection = (clone $baseQuery)->get(['total', 'paid_total'])->sum(function ($row) {
             return max(0, (float) $row->total - (float) $row->paid_total);
         });
@@ -97,9 +101,10 @@ class DashboardController extends Controller
         foreach ($days as $day) {
             $incomeByDay[] = [
                 'label' => $day->format('d/m'),
-                'amount' => (float) (clone $baseQuery)
-                    ->whereDate('updated_at', $day->toDateString())
-                    ->sum('paid_total'),
+                'amount' => (float) SalesMovement::query()
+                    ->where('branch_id', $branchId)
+                    ->whereHas('movement', fn ($query) => $query->whereDate('moved_at', $day->toDateString()))
+                    ->sum('total'),
             ];
         }
 
@@ -241,6 +246,64 @@ class DashboardController extends Controller
             ->limit(6)
             ->get();
 
+        $salesTodayDetails = SalesMovement::query()
+            ->with(['movement.documentType', 'movement.person', 'movement.branch'])
+            ->where('branch_id', $branchId)
+            ->whereHas('movement', fn ($query) => $query->whereDate('moved_at', $today))
+            ->get()
+            ->sortByDesc(fn ($sale) => optional(optional($sale->movement)->moved_at)->timestamp)
+            ->values();
+
+        $expensesTodayDetails = collect([]);
+        // Gastos de caja hoy
+        $cashMovements->filter(function ($row) use ($today) {
+            return strtoupper((string) ($row->paymentConcept->type ?? '')) === 'E'
+                && optional($row->created_at)->toDateString() === $today;
+        })->each(function($row) use ($expensesTodayDetails) {
+            $expensesTodayDetails->push([
+                'type' => 'CAJA',
+                'description' => $row->description ?: ($row->paymentConcept->name ?? 'Gasto de caja'),
+                'amount' => (float)$row->total,
+                'date' => $row->created_at,
+                'reference' => $row->reference_number
+            ]);
+        });
+        // Compras hoy
+        \App\Models\WorkshopPurchaseRecord::query()
+            ->where('branch_id', $branchId)
+            ->whereDate('issued_at', $today)
+            ->get()
+            ->each(function($row) use ($expensesTodayDetails) {
+                $expensesTodayDetails->push([
+                    'type' => 'COMPRA',
+                    'description' => $row->provider_name ?: 'Proveedor varios',
+                    'amount' => (float)$row->total,
+                    'date' => $row->issued_at,
+                    'reference' => $row->document_number
+                ]);
+            });
+        $expensesTodayDetails = $expensesTodayDetails->sortByDesc('date')->values();
+
+        $activeOrdersDetails = (clone $baseQuery)
+            ->whereIn('status', $activeStatuses)
+            ->with(['movement', 'vehicle', 'client'])
+            ->latest('id')
+            ->get();
+
+        $maintenanceWeekDetails = WorkshopMovementDetail::query()
+            ->join('workshop_movements', 'workshop_movements.id', '=', 'workshop_movement_details.workshop_movement_id')
+            ->leftJoin('workshop_services', 'workshop_services.id', '=', 'workshop_movement_details.service_id')
+            ->where('workshop_movements.branch_id', $branchId)
+            ->whereBetween('workshop_movements.intake_date', [$dateFrom, $dateTo])
+            ->whereIn('workshop_movement_details.line_type', ['SERVICE', 'SERVCE'])
+            ->where(function ($query) {
+                $query->where('workshop_services.type', 'preventivo')
+                    ->orWhere('workshop_movement_details.description', 'ILIKE', '%mantenimiento%');
+            })
+            ->with(['workshopMovement.vehicle', 'workshopMovement.client', 'workshopMovement.movement'])
+            ->select('workshop_movement_details.*')
+            ->get();
+
         $dashboardData = [
             'branchName' => (string) (Branch::query()->where('id', $branchId)->value('legal_name') ?? 'Sucursal actual'),
             'ordersActive' => $ordersActive,
@@ -268,6 +331,10 @@ class DashboardController extends Controller
             'topServices' => $topServices,
             'incomeByDay' => $incomeByDay,
             'recentOrders' => $recentOrders,
+            'salesTodayDetails' => $salesTodayDetails,
+            'expensesTodayDetails' => $expensesTodayDetails,
+            'activeOrdersDetails' => $activeOrdersDetails,
+            'maintenanceWeekDetails' => $maintenanceWeekDetails,
             'totalOrdersCount' => $totalOrdersCount,
             'dateFrom' => $dateFrom->toDateString(),
             'dateTo' => $dateTo->toDateString(),

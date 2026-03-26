@@ -378,7 +378,7 @@
     </div>
 </header>
 
-@if($totalNotifs > 0)
+@if($totalNotifs > 0 && request()->routeIs('dashboard'))
     {{-- Welcome Toast Card (Alert on login/load) --}}
     <div x-data="{ show: false }" 
          x-init="setTimeout(() => show = true, 800); setTimeout(() => show = false, 8000)"

@@ -61,6 +61,34 @@
         ];
 
         $isMonday = now()->isMonday();
+
+        // --- CÁLCULO DE DATOS PARA EL GRÁFICO (CENTRALIZADO) ---
+        $count = count($incomeByDay);
+        $maxIncomeLocal = max(1, $incomeByDay->max('amount'));
+        $yMax = ceil($maxIncomeLocal / 15) * 15;
+        if ($yMax == 0) $yMax = 60;
+        
+        $ticks = [];
+        for ($i = 4; $i >= 0; $i--) {
+            $ticks[] = ($yMax / 4) * $i;
+        }
+
+        $points = [];
+        foreach($incomeByDay as $index => $row) {
+            $x = ($index / (max(1, $count - 1))) * 1000;
+            $y = 100 - (($row['amount'] / $yMax) * 100);
+            $points[] = ['x' => $x, 'y' => $y];
+        }
+        
+        $path = "M " . $points[0]['x'] . " " . $points[0]['y'];
+        for ($i = 0; $i < count($points) - 1; $i++) {
+            $curr = $points[$i];
+            $next = $points[$i+1];
+            $cp1x = $curr['x'] + ($next['x'] - $curr['x']) / 2;
+            $path .= " C $cp1x " . $curr['y'] . ", $cp1x " . $next['y'] . ", " . $next['x'] . " " . $next['y'];
+        }
+        $areaPath = $path . " L 1000 100 L 0 100 Z";
+        // -----------------------------------------------------
     @endphp
 
     <div class="flex items-center justify-between mb-6">
@@ -68,8 +96,8 @@
             <h1 class="text-2xl font-black text-slate-900">Dashboard Taller</h1>
             <p class="text-xs text-slate-500 font-medium">Vista general de operaciones del taller</p>
         </div>
-        <div class="flex items-center gap-3">
-            <button class="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-xl text-xs font-black shadow-sm flex items-center gap-2 hover:bg-slate-50 transition-all">
+        <div class="flex items-center gap-3 print:hidden">
+            <button onclick="window.print()" class="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-xl text-xs font-black shadow-sm flex items-center gap-2 hover:bg-slate-50 transition-all">
                 <i class="ri-download-2-line"></i> Exportar
             </button>
             <button class="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-black shadow-sm flex items-center gap-2 hover:bg-blue-700 transition-all">
@@ -79,9 +107,119 @@
     </div>
 
     <div class="space-y-6 pb-10" id="workshop-dashboard">
+        <!-- CABECERA FORMAL DE REPORTE (SOLO IMPRESIÓN) -->
+        <header class="hidden print:flex flex-col gap-6 mb-10 pb-6 border-b-2 border-slate-900 w-full">
+            <div class="flex flex-row justify-between items-start w-full">
+                <div class="flex flex-col gap-2">
+                    <img src="/images/logo/Xinergia.png" alt="Logo" class="h-12 w-auto mb-2 self-start" />
+                    <h1 class="text-4xl font-black text-slate-900 tracking-tight leading-none uppercase">Reporte Operativo de Taller</h1>
+                    <div class="flex items-center gap-4 mt-1">
+                        <p class="text-sm font-bold text-slate-500 uppercase tracking-widest border-r border-slate-300 pr-4">
+                            Sede: <span class="text-slate-900">{{ $dashboardData['branchName'] ?? 'Principal' }}</span>
+                        </p>
+                        <p class="text-[10px] font-black text-white bg-slate-900 px-2 py-0.5 rounded uppercase tracking-tighter">
+                            Documento Confidencial
+                        </p>
+                    </div>
+                </div>
+                <div class="text-right flex flex-col items-end gap-1">
+                    <div class="px-4 py-1.5 bg-slate-100 border border-slate-200 text-slate-800 text-[10px] font-black rounded-lg uppercase tracking-widest mb-2 shadow-sm">
+                        Resumen Diario
+                    </div>
+                    <p class="text-xs font-bold text-slate-600">Fecha: <span class="text-slate-900 font-black">{{ now()->format('d/m/Y') }}</span></p>
+                    <p class="text-xs font-bold text-slate-600">Hora: <span class="text-slate-900 font-black">{{ now()->format('H:i') }}</span></p>
+                    <p class="text-[10px] text-slate-400 mt-3 italic font-medium">Generado por: {{ auth()->user()->name ?? 'Administrador' }}</p>
+                </div>
+            </div>
+
+            <!-- RESUMEN EJECUTIVO (KPIs) -->
+            <div class="grid grid-cols-4 gap-6 mt-4 w-full">
+                <div class="p-5 bg-white border-2 border-emerald-600 rounded-2xl shadow-sm">
+                    <p class="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Ingresos Hoy</p>
+                    <p class="text-2xl font-black text-slate-900 mt-1">S/ {{ number_format($dashboardData['todayInvoiced'] ?? 0, 2) }}</p>
+                </div>
+                <div class="p-5 bg-white border-2 border-red-600 rounded-2xl shadow-sm">
+                    <p class="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1">Egresos Hoy</p>
+                    <p class="text-2xl font-black text-slate-900 mt-1">S/ {{ number_format($dashboardData['expensesToday'] ?? 0, 2) }}</p>
+                </div>
+                <div class="p-5 bg-white border-2 border-blue-600 rounded-2xl shadow-sm">
+                    <p class="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Órdenes Activas</p>
+                    <p class="text-2xl font-black text-slate-900 mt-1">{{ number_format($dashboardData['ordersActive'] ?? 0) }}</p>
+                </div>
+                <div class="p-5 bg-white border-2 border-purple-600 rounded-2xl shadow-sm">
+                    <p class="text-[10px] font-black text-purple-600 uppercase tracking-widest mb-1">Servicios Semana</p>
+                    <p class="text-2xl font-black text-slate-900 mt-1">{{ number_format($dashboardData['maintenancesWeek'] ?? 0) }}</p>
+                </div>
+            </div>
+        </header>
         
-        <!-- HERO CARDS: VENTAS, GASTOS, INGRESOS, EGRESOS -->
-        <section class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <!-- GRÁFICO DE TENDENCIA (SOLO PARA LA PRIMERA HOJA DEL PDF) -->
+        <article class="hidden print:flex bg-white rounded-[2rem] border-2 border-slate-200 p-8 flex-col relative overflow-hidden mb-10 trend-chart-article" style="min-height: 450px !important;">
+            <div class="flex items-start justify-between mb-8 px-8 pt-6 relative z-10">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg bg-[#F4F6FA] border border-slate-100 flex items-center justify-center shadow-sm">
+                        <i class="ri-line-chart-line text-blue-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900 leading-tight">Tendencia de Ingresos</h3>
+                        <p class="text-sm text-slate-500">Resumen - Últimos 7 días</p>
+                    </div>
+                </div>
+                <div class="text-right bg-[#F4F6FA] px-4 py-3 rounded-xl border border-slate-100">
+                    <p class="text-[10px] text-blue-600 font-bold uppercase tracking-wider mb-1">Total Semana</p>
+                    <p class="text-2xl font-bold text-blue-700 leading-none">S/ {{ number_format((float) ($incomeByDay->sum('amount')), 2) }}</p>
+                </div>
+            </div>
+            <!-- Contenedor del Gráfico -->
+            <div class="flex-1 flex flex-col min-h-[320px] px-8 pb-6">
+                <div class="flex flex-1 items-stretch">
+                    <!-- Eje Y (Labels) -->
+                    <div class="flex flex-col justify-between text-[11px] text-slate-400 font-medium pr-6 mb-8 mt-1">
+                        @foreach($ticks as $tick)
+                            <span>{{ number_format($tick, 0) }}</span>
+                        @endforeach
+                    </div>
+
+                    <!-- Área del Gráfico -->
+                    <div class="relative flex-1 mb-8" style="height: 250px !important;">
+                        <!-- Grid Lines -->
+                        <div class="absolute inset-0 flex flex-col justify-between h-full pointer-events-none">
+                            @foreach($ticks as $tick)
+                                <div class="w-full h-[1px] border-t border-dashed border-slate-100"></div>
+                            @endforeach
+                        </div>
+
+                        <!-- SVG del Gráfico -->
+                        <div class="absolute inset-0 h-full">
+                            <svg viewBox="0 0 1000 100" preserveAspectRatio="none" class="w-full h-full overflow-visible">
+                                <defs>
+                                    <linearGradient id="colorValuePrint" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stop-color="#3b82f6" stop-opacity="0.4"/>
+                                        <stop offset="95%" stop-color="#3b82f6" stop-opacity="0.05"/>
+                                    </linearGradient>
+                                </defs>
+                                <path d="{{ $areaPath }}" fill="url(#colorValuePrint)" />
+                                <path d="{{ $path }}" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                
+                                @foreach($points as $p)
+                                    <circle cx="{{ $p['x'] }}" cy="{{ $p['y'] }}" r="3" fill="#2563eb" stroke="white" stroke-width="2" />
+                                @endforeach
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Eje X (Dates) -->
+                <div class="flex justify-between pl-[40px] border-t border-slate-50 pt-4">
+                    @foreach($incomeByDay as $row)
+                        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{{ $row['label'] }}</span>
+                    @endforeach
+                </div>
+            </div>
+        </article>
+
+        <!-- KPI CARDS Y ANEXOS DETALLADOS -->
+        <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8 hero-kpi-grid print:grid-cols-2 print:gap-4 print:mb-6">
             <!-- Ingreso Hoy -->
             <article class="bg-white p-6 rounded-[1.5rem] border border-slate-100 transition-all hover:bg-slate-50/50">
                 <div class="flex justify-between items-start mb-6">
@@ -151,140 +289,188 @@
             </article>
         </section>
 
-        <!-- MAIN GRID: TRENDS & BIRTHDAYS -->
-        <section class="grid grid-cols-1 gap-6 xl:grid-cols-12">
-            <article class="bg-white rounded-[1.5rem] border border-slate-100 p-8 xl:col-span-8 flex flex-col relative overflow-hidden transition-all hover:shadow-md">
-                <!-- Header del gráfico -->
-                <div class="flex items-start justify-between mb-8 px-8 pt-6 relative z-10">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-lg bg-[#F4F6FA] border border-slate-100 flex items-center justify-center shadow-sm">
-                            <i class="ri-line-chart-line text-blue-600 text-xl"></i>
-                        </div>
-                        <div>
-                            <h3 class="text-lg font-bold text-slate-900 leading-tight">Tendencia de Ingresos</h3>
-                            <p class="text-sm text-slate-500">Últimos 7 días</p>
-                        </div>
-                    </div>
-                    <div class="text-right bg-[#F4F6FA] px-4 py-3 rounded-xl border border-slate-100">
-                        <p class="text-[10px] text-blue-600 font-bold uppercase tracking-wider mb-1">Total Semana</p>
-                        <p class="text-2xl font-bold text-blue-700 leading-none">S/ {{ number_format((float) ($incomeByDay->sum('amount')), 2) }}</p>
-                    </div>
-                </div>
-                <!-- Contenedor del Gráfico -->
-                <div class="flex-1 flex flex-col min-h-[320px] px-8 pb-6">
-                    <div class="flex flex-1 items-stretch">
-                        @php
-                            $count = count($incomeByDay);
-                            $maxIncomeLocal = max(1, $incomeByDay->max('amount'));
-                            $yMax = ceil($maxIncomeLocal / 15) * 15;
-                            if ($yMax == 0) $yMax = 60;
-                            
-                            $ticks = [];
-                            for ($i = 4; $i >= 0; $i--) {
-                                $ticks[] = ($yMax / 4) * $i;
-                            }
-
-                            $points = [];
-                            foreach($incomeByDay as $index => $row) {
-                                $x = ($index / (max(1, $count - 1))) * 1000;
-                                $y = 100 - (($row['amount'] / $yMax) * 100);
-                                $points[] = ['x' => $x, 'y' => $y];
-                            }
-                            
-                            $path = "M " . $points[0]['x'] . " " . $points[0]['y'];
-                            for ($i = 0; $i < count($points) - 1; $i++) {
-                                $curr = $points[$i];
-                                $next = $points[$i+1];
-                                $cp1x = $curr['x'] + ($next['x'] - $curr['x']) / 2;
-                                $path .= " C $cp1x " . $curr['y'] . ", $cp1x " . $next['y'] . ", " . $next['x'] . " " . $next['y'];
-                            }
-                            $areaPath = $path . " L 1000 100 L 0 100 Z";
-                        @endphp
-
-                        <!-- Eje Y (Labels) -->
-                        <div class="flex flex-col justify-between text-[11px] text-slate-400 font-medium pr-6 mb-8 mt-1">
-                            @foreach($ticks as $tick)
-                                <span>{{ number_format($tick, 0) }}</span>
-                            @endforeach
-                        </div>
-
-                        <!-- Área del Gráfico -->
-                        <div class="relative flex-1 mb-8">
-                            <!-- Grid Lines -->
-                            <div class="absolute inset-0 flex flex-col justify-between h-full pointer-events-none">
-                                @foreach($ticks as $tick)
-                                    <div class="w-full h-[1px] border-t border-dashed border-slate-100"></div>
-                                @endforeach
-                            </div>
-
-                            <!-- SVG del Gráfico -->
-                            <div class="absolute inset-0 h-full">
-                                <svg viewBox="0 0 1000 100" preserveAspectRatio="none" class="w-full h-full overflow-visible">
-                                    <defs>
-                                        <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stop-color="#3b82f6" stop-opacity="0.4"/>
-                                            <stop offset="95%" stop-color="#3b82f6" stop-opacity="0.05"/>
-                                        </linearGradient>
-                                    </defs>
-                                    <path d="{{ $areaPath }}" fill="url(#colorValue)" />
-                                    <path d="{{ $path }}" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                                    
-                                    @foreach($points as $p)
-                                        <circle cx="{{ $p['x'] }}" cy="{{ $p['y'] }}" r="3" fill="#3b82f6" stroke="white" stroke-width="2" />
-                                    @endforeach
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Eje X (Dates) - Ahora fuera del área absoluta para asegurar que siempre esté abajo -->
-                    <div class="flex justify-between pl-[40px] border-t border-slate-50 pt-4">
-                        @foreach($incomeByDay as $row)
-                            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{{ $row['label'] }}</span>
-                        @endforeach
-                    </div>
-                </div>
-            </article>
-
-            <article class="rounded-[1.5rem] border border-slate-100 bg-white p-6 xl:col-span-4 h-full flex flex-col overflow-hidden">
-                <div class="mb-8 flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-orange-600 text-white flex items-center justify-center shadow-lg shadow-orange-600/20">
-                        <i class="ri-cake-2-fill text-xl"></i>
+        <!-- SECCIÓN DE DETALLES (SOLO PDF) - MOVEMOS ESTO AQUÍ PARA QUE APAREZCA JUNTO A LAS TARJETAS -->
+        <div class="hidden print:block space-y-12">
+            <!-- Detalle Ingresos -->
+            @php $salesTodayDetails = $salesTodayDetails ?? collect([]) @endphp
+            <section class="break-inside-avoid">
+                <div class="mb-4 flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl text-emerald-600 bg-emerald-50 flex items-center justify-center border border-emerald-100">
+                        <i class="ri-wallet-3-fill text-xl"></i>
                     </div>
                     <div>
-                        <h3 class="text-lg font-black text-slate-900 leading-tight">Cumpleaños</h3>
-                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Esta semana</p>
+                        <p class="text-[10px] font-black text-emerald-600 uppercase tracking-widest leading-none mb-1">DETALLE OPERATIVO</p>
+                        <h3 class="text-xl font-black text-slate-800 leading-none">Movimientos de Ingresos (Hoy)</h3>
                     </div>
                 </div>
-                
-                <div class="space-y-4 overflow-y-auto pr-1 custom-scrollbar flex-1">
-                    @forelse($birthdays as $bday)
-                        <div class="flex items-center justify-between p-4 rounded-2xl border border-transparent birthday-hover-row cursor-pointer transition-all group/item">
-                            <div class="flex items-center gap-4">
-                                <div class="w-12 h-12 rounded-full text-white flex items-center justify-center font-black text-sm shadow-lg shadow-blue-500/20" style="background-color: #2563eb !important;">
-                                    {{ substr($bday->first_name, 0, 1) }}{{ substr($bday->last_name, 0, 1) }}
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <h4 class="font-black text-slate-800 uppercase text-sm leading-tight mb-1 whitespace-normal break-words">{{ $bday->first_name }} {{ $bday->last_name }}</h4>
-                                    <p class="text-[10px] font-black text-slate-400 flex items-center gap-1 uppercase">
-                                        <i class="ri-cake-2-line text-orange-400"></i>
-                                        {{ \Carbon\Carbon::parse($bday->fecha_nacimiento)->translatedFormat('d \d\e M') }}
-                                    </p>
-                                </div>
-                            </div>
-                            <a href="https://wa.me/{{ preg_replace('/\D/', '', $bday->phone) }}" target="_blank" class="w-11 h-11 rounded-[1.2rem] text-white flex items-center justify-center hover:scale-110 transition-all shrink-0 shadow-lg shadow-emerald-500/20" style="background-color: #25D366 !important;">
-                                <i class="ri-whatsapp-line text-xl"></i>
-                            </a>
-                        </div>
-                    @empty
-                        <div class="h-full flex flex-col items-center justify-center py-10 opacity-30">
-                            <i class="ri-cake-2-line text-3xl mb-2 text-slate-300"></i>
-                            <p class="text-xs font-bold italic">Sin cumpleaños</p>
-                        </div>
-                    @endforelse
+                <div class="rounded-2xl border-2 border-slate-200 bg-white overflow-hidden shadow-sm">
+                    <table class="w-full text-left">
+                        <thead class="bg-slate-50 border-b-2 border-slate-200">
+                            <tr>
+                                <th class="px-6 py-4 text-[10px] font-black uppercase text-slate-400">Hora</th>
+                                <th class="px-6 py-4 text-[10px] font-black uppercase text-slate-400">Comprobante</th>
+                                <th class="px-6 py-4 text-[10px] font-black uppercase text-slate-400">Cliente</th>
+                                <th class="px-6 py-4 text-right text-[10px] font-black uppercase text-slate-400">Monto</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @forelse($salesTodayDetails as $sale)
+                                <tr>
+                                    <td class="px-6 py-4 text-xs font-bold text-slate-500">{{ \Carbon\Carbon::parse($sale->created_at)->format('H:i') }}</td>
+                                    <td class="px-6 py-4 text-xs font-black text-slate-900">{{ $sale->number }}</td>
+                                    <td class="px-6 py-4 text-xs font-bold text-slate-700 uppercase">{{ $sale->client->first_name ?? '' }} {{ $sale->client->last_name ?? '' }}</td>
+                                    <td class="px-6 py-4 text-right text-xs font-black text-slate-900">S/ {{ number_format($sale->total, 2) }}</td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="4" class="py-8 text-center text-xs text-slate-400 italic font-medium">Sin movimientos hoy</td></tr>
+                            @endforelse
+                        </tbody>
+                        <tfoot class="bg-emerald-50/50">
+                            <tr class="font-black text-emerald-700">
+                                <td colspan="3" class="px-6 py-4 text-xs text-right uppercase tracking-widest">Total Ingresado:</td>
+                                <td class="px-6 py-4 text-right text-sm">S/ {{ number_format($salesTodayDetails->sum('total'), 2) }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
                 </div>
-            </article>
-        </section>
+            </section>
+
+            <!-- Detalle Gastos -->
+            @php $expensesTodayDetails = $expensesTodayDetails ?? collect([]) @endphp
+            <section class="break-inside-avoid">
+                <div class="mb-4 flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl text-red-600 bg-red-50 flex items-center justify-center border border-red-100">
+                        <i class="ri-money-dollar-circle-fill text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-black text-red-600 uppercase tracking-widest leading-none mb-1">DETALLE OPERATIVO</p>
+                        <h3 class="text-xl font-black text-slate-800 leading-none">Movimientos de Egresos (Hoy)</h3>
+                    </div>
+                </div>
+                <div class="rounded-2xl border-2 border-slate-200 bg-white overflow-hidden shadow-sm">
+                    <table class="w-full text-left">
+                        <thead class="bg-slate-50 border-b-2 border-slate-200">
+                            <tr>
+                                <th class="px-6 py-4 text-[10px] font-black uppercase text-slate-400">Tipo</th>
+                                <th class="px-6 py-4 text-[10px] font-black uppercase text-slate-400">Ref.</th>
+                                <th class="px-6 py-4 text-[10px] font-black uppercase text-slate-400">Descripción / Proveedor</th>
+                                <th class="px-6 py-4 text-right text-[10px] font-black uppercase text-slate-400">Monto</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @forelse($expensesTodayDetails as $exp)
+                                <tr>
+                                    <td class="px-6 py-4 text-[10px] font-black uppercase"><span class="bg-gray-100 px-2 py-0.5 rounded">{{ $exp->type }}</span></td>
+                                    <td class="px-6 py-4 text-xs font-bold text-slate-500">{{ $exp->reference ?: '-' }}</td>
+                                    <td class="px-6 py-4 text-xs font-bold text-slate-700 uppercase">{{ $exp->description ?: ($exp->provider->legal_name ?? 'S/P') }}</td>
+                                    <td class="px-6 py-4 text-right text-xs font-black text-red-600">S/ {{ number_format($exp->total, 2) }}</td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="4" class="py-10 text-center text-xs text-slate-400 italic font-medium">Sin egresos registrados hoy</td></tr>
+                            @endforelse
+                        </tbody>
+                        <tfoot class="bg-red-50/50">
+                            <tr class="font-black text-red-700">
+                                <td colspan="3" class="px-6 py-4 text-xs text-right uppercase tracking-widest">Total Egresado:</td>
+                                <td class="px-6 py-4 text-right text-sm">S/ {{ number_format($expensesTodayDetails->sum('total'), 2) }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Detalle Activas -->
+            @php $activeOrdersDetails = $activeOrdersDetails ?? collect([]) @endphp
+            <section class="break-inside-avoid">
+                <div class="mb-4 flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl text-blue-600 bg-blue-50 flex items-center justify-center border border-blue-100">
+                        <i class="ri-folder-open-fill text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none mb-1">DATOS DE TALLER</p>
+                        <h3 class="text-xl font-black text-slate-800 leading-none">Órdenes Activas</h3>
+                    </div>
+                </div>
+                <div class="rounded-2xl border-2 border-slate-200 bg-white overflow-hidden shadow-sm">
+                    <table class="w-full text-left">
+                        <thead class="bg-slate-50 border-b-2 border-slate-200">
+                            <tr>
+                                <th class="px-6 py-4 text-[10px] font-black uppercase text-slate-400 text-center">Nº</th>
+                                <th class="px-6 py-4 text-[10px] font-black uppercase text-slate-400">Cliente / Vehículo</th>
+                                <th class="px-6 py-4 text-[10px] font-black uppercase text-slate-400">Estado</th>
+                                <th class="px-6 py-4 text-right text-[10px] font-black uppercase text-slate-400">Ingresó</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @forelse($activeOrdersDetails as $order)
+                                <tr>
+                                    <td class="px-6 py-4 text-xs font-black text-slate-900 text-center">{{ $order->movement->number ?? sprintf("%08d", $order->id) }}</td>
+                                    <td class="px-6 py-4">
+                                        <p class="text-xs font-black text-slate-800 uppercase leading-none mb-1">{{ ($order->client->first_name ?? '') }} {{ ($order->client->last_name ?? '') }}</p>
+                                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{{ ($order->vehicle->plate ?? '') }} - {{ ($order->vehicle->brand ?? '') }} {{ ($order->vehicle->model ?? '') }}</p>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span class="px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest bg-blue-50 text-blue-600 border border-blue-100">
+                                            {{ strtoupper($order->status) }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-right text-[11px] font-bold text-slate-500 whitespace-nowrap">
+                                        {{ \Carbon\Carbon::parse($order->created_at)->diffForHumans(now(), true) }}
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="4" class="py-10 text-center text-xs text-slate-400 italic">No hay órdenes activas</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Detalle Mant. Semana -->
+            @php $maintenanceWeekDetails = $maintenanceWeekDetails ?? collect([]) @endphp
+            <section class="break-inside-avoid">
+                <div class="mb-4 flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl text-purple-600 bg-purple-50 flex items-center justify-center border border-purple-100">
+                        <i class="ri-service-fill text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-black text-purple-600 uppercase tracking-widest leading-none mb-1">DATOS DE TALLER</p>
+                        <h3 class="text-xl font-black text-slate-800 leading-none">Mantenimientos (Semana)</h3>
+                    </div>
+                </div>
+                <div class="rounded-2xl border-2 border-slate-200 bg-white overflow-hidden shadow-sm">
+                    <table class="w-full text-left">
+                        <thead class="bg-slate-50 border-b-2 border-slate-200">
+                            <tr>
+                                <th class="px-6 py-4 text-[10px] font-black uppercase text-slate-400">Fecha</th>
+                                <th class="px-6 py-4 text-[10px] font-black uppercase text-slate-400">Placa / Cliente</th>
+                                <th class="px-6 py-4 text-[10px] font-black uppercase text-slate-400 text-center">Servicios</th>
+                                <th class="px-6 py-4 text-right text-[10px] font-black uppercase text-slate-400">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @forelse($maintenanceWeekDetails as $m)
+                                <tr>
+                                    <td class="px-6 py-4 text-[11px] font-bold text-slate-500 whitespace-nowrap">{{ \Carbon\Carbon::parse($m->finished_at ?? $m->delivery_date)->format('d/m/Y') }}</td>
+                                    <td class="px-6 py-4">
+                                        <p class="text-xs font-black text-slate-900 uppercase tracking-tighter">{{ $m->vehicle->plate ?? '-' }}</p>
+                                        <p class="text-[9px] font-bold text-slate-400 uppercase truncate max-w-[150px]">{{ $m->client->first_name ?? '' }} {{ $m->client->last_name ?? '' }}</p>
+                                    </td>
+                                    <td class="px-6 py-4 text-center">
+                                        <span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-black">{{ $m->details_count ?? 0 }} ítems</span>
+                                    </td>
+                                    <td class="px-6 py-4 text-right text-xs font-black text-slate-900">S/ {{ number_format($m->total, 2) }}</td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="4" class="py-10 text-center text-xs text-slate-400 italic">Sin mantenimientos esta semana</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- SECCIÓN DE GRÁFICO YA FUE MOVIDA ARRIBA -->
 
         <!-- SECONDARY GRID: PRODUCTIVITY & FREQUENT CLIENTS -->
         <section class="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -350,7 +536,7 @@
                                     {{ $client->visits }} ÓRDENES • S/ {{ number_format($client->total_spent ?? 0, 2) }}
                                 </p>
                             </div>
-                            <button class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 transition-all shrink-0 shadow-lg">
+                            <button class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 transition-all shrink-0 shadow-lg print:hidden">
                                 <i class="ri-user-add-fill text-lg"></i>
                             </button>
                         </div>
@@ -363,6 +549,115 @@
                 </div>
             </article>
         </section>
+        <!-- MAIN GRID: TRENDS & BIRTHDAYS -->
+        <section class="grid grid-cols-1 gap-6 xl:grid-cols-12 mb-6">
+            <article class="bg-white rounded-[1.5rem] border border-slate-100 p-8 xl:col-span-8 flex flex-col relative overflow-hidden transition-all hover:shadow-md trend-chart-article print:hidden">
+                <!-- Header del gráfico -->
+                <div class="flex items-start justify-between mb-8 px-8 pt-6 relative z-10">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-[#F4F6FA] border border-slate-100 flex items-center justify-center shadow-sm">
+                            <i class="ri-line-chart-line text-blue-600 text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-900 leading-tight">Tendencia de Ingresos</h3>
+                            <p class="text-sm text-slate-500">Últimos 7 días</p>
+                        </div>
+                    </div>
+                    <div class="text-right bg-[#F4F6FA] px-4 py-3 rounded-xl border border-slate-100">
+                        <p class="text-[10px] text-blue-600 font-bold uppercase tracking-wider mb-1">Total Semana</p>
+                        <p class="text-2xl font-bold text-blue-700 leading-none">S/ {{ number_format((float) ($incomeByDay->sum('amount')), 2) }}</p>
+                    </div>
+                </div>
+                <!-- Contenedor del Gráfico -->
+                <div class="flex-1 flex flex-col min-h-[320px] px-8 pb-6">
+                    <div class="flex flex-1 items-stretch">
+
+                        <!-- Eje Y (Labels) -->
+                        <div class="flex flex-col justify-between text-[11px] text-slate-400 font-medium pr-6 mb-8 mt-1">
+                            @foreach($ticks as $tick)
+                                <span>{{ number_format($tick, 0) }}</span>
+                            @endforeach
+                        </div>
+
+                        <!-- Área del Gráfico -->
+                        <div class="relative flex-1 mb-8" style="height: 250px !important;">
+                            <!-- Grid Lines -->
+                            <div class="absolute inset-0 flex flex-col justify-between h-full pointer-events-none">
+                                @foreach($ticks as $tick)
+                                    <div class="w-full h-[1px] border-t border-dashed border-slate-100"></div>
+                                @endforeach
+                            </div>
+
+                            <!-- SVG del Gráfico -->
+                            <div class="absolute inset-0 h-full">
+                                <svg viewBox="0 0 1000 100" preserveAspectRatio="none" class="w-full h-full overflow-visible">
+                                    <defs>
+                                        <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stop-color="#3b82f6" stop-opacity="0.4"/>
+                                            <stop offset="95%" stop-color="#3b82f6" stop-opacity="0.05"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <path d="{{ $areaPath }}" fill="url(#colorValue)" />
+                                    <path d="{{ $path }}" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                    
+                                    @foreach($points as $p)
+                                        <circle cx="{{ $p['x'] }}" cy="{{ $p['y'] }}" r="3" fill="#2563eb" stroke="white" stroke-width="2" />
+                                    @endforeach
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Eje X (Dates) -->
+                    <div class="flex justify-between pl-[40px] border-t border-slate-50 pt-4">
+                        @foreach($incomeByDay as $row)
+                            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{{ $row['label'] }}</span>
+                        @endforeach
+                    </div>
+                </div>
+            </article>
+
+            <!-- CUMPLEAÑOS -->
+            <article class="rounded-[1.5rem] border border-slate-100 bg-white p-6 xl:col-span-4 h-full flex flex-col overflow-hidden">
+                <div class="mb-8 flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-orange-600 text-white flex items-center justify-center shadow-lg shadow-orange-600/20">
+                        <i class="ri-cake-2-fill text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-black text-slate-900 leading-tight">Cumpleaños</h3>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Esta semana</p>
+                    </div>
+                </div>
+                
+                <div class="space-y-4 overflow-y-auto pr-1 custom-scrollbar flex-1">
+                    @forelse($birthdays as $bday)
+                        <div class="flex items-center justify-between p-4 rounded-2xl border border-transparent birthday-hover-row cursor-pointer transition-all group/item">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-full text-white flex items-center justify-center font-black text-sm shadow-lg shadow-blue-500/20" style="background-color: #2563eb !important;">
+                                    {{ substr($bday->first_name, 0, 1) }}{{ substr($bday->last_name, 0, 1) }}
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <h4 class="font-black text-slate-800 uppercase text-sm leading-tight mb-1 whitespace-normal break-words">{{ $bday->first_name }} {{ $bday->last_name }}</h4>
+                                    <p class="text-[10px] font-black text-slate-400 flex items-center gap-1 uppercase">
+                                        <i class="ri-cake-2-line text-orange-400"></i>
+                                        {{ \Carbon\Carbon::parse($bday->fecha_nacimiento)->translatedFormat('d \d\e M') }}
+                                    </p>
+                                </div>
+                            </div>
+                            <a href="https://wa.me/{{ preg_replace('/\D/', '', $bday->phone) }}" target="_blank" class="w-11 h-11 rounded-[1.2rem] text-white flex items-center justify-center hover:scale-110 transition-all shrink-0 shadow-lg shadow-emerald-500/20" style="background-color: #25D366 !important;">
+                                <i class="ri-whatsapp-line text-xl"></i>
+                            </a>
+                        </div>
+                    @empty
+                        <div class="h-full flex flex-col items-center justify-center py-10 opacity-30">
+                            <i class="ri-cake-2-line text-3xl mb-2 text-slate-300"></i>
+                            <p class="text-xs font-bold italic">Sin cumpleaños</p>
+                        </div>
+                    @endforelse
+                </div>
+            </article>
+        </section>
+
 
         <!-- BOTTOM GRID: TOP SERVICES & RECENT ORDERS -->
         <section class="grid grid-cols-1 gap-6 xl:grid-cols-12">
@@ -450,7 +745,7 @@
                         </div>
                     </div>
                     
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 print:hidden">
                         <div class="relative group">
                             <i class="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm group-focus-within:text-[#465fff] transition-colors"></i>
                             <input type="text" x-model="search" placeholder="Buscar..." class="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:border-[#465fff] focus:bg-white transition-all w-full md:w-56 placeholder:text-slate-300">
@@ -461,7 +756,7 @@
                     </div>
                 </div>
 
-                <div class="overflow-x-auto -mx-6 px-6">
+                <div class="overflow-x-auto -mx-6 px-6 print:mx-0 print:px-0">
                     <table class="w-full text-left min-w-[700px]">
                         <thead>
                             <tr class="bg-[#1e293b] text-white text-[10px] uppercase font-black tracking-[0.15em]">
@@ -508,7 +803,7 @@
                 </div>
 
                 @if(($dashboardData['totalOrdersCount'] ?? 0) > $recentOrders->count())
-                    <div class="mt-6 flex justify-center border-t border-slate-100 pt-6">
+                    <div class="mt-6 flex justify-center border-t border-slate-100 pt-6 print:hidden">
                         <x-ui.link-button size="md" variant="outline" href="{{ route('workshop.orders.index') }}" class="group/btn">
                             <span>Ver todas las órdenes</span>
                             <i class="ri-arrow-right-line ml-1 group-hover/btn:translate-x-1 transition-transform"></i>
@@ -517,6 +812,8 @@
                 @endif
             </article>
         </section>
+
+        <!-- SECCIÓN DE ANEXOS YA FUE MOVIDA ARRIBA CERCA DE LAS TARJETAS (SOLO PDF) -->
 
     </div>
 
@@ -558,6 +855,172 @@
             -webkit-line-clamp: 1;
             -webkit-box-orient: vertical;
             overflow: hidden;
+        }
+
+        @media print {
+            /* 1. Forzar colores de fondo y gráficos (muy importante) */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+
+            @page {
+                size: portrait;
+                margin: 15mm;
+            }
+
+            /* 2. Ocultar menús, navs, cargadores y ventanas emergentes */
+            header, aside, nav, footer, 
+            [id*="sidebar"], [class*="sidebar"],
+            [id*="navbar"], [class*="navbar"],
+            [class*="preloader"], [class*="loading-overlay"],
+            .fixed.z-999999, .fixed.z-\[999999\], 
+            .fixed.z-\[9999\], .fixed.z-50, 
+            .swal2-container,
+            button, input, select, .print\:hidden {
+                display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
+            }
+
+            /* No ocultar mi nueva cabecera de reporte ni el buscador de Alpine si es necesario, 
+               pero sí los inputs y botones generales */
+            #workshop-dashboard header.hidden.print\:flex {
+                display: flex !important;
+            }
+
+            /* Forzar tablas a ocupar el ancho exacto sin scroll */
+            .overflow-x-auto {
+                overflow: visible !important;
+            }
+            table {
+                width: 100% !important;
+                min-width: 0 !important;
+                table-layout: auto !important;
+            }
+
+            /* 2. Expandir contenedores principales para permitir paginación */
+            html, body, #app, main, .main-content {
+                display: block !important;
+                height: auto !important;
+                min-height: auto !important;
+                max-height: none !important;
+                overflow: visible !important;
+                position: static !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+            }
+
+            /* 3. El dashboard mismo debe fluir de forma natural */
+            #workshop-dashboard {
+                position: static !important;
+                display: block !important;
+                height: auto !important;
+                overflow: visible !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+
+            /* 4. Solucionar el corte de listas largas: transformamos las grillas grandes en bloques apilados */
+            #workshop-dashboard section.grid:not(:first-of-type):not(.hero-kpi-grid) {
+                display: block !important;
+            }
+            #workshop-dashboard section.grid:not(:first-of-type):not(.hero-kpi-grid) > article {
+                display: block !important;
+                width: 100% !important;
+                margin-bottom: 2rem !important;
+                height: auto !important;
+            }
+
+            /* Forzar el grid de KPIs a ser 2x2 en impresión */
+            .hero-kpi-grid {
+                display: grid !important;
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 1.5rem !important;
+            }
+            .hero-kpi-grid > article {
+                display: flex !important;
+                flex-direction: column !important;
+                width: auto !important;
+                margin-bottom: 0 !important;
+            }
+
+            /* 5. Solucionar el corte de contenido interno (los scrollbars) */
+            #workshop-dashboard .overflow-y-auto, 
+            #workshop-dashboard .overflow-x-auto, 
+            #workshop-dashboard .overflow-hidden, 
+            #workshop-dashboard .h-full, 
+            #workshop-dashboard .custom-scrollbar {
+                display: block !important;
+                overflow: visible !important;
+                height: auto !important;
+                max-height: none !important;
+            }
+
+            /* 6. Evitar que las tarjetas se corten a la mitad entre hojas */
+            article, .bg-white, .wk-premium-card, section.grid > article {
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+                margin-bottom: 2.5rem !important;
+                display: block !important;
+                position: relative !important;
+                border: 2px solid #cbd5e1 !important; /* Bordes más fuertes para reportes */
+                padding: 1.5rem !important;
+                border-radius: 1rem !important;
+                background-color: #ffffff !important;
+            }
+
+            /* Forzar el gráfico de tendencia a ser visible */
+            .trend-chart-article {
+                width: 100% !important;
+                display: block !important;
+                min-height: 450px !important;
+                page-break-inside: avoid !important;
+            }
+            .trend-chart-article svg {
+                min-height: 250px !important;
+                display: block !important;
+            }
+
+            /* Los anexos grandes SÍ pueden cortar, pero entre filas */
+            section.break-before-auto article {
+                break-inside: auto !important;
+                page-break-inside: auto !important;
+                border-width: 1px !important;
+            }
+            tr {
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+            }
+            th {
+                background-color: #f1f5f9 !important;
+                color: #0f172a !important;
+                border: 1px solid #94a3b8 !important;
+                font-weight: bold !important;
+                text-transform: uppercase !important;
+                font-size: 9px !important;
+            }
+            td {
+                border-bottom: 1px solid #e2e8f0 !important;
+                color: #1e293b !important;
+            }
+
+            /* 7. Mejorar visibilidad de textos e íconos en el PDF */
+            .text-slate-400, .text-slate-500 {
+                color: #475569 !important; /* Más oscuro aún para impresión */
+            }
+            .text-slate-800, .text-slate-900 {
+                color: #000000 !important; /* Negro puro para máximo contraste */
+            }
+            .bg-slate-50 {
+                background-color: #f8fafc !important;
+            }
+            .wk-premium-card, article {
+                box-shadow: none !important;
+            }
         }
     </style>
 @endsection

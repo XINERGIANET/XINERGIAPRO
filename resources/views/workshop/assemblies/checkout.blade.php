@@ -12,6 +12,7 @@
         phone: '', email: '', address: '', genero: '', fecha_nacimiento: '', 
         location_id: '' 
     },
+    rucLookupMeta: null,
     
     searchDocument() {
         if (!this.newClient.document_number) return;
@@ -31,18 +32,34 @@
             .then(res => res.json())
             .then(data => {
                 this.isSearchingDocument = false;
-                if(data.success === false) {
+                if (data.success === false || data.status === false) {
                     this.clientError = data.message || 'Error al buscar documento.';
                     return;
                 }
                 this.clientError = '';
                 if (this.newClient.person_type === 'DNI') {
-                    this.newClient.first_name = data.nombres || '';
-                    this.newClient.last_name = (data.apellido_paterno ? data.apellido_paterno + ' ' : '') + (data.apellido_materno || '');
+                    this.newClient.first_name = data.nombres || data.first_name || '';
+                    if (data.apellido_paterno || data.apellido_materno) {
+                        this.newClient.last_name = (data.apellido_paterno ? data.apellido_paterno + ' ' : '') + (data.apellido_materno || '');
+                    } else {
+                        this.newClient.last_name = data.last_name || '';
+                    }
+                    if (data.fecha_nacimiento && !this.newClient.fecha_nacimiento) this.newClient.fecha_nacimiento = data.fecha_nacimiento;
+                    if (data.genero) this.newClient.genero = data.genero;
+                    this.rucLookupMeta = null;
                 } else if (this.newClient.person_type === 'RUC') {
-                    this.newClient.first_name = data.razon_social || '';
+                    this.newClient.first_name = data.legal_name || data.razon_social || '';
                     this.newClient.last_name = '';
-                    this.newClient.address = data.direccion || '';
+                    this.newClient.address = data.address || data.direccion || '';
+                    if (data.raw && data.raw.fecha_inscripcion) {
+                        const match = String(data.raw.fecha_inscripcion).match(/^(\d{4}-\d{2}-\d{2})/);
+                        if (match) this.newClient.fecha_nacimiento = match[1];
+                    }
+                    this.rucLookupMeta = {
+                        trade_name: data.trade_name || '',
+                        condition: data.condition || '',
+                        taxpayer_status: data.taxpayer_status || '',
+                    };
                 }
             })
             .catch(() => {
@@ -110,6 +127,13 @@
         if (this.paymentRows.length === 0 && !this.isDebtPaymentSelected()) this.addPaymentRow(true);
         this.syncInvoiceBillingFields();
         this.syncAmount();
+        
+        this.$watch('newClient.person_type', (value) => {
+            if (value === 'RUC') {
+                this.newClient.last_name = '';
+                this.newClient.genero = '';
+            }
+        });
     },
     
     // --- PAYMENT METHODS LOGIC ---
@@ -523,8 +547,8 @@
 
                     <form @submit.prevent="saveQuickClient" class="grid grid-cols-1 gap-4 md:grid-cols-4">
                         <div>
-                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Tipo de persona <span class="text-red-500">*</span></label>
-                            <select x-model="newClient.person_type" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:ring-brand-500">
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Tipo de persona</label>
+                            <select x-model="newClient.person_type" required class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:ring-brand-500">
                                 <option value="DNI">DNI</option>
                                 <option value="RUC">RUC</option>
                                 <option value="CARNET DE EXTRANGERIA">CARNET DE EXTRANGERIA</option>
@@ -532,7 +556,7 @@
                             </select>
                         </div>
                         <div>
-                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Documento <span class="text-red-500">*</span></label>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Documento</label>
                             <div class="flex items-center gap-2">
                                 <input x-model="newClient.document_number" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:ring-brand-500" placeholder="Documento" required>
                                 <button type="button" @click="searchDocument()" :disabled="isSearchingDocument" class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-[#334155] px-4 text-sm font-medium text-white hover:bg-[#1f3f98] disabled:opacity-60 text-lg">
@@ -542,19 +566,21 @@
                             </div>
                         </div>
                         <div>
-                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Nombres <span class="text-red-500">*</span></label>
-                            <input x-model="newClient.first_name" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:ring-brand-500" placeholder="Nombres / Razon social" required>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">
+                                <span x-text="newClient.person_type === 'RUC' ? 'Razon social' : 'Nombres'"></span>
+                            </label>
+                            <input x-model="newClient.first_name" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:ring-brand-500" :placeholder="newClient.person_type === 'RUC' ? 'Ingrese razon social' : 'Nombres'" required>
                         </div>
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Apellidos <span class="text-red-500">*</span></label>
+                        <div x-show="newClient.person_type !== 'RUC'" x-cloak>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Apellidos</label>
                             <input x-model="newClient.last_name" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:ring-brand-500" placeholder="Apellidos" :required="newClient.person_type !== 'RUC'">
                         </div>
 
                         <div>
-                            <label class="mb-1.5 block text-sm font-medium text-gray-700">Fecha de nacimiento</label>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700" x-text="newClient.person_type === 'RUC' ? 'Fecha de inscripcion' : 'Fecha de nacimiento'"></label>
                             <input x-model="newClient.fecha_nacimiento" type="date" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:ring-brand-500">
                         </div>
-                        <div>
+                        <div x-show="newClient.person_type !== 'RUC'" x-cloak>
                             <label class="mb-1.5 block text-sm font-medium text-gray-700">Genero</label>
                             <select x-model="newClient.genero" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:ring-brand-500">
                                 <option value="">Seleccione genero</option>
@@ -594,6 +620,23 @@
                                 <option value="">Por defecto de sucursal</option>
                             </select>
                         </div>
+
+                        <template x-if="newClient.person_type === 'RUC' && rucLookupMeta">
+                            <div class="col-span-1 md:col-span-4 grid gap-4 rounded-xl border border-amber-200 bg-amber-50 p-4 sm:grid-cols-3">
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Nombre comercial</p>
+                                    <p class="mt-1 text-sm text-slate-700" x-text="rucLookupMeta.trade_name || '-'"></p>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Condicion</p>
+                                    <p class="mt-1 text-sm text-slate-700" x-text="rucLookupMeta.condition || '-'"></p>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Estado</p>
+                                    <p class="mt-1 text-sm text-slate-700" x-text="rucLookupMeta.taxpayer_status || '-'"></p>
+                                </div>
+                            </div>
+                        </template>
 
                         <div class="md:col-span-4 mt-2">
                             <label class="mb-1.5 block text-sm font-medium text-gray-700">Roles</label>

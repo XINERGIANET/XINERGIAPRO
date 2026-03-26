@@ -97,6 +97,49 @@
             console.error('Error configurando costo:', e);
         }
         this.configLoading = false;
+    },
+
+    // --- QUICK LOCATION CONFIG ---
+    locationsData: @js($assemblyLocations),
+    locationLoading: false,
+    locationData: { name: '', address: '', active: '1', apply_to_all_branches: false },
+
+    openQuickLocation() {
+        this.locationData = { name: '', address: '', active: '1', apply_to_all_branches: false };
+        this.$dispatch('open-quick-location-modal');
+    },
+
+    async submitQuickLocation() {
+        if (!this.locationData.name) return;
+        this.locationLoading = true;
+        
+        try {
+            const response = await fetch('{{ route('workshop.assembly-locations.store') }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(this.locationData)
+            });
+
+            const result = await response.json();
+            if (result.status === 'success') {
+                this.locationsData.push(result.location);
+                this.locationsData = [...this.locationsData];
+                
+                const selectEl = document.getElementById('workshop_assembly_location_id');
+                if (selectEl) {
+                    setTimeout(() => { selectEl.value = result.location.id; }, 100);
+                }
+                
+                this.$dispatch('close-quick-location-modal');
+            }
+        } catch (e) {
+            console.error('Error configurando ubicacion:', e);
+        }
+        this.locationLoading = false;
     }
 }">
     <x-common.page-breadcrumb pageTitle="Armados Taller" />
@@ -501,12 +544,17 @@
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Ubicación del armado</label>
-                    <select name="workshop_assembly_location_id" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm">
-                        <option value="">Seleccione ubicación...</option>
-                        @foreach($assemblyLocations as $location)
-                            <option value="{{ $location->id }}">{{ $location->name }}</option>
-                        @endforeach
-                    </select>
+                    <div class="flex items-start gap-2">
+                        <select name="workshop_assembly_location_id" id="workshop_assembly_location_id" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm flex-1">
+                            <option value="">Seleccione ubicación...</option>
+                            <template x-for="loc in locationsData" :key="loc.id">
+                                <option :value="loc.id" x-text="loc.name"></option>
+                            </template>
+                        </select>
+                        <button type="button" @click="openQuickLocation()" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition" title="Nueva ubicación">
+                            <i class="ri-add-line text-lg"></i>
+                        </button>
+                    </div>
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Técnico responsable</label>
@@ -624,6 +672,57 @@
                         <i class="ri-save-line" x-show="!configLoading"></i>
                         <span x-text="configLoading ? 'Procesando...' : 'Guardar y Continuar'"></span>
                     </button>
+                </div>
+            </div>
+        </div>
+    </x-ui.modal>
+
+    {{-- Modal rápido para configuración de ubicaciones --}}
+    <x-ui.modal 
+        x-data="{ open: false }" 
+        @open-quick-location-modal.window="open = true" 
+        @close-quick-location-modal.window="open = false" 
+        :isOpen="false" :showCloseButton="false" class="max-w-xl">
+        <div class="p-6 sm:p-8">
+            <div class="mb-6 flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800">Nueva ubicacion de armado</h3>
+                    <p class="mt-1 text-sm text-gray-500">Define el lugar y si aplica a la sucursal actual o a todas.</p>
+                </div>
+                <button type="button" @click="open = false" class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:bg-gray-100 transition-colors">
+                    <i class="ri-close-line text-xl"></i>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-slate-700">Nombre <span class="text-red-500">*</span></label>
+                    <input type="text" x-model="locationData.name" class="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-medium text-slate-700" placeholder="Ej: Area electrica">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-slate-700">Estado</label>
+                    <select x-model="locationData.active" class="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-medium text-slate-700">
+                        <option value="1">Activa</option>
+                        <option value="0">Inactiva</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="mb-1 block text-sm font-medium text-slate-700">Direccion</label>
+                    <input type="text" x-model="locationData.address" class="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-medium text-slate-700" placeholder="Direccion opcional">
+                </div>
+                <label class="md:col-span-2 inline-flex items-center gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm font-medium text-violet-700">
+                    <input type="checkbox" x-model="locationData.apply_to_all_branches" class="h-4 w-4 rounded border-violet-300 text-violet-600">
+                    <span>Aplicar a todas las sucursales de la empresa</span>
+                </label>
+                <div class="md:col-span-2 flex gap-3 pt-2">
+                    <x-ui.button type="button" @click="submitQuickLocation()" size="md" variant="primary" class="flex-1" style="background:linear-gradient(90deg,#7c3aed,#6d28d9);color:#fff;" x-bind:disabled="locationLoading">
+                        <i class="ri-save-line" x-show="!locationLoading"></i>
+                        <span x-text="locationLoading ? 'Guardando...' : 'Guardar ubicacion'"></span>
+                    </x-ui.button>
+                    <x-ui.button type="button" size="md" variant="outline" class="flex-1" @click="open = false" x-bind:disabled="locationLoading">
+                        <i class="ri-close-line"></i>
+                        <span>Cancelar</span>
+                    </x-ui.button>
                 </div>
             </div>
         </div>
