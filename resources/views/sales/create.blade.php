@@ -809,9 +809,6 @@
             if (invoiceMode && invoiceDocumentIds.has(Number(currentSale.document_type_id || 0)) && currentSale.billing_status === 'PENDING') {
                 currentSale.billing_status = 'INVOICED';
             }
-            if (!isEditMode) {
-                syncCashRegisterForCurrentDocumentType();
-            }
 
             const getImageUrl = (imgUrl) => imgUrl && String(imgUrl).trim() !== ''
                 ? imgUrl
@@ -1311,6 +1308,9 @@
                     syncAutocompleteDisplay(cashRegisterSelect);
                 }
             };
+            if (!isEditMode) {
+                syncCashRegisterForCurrentDocumentType();
+            }
             const isDebtSaleSelected = () => String(currentSale.payment_type || 'CONTADO') === 'DEUDA';
             let saleMovedAtDebtListenerBound = false;
             let saleDebtFieldsBound = false;
