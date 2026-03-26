@@ -1444,13 +1444,13 @@
                                 </div>
                             </label>
                             <template x-if="orderedServiceTiers(service).length > 0">
-                                <div class="mt-1.5 flex justify-end">
+                                <div class="mt-2 flex justify-end pr-7">
                                     <select
                                         :value="getServiceCcOverride(service.id)"
                                         @click.stop
                                         @change="setServiceCcOverride(service.id, $event.target.value)"
                                         data-gsa-skip="true"
-                                        class="h-7 w-[126px] rounded-md border border-gray-200 bg-gray-50 px-2 text-[11px] text-gray-600"
+                                        class="h-8 w-[124px] rounded-md border border-gray-200 bg-gray-50 px-2 text-[11px] text-gray-600"
                                     >
                                         <template x-for="option in servicePriceOptions(service)" :key="`${service.id}-${option.value}`">
                                             <option :value="option.value" x-text="option.label"></option>
