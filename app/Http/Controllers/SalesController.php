@@ -140,6 +140,20 @@ class SalesController extends Controller
             ->with(['branch', 'person', 'movementType', 'documentType', 'salesMovement.details.unit'])
             ->where('movement_type_id', 2) //2 es venta
             ->when($branchId, fn ($query) => $query->where('movements.branch_id', $branchId))
+            ->when($selectedBoxId, function ($query) use ($selectedBoxId) {
+                $query->where(function ($inner) use ($selectedBoxId) {
+                    $inner->whereHas('cashMovement', fn ($cashQuery) => $cashQuery->where('cash_register_id', $selectedBoxId))
+                        ->orWhereExists(function ($subQuery) use ($selectedBoxId) {
+                            $subQuery->select(DB::raw(1))
+                                ->from('movements as cash_entry_movement')
+                                ->join('cash_movements', 'cash_movements.movement_id', '=', 'cash_entry_movement.id')
+                                ->whereColumn('cash_entry_movement.parent_movement_id', 'movements.id')
+                                ->where('cash_movements.cash_register_id', $selectedBoxId)
+                                ->whereNull('cash_entry_movement.deleted_at')
+                                ->whereNull('cash_movements.deleted_at');
+                        });
+                });
+            })
             ->when($selectedShiftRelation, function ($query) use ($selectedShiftRelation) {
                 $query->where('moved_at', '>=', $selectedShiftRelation->started_at);
                 if ($selectedShiftRelation->ended_at !== null) {
@@ -601,10 +615,12 @@ class SalesController extends Controller
                     : $baseNetLineTotal;
 
                 return [
+                    'kind' => $detail->product_id ? 'product' : 'glosa',
                     'pId' => (int) ($detail->product_id ?? 0),
                     'name' => $detail->product->description ?? $detail->description ?? ('Producto #' . $detail->product_id),
                     'qty' => $quantity,
                     'price' => $quantity > 0 ? ($baseGrossLineTotal / $quantity) : 0,
+                    'tax_rate' => $taxRatePct,
                     'note' => (string) ($detail->comment ?? ''),
                 ];
             })
@@ -763,8 +779,9 @@ class SalesController extends Controller
                         $quantity = (float) $detail->quantity ?: 1;
                         $priceWithTax = $quantity > 0 ? $amountWithTax / $quantity : 0;
                         return [
+                            'kind' => $detail->product_id ? 'product' : 'glosa',
                             'pId' => $detail->product_id,
-                            'name' => $detail->product->description ?? 'Producto #' . $detail->product_id,
+                            'name' => $detail->product->description ?? $detail->description ?? 'Detalle',
                             'qty' => $quantity,
                             'price' => $priceWithTax,
                             'tax_rate' => $taxRatePct,
@@ -823,15 +840,29 @@ class SalesController extends Controller
             ], 422);
         }
 
+        $request->merge([
+            'items' => collect((array) $request->input('items', []))
+                ->filter(function ($item) {
+                    $productId = (int) data_get($item, 'pId', 0);
+                    $name = trim((string) data_get($item, 'name', ''));
+                    return $productId > 0 || $name !== '';
+                })
+                ->values()
+                ->all(),
+        ]);
+
         try {
             $validated = $request->validate([
                 'items' => 'required|array|min:1',
-                'items.*.pId' => 'required|integer|exists:products,id',
+                'items.*.kind' => 'nullable|string|in:product,glosa',
+                'items.*.pId' => 'nullable|integer|exists:products,id',
+                'items.*.name' => 'nullable|string|max:255',
                 'items.*.qty' => 'required|numeric|min:0.000001',
                 'items.*.price' => 'required|numeric|min:0',
                 'items.*.note' => 'nullable|string|max:65535',
                 // Compatibilidad: algunos flujos pueden enviar `comment` en lugar de `note`
                 'items.*.comment' => 'nullable|string|max:65535',
+                'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
                 'document_type_id' => 'required|integer|exists:document_types,id',
                 'cash_register_id' => [
                     'required',
@@ -842,7 +873,7 @@ class SalesController extends Controller
                 'payment_type' => 'required|string|in:CONTADO,DEUDA',
                 'payment_methods' => 'nullable|array',
                 'payment_methods.*.payment_method_id' => 'nullable|integer|exists:payment_methods,id',
-                'payment_methods.*.amount' => 'nullable|numeric|min:0.01',
+                'payment_methods.*.amount' => 'nullable|numeric|min:0',
                 'payment_methods.*.payment_gateway_id' => 'nullable|integer|exists:payment_gateways,id',
                 'payment_methods.*.card_id' => 'nullable|integer|exists:cards,id',
                 'payment_methods.*.digital_wallet_id' => 'nullable|integer|exists:digital_wallets,id',
@@ -852,6 +883,8 @@ class SalesController extends Controller
                 'discount_type' => 'nullable|string|in:NONE,PERCENTAGE,AMOUNT',
                 'discount_value' => 'nullable|numeric|min:0',
                 'notes' => 'nullable|string',
+                'series' => 'nullable|string|max:20',
+                'number' => 'nullable|string|max:255',
                 'movement_id' => 'nullable|integer|exists:movements,id', // ID del borrador a completar
                 'moved_at' => 'nullable|string|max:32',
                 'credit_days' => 'nullable|integer|min:0|max:3650',
@@ -863,6 +896,18 @@ class SalesController extends Controller
                 'message' => 'Error de validación',
                 'errors' => $e->errors()
             ], 422);
+        }
+
+        foreach ((array) ($validated['items'] ?? []) as $index => $item) {
+            $productId = (int) ($item['pId'] ?? 0);
+            $name = trim((string) ($item['name'] ?? ''));
+            if ($productId <= 0 && $name === '') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error de validación',
+                    'errors' => ["items.{$index}.name" => ['La glosa o detalle manual debe tener una descripción.']],
+                ], 422);
+            }
         }
 
         try {
@@ -923,6 +968,7 @@ class SalesController extends Controller
                     $debtDueAt = $movedAt->copy()->addDays(max(0, (int) ($validated['credit_days'] ?? 0)));
                 }
             }
+            $headerSeries = trim((string) ($validated['series'] ?? ''));
             $invoiceSeries = $isInvoiceDocument
                 ? trim((string) ($validated['invoice_series'] ?? '001'))
                 : '001';
@@ -1035,12 +1081,16 @@ class SalesController extends Controller
                     throw new \Exception('No se encontró el movimiento de venta');
                 }
                 
-                $number = $movement->number;
+                $number = trim((string) ($validated['number'] ?? '')) ?: $movement->number;
+                $headerSeries = $headerSeries !== ''
+                    ? $headerSeries
+                    : trim((string) ($movement->salesMovement?->series ?? ''));
                 
                 $previousMovementStatus = (string) $movement->status;
 
                 // Actualizar el movimiento - siempre se completa el pago completo
                 $movement->update([
+                    'number' => $number,
                     'comment' => $request->notes ?? ($isDebtSale ? 'Venta registrada como deuda' : 'Venta completada desde punto de venta'),
                     'status' => 'A', // Siempre Activo (pago completo)
                     'document_type_id' => $documentType->id,
@@ -1124,7 +1174,9 @@ class SalesController extends Controller
                 // Actualizar el SalesMovement existente
                 $salesMovement = $movement->salesMovement;
                 $salesMovement->update([
-                    'series' => $invoiceSeries !== '' ? $invoiceSeries : ($salesMovement->series ?: '001'),
+                    'series' => $isInvoiceDocument
+                        ? ($invoiceSeries !== '' ? $invoiceSeries : ($salesMovement->series ?: '001'))
+                        : ($headerSeries !== '' ? $headerSeries : ($salesMovement->series ?: ($cashRegister->series ?: '001'))),
                     'billing_status' => $billingStatus,
                     'billing_number' => $invoiceNumber,
                     'payment_type' => $isDebtSale ? 'CREDITO' : 'CONTADO',
@@ -1139,7 +1191,9 @@ class SalesController extends Controller
                         'id' => $branch->id,
                         'legal_name' => $branch->legal_name,
                     ],
-                    'series' => $invoiceSeries !== '' ? $invoiceSeries : '001',
+                    'series' => $isInvoiceDocument
+                        ? ($invoiceSeries !== '' ? $invoiceSeries : '001')
+                        : ($headerSeries !== '' ? $headerSeries : ($cashRegister->series ?: '001')),
                     'billing_status' => $billingStatus,
                     'billing_number' => $invoiceNumber,
                     'year' => Carbon::now()->year,
@@ -1160,63 +1214,90 @@ class SalesController extends Controller
 
             // Crear SalesMovementDetails y actualizar stock (nota por producto en comment)
             foreach (array_values($validated['items']) as $index => $item) {
-                $product = Product::with('baseUnit')->findOrFail($item['pId']);
-                
-                // Bloquear el registro para evitar condiciones de carrera
-                $productBranch = ProductBranch::with('taxRate')
-                    ->where('product_id', $item['pId'])
-                    ->where('branch_id', $branchId)
-                    ->lockForUpdate()
-                    ->first();
-
-                if (!$productBranch) {
-                    throw new \Exception("Producto {$product->description} no disponible en esta sucursal");
-                }
-
-                // Validar stock disponible
-                $quantityToSell = (int) $item['qty'];
-                $currentStock = (int) ($productBranch->stock ?? 0);
-                
-                // if ($currentStock < $quantityToSell) {
-                //     throw new \Exception(
-                //         "Stock insuficiente para el producto {$product->description}. " .
-                //         "Stock disponible: {$currentStock}, Cantidad solicitada: {$quantityToSell}"
-                //     );
-                // }
-
-                $unit = $product->baseUnit;
-                if (!$unit) {
-                    throw new \Exception("El producto {$product->description} no tiene una unidad base configurada");
-                }
-
-                $taxRate = $productBranch->taxRate;
+                $productId = (int) ($item['pId'] ?? 0);
                 $lineCalculated = $calculated['lines'][$index] ?? null;
                 if (!$lineCalculated) {
-                    throw new \Exception("No se pudo calcular el descuento del producto {$product->description}");
+                    throw new \Exception('No se pudo calcular el descuento de una línea de la venta');
                 }
 
-                // Nota por producto (compatibilidad note/comment) y normalización
                 $detailNoteRaw = data_get($item, 'note', data_get($item, 'comment'));
                 $detailNote = $detailNoteRaw === null ? null : trim((string) $detailNoteRaw);
                 $detailNote = ($detailNote !== '') ? $detailNote : null;
-                SalesMovementDetail::create([
-                    'detail_type' => 'DETAILED',
-                    'sales_movement_id' => $salesMovement->id,
-                    'code' => $product->code,
-                    'description' => $product->description,
-                    'product_id' => $product->id,
-                    'product_snapshot' => [
-                        'id' => $product->id,
+
+                if ($productId > 0) {
+                    $product = Product::with('baseUnit')->findOrFail($productId);
+
+                    $productBranch = ProductBranch::with('taxRate')
+                        ->where('product_id', $productId)
+                        ->where('branch_id', $branchId)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (!$productBranch) {
+                        throw new \Exception("Producto {$product->description} no disponible en esta sucursal");
+                    }
+
+                    $quantityToSell = (int) $item['qty'];
+                    $currentStock = (int) ($productBranch->stock ?? 0);
+                    $unit = $product->baseUnit;
+                    if (!$unit) {
+                        throw new \Exception("El producto {$product->description} no tiene una unidad base configurada");
+                    }
+
+                    $taxRate = $productBranch->taxRate;
+                    SalesMovementDetail::create([
+                        'detail_type' => 'DETAILED',
+                        'sales_movement_id' => $salesMovement->id,
                         'code' => $product->code,
                         'description' => $product->description,
-                        'marca' => $product->marca,
-                    ],
-                    'unit_id' => $unit->id,
-                    'tax_rate_id' => $taxRate?->id,
-                    'tax_rate_snapshot' => $taxRate ? [
-                        'id' => $taxRate->id,
-                        'description' => $taxRate->description,
-                        'tax_rate' => $taxRate->tax_rate,
+                        'product_id' => $product->id,
+                        'product_snapshot' => [
+                            'id' => $product->id,
+                            'code' => $product->code,
+                            'description' => $product->description,
+                            'marca' => $product->marca,
+                        ],
+                        'unit_id' => $unit->id,
+                        'tax_rate_id' => $taxRate?->id,
+                        'tax_rate_snapshot' => $taxRate ? [
+                            'id' => $taxRate->id,
+                            'description' => $taxRate->description,
+                            'tax_rate' => $taxRate->tax_rate,
+                        ] : null,
+                        'quantity' => $item['qty'],
+                        'amount' => $lineCalculated['discounted_gross_total'],
+                        'discount_percentage' => $calculated['discount_percentage'],
+                        'original_amount' => $lineCalculated['net_total'],
+                        'comment' => $detailNote,
+                        'parent_detail_id' => null,
+                        'complements' => [],
+                        'status' => 'A',
+                        'branch_id' => $branchId,
+                    ]);
+
+                    $productBranch->update([
+                        'stock' => $currentStock - $quantityToSell
+                    ]);
+                    continue;
+                }
+
+                $defaultUnitId = Unit::query()->value('id');
+                if (!$defaultUnitId) {
+                    throw new \Exception('No existen unidades registradas para guardar la glosa de la venta.');
+                }
+
+                SalesMovementDetail::create([
+                    'detail_type' => 'GLOSA',
+                    'sales_movement_id' => $salesMovement->id,
+                    'code' => '',
+                    'description' => trim((string) ($item['name'] ?? '')) ?: 'Detalle',
+                    'product_id' => null,
+                    'product_snapshot' => null,
+                    'unit_id' => $defaultUnitId,
+                    'tax_rate_id' => null,
+                    'tax_rate_snapshot' => $lineCalculated['tax_rate_value'] > 0 ? [
+                        'description' => 'Manual',
+                        'tax_rate' => round($lineCalculated['tax_rate_value'] * 100, 6),
                     ] : null,
                     'quantity' => $item['qty'],
                     'amount' => $lineCalculated['discounted_gross_total'],
@@ -1228,21 +1309,18 @@ class SalesController extends Controller
                     'status' => 'A',
                     'branch_id' => $branchId,
                 ]);
-
-                // Restar el stock del producto en la sucursal
-                $newStock = $currentStock - $quantityToSell;
-                $productBranch->update([
-                    'stock' => $newStock
-                ]);
             }
             
             app(KardexSyncService::class)->syncMovement($movement);
 
-            // Crear/actualizar movimiento de caja separado del movimiento de venta
+            // Crear/actualizar movimiento de caja separado del movimiento de venta.
+            // Compatibilidad: algunas ventas antiguas guardaron el cash_movement directamente en el movement de venta.
+            $legacyDirectCashMovement = CashMovements::query()
+                ->where('movement_id', $movement->id)
+                ->first();
             $cashEntryMovement = $this->resolveCashEntryMovementBySaleMovement($movement->id);
-         
 
-            if (!$cashEntryMovement) {
+            if (!$cashEntryMovement && !$legacyDirectCashMovement) {
                 $cashEntryMovement = Movement::create([
                     'number' => $this->generateCashMovementNumber(
                         (int) $branchId,
@@ -1265,7 +1343,7 @@ class SalesController extends Controller
                     'branch_id' => $branchId,
                     'parent_movement_id' => $movement->id,
                 ]);
-            } else {
+            } elseif ($cashEntryMovement) {
                 $cashEntryMovement->update([
                     'moved_at' => now(),
                     'person_id' => $selectedPerson?->id,
@@ -1280,7 +1358,11 @@ class SalesController extends Controller
             }
 
             // Crear o actualizar CashMovement (entrada de dinero)
-            $cashMovement = CashMovements::where('movement_id', $cashEntryMovement->id)->first();
+            $cashMovement = $legacyDirectCashMovement;
+            if (!$cashMovement && $cashEntryMovement) {
+                $cashMovement = CashMovements::where('movement_id', $cashEntryMovement->id)->first();
+            }
+            $cashReferenceNumber = $cashEntryMovement?->number ?: $movement->number;
 
             if ($cashMovement) {
                 $cashMovement->update([
@@ -1331,7 +1413,7 @@ class SalesController extends Controller
                     'paid_at' => null,
                     'payment_method_id' => $debtPaymentMethod->id,
                     'payment_method' => $debtPaymentMethod->description ?? 'Deuda',
-                    'number' => $cashEntryMovement->number,
+                    'number' => $cashReferenceNumber,
                     'card_id' => null,
                     'card' => '',
                     'bank_id' => null,
@@ -1389,7 +1471,7 @@ class SalesController extends Controller
                     'paid_at' => now(),
                     'payment_method_id' => $paymentMethod->id,
                     'payment_method' => $paymentMethod->description ?? '',
-                    'number' => $cashEntryMovement->number,
+                    'number' => $cashReferenceNumber,
                     'card_id' => $card?->id,
                     'card' => $card?->description ?? '',
                     'bank_id' => null,
@@ -1415,7 +1497,7 @@ class SalesController extends Controller
                 'message' => 'Venta procesada correctamente',
                 'data' => [
                     'movement_id' => $movement->id,
-                    'cash_movement_id' => $cashEntryMovement->id,
+                    'cash_movement_id' => $cashEntryMovement?->id ?? $cashMovement?->id,
                     'number' => $number,
                     'total' => $total,
                 ]
@@ -1448,15 +1530,29 @@ class SalesController extends Controller
     // Guardar venta como borrador/pendiente (sin pago)
     public function saveDraft(Request $request)
     {
+        $request->merge([
+            'items' => collect((array) $request->input('items', []))
+                ->filter(function ($item) {
+                    $productId = (int) data_get($item, 'pId', 0);
+                    $name = trim((string) data_get($item, 'name', ''));
+                    return $productId > 0 || $name !== '';
+                })
+                ->values()
+                ->all(),
+        ]);
+
         try {
             $validated = $request->validate([
                 'items' => 'required|array|min:1',
-                'items.*.pId' => 'required|integer|exists:products,id',
+                'items.*.kind' => 'nullable|string|in:product,glosa',
+                'items.*.pId' => 'nullable|integer|exists:products,id',
+                'items.*.name' => 'nullable|string|max:255',
                 'items.*.qty' => 'required|numeric|min:0.000001',
                 'items.*.price' => 'required|numeric|min:0',
                 'items.*.note' => 'nullable|string|max:65535',
                 // Compatibilidad: algunos flujos pueden enviar `comment` en lugar de `note`
                 'items.*.comment' => 'nullable|string|max:65535',
+                'items.*.tax_rate' => 'nullable|numeric|min:0|max:100',
                 'document_type_id' => 'nullable|integer|exists:document_types,id',
                 'payment_type' => 'nullable|string|in:CONTADO,DEUDA',
                 'billing_status' => 'nullable|string|in:PENDING,INVOICED,NOT_APPLICABLE',
@@ -1472,6 +1568,18 @@ class SalesController extends Controller
                 'message' => 'Error de validación',
                 'errors' => $e->errors()
             ], 422);
+        }
+
+        foreach ((array) ($validated['items'] ?? []) as $index => $item) {
+            $productId = (int) ($item['pId'] ?? 0);
+            $name = trim((string) ($item['name'] ?? ''));
+            if ($productId <= 0 && $name === '') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error de validación',
+                    'errors' => ["items.{$index}.name" => ['La glosa o detalle manual debe tener una descripción.']],
+                ], 422);
+            }
         }
 
         try {
@@ -1598,50 +1706,82 @@ class SalesController extends Controller
 
             // Crear SalesMovementDetails (sin restar stock porque es borrador; nota por producto en comment)
             foreach (array_values($validated['items']) as $index => $item) {
-                $product = Product::with('baseUnit')->findOrFail($item['pId']);
-                $productBranch = ProductBranch::with('taxRate')
-                    ->where('product_id', $item['pId'])
-                    ->where('branch_id', $branchId)
-                    ->first();
-
-                if (!$productBranch) {
-                    throw new \Exception("Producto {$product->description} no disponible en esta sucursal");
-                }
-
-                $unit = $product->baseUnit;
-                if (!$unit) {
-                    throw new \Exception("El producto {$product->description} no tiene una unidad base configurada");
-                }
-
-                $taxRate = $productBranch->taxRate;
+                $productId = (int) ($item['pId'] ?? 0);
                 $lineCalculated = $calculated['lines'][$index] ?? null;
                 if (!$lineCalculated) {
-                    throw new \Exception("No se pudo calcular el descuento del producto {$product->description}");
+                    throw new \Exception('No se pudo calcular el descuento de una línea del borrador');
                 }
 
-                // Nota por producto (compatibilidad note/comment) y normalización
                 $detailNoteRaw = data_get($item, 'note', data_get($item, 'comment'));
                 $detailNote = $detailNoteRaw === null ? null : trim((string) $detailNoteRaw);
                 $detailNote = ($detailNote !== '') ? $detailNote : null;
 
-                SalesMovementDetail::create([
-                    'detail_type' => 'DETAILED',
-                    'sales_movement_id' => $salesMovement->id,
-                    'code' => $product->code,
-                    'description' => $product->description,
-                    'product_id' => $product->id,
-                    'product_snapshot' => [
-                        'id' => $product->id,
+                if ($productId > 0) {
+                    $product = Product::with('baseUnit')->findOrFail($productId);
+                    $productBranch = ProductBranch::with('taxRate')
+                        ->where('product_id', $productId)
+                        ->where('branch_id', $branchId)
+                        ->first();
+
+                    if (!$productBranch) {
+                        throw new \Exception("Producto {$product->description} no disponible en esta sucursal");
+                    }
+
+                    $unit = $product->baseUnit;
+                    if (!$unit) {
+                        throw new \Exception("El producto {$product->description} no tiene una unidad base configurada");
+                    }
+
+                    $taxRate = $productBranch->taxRate;
+                    SalesMovementDetail::create([
+                        'detail_type' => 'DETAILED',
+                        'sales_movement_id' => $salesMovement->id,
                         'code' => $product->code,
                         'description' => $product->description,
-                        'marca' => $product->marca,
-                    ],
-                    'unit_id' => $unit->id,
-                    'tax_rate_id' => $taxRate?->id,
-                    'tax_rate_snapshot' => $taxRate ? [
-                        'id' => $taxRate->id,
-                        'description' => $taxRate->description,
-                        'tax_rate' => $taxRate->tax_rate,
+                        'product_id' => $product->id,
+                        'product_snapshot' => [
+                            'id' => $product->id,
+                            'code' => $product->code,
+                            'description' => $product->description,
+                            'marca' => $product->marca,
+                        ],
+                        'unit_id' => $unit->id,
+                        'tax_rate_id' => $taxRate?->id,
+                        'tax_rate_snapshot' => $taxRate ? [
+                            'id' => $taxRate->id,
+                            'description' => $taxRate->description,
+                            'tax_rate' => $taxRate->tax_rate,
+                        ] : null,
+                        'quantity' => $item['qty'],
+                        'amount' => $lineCalculated['discounted_gross_total'],
+                        'discount_percentage' => $calculated['discount_percentage'],
+                        'original_amount' => $lineCalculated['net_total'],
+                        'comment' => $detailNote,
+                        'parent_detail_id' => null,
+                        'complements' => [],
+                        'status' => 'A',
+                        'branch_id' => $branchId,
+                    ]);
+                    continue;
+                }
+
+                $defaultUnitId = Unit::query()->value('id');
+                if (!$defaultUnitId) {
+                    throw new \Exception('No existen unidades registradas para guardar la glosa del borrador.');
+                }
+
+                SalesMovementDetail::create([
+                    'detail_type' => 'GLOSA',
+                    'sales_movement_id' => $salesMovement->id,
+                    'code' => '',
+                    'description' => trim((string) ($item['name'] ?? '')) ?: 'Detalle',
+                    'product_id' => null,
+                    'product_snapshot' => null,
+                    'unit_id' => $defaultUnitId,
+                    'tax_rate_id' => null,
+                    'tax_rate_snapshot' => $lineCalculated['tax_rate_value'] > 0 ? [
+                        'description' => 'Manual',
+                        'tax_rate' => round($lineCalculated['tax_rate_value'] * 100, 6),
                     ] : null,
                     'quantity' => $item['qty'],
                     'amount' => $lineCalculated['discounted_gross_total'],
@@ -1945,13 +2085,21 @@ class SalesController extends Controller
         $grossTotal = 0.0;
 
         foreach ($items as $index => $item) {
-            $productBranch = ProductBranch::with('taxRate')
-                ->where('product_id', $item['pId'])
-                ->where('branch_id', $branchId)
-                ->first();
+            $productId = (int) ($item['pId'] ?? 0);
+            $manualTaxRate = max(0, (float) ($item['tax_rate'] ?? 0));
+            $taxRateValue = $defaultTaxPct;
 
-            $taxRate = $productBranch?->taxRate;
-            $taxRateValue = $taxRate ? ($taxRate->tax_rate / 100) : $defaultTaxPct;
+            if ($productId > 0) {
+                $productBranch = ProductBranch::with('taxRate')
+                    ->where('product_id', $productId)
+                    ->where('branch_id', $branchId)
+                    ->first();
+
+                $taxRate = $productBranch?->taxRate;
+                $taxRateValue = $taxRate ? ($taxRate->tax_rate / 100) : $defaultTaxPct;
+            } elseif ($manualTaxRate > 0) {
+                $taxRateValue = $manualTaxRate / 100;
+            }
 
             $itemGrossTotal = max(0, (float) ($item['qty'] ?? 0) * (float) ($item['price'] ?? 0));
             $itemNetTotal = $taxRateValue > 0 ? ($itemGrossTotal / (1 + $taxRateValue)) : $itemGrossTotal;

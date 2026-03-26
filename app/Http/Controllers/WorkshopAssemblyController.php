@@ -27,6 +27,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use App\Services\Accounting\AccountReceivablePayableService;
 
@@ -96,7 +97,9 @@ class WorkshopAssemblyController extends Controller
             ->whereHas('roles', function ($query) {
                 $query->where('roles.id', 2); // Role 2 = Empleado
             })
+            ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
             ->orderBy('first_name')
+            ->orderBy('last_name')
             ->get();
 
         $vehicleTypes = \App\Models\VehicleType::query()
@@ -248,7 +251,15 @@ class WorkshopAssemblyController extends Controller
             'color' => ['nullable', 'string', 'max:40'],
             'vin' => ['nullable', 'string', 'max:100'],
             'workshop_assembly_location_id' => ['nullable', 'integer', 'exists:workshop_assembly_locations,id'],
-            'responsible_technician_person_id' => ['nullable', 'integer', 'exists:people,id'],
+            'responsible_technician_person_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('people', 'id')->where(function ($query) use ($branchId) {
+                    if ($branchId > 0) {
+                        $query->where('branch_id', $branchId);
+                    }
+                }),
+            ],
             'quantity' => ['required', 'integer', 'min:1'],
             'unit_cost' => ['nullable', 'numeric', 'min:0'],
             'assembled_at' => ['required', 'date'],
@@ -311,7 +322,15 @@ class WorkshopAssemblyController extends Controller
             'color' => ['nullable', 'string', 'max:40'],
             'vin' => ['nullable', 'string', 'max:100'],
             'workshop_assembly_location_id' => ['nullable', 'integer', 'exists:workshop_assembly_locations,id'],
-            'responsible_technician_person_id' => ['nullable', 'integer', 'exists:people,id'],
+            'responsible_technician_person_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('people', 'id')->where(function ($query) use ($branchId) {
+                    if ($branchId > 0) {
+                        $query->where('branch_id', $branchId);
+                    }
+                }),
+            ],
             'quantity' => ['required', 'integer', 'min:1'],
             'unit_cost' => ['required', 'numeric', 'min:0'],
             'assembled_at' => ['required', 'date'],

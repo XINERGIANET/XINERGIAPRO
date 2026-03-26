@@ -49,6 +49,7 @@ function purchaseCreateForm(c) {
         },
         documentTypeId: Number(c.initialDocumentTypeId || 0),
         paymentType: c.initialPaymentType || 'CONTADO',
+        affectsCash: c.initialAffectsCash || 'N',
         dueDate: c.initialDueDate || '',
         manualCreditDays: null,
         cashRegisterId: Number(c.initialCashRegisterId || 0),
@@ -106,7 +107,15 @@ function purchaseCreateForm(c) {
                 ? (c.initialRows || []).map((row) => this.makePaymentRowFromExisting(row))
                 : [];
 
-            if (this.paymentType === 'CONTADO' && !this.paymentRows.length) {
+            if (this.paymentType !== 'CONTADO') {
+                this.affectsCash = 'S';
+            }
+
+            if (this.paymentType === 'CONTADO' && this.affectsCash !== 'S') {
+                this.paymentRows = [];
+            }
+
+            if (this.paymentType === 'CONTADO' && this.affectsCash === 'S' && !this.paymentRows.length) {
                 this.addPaymentRow();
             }
 
@@ -660,6 +669,11 @@ function purchaseCreateForm(c) {
             { value: 'CREDITO', label: 'CREDITO / DEUDA' },
         ],
 
+        affectsCashOptions: [
+            { value: 'S', label: 'Si' },
+            { value: 'N', label: 'No' },
+        ],
+
         quickProviderPersonTypeOptions: [
             { value: 'DNI', label: 'DNI' },
             { value: 'RUC', label: 'RUC' },
@@ -1186,6 +1200,28 @@ function purchaseCreateForm(c) {
 
         onPaymentTypeChange() {
             if (this.paymentType === 'CONTADO') {
+                if (this.affectsCash !== 'S' && this.affectsCash !== 'N') {
+                    this.affectsCash = 'N';
+                }
+                if (!this.paymentRows.length) {
+                    this.addPaymentRow();
+                }
+                this.syncPaymentAmounts();
+                return;
+            }
+
+            this.affectsCash = 'S';
+            this.paymentRows = [];
+            this.syncCreditDueDate(true);
+        },
+
+        onAffectsCashChange() {
+            if (this.paymentType !== 'CONTADO') {
+                this.affectsCash = 'S';
+                return;
+            }
+
+            if (this.affectsCash === 'S') {
                 if (!this.paymentRows.length) {
                     this.addPaymentRow();
                 }
@@ -1194,11 +1230,10 @@ function purchaseCreateForm(c) {
             }
 
             this.paymentRows = [];
-            this.syncCreditDueDate(true);
         },
 
         syncPaymentAmounts() {
-            if (this.paymentType !== 'CONTADO' || !this.paymentRows.length) {
+            if (this.paymentType !== 'CONTADO' || this.affectsCash !== 'S' || !this.paymentRows.length) {
                 return;
             }
 

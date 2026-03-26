@@ -60,18 +60,23 @@ class WorkshopOrderController extends Controller
         $search = trim((string) $request->input('search', ''));
         $perPage = (int) $request->input('per_page', 10);
         $selectedStatus = $this->normalizeWorkshopOrderListStatus((string) $request->input('status', 'all'));
+        $dateFrom = $this->normalizeWorkshopOrderListDate((string) $request->input('date_from', ''));
+        $dateTo = $this->normalizeWorkshopOrderListDate((string) $request->input('date_to', ''));
 
-        $orders = $this->workshopOrdersFilteredQuery($branchId, $companyId, $search, $selectedStatus)
+        $orders = $this->workshopOrdersFilteredQuery($branchId, $companyId, $search, $selectedStatus, $dateFrom, $dateTo)
             ->with([
                 'movement',
                 'vehicle',
                 'client' => fn ($query) => $query->withTrashed(),
+                'details.service',
+                'details.product',
+                'details.technician' => fn ($query) => $query->withTrashed(),
             ])
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
 
-        return view('workshop.orders.index', compact('orders', 'search', 'perPage', 'selectedStatus'));
+        return view('workshop.orders.index', compact('orders', 'search', 'perPage', 'selectedStatus', 'dateFrom', 'dateTo'));
     }
 
     public function destroyBulk(Request $request): RedirectResponse
@@ -146,7 +151,7 @@ class WorkshopOrderController extends Controller
         ]);
 
         if ($validator->fails()) {
-            $msg = (string) ($validator->errors()->first('file') ?: 'Archivo no válido. Usa .xlsx, .xls o .csv (máx. 10 MB).');
+            $msg = (string) ($validator->errors()->first('file') ?: 'Archivo no vÃ¡lido. Usa .xlsx, .xls o .csv (mÃ¡x. 10 MB).');
 
             return redirect()
                 ->route('workshop.orders.index', array_filter(['view_id' => $viewId]))
@@ -161,15 +166,15 @@ class WorkshopOrderController extends Controller
         if ($branchId <= 0 || $companyId <= 0) {
             return redirect()
                 ->route('workshop.orders.index', array_filter(['view_id' => $viewId]))
-                ->with('error', 'Selecciona una sucursal para importar órdenes.');
+                ->with('error', 'Selecciona una sucursal para importar Ã³rdenes.');
         }
 
         $uploaded = $request->file('file');
         if (!$uploaded) {
             return redirect()
                 ->route('workshop.orders.index', array_filter(['view_id' => $viewId]))
-                ->withErrors(['file' => 'No se recibió ningún archivo.'])
-                ->with('error', 'No se recibió ningún archivo.');
+                ->withErrors(['file' => 'No se recibiÃ³ ningÃºn archivo.'])
+                ->with('error', 'No se recibiÃ³ ningÃºn archivo.');
         }
 
         $ext = strtolower((string) $uploaded->getClientOriginalExtension());
@@ -258,7 +263,7 @@ class WorkshopOrderController extends Controller
 
                     $glosas = $row['service_descriptions'];
                     if ($glosas === []) {
-                        throw new \RuntimeException('OBSERVACIONES sin ítems válidos después de separar por +.');
+                        throw new \RuntimeException('OBSERVACIONES sin Ã­tems vÃ¡lidos despuÃ©s de separar por +.');
                     }
 
                     $intakeDate = $row['intake_date'] ?? now()->toDateString();
@@ -296,11 +301,11 @@ class WorkshopOrderController extends Controller
             }
         }
 
-        $msg = "Importaci�n: {$created} orden(es) creada(s) como terminada(s), con servicios en glosa.";
+        $msg = "Importación: {$created} orden(es) creada(s) como terminada(s), con servicios en glosa.";
         if ($rowErrors !== []) {
             $msg .= ' Errores: ' . implode(' | ', array_slice($rowErrors, 0, 8));
             if (count($rowErrors) > 8) {
-                $msg .= ' (+' . (count($rowErrors) - 8) . ' más)';
+                $msg .= ' (+' . (count($rowErrors) - 8) . ' mÃ¡s)';
             }
         }
 
@@ -358,7 +363,7 @@ class WorkshopOrderController extends Controller
             return true;
         }
 
-        $markers = ['-', '--', '.', '..', 'N/A', 'NA', 'S/N', 'SN', 'XXX', 'SINPLACA', '0', '00', '—', '–'];
+        $markers = ['-', '--', '.', '..', 'N/A', 'NA', 'S/N', 'SN', 'XXX', 'SINPLACA', '0', '00', 'â€”', 'â€“'];
         foreach ($markers as $m) {
             if ($normalized === strtoupper($m)) {
                 return true;
@@ -481,7 +486,7 @@ class WorkshopOrderController extends Controller
     {
         $t = strtoupper(trim($value));
 
-        return $t === '-' || $t === '—' || $t === '–' || $t === 'N/A' || $t === 'S/N';
+        return $t === '-' || $t === 'â€”' || $t === 'â€“' || $t === 'N/A' || $t === 'S/N';
     }
 
     private function isImportAnonymousDocument(string $doc): bool
@@ -491,7 +496,7 @@ class WorkshopOrderController extends Controller
             return true;
         }
         $u = strtoupper($t);
-        if (in_array($u, ['-', 'N/A', 'S/N', 'SN', '—', '–'], true)) {
+        if (in_array($u, ['-', 'N/A', 'S/N', 'SN', 'â€”', 'â€“'], true)) {
             return true;
         }
         if (preg_match('/^\d+$/', $t)) {
@@ -565,7 +570,7 @@ class WorkshopOrderController extends Controller
         $branch = Branch::query()->findOrFail($branchId);
         $districtId = (int) ($branch->location_id ?? 0);
         if ($districtId <= 0) {
-            throw new \RuntimeException('La sucursal no tiene distrito configurado; no se puede crear el cliente de la fila «' . $fullName . '».');
+            throw new \RuntimeException('La sucursal no tiene distrito configurado; no se puede crear el cliente de la fila Â«' . $fullName . 'Â».');
         }
 
         [$firstName, $lastName] = $this->splitImportPersonFullName($fullName);
@@ -1261,7 +1266,7 @@ class WorkshopOrderController extends Controller
     /**
      * @return \Illuminate\Database\Eloquent\Builder<\App\Models\WorkshopMovement>
      */
-    private function workshopOrdersFilteredQuery(int $branchId, int $companyId, string $search, string $selectedStatus)
+    private function workshopOrdersFilteredQuery(int $branchId, int $companyId, string $search, string $selectedStatus, ?string $dateFrom = null, ?string $dateTo = null)
     {
         $selectedStatus = $this->normalizeWorkshopOrderListStatus($selectedStatus);
 
@@ -1269,15 +1274,36 @@ class WorkshopOrderController extends Controller
             ->when($companyId > 0, fn ($query) => $query->where('company_id', $companyId))
             ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
             ->when($selectedStatus !== 'all', fn ($query) => $query->where('status', $selectedStatus))
+            ->when($dateFrom, fn ($query) => $query->whereDate('intake_date', '>=', $dateFrom))
+            ->when($dateTo, fn ($query) => $query->whereDate('intake_date', '<=', $dateTo))
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($inner) use ($search) {
                     $inner->whereHas('movement', fn ($movementQuery) => $movementQuery->where('number', 'ILIKE', "%{$search}%"))
-                        ->orWhereHas('vehicle', fn ($vehicleQuery) => $vehicleQuery->where('plate', 'ILIKE', "%{$search}%"))
+                        ->orWhereHas('vehicle', fn ($vehicleQuery) => $vehicleQuery
+                            ->where('plate', 'ILIKE', "%{$search}%")
+                            ->orWhere('brand', 'ILIKE', "%{$search}%")
+                            ->orWhere('model', 'ILIKE', "%{$search}%"))
                         ->orWhereHas('client', fn ($clientQuery) => $clientQuery
-                            ->where('first_name', 'ILIKE', "%{$search}%")
-                            ->orWhere('last_name', 'ILIKE', "%{$search}%"));
+                            ->where('document_number', 'ILIKE', "%{$search}%")
+                            ->orWhere('first_name', 'ILIKE', "%{$search}%")
+                            ->orWhere('last_name', 'ILIKE', "%{$search}%")
+                            ->orWhereRaw("TRIM(COALESCE(first_name, '') || ' ' || COALESCE(last_name, '')) ILIKE ?", ["%{$search}%"]));
                 });
             });
+    }
+
+    private function normalizeWorkshopOrderListDate(string $value): ?string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+
+        try {
+            return \Carbon\Carbon::createFromFormat('Y-m-d', $value)->format('Y-m-d');
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     private function normalizeWorkshopOrderListStatus(string $selectedStatus): string
@@ -1355,3 +1381,4 @@ class WorkshopOrderController extends Controller
         return $path;
     }
 }
+

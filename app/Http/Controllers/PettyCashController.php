@@ -801,8 +801,6 @@ class PettyCashController extends Controller
                     $movement->cashMovement->details()->delete();
                     $movement->cashMovement()->delete();
                 }
-
-                $movement->delete();
             });
 
             $params = ['cash_register_id' => $cash_register_id];
@@ -811,7 +809,7 @@ class PettyCashController extends Controller
             }
 
             return redirect()->route('admin.petty-cash.index', $params)
-                ->with('success', 'Movimiento eliminado correctamente.');
+                ->with('success', 'Movimiento de caja eliminado correctamente.');
         } catch (\Exception $e) {
             return back()->withErrors(['error' => 'Error al eliminar: ' . $e->getMessage()]);
         }

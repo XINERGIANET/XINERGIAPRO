@@ -4,9 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Workshop\StoreVehicleRequest;
 use App\Http\Requests\Workshop\UpdateVehicleRequest;
+use App\Models\Appointment;
+use App\Models\CashMovements;
 use App\Models\Person;
+use App\Models\SalesMovement;
 use App\Models\Vehicle;
 use App\Models\VehicleType;
+use App\Models\WorkshopMovement;
 use App\Support\WorkshopAuthorization;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -124,6 +128,104 @@ class WorkshopVehicleController extends Controller
         return back()->with('status', 'Vehiculo eliminado correctamente.');
     }
 
+    public function show(Request $request, Vehicle $vehicle)
+    {
+        $this->assertVehicleScope($vehicle);
+
+        $branchId = (int) session('branch_id');
+        $companyId = (int) $vehicle->company_id;
+
+        $vehicle->loadMissing(['client', 'vehicleType']);
+
+        $orders = WorkshopMovement::query()
+            ->with([
+                'movement',
+                'vehicle',
+                'details.service',
+                'details.technician',
+                'technicians.technician',
+            ])
+            ->where('vehicle_id', $vehicle->id)
+            ->where('company_id', $companyId)
+            ->orderByDesc('id')
+            ->limit(200)
+            ->get();
+
+        $appointments = Appointment::query()
+            ->where('vehicle_id', $vehicle->id)
+            ->where('company_id', $companyId)
+            ->orderByDesc('start_at')
+            ->limit(100)
+            ->get();
+
+        $saleIds = $orders->pluck('sales_movement_id')->filter()->unique()->values();
+        $cashIds = $orders->pluck('cash_movement_id')->filter()->unique()->values();
+
+        $sales = SalesMovement::query()
+            ->with('movement')
+            ->whereHas('movement', fn ($query) => $query->where('branch_id', $branchId))
+            ->whereIn('id', $saleIds)
+            ->orderByDesc('id')
+            ->limit(200)
+            ->get();
+
+        $payments = CashMovements::query()
+            ->with('movement')
+            ->whereHas('movement', fn ($query) => $query->where('branch_id', $branchId))
+            ->whereIn('id', $cashIds)
+            ->orderByDesc('id')
+            ->limit(200)
+            ->get();
+
+        $purchases = collect();
+
+        $totalOrdersCount = $orders->count();
+        $totalOrders = (float) $orders->sum('total');
+        $totalPaidOrders = (float) $orders->sum('paid_total');
+        $debtOrders = max(0, $totalOrders - $totalPaidOrders);
+        $totalSales = (float) $sales->sum('total');
+        $totalPurchases = (float) $purchases->sum('total');
+        $totalPayments = (float) $payments->sum('total');
+
+        if ($request->boolean('modal')) {
+            return response(view('workshop.vehicles._history_content', compact(
+                'vehicle',
+                'appointments',
+                'orders',
+                'sales',
+                'purchases',
+                'payments',
+                'totalOrdersCount',
+                'totalOrders',
+                'totalPaidOrders',
+                'debtOrders',
+                'totalSales',
+                'totalPurchases',
+                'totalPayments'
+            ))->render(), 200, [
+                'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+                'Pragma' => 'no-cache',
+                'Expires' => '0',
+            ]);
+        }
+
+        return view('workshop.vehicles.history', compact(
+            'vehicle',
+            'appointments',
+            'orders',
+            'sales',
+            'purchases',
+            'payments',
+            'totalOrdersCount',
+            'totalOrders',
+            'totalPaidOrders',
+            'debtOrders',
+            'totalSales',
+            'totalPurchases',
+            'totalPayments'
+        ));
+    }
+
     public function destroyBulk(Request $request): RedirectResponse
     {
         $validated = $request->validate([
@@ -224,4 +326,3 @@ class WorkshopVehicleController extends Controller
             });
     }
 }
-

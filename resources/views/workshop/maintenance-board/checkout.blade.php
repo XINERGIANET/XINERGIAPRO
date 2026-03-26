@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('content')
 <div
@@ -8,6 +8,8 @@
         productLines: @js(array_values(old('product_lines', []))),
         documentTypeOptions: @js(collect($documentTypes ?? collect())->map(fn ($doc) => ['id' => (int) $doc->id, 'name' => (string) ($doc->name ?? '')])->values()->all()),
         selectedDocumentTypeId: @js((string) old('document_type_id', $defaultDocumentTypeId ?? optional(($documentTypes ?? collect())->first())->id)),
+        saleHeaderSeries: @js('001'),
+        saleHeaderNumber: @js('00000001'),
         billingStatus: @js((string) old('billing_status', 'PENDING')),
         invoiceSeries: @js((string) old('invoice_series', '001')),
         invoiceNumber: @js((string) old('invoice_number', '')),
@@ -38,6 +40,7 @@
             }
             this.syncInvoiceBillingFields();
             this.syncAmount();
+            this.refreshSaleHeaderPreview();
         },
         currentDocumentType() {
             return this.documentTypeOptions.find((item) => String(item.id) === String(this.selectedDocumentTypeId || '')) || null;
@@ -67,6 +70,35 @@
 
             if (this.billingStatus === 'PENDING') {
                 this.invoiceNumber = '';
+            }
+        },
+        async refreshSaleHeaderPreview() {
+            const docId = Number(this.selectedDocumentTypeId || 0);
+            const cashId = Number(this.$refs.cashRegisterSelect?.value || 0);
+            if (!docId || !cashId) return;
+
+            const url = new URL(@js(route('admin.sales.preview.header')), window.location.origin);
+            url.searchParams.set('document_type_id', String(docId));
+            url.searchParams.set('cash_register_id', String(cashId));
+
+            try {
+                const res = await fetch(url.toString(), {
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data?.series != null) {
+                    this.saleHeaderSeries = String(data.series);
+                }
+                if (data?.number != null) {
+                    this.saleHeaderNumber = String(data.number);
+                }
+                if (this.isInvoiceDocumentSelected() && this.billingStatus === 'INVOICED') {
+                    this.invoiceSeries = this.saleHeaderSeries || '001';
+                    this.invoiceNumber = this.saleHeaderNumber || '';
+                }
+            } catch (e) {
+                /* ignorar */
             }
         },
         lineSubtotal(line) {
@@ -203,7 +235,7 @@
         $checkoutOsLabel = 'OS ' . ($order->movement?->number ?? ('#' . $order->id));
     @endphp
     <x-common.page-breadcrumb
-        :pageTitle="'Venta y cobro · ' . $checkoutOsLabel"
+        :pageTitle="'Venta y cobro Â· ' . $checkoutOsLabel"
         :crumbs="[
             ['label' => 'Tablero de Mantenimiento', 'url' => route('workshop.maintenance-board.index')],
             ['label' => $checkoutOsLabel . ' | Venta y cobro'],
@@ -251,7 +283,7 @@
 
             <div class="overflow-hidden rounded-xl border border-slate-200">
                 <div class="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
-                    Servicios y lineas pendientes a cobrar
+                    Servicios y líneas pendientes a cobrar
                 </div>
                 <table class="w-full">
                     <thead class="bg-slate-800 text-white">
@@ -265,7 +297,7 @@
                     <tbody class="divide-y divide-slate-100 bg-white">
                         <template x-if="pendingLines.length === 0">
                             <tr>
-                                <td colspan="4" class="px-3 py-5 text-center text-sm text-slate-500">No hay lineas pendientes.</td>
+                                <td colspan="4" class="px-3 py-5 text-center text-sm text-slate-500">No hay líneas pendientes.</td>
                             </tr>
                         </template>
                         <template x-for="line in pendingLines" :key="`pending-${line.detail_id}`">
@@ -329,16 +361,24 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-5">
                 <div>
                     <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Documento de venta</label>
-                    <select x-model="selectedDocumentTypeId" @change="syncInvoiceBillingFields()" name="document_type_id" required class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                    <select x-model="selectedDocumentTypeId" @change="syncInvoiceBillingFields(); refreshSaleHeaderPreview()" name="document_type_id" required class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
                         @foreach(($documentTypes ?? collect()) as $doc)
                             <option value="{{ $doc->id }}">
                                 {{ $doc->name }}
                             </option>
                         @endforeach
                     </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Serie</label>
+                    <input type="text" x-model="saleHeaderSeries" readonly tabindex="-1" class="h-11 w-full rounded-lg border border-gray-300 bg-slate-50 px-3 text-sm font-semibold text-slate-700">
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Correlativo</label>
+                    <input type="text" x-model="saleHeaderNumber" readonly tabindex="-1" class="h-11 w-full rounded-lg border border-gray-300 bg-slate-50 px-3 text-sm font-semibold text-slate-700">
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Condición</label>
@@ -349,7 +389,7 @@
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Caja</label>
-                    <select name="cash_register_id" required class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                    <select x-ref="cashRegisterSelect" @change="refreshSaleHeaderPreview()" name="cash_register_id" required class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
                         @foreach(($cashRegisters ?? collect()) as $cash)
                             <option value="{{ $cash->id }}" @selected(old('cash_register_id', optional(($cashRegisters ?? collect())->first())->id) == $cash->id)>
                                 Caja {{ $cash->number }}
@@ -366,7 +406,7 @@
             <div x-show="isInvoiceDocumentSelected()" x-cloak class="grid grid-cols-1 gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4 md:grid-cols-3">
                 <div>
                     <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Estado de factura</label>
-                    <select x-model="billingStatus" @change="syncInvoiceBillingFields()" name="billing_status" class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm">
+                    <select x-model="billingStatus" @change="syncInvoiceBillingFields(); refreshSaleHeaderPreview()" name="billing_status" class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm">
                         <option value="INVOICED">Facturado</option>
                         <option value="PENDING">Por facturar</option>
                     </select>
@@ -402,7 +442,7 @@
                 <p class="mt-1 text-xs text-sky-800">No se registran medios de pago. Elige el documento de venta y confirma para facturar (si aplica) y marcar la OS como entregada.</p>
             </div>
 
-            <div x-show="!isDebtPaymentSelected() && !nothingToCollect()" x-cloak class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div x-show="!isDebtPaymentSelected() && !nothingToCollect()" x-cloak data-gsa-skip="true" class="overflow-visible rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div class="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 md:flex-row md:items-center md:justify-between">
                     <div>
                         <p class="text-sm font-semibold text-slate-800">Desglose de cobro</p>
@@ -591,3 +631,4 @@
     </x-common.component-card>
 </div>
 @endsection
+

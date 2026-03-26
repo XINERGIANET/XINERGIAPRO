@@ -85,7 +85,35 @@ class WorkshopMaintenanceBoardController extends Controller
             ->when($search !== '', function ($query) use ($search) {
                 $needle = mb_strtolower($search, 'UTF-8');
                 $query->where(function ($inner) use ($needle) {
-                    $inner->whereHas('client', function ($clientQuery) use ($needle) {
+                    $inner->whereHas('movement', function ($movementQuery) use ($needle) {
+                        $movementQuery
+                            ->whereRaw('LOWER(COALESCE(number, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(comment, \'\')) LIKE ?', ["%{$needle}%"]);
+                    })->orWhereHas('client', function ($clientQuery) use ($needle) {
+                        $clientQuery
+                            ->whereRaw('LOWER(COALESCE(first_name, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(last_name, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(TRIM(COALESCE(first_name, \'\') || \' \' || COALESCE(last_name, \'\'))) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(document_number, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(person_type, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(phone, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(email, \'\')) LIKE ?', ["%{$needle}%"]);
+                    })->orWhereHas('vehicle', function ($vehicleQuery) use ($needle) {
+                        $vehicleQuery
+                            ->whereRaw('LOWER(COALESCE(type, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(brand, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(model, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(TRIM(COALESCE(brand, \'\') || \' \' || COALESCE(model, \'\'))) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(plate, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(vin, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(engine_number, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(chassis_number, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(serial_number, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('CAST(COALESCE(engine_displacement_cc, 0) AS TEXT) LIKE ?', ["%{$needle}%"]);
+                    })->orWhereHas('details', function ($detailQuery) use ($needle) {
+                        $detailQuery
+                            ->whereRaw('LOWER(COALESCE(description, \'\')) LIKE ?', ["%{$needle}%"]);
+                    })->orWhereHas('client', function ($clientQuery) use ($needle) {
                         $clientQuery
                             ->whereRaw('LOWER(COALESCE(first_name, \'\')) LIKE ?', ["%{$needle}%"])
                             ->orWhereRaw('LOWER(COALESCE(last_name, \'\')) LIKE ?', ["%{$needle}%"])
@@ -677,6 +705,8 @@ class WorkshopMaintenanceBoardController extends Controller
         [$branchId, $companyId] = $this->branchScope();
 
         $validated = $request->validate([
+            'vehicle_id' => ['required', 'integer', 'exists:vehicles,id'],
+            'client_person_id' => ['nullable', 'integer', 'exists:people,id'],
             'mileage_in' => ['nullable', 'integer', 'min:0'],
             'tow_in' => ['nullable', 'boolean'],
             'diagnosis_text' => ['nullable', 'string'],
@@ -705,10 +735,22 @@ class WorkshopMaintenanceBoardController extends Controller
         ]);
 
         $vehicle = Vehicle::query()
-            ->where('id', (int) $order->vehicle_id)
+            ->where('id', (int) $validated['vehicle_id'])
             ->where('company_id', $companyId)
             ->where('branch_id', $branchId)
             ->firstOrFail();
+
+        $clientPersonId = isset($validated['client_person_id']) && (int) $validated['client_person_id'] > 0
+            ? (int) $validated['client_person_id']
+            : (int) $vehicle->client_person_id;
+
+        if ($clientPersonId <= 0) {
+            return back()->withErrors(['error' => 'El vehiculo seleccionado no tiene cliente asociado.']);
+        }
+
+        if ((int) $vehicle->client_person_id !== $clientPersonId) {
+            return back()->withErrors(['error' => 'El vehiculo no pertenece al cliente seleccionado.']);
+        }
 
         try {
             $parsedServiceLines = $this->parseMaintenanceBoardServiceLines((array) ($validated['service_lines'] ?? []));
@@ -724,13 +766,15 @@ class WorkshopMaintenanceBoardController extends Controller
         $user = auth()->user();
 
         try {
-            DB::transaction(function () use ($order, $request, $validated, $branchId, $vehicle, $parsedServiceLines, $user) {
+            DB::transaction(function () use ($order, $request, $validated, $branchId, $vehicle, $clientPersonId, $parsedServiceLines, $user) {
                 $lockedOrder = WorkshopMovement::query()
                     ->where('id', $order->id)
                     ->lockForUpdate()
                     ->firstOrFail();
 
                 $this->flowService->updateOrder($lockedOrder, [
+                    'vehicle_id' => (int) $validated['vehicle_id'],
+                    'client_person_id' => $clientPersonId,
                     'mileage_in' => $validated['mileage_in'] ?? null,
                     'tow_in' => (bool) ($validated['tow_in'] ?? false),
                     'diagnosis_text' => $validated['diagnosis_text'] ?? null,
@@ -864,7 +908,12 @@ class WorkshopMaintenanceBoardController extends Controller
                             'line_type' => 'SERVICE',
                             'service_id' => $serviceId,
                             'description' => (string) $service->name,
+<<<<<<< HEAD
                             'unit_price' => $unitPrice,
+=======
+                            'qty' => $qty,
+                            'unit_price' => $resolvedPrice,
+>>>>>>> d6255291b4fa2905a927e1f54a4b248a45c23311
                             'validity_months' => $line['validity_months'] ?? null,
                         ]);
                     }
@@ -1044,6 +1093,24 @@ class WorkshopMaintenanceBoardController extends Controller
     public function storeVehicleQuick(Request $request): JsonResponse
     {
         [$branchId, $companyId] = $this->branchScope();
+
+        $normalizeVehicleIdentifier = static function ($value): ?string {
+            $normalized = trim((string) $value);
+
+            if ($normalized === '' || $normalized === '-' || $normalized === '--') {
+                return null;
+            }
+
+            return $normalized;
+        };
+
+        $request->merge([
+            'plate' => $normalizeVehicleIdentifier($request->input('plate')),
+            'vin' => $normalizeVehicleIdentifier($request->input('vin')),
+            'engine_number' => $normalizeVehicleIdentifier($request->input('engine_number')),
+            'chassis_number' => $normalizeVehicleIdentifier($request->input('chassis_number')),
+            'serial_number' => $normalizeVehicleIdentifier($request->input('serial_number')),
+        ]);
 
         $validated = $request->validate([
             'client_person_id' => [

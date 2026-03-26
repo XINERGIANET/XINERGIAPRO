@@ -4,6 +4,15 @@
     @php
         $viewId = request('view_id');
         $purchaseIndexUrl = route('admin.purchases.index', $viewId ? ['view_id' => $viewId] : []);
+        $isEditing = isset($purchase) && $purchase;
+        $pageTitle = $isEditing ? 'Editar compra' : 'Nueva compra';
+        $cardTitle = $isEditing ? 'Compras | Editar' : 'Compras | Nuevo';
+        $cardDesc = $isEditing
+            ? 'Actualiza la compra con la misma interfaz operativa del registro.'
+            : 'Registra la compra, actualiza stock y, si corresponde, genera la salida de caja desde un solo flujo.';
+        $formAction = $isEditing
+            ? route('admin.purchases.update', array_merge([$purchase], $viewId ? ['view_id' => $viewId] : []))
+            : route('admin.purchases.store', $viewId ? ['view_id' => $viewId] : []);
     @endphp
 
     <div
@@ -11,22 +20,30 @@
         x-data="purchaseCreateForm(@js($purchaseCreateConfig))"
         x-init="init()"
     >
-        <x-common.page-breadcrumb pageTitle="Nueva compra" />
+        <x-common.page-breadcrumb :pageTitle="$pageTitle" />
 
         @if (session('status'))
             <div class="mb-4 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-700">{{ session('status') }}</div>
         @endif
+        @if ($errors->any())
+            <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+                {{ $errors->first('error') ?: $errors->first() }}
+            </div>
+        @endif
 
         <x-common.component-card
-            title="Compras | Nuevo"
-            desc="Registra la compra, actualiza stock y, si corresponde, genera la salida de caja desde un solo flujo."
+            :title="$cardTitle"
+            :desc="$cardDesc"
         >
             <form
                 method="POST"
-                action="{{ route('admin.purchases.store', $viewId ? ['view_id' => $viewId] : []) }}"
+                action="{{ $formAction }}"
                 class="space-y-6"
             >
                 @csrf
+                @if($isEditing)
+                    @method('PUT')
+                @endif
                 @include('purchases._create_pos', ['purchaseIndexUrl' => $purchaseIndexUrl])
             </form>
         </x-common.component-card>

@@ -31,7 +31,7 @@
                     name="search"
                     value="{{ $search ?? '' }}"
                     class="h-11 w-full flex-1 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 focus:border-orange-400 focus:outline-none sm:min-w-[340px]"
-                    placeholder="Buscar por cliente o vehiculo"
+                    placeholder="Buscar por OS, DNI, RUC, cliente, placa, marca, modelo o vehículo"
                 >
                 <select
                     id="status"
@@ -232,7 +232,11 @@
             @endforelse
         </div>
 
-        <div class="mt-5">{{ $cards->links() }}</div>
+        <div class="mt-5 flex justify-end">
+            <div class="flex-none pagination-simple">
+                {{ $cards->links('vendor.pagination.forced') }}
+            </div>
+        </div>
     </x-common.component-card>
 
     <x-ui.modal

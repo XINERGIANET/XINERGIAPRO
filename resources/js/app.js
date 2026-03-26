@@ -449,7 +449,214 @@ const bindSwalDelete = () => {
     });
 };
 
+const ensureGlobalSelectAutocompleteStyles = () => {
+    if (document.getElementById('global-select-autocomplete-styles')) {
+        return;
+    }
+    const style = document.createElement('style');
+    style.id = 'global-select-autocomplete-styles';
+    style.textContent = `
+        .gsa-native-hidden { display: none !important; }
+        .gsa-wrap { position: relative; width: 100%; }
+        .gsa-trigger {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .5rem;
+            width: 100%;
+            min-height: 2.75rem;
+            border: 1px solid rgb(209 213 219);
+            border-radius: .75rem;
+            background: #fff;
+            padding: .625rem .875rem;
+            font-size: .875rem;
+            color: rgb(31 41 55);
+            box-shadow: 0 1px 2px rgba(0,0,0,.04);
+            cursor: pointer;
+        }
+        .gsa-trigger:focus { outline: 2px solid rgba(59,130,246,.12); outline-offset: 1px; }
+        .gsa-trigger[disabled] { opacity: .6; cursor: not-allowed; }
+        .gsa-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+        .gsa-placeholder { color: rgb(156 163 175); }
+        .gsa-chevron { flex-shrink: 0; color: rgb(107 114 128); transition: transform .15s ease; }
+        .gsa-wrap[data-open="true"] .gsa-chevron { transform: rotate(180deg); }
+        .gsa-panel {
+            position: absolute;
+            top: calc(100% + .25rem);
+            left: 0;
+            right: 0;
+            z-index: 80;
+            overflow: hidden;
+            border: 1px solid rgb(229 231 235);
+            border-radius: .75rem;
+            background: #fff;
+            box-shadow: 0 10px 25px rgba(15,23,42,.12);
+        }
+        .gsa-search {
+            width: calc(100% - 1rem);
+            height: 2.25rem;
+            margin: .5rem;
+            border: 1px solid rgb(229 231 235);
+            border-radius: .5rem;
+            background: rgb(249 250 251);
+            padding: 0 .75rem;
+            font-size: .875rem;
+        }
+        .gsa-list { max-height: 15rem; overflow: auto; padding: .25rem 0; }
+        .gsa-option, .gsa-empty {
+            width: 100%;
+            padding: .625rem .875rem;
+            font-size: .875rem;
+            text-align: left;
+        }
+        .gsa-option:hover, .gsa-option.is-active { background: rgb(238 242 255); }
+        .gsa-empty { color: rgb(107 114 128); }
+    `;
+    document.head.appendChild(style);
+};
+
+const createGlobalSelectAutocomplete = (select) => {
+    if (!select || select.dataset.gsaEnhanced === 'true') {
+        return;
+    }
+    if (select.multiple || Number(select.size || 0) > 1) {
+        return;
+    }
+    if (select.classList.contains('sr-only') || select.getAttribute('aria-hidden') === 'true') {
+        return;
+    }
+    if (
+        select.closest('[data-gsa-skip="true"]')
+        || select.closest('.gsa-wrap')
+        || select.closest('.swal2-container')
+        || select.closest('.swal2-popup')
+    ) {
+        return;
+    }
+
+    select.dataset.gsaEnhanced = 'true';
+    select.classList.add('gsa-native-hidden');
+
+    const wrap = document.createElement('div');
+    wrap.className = 'gsa-wrap';
+    wrap.dataset.open = 'false';
+
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'gsa-trigger';
+    trigger.disabled = !!select.disabled;
+    trigger.innerHTML = `
+        <span class="gsa-label"></span>
+        <span class="gsa-chevron"><i class="ri-arrow-down-s-line"></i></span>
+    `;
+
+    const panel = document.createElement('div');
+    panel.className = 'gsa-panel';
+    panel.hidden = true;
+
+    const search = document.createElement('input');
+    search.type = 'text';
+    search.className = 'gsa-search';
+    search.placeholder = 'Buscar...';
+
+    const list = document.createElement('div');
+    list.className = 'gsa-list';
+
+    panel.append(search, list);
+    wrap.append(trigger, panel);
+    select.insertAdjacentElement('afterend', wrap);
+
+    const getOptions = () => Array.from(select.options || []).map((opt) => ({
+        value: String(opt.value ?? ''),
+        label: String(opt.textContent ?? '').trim(),
+        disabled: !!opt.disabled,
+        selected: !!opt.selected,
+    }));
+
+    const syncLabel = () => {
+        const current = select.options[select.selectedIndex] || null;
+        const labelEl = trigger.querySelector('.gsa-label');
+        const text = current ? String(current.textContent ?? '').trim() : '';
+        labelEl.textContent = text || 'Seleccionar...';
+        labelEl.classList.toggle('gsa-placeholder', !text);
+        trigger.disabled = !!select.disabled;
+    };
+
+    const close = () => {
+        wrap.dataset.open = 'false';
+        panel.hidden = true;
+        search.value = '';
+    };
+
+    const render = () => {
+        const q = search.value.trim().toLowerCase();
+        const options = getOptions().filter((opt) => !q || opt.label.toLowerCase().includes(q));
+        list.innerHTML = '';
+        if (!options.length) {
+            const empty = document.createElement('div');
+            empty.className = 'gsa-empty';
+            empty.textContent = 'Sin coincidencias.';
+            list.appendChild(empty);
+            return;
+        }
+        options.forEach((opt) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'gsa-option' + (opt.selected ? ' is-active' : '');
+            btn.textContent = opt.label;
+            btn.disabled = opt.disabled;
+            btn.addEventListener('click', () => {
+                select.value = opt.value;
+                select.dispatchEvent(new Event('input', { bubbles: true }));
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+                syncLabel();
+                close();
+            });
+            list.appendChild(btn);
+        });
+    };
+
+    trigger.addEventListener('click', () => {
+        if (trigger.disabled) {
+            return;
+        }
+        const open = wrap.dataset.open === 'true';
+        document.querySelectorAll('.gsa-wrap[data-open="true"]').forEach((el) => {
+            if (el !== wrap) {
+                el.dataset.open = 'false';
+                const elPanel = el.querySelector('.gsa-panel');
+                const elSearch = el.querySelector('.gsa-search');
+                if (elPanel) elPanel.hidden = true;
+                if (elSearch) elSearch.value = '';
+            }
+        });
+        wrap.dataset.open = open ? 'false' : 'true';
+        panel.hidden = open;
+        if (!open) {
+            render();
+            setTimeout(() => search.focus(), 0);
+        }
+    });
+
+    search.addEventListener('input', render);
+    select.addEventListener('change', syncLabel);
+
+    document.addEventListener('click', (event) => {
+        if (!wrap.contains(event.target)) {
+            close();
+        }
+    });
+
+    syncLabel();
+};
+
+const enhanceGlobalSelectAutocompletes = (root = document) => {
+    ensureGlobalSelectAutocompleteStyles();
+    root.querySelectorAll('select').forEach(createGlobalSelectAutocomplete);
+};
+
 const initPage = () => {
+    enhanceGlobalSelectAutocompletes();
     // Map imports
     if (document.querySelector('#mapOne')) {
         import('./components/map').then(module => module.initMap());

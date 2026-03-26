@@ -58,16 +58,16 @@
                             </div>
                             <div class="xl:col-span-2">
                                 <label for="sale-header-series" class="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Serie</label>
-                                <input type="text" id="sale-header-series" readonly tabindex="-1"
+                                <input type="text" id="sale-header-series" @if(!$isEditMode) readonly tabindex="-1" @endif
                                     value="{{ $saleSeriesPreview ?? '001' }}"
-                                    class="h-12 w-full cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-100 px-4 text-sm font-semibold text-slate-600"
+                                    class="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-semibold {{ $isEditMode ? 'bg-white text-slate-700 focus:border-orange-400 focus:ring-4 focus:ring-orange-100 outline-none' : 'cursor-not-allowed bg-slate-100 text-slate-600' }}"
                                     autocomplete="off">
                             </div>
                             <div class="xl:col-span-2">
                                 <label for="sale-header-number" class="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Numero <span class="text-red-500">*</span></label>
-                                <input type="text" id="sale-header-number" readonly tabindex="-1"
+                                <input type="text" id="sale-header-number" @if(!$isEditMode) readonly tabindex="-1" @endif
                                     value="{{ $saleNumberPreview ?? '00000001' }}"
-                                    class="h-12 w-full cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-100 px-4 text-sm font-semibold text-slate-600"
+                                    class="h-12 w-full rounded-2xl border border-slate-200 px-4 text-sm font-semibold {{ $isEditMode ? 'bg-white text-slate-700 focus:border-orange-400 focus:ring-4 focus:ring-orange-100 outline-none' : 'cursor-not-allowed bg-slate-100 text-slate-600' }}"
                                     autocomplete="off">
                             </div>
                         </div>
@@ -736,16 +736,21 @@
             let currentSale = isEditMode && initialSaleData
                 ? {
                     id: Number(initialSaleData.id || 0) || null,
+                    number: String(initialSaleData.number || ''),
                     clientId: initialSaleData.clientId ? Number(initialSaleData.clientId) : (defaultClient ? defaultClient.id : null),
                     clientName: initialSaleData.clientName || (defaultClient ? defaultClient.label : 'Publico General'),
                     status: 'editing',
                     notes: String(initialSaleData.notes || ''),
                     items: Array.isArray(initialSaleData.items)
-                        ? initialSaleData.items.map((item) => ({
+                        ? initialSaleData.items
+                            .filter((item) => Number(item?.pId || 0) > 0 || String(item?.name || '').trim() !== '')
+                            .map((item) => ({
+                            kind: String(item.kind || (Number(item.pId || 0) > 0 ? 'product' : 'glosa')),
                             pId: Number(item.pId || 0),
                             name: String(item.name || ''),
                             qty: Number(item.qty || 0),
                             price: Number(item.price || 0),
+                            tax_rate: Number(item.tax_rate || 0),
                             note: String(item.note || ''),
                         }))
                         : [],
@@ -2232,14 +2237,23 @@
                     container.innerHTML = '<div class="flex min-h-[240px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-center"><div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-sm"><i class="ri-shopping-bag-3-line text-3xl"></i></div><p class="mt-4 text-base font-bold text-slate-800">Sin productos en la orden</p><p class="mt-1 text-sm text-slate-500">Agrega productos desde el catálogo.</p></div>';
                 } else {
                     currentSale.items.forEach((item, index) => {
-                        const prod = products.find((p) => Number(p.id) === Number(item.pId)) || {
-                            id: Number(item.pId) || 0,
-                            name: item.name || 'Producto',
-                            img: null,
-                        };
+                        const isManualLine = Number(item.pId || 0) <= 0 || String(item.kind || '') === 'glosa';
+                        const prod = !isManualLine
+                            ? (products.find((p) => Number(p.id) === Number(item.pId)) || {
+                                id: Number(item.pId) || 0,
+                                name: item.name || 'Producto',
+                                img: null,
+                            })
+                            : {
+                                id: 0,
+                                name: item.name || 'Detalle',
+                                img: null,
+                            };
 
                         const itemTotal = (Number(item.price) || 0) * (Number(item.qty) || 0);
-                        const taxPct = taxRateByProductId.get(Number(item.pId)) ?? defaultTaxPct;
+                        const taxPct = isManualLine
+                            ? (Number(item.tax_rate || 0) || defaultTaxPct)
+                            : (taxRateByProductId.get(Number(item.pId)) ?? defaultTaxPct);
                         const taxVal = taxPct / 100;
                         const itemSubtotal = taxVal > 0 ? itemTotal / (1 + taxVal) : itemTotal;
                         subtotalBase += itemSubtotal;
@@ -2252,8 +2266,17 @@
                                 <div class="p-3">
                                     <div class="flex items-start justify-between gap-3">
                                         <div class="min-w-0 flex-1">
-                                            <h5 class="truncate text-sm font-bold text-slate-900">${prod.name || 'Producto'}</h5>
-                                            <p class="mt-1 text-[11px] font-medium text-slate-500">Cantidad x precio de venta</p>
+                                            ${isManualLine ? `
+                                                <input
+                                                    data-role="line-name"
+                                                    data-index="${index}"
+                                                    type="text"
+                                                    value="${String(item.name || '').replace(/"/g, '&quot;')}"
+                                                    placeholder="Detalle o glosa"
+                                                    class="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold text-slate-900 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100"
+                                                >
+                                            ` : `<h5 class="truncate text-sm font-bold text-slate-900">${prod.name || 'Producto'}</h5>`}
+                                            <p class="mt-1 text-[11px] font-medium text-slate-500">${isManualLine ? 'Detalle manual editable' : 'Cantidad x precio de venta'}</p>
                                         </div>
                                         <div class="inline-flex shrink-0 items-center rounded-xl border border-slate-200 bg-slate-50">
                                             <button type="button" onclick="updateQty(${index}, -1)" class="flex h-8 w-8 items-center justify-center text-slate-700 hover:text-rose-600"><i class="ri-subtract-line"></i></button>
@@ -2299,6 +2322,11 @@
                             `;
                         row.querySelector('[data-role="unit-price"]')?.addEventListener('change', (event) => {
                             setItemUnitPrice(index, event.currentTarget.value);
+                        });
+                        row.querySelector('[data-role="line-name"]')?.addEventListener('input', (event) => {
+                            if (!currentSale.items[index]) return;
+                            currentSale.items[index].name = String(event.currentTarget.value || '');
+                            saveDB();
                         });
                         row.querySelector('[data-role="line-total"]')?.addEventListener('change', (event) => {
                             setItemLineTotal(index, event.currentTarget.value);
@@ -2388,10 +2416,13 @@ const total = subtotalBase + tax - discount;
                 }
 
                 const payload = {
-    items: currentSale.items.map((item) => ({
-        pId: Number(item.pId),
+    items: currentSale.items.filter((item) => Number(item.pId || 0) > 0 || String(item.name || '').trim() !== '').map((item) => ({
+        kind: String(item.kind || (Number(item.pId || 0) > 0 ? 'product' : 'glosa')),
+        pId: Number(item.pId || 0) || null,
+        name: String(item.name || '').trim(),
         qty: Number(item.qty),
         price: Number(item.price),
+        tax_rate: Number(item.tax_rate || 0),
         note: item.note || '',
     })),
 
@@ -2400,7 +2431,7 @@ const total = subtotalBase + tax - discount;
 
     payment_type: currentSale.payment_type || 'CONTADO',
     document_type_id: Number(document.getElementById('document-type-select')?.value || 0),
-    cash_register_id: Number(document.getElementById('cash-register-select')?.value || 0),
+    cash_register_id: Number(currentSale.cash_register_id || document.getElementById('cash-register-select')?.value || 0),
     person_id: currentSale.clientId ? Number(currentSale.clientId) : null,
 
     payment_methods: isDebtSaleSelected() ? [] : paymentRows.map((row) => ({
@@ -2412,6 +2443,8 @@ const total = subtotalBase + tax - discount;
     })),
 
     notes: document.getElementById('sale-notes')?.value || '',
+    series: String(document.getElementById('sale-header-series')?.value || '').trim(),
+    number: String(document.getElementById('sale-header-number')?.value || '').trim(),
     moved_at: String(document.getElementById('sale-moved-at')?.value || '').trim(),
     ...(isDebtSaleSelected() ? {
         credit_days: Math.max(0, parseInt(currentSale.credit_days, 10) || 0),
@@ -2508,7 +2541,7 @@ const total = subtotalBase + tax - discount;
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
                     },
                     body: JSON.stringify({
-                        items: currentSale.items.map((item) => ({ pId: item.pId, qty: Number(item.qty), price: Number(item.price), note: item.note || '' })),
+                        items: currentSale.items.filter((item) => Number(item.pId || 0) > 0 || String(item.name || '').trim() !== '').map((item) => ({ kind: String(item.kind || (Number(item.pId || 0) > 0 ? 'product' : 'glosa')), pId: Number(item.pId || 0) || null, name: String(item.name || '').trim(), qty: Number(item.qty), price: Number(item.price), tax_rate: Number(item.tax_rate || 0), note: item.note || '' })),
                         payment_type: currentSale.payment_type || 'CONTADO',
                         document_type_id: Number(document.getElementById('document-type-select')?.value || 0) || null,
                         billing_status: isInvoiceDocumentSelected() ? currentSale.billing_status : 'NOT_APPLICABLE',

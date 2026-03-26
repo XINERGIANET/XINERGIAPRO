@@ -29,6 +29,7 @@ use App\Services\AccountReceivablePayableService;
 use App\Services\KardexSyncService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
 class PurchaseController extends Controller
@@ -210,119 +211,125 @@ class PurchaseController extends Controller
         $branchId = (int) session('branch_id');
         $user = $request->user();
 
-        DB::transaction(function () use ($validated, $branchId, $user) {
-            $movementType = $this->resolvePurchaseMovementType();
-            $person = Person::query()
-                ->where('id', $validated['person_id'])
-                ->where('branch_id', $branchId)
-                ->whereHas('roles', function ($query) use ($branchId) {
-                    $query->where('roles.id', 4)
-                        ->where('role_person.branch_id', $branchId);
-                })
-                ->firstOrFail();
-            $documentType = DocumentType::query()->findOrFail($validated['document_type_id']);
-            $responsibleName = $user?->person
-                ? trim((string) (($user->person->first_name ?? '') . ' ' . ($user->person->last_name ?? '')))
-                : ($user?->name ?? 'Sistema');
+        try {
+            DB::transaction(function () use ($validated, $branchId, $user) {
+                $movementType = $this->resolvePurchaseMovementType();
+                $person = Person::query()
+                    ->where('id', $validated['person_id'])
+                    ->where('branch_id', $branchId)
+                    ->whereHas('roles', function ($query) use ($branchId) {
+                        $query->where('roles.id', 4)
+                            ->where('role_person.branch_id', $branchId);
+                    })
+                    ->firstOrFail();
+                $documentType = DocumentType::query()->findOrFail($validated['document_type_id']);
+                $responsibleName = $user?->person
+                    ? trim((string) (($user->person->first_name ?? '') . ' ' . ($user->person->last_name ?? '')))
+                    : ($user?->name ?? 'Sistema');
 
-            $totals = $this->calculateTotals(
-                $validated['items'],
-                (float) $validated['tax_rate_percent'],
-                $validated['includes_tax']
-            );
+                $totals = $this->calculateTotals(
+                    $validated['items'],
+                    (float) $validated['tax_rate_percent'],
+                    $validated['includes_tax']
+                );
 
-            $movement = Movement::query()->create([
-                'number' => $validated['number'],
-                'moved_at' => $validated['moved_at'],
-                'user_id' => $user?->id,
-                'user_name' => $user?->name ?? 'Sistema',
-                'person_id' => $person->id,
-                'person_name' => trim(($person->first_name ?? '') . ' ' . ($person->last_name ?? '')),
-                'responsible_id' => $user?->id,
-                'responsible_name' => $responsibleName,
-                'comment' => $validated['comment'] ?? null,
-                'status' => 'A',
-                'movement_type_id' => $movementType->id,
-                'document_type_id' => $documentType->id,
-                'branch_id' => $branchId,
-            ]);
-
-            $purchase = PurchaseMovement::query()->create([
-                'series' => $validated['series'] ?? '001',
-                'year' => (string) date('Y', strtotime($validated['moved_at'])),
-                'detail_type' => $validated['detail_type'],
-                'includes_tax' => $validated['includes_tax'],
-                'payment_type' => $validated['payment_type'],
-                'affects_cash' => $validated['affects_cash'],
-                'currency' => $validated['currency'],
-                'exchange_rate' => $validated['exchange_rate'],
-                'subtotal' => $totals['subtotal'],
-                'tax' => $totals['tax'],
-                'total' => $totals['total'],
-                'affects_kardex' => $validated['affects_kardex'],
-                'movement_id' => $movement->id,
-                'branch_id' => $branchId,
-            ]);
-
-            foreach ($validated['items'] as $item) {
-                $quantity = (float) $item['quantity'];
-                $amount = (float) $item['amount'];
-                $unitId = (int) $item['unit_id'];
-                $productId = !empty($item['product_id']) ? (int) $item['product_id'] : null;
-                $product = $productId ? Product::query()->find($productId) : null;
-
-                PurchaseMovementDetail::query()->create([
-                    'detail_type' => $validated['detail_type'],
-                    'purchase_movement_id' => $purchase->id,
-                    'code' => (string) ($product?->code ?? 'GLOSA'),
-                    'description' => (string) ($item['description'] ?? $product?->description ?? 'Sin descripcion'),
-                    'product_id' => $product?->id,
-                    'product_json' => $product ? [
-                        'id' => $product->id,
-                        'code' => $product->code,
-                        'description' => $product->description,
-                    ] : null,
-                    'unit_id' => $unitId,
-                    'tax_rate_id' => null,
-                    'quantity' => $quantity,
-                    'amount' => $amount,
-                    'comment' => (string) ($item['comment'] ?? ''),
-                    'status' => 'E',
+                $movement = Movement::query()->create([
+                    'number' => $validated['number'],
+                    'moved_at' => $validated['moved_at'],
+                    'user_id' => $user?->id,
+                    'user_name' => $user?->name ?? 'Sistema',
+                    'person_id' => $person->id,
+                    'person_name' => trim(($person->first_name ?? '') . ' ' . ($person->last_name ?? '')),
+                    'responsible_id' => $user?->id,
+                    'responsible_name' => $responsibleName,
+                    'comment' => $validated['comment'] ?? null,
+                    'status' => 'A',
+                    'movement_type_id' => $movementType->id,
+                    'document_type_id' => $documentType->id,
                     'branch_id' => $branchId,
                 ]);
 
-                if ($validated['affects_kardex'] === 'S' && $product) {
-                    $this->incrementBranchStock($branchId, $product->id, $quantity);
+                $purchase = PurchaseMovement::query()->create([
+                    'series' => $validated['series'] ?? '001',
+                    'year' => (string) date('Y', strtotime($validated['moved_at'])),
+                    'detail_type' => $validated['detail_type'],
+                    'includes_tax' => $validated['includes_tax'],
+                    'payment_type' => $validated['payment_type'],
+                    'affects_cash' => $validated['affects_cash'],
+                    'currency' => $validated['currency'],
+                    'exchange_rate' => $validated['exchange_rate'],
+                    'subtotal' => $totals['subtotal'],
+                    'tax' => $totals['tax'],
+                    'total' => $totals['total'],
+                    'affects_kardex' => $validated['affects_kardex'],
+                    'movement_id' => $movement->id,
+                    'branch_id' => $branchId,
+                ]);
+
+                foreach ($validated['items'] as $item) {
+                    $quantity = (float) $item['quantity'];
+                    $amount = (float) $item['amount'];
+                    $unitId = (int) $item['unit_id'];
+                    $productId = !empty($item['product_id']) ? (int) $item['product_id'] : null;
+                    $product = $productId ? Product::query()->find($productId) : null;
+
+                    PurchaseMovementDetail::query()->create([
+                        'detail_type' => $validated['detail_type'],
+                        'purchase_movement_id' => $purchase->id,
+                        'code' => (string) ($product?->code ?? 'GLOSA'),
+                        'description' => (string) ($item['description'] ?? $product?->description ?? 'Sin descripcion'),
+                        'product_id' => $product?->id,
+                        'product_json' => $product ? [
+                            'id' => $product->id,
+                            'code' => $product->code,
+                            'description' => $product->description,
+                        ] : null,
+                        'unit_id' => $unitId,
+                        'tax_rate_id' => null,
+                        'quantity' => $quantity,
+                        'amount' => $amount,
+                        'comment' => (string) ($item['comment'] ?? ''),
+                        'status' => 'E',
+                        'branch_id' => $branchId,
+                    ]);
+
+                    if ($validated['affects_kardex'] === 'S' && $product) {
+                        $this->incrementBranchStock($branchId, $product->id, $quantity);
+                    }
                 }
-            }
 
-            app(KardexSyncService::class)->syncMovement($movement);
+                app(KardexSyncService::class)->syncMovement($movement);
 
-            if (($validated['payment_type'] ?? 'CONTADO') === 'CREDITO') {
-                $dueDate = $this->resolvePurchaseDueDate($validated, $person);
-                $this->registerPurchaseDebt(
-                    movement: $movement,
-                    person: $person,
-                    validated: $validated,
-                    total: (float) $totals['total'],
-                    branchId: $branchId,
-                    user: $user,
-                    dueDate: $dueDate,
-                );
-            } elseif (
-                ($validated['payment_type'] ?? 'CONTADO') === 'CONTADO'
-                && ($validated['affects_cash'] ?? 'N') === 'S'
-            ) {
-                $this->registerPurchaseCashOutflow(
-                    movement: $movement,
-                    person: $person,
-                    validated: $validated,
-                    total: (float) $totals['total'],
-                    branchId: $branchId,
-                    user: $user
-                );
-            }
-        });
+                if (($validated['payment_type'] ?? 'CONTADO') === 'CREDITO') {
+                    $dueDate = $this->resolvePurchaseDueDate($validated, $person);
+                    $this->registerPurchaseDebt(
+                        movement: $movement,
+                        person: $person,
+                        validated: $validated,
+                        total: (float) $totals['total'],
+                        branchId: $branchId,
+                        user: $user,
+                        dueDate: $dueDate,
+                    );
+                } elseif (
+                    ($validated['payment_type'] ?? 'CONTADO') === 'CONTADO'
+                    && ($validated['affects_cash'] ?? 'N') === 'S'
+                ) {
+                    $this->registerPurchaseCashOutflow(
+                        movement: $movement,
+                        person: $person,
+                        validated: $validated,
+                        total: (float) $totals['total'],
+                        branchId: $branchId,
+                        user: $user
+                    );
+                }
+            });
+        } catch (\Throwable $e) {
+            return back()->withInput()->withErrors([
+                'error' => $e->getMessage() ?: 'No se pudo registrar la compra.',
+            ]);
+        }
 
         return redirect()
             ->route('admin.purchases.index', $request->filled('view_id') ? ['view_id' => $request->input('view_id')] : [])
@@ -334,10 +341,7 @@ class PurchaseController extends Controller
         $this->assertValidPurchaseMovement($purchase);
         $purchase->load(['purchaseMovement.details']);
 
-        return view('purchases.edit', array_merge(
-            $this->getFormData($request),
-            ['purchase' => $purchase]
-        ));
+        return view('purchases.create', $this->getFormData($request, $purchase));
     }
 
     public function update(Request $request, Movement $purchase)
@@ -348,102 +352,135 @@ class PurchaseController extends Controller
         $validated = $this->validatePurchase($request);
         $branchId = (int) session('branch_id');
 
-        DB::transaction(function () use ($purchase, $validated, $branchId) {
-            $documentType = DocumentType::query()->findOrFail($validated['document_type_id']);
-            $person = Person::query()
-                ->where('id', $validated['person_id'])
-                ->where('branch_id', $branchId)
-                ->whereHas('roles', function ($query) use ($branchId) {
-                    $query->where('roles.id', 4)
-                        ->where('role_person.branch_id', $branchId);
-                })
-                ->firstOrFail();
-            $user = request()->user();
-            $responsibleName = $user?->person
-                ? trim((string) (($user->person->first_name ?? '') . ' ' . ($user->person->last_name ?? '')))
-                : ($user?->name ?? 'Sistema');
+        try {
+            DB::transaction(function () use ($purchase, $validated, $branchId) {
+                $documentType = DocumentType::query()->findOrFail($validated['document_type_id']);
+                $person = Person::query()
+                    ->where('id', $validated['person_id'])
+                    ->where('branch_id', $branchId)
+                    ->whereHas('roles', function ($query) use ($branchId) {
+                        $query->where('roles.id', 4)
+                            ->where('role_person.branch_id', $branchId);
+                    })
+                    ->firstOrFail();
+                $user = request()->user();
+                $responsibleName = $user?->person
+                    ? trim((string) (($user->person->first_name ?? '') . ' ' . ($user->person->last_name ?? '')))
+                    : ($user?->name ?? 'Sistema');
 
-            $oldPurchase = $purchase->purchaseMovement;
-            $oldDetails = $oldPurchase->details;
+                $oldPurchase = $purchase->purchaseMovement;
+                $oldDetails = $oldPurchase->details;
 
-            if ($oldPurchase->affects_kardex === 'S') {
-                foreach ($oldDetails as $detail) {
-                    if ($detail->product_id) {
-                        $this->decrementBranchStock($branchId, (int) $detail->product_id, (float) $detail->quantity);
+                if ($oldPurchase->affects_kardex === 'S') {
+                    foreach ($oldDetails as $detail) {
+                        if ($detail->product_id) {
+                            $this->decrementBranchStock($branchId, (int) $detail->product_id, (float) $detail->quantity);
+                        }
                     }
                 }
-            }
 
-            $totals = $this->calculateTotals(
-                $validated['items'],
-                (float) $validated['tax_rate_percent'],
-                $validated['includes_tax']
-            );
+                $totals = $this->calculateTotals(
+                    $validated['items'],
+                    (float) $validated['tax_rate_percent'],
+                    $validated['includes_tax']
+                );
 
-            $purchase->update([
-                'number' => $validated['number'],
-                'moved_at' => $validated['moved_at'],
-                'person_id' => $person->id,
-                'person_name' => trim(($person->first_name ?? '') . ' ' . ($person->last_name ?? '')),
-                'responsible_id' => $user?->id,
-                'responsible_name' => $responsibleName,
-                'comment' => $validated['comment'] ?? null,
-                'document_type_id' => $documentType->id,
-            ]);
-
-            $oldPurchase->update([
-                'series' => $validated['series'] ?? '001',
-                'year' => (string) date('Y', strtotime($validated['moved_at'])),
-                'detail_type' => $validated['detail_type'],
-                'includes_tax' => $validated['includes_tax'],
-                'payment_type' => $validated['payment_type'],
-                'affects_cash' => $validated['affects_cash'],
-                'currency' => $validated['currency'],
-                'exchange_rate' => $validated['exchange_rate'],
-                'subtotal' => $totals['subtotal'],
-                'tax' => $totals['tax'],
-                'total' => $totals['total'],
-                'affects_kardex' => $validated['affects_kardex'],
-            ]);
-
-            PurchaseMovementDetail::query()
-                ->where('purchase_movement_id', $oldPurchase->id)
-                ->delete();
-
-            foreach ($validated['items'] as $item) {
-                $quantity = (float) $item['quantity'];
-                $amount = (float) $item['amount'];
-                $unitId = (int) $item['unit_id'];
-                $productId = !empty($item['product_id']) ? (int) $item['product_id'] : null;
-                $product = $productId ? Product::query()->find($productId) : null;
-
-                PurchaseMovementDetail::query()->create([
-                    'detail_type' => $validated['detail_type'],
-                    'purchase_movement_id' => $oldPurchase->id,
-                    'code' => (string) ($product?->code ?? 'GLOSA'),
-                    'description' => (string) ($item['description'] ?? $product?->description ?? 'Sin descripcion'),
-                    'product_id' => $product?->id,
-                    'product_json' => $product ? [
-                        'id' => $product->id,
-                        'code' => $product->code,
-                        'description' => $product->description,
-                    ] : null,
-                    'unit_id' => $unitId,
-                    'tax_rate_id' => null,
-                    'quantity' => $quantity,
-                    'amount' => $amount,
-                    'comment' => (string) ($item['comment'] ?? ''),
-                    'status' => 'E',
-                    'branch_id' => $branchId,
+                $purchase->update([
+                    'number' => $validated['number'],
+                    'moved_at' => $validated['moved_at'],
+                    'person_id' => $person->id,
+                    'person_name' => trim(($person->first_name ?? '') . ' ' . ($person->last_name ?? '')),
+                    'responsible_id' => $user?->id,
+                    'responsible_name' => $responsibleName,
+                    'comment' => $validated['comment'] ?? null,
+                    'document_type_id' => $documentType->id,
                 ]);
 
-                if ($validated['affects_kardex'] === 'S' && $product) {
-                    $this->incrementBranchStock($branchId, $product->id, $quantity);
-                }
-            }
+                $oldPurchase->update([
+                    'series' => $validated['series'] ?? '001',
+                    'year' => (string) date('Y', strtotime($validated['moved_at'])),
+                    'detail_type' => $validated['detail_type'],
+                    'includes_tax' => $validated['includes_tax'],
+                    'payment_type' => $validated['payment_type'],
+                    'affects_cash' => $validated['affects_cash'],
+                    'currency' => $validated['currency'],
+                    'exchange_rate' => $validated['exchange_rate'],
+                    'subtotal' => $totals['subtotal'],
+                    'tax' => $totals['tax'],
+                    'total' => $totals['total'],
+                    'affects_kardex' => $validated['affects_kardex'],
+                ]);
 
-            app(KardexSyncService::class)->syncMovement($purchase);
-        });
+                PurchaseMovementDetail::query()
+                    ->where('purchase_movement_id', $oldPurchase->id)
+                    ->delete();
+
+                foreach ($validated['items'] as $item) {
+                    $quantity = (float) $item['quantity'];
+                    $amount = (float) $item['amount'];
+                    $unitId = (int) $item['unit_id'];
+                    $productId = !empty($item['product_id']) ? (int) $item['product_id'] : null;
+                    $product = $productId ? Product::query()->find($productId) : null;
+
+                    PurchaseMovementDetail::query()->create([
+                        'detail_type' => $validated['detail_type'],
+                        'purchase_movement_id' => $oldPurchase->id,
+                        'code' => (string) ($product?->code ?? 'GLOSA'),
+                        'description' => (string) ($item['description'] ?? $product?->description ?? 'Sin descripcion'),
+                        'product_id' => $product?->id,
+                        'product_json' => $product ? [
+                            'id' => $product->id,
+                            'code' => $product->code,
+                            'description' => $product->description,
+                        ] : null,
+                        'unit_id' => $unitId,
+                        'tax_rate_id' => null,
+                        'quantity' => $quantity,
+                        'amount' => $amount,
+                        'comment' => (string) ($item['comment'] ?? ''),
+                        'status' => 'E',
+                        'branch_id' => $branchId,
+                    ]);
+
+                    if ($validated['affects_kardex'] === 'S' && $product) {
+                        $this->incrementBranchStock($branchId, $product->id, $quantity);
+                    }
+                }
+
+                $this->deletePurchaseFinancialRecords($purchase);
+
+                if (($validated['payment_type'] ?? 'CONTADO') === 'CREDITO') {
+                    $dueDate = $this->resolvePurchaseDueDate($validated, $person);
+                    $this->registerPurchaseDebt(
+                        movement: $purchase,
+                        person: $person,
+                        validated: $validated,
+                        total: (float) $totals['total'],
+                        branchId: $branchId,
+                        user: $user,
+                        dueDate: $dueDate,
+                    );
+                } elseif (
+                    ($validated['payment_type'] ?? 'CONTADO') === 'CONTADO'
+                    && ($validated['affects_cash'] ?? 'N') === 'S'
+                ) {
+                    $this->registerPurchaseCashOutflow(
+                        movement: $purchase,
+                        person: $person,
+                        validated: $validated,
+                        total: (float) $totals['total'],
+                        branchId: $branchId,
+                        user: $user
+                    );
+                }
+
+                app(KardexSyncService::class)->syncMovement($purchase);
+            });
+        } catch (\Throwable $e) {
+            return back()->withInput()->withErrors([
+                'error' => $e->getMessage() ?: 'No se pudo actualizar la compra.',
+            ]);
+        }
 
         return redirect()
             ->route('admin.purchases.index', $request->filled('view_id') ? ['view_id' => $request->input('view_id')] : [])
@@ -546,7 +583,7 @@ class PurchaseController extends Controller
         return $validated;
     }
 
-    private function getFormData(Request $request): array
+    private function getFormData(Request $request, ?Movement $purchase = null): array
     {
         $branchId = (int) session('branch_id');
         $movementType = $this->resolvePurchaseMovementType();
@@ -620,6 +657,27 @@ class PurchaseController extends Controller
         $productQuickCreateCurrentBranch = Branch::query()->find($branchId);
         $productQuickCreateNextCode = $this->nextBranchProductCodeForPurchase($branchId);
 
+        $hasProductMarca = Schema::hasColumn('products', 'marca');
+
+        $productColumns = [
+            'products.id',
+            'products.code',
+            'products.description',
+            'products.image',
+            'products.base_unit_id as unit_sale',
+            'product_branch.purchase_price',
+            'product_branch.avg_cost',
+            'product_branch.stock',
+            'units.description as unit_name',
+            DB::raw('CASE WHEN category_branch.id IS NOT NULL THEN categories.description ELSE NULL END as category_name'),
+        ];
+
+        if ($hasProductMarca) {
+            $productColumns[] = 'products.marca';
+        } else {
+            $productColumns[] = DB::raw("'' as marca");
+        }
+
         $products = Product::query()
             ->join('product_branch', function ($join) use ($branchId) {
                 $join->on('product_branch.product_id', '=', 'products.id')
@@ -634,24 +692,47 @@ class PurchaseController extends Controller
             })
             ->where('products.classification', 'GOOD')
             ->orderBy('products.description')
-            ->get([
-                'products.id',
-                'products.code',
-                'products.marca',
-                'products.description',
-                'products.image',
-                'products.base_unit_id as unit_sale',
-                'product_branch.purchase_price',
-                'product_branch.avg_cost',
-                'product_branch.stock',
-                'units.description as unit_name',
-                DB::raw('CASE WHEN category_branch.id IS NOT NULL THEN categories.description ELSE NULL END as category_name'),
-            ]);
+            ->get($productColumns);
 
         $defaultTaxRate = (float) (TaxRate::query()->where('status', true)->orderBy('order_num')->value('tax_rate') ?? 18);
         $purchaseNumberPreview = $documentTypes->isNotEmpty()
             ? $this->generatePurchaseNumber((int) $documentTypes->first()->id, $branchId)
             : '00000001';
+        $purchaseMovement = $purchase?->purchaseMovement;
+        $purchaseCashMovement = $purchase
+            ? CashMovements::query()
+                ->with('details')
+                ->whereHas('movement', fn ($query) => $query->where('parent_movement_id', $purchase->id))
+                ->latest('id')
+                ->first()
+            : null;
+        $purchaseCashDetails = $purchaseCashMovement?->details ?? collect();
+        $isEditing = $purchase !== null;
+        $initialItems = old('items', $isEditing
+            ? $purchaseMovement?->details->map(fn ($detail) => [
+                'product_id' => $detail->product_id,
+                'unit_id' => $detail->unit_id,
+                'description' => (string) ($detail->description ?? ''),
+                'quantity' => (float) ($detail->quantity ?? 1),
+                'amount' => (float) ($detail->amount ?? 0),
+                'comment' => (string) ($detail->comment ?? ''),
+            ])->values()->all()
+            : []);
+        $initialPaymentRows = old('payment_methods', $isEditing
+            ? $purchaseCashDetails->map(fn ($detail) => [
+                'payment_method_id' => $detail->payment_method_id,
+                'amount' => (float) ($detail->amount ?? 0),
+                'payment_gateway_id' => $detail->payment_gateway_id,
+                'card_id' => $detail->card_id,
+                'digital_wallet_id' => $detail->digital_wallet_id,
+            ])->values()->all()
+            : []);
+        $initialTaxRate = (float) old(
+            'tax_rate_percent',
+            ($isEditing && (float) ($purchaseMovement?->subtotal ?? 0) > 0)
+                ? round((((float) ($purchaseMovement?->tax ?? 0)) / ((float) $purchaseMovement->subtotal)) * 100, 2)
+                : $defaultTaxRate
+        );
 
         $purchaseCreateConfig = [
             'products' => $products->map(fn ($p) => [
@@ -684,21 +765,23 @@ class PurchaseController extends Controller
             'paymentGateways' => $paymentGateways->values(),
             'cards' => $cards->values(),
             'digitalWallets' => $digitalWallets->values(),
-            'initialProviderId' => (int) old('person_id', 0),
-            'initialItems' => old('items', []),
-            'initialPaymentType' => (string) old('payment_type', 'CONTADO'),
-            'initialDueDate' => (string) old('due_date', ''),
-            'initialDocumentTypeId' => (int) old('document_type_id', $documentTypes->first()->id ?? 0),
-            'initialCashRegisterId' => (int) old('cash_register_id', $defaultCashRegisterId ?? 0),
-            'initialRows' => old('payment_methods', []),
-            'initialDetailType' => (string) old('detail_type', 'DETALLADO'),
-            'initialAffectsKardex' => (string) old('affects_kardex', 'S'),
-            'initialTaxRate' => (float) old('tax_rate_percent', $defaultTaxRate),
-            'initialIncludesTax' => (string) old('includes_tax', 'S'),
-            'initialCurrency' => (string) old('currency', 'PEN'),
-            'initialExchangeRate' => (float) old('exchange_rate', 3.5),
-            'initialMovedAt' => (string) old('moved_at', now()->format('Y-m-d H:i')),
-            'purchaseNumberPreview' => (string) $purchaseNumberPreview,
+            'initialProviderId' => (int) old('person_id', $purchase?->person_id ?? 0),
+            'initialItems' => $initialItems,
+            'initialPaymentType' => (string) old('payment_type', $purchaseMovement?->payment_type ?? 'CONTADO'),
+            'initialDueDate' => (string) old('due_date', optional($purchaseCashDetails->first()?->due_at)->format('Y-m-d') ?? ''),
+            'initialDocumentTypeId' => (int) old('document_type_id', $purchase?->document_type_id ?? ($documentTypes->first()->id ?? 0)),
+            'initialCashRegisterId' => (int) old('cash_register_id', $purchaseCashMovement?->cash_register_id ?? ($defaultCashRegisterId ?? 0)),
+            'initialRows' => $initialPaymentRows,
+            'initialDetailType' => (string) old('detail_type', $purchaseMovement?->detail_type ?? 'DETALLADO'),
+            'initialAffectsCash' => (string) old('affects_cash', $purchaseMovement?->affects_cash ?? 'N'),
+            'initialAffectsKardex' => (string) old('affects_kardex', $purchaseMovement?->affects_kardex ?? 'S'),
+            'initialTaxRate' => $initialTaxRate,
+            'initialIncludesTax' => (string) old('includes_tax', $purchaseMovement?->includes_tax ?? 'S'),
+            'initialCurrency' => (string) old('currency', $purchaseMovement?->currency ?? 'PEN'),
+            'initialExchangeRate' => (float) old('exchange_rate', $purchaseMovement?->exchange_rate ?? 3.5),
+            'initialMovedAt' => (string) old('moved_at', optional($purchase?->moved_at)->format('Y-m-d H:i') ?? now()->format('Y-m-d H:i')),
+            'initialSeries' => (string) old('series', $purchaseMovement?->series ?? '001'),
+            'purchaseNumberPreview' => (string) old('number', $purchase?->number ?? $purchaseNumberPreview),
             'quickProviderStoreUrl' => route('admin.purchases.providers.store'),
             'reniecApiUrl' => route('api.reniec'),
             'rucApiUrl' => route('api.ruc'),
@@ -711,6 +794,7 @@ class PurchaseController extends Controller
             'branchDepartmentName' => (string) ($department->name ?? ''),
             'branchProvinceName' => (string) ($province->name ?? ''),
             'branchDistrictName' => (string) ($district->name ?? ''),
+            'isEditing' => $isEditing,
         ];
 
         return [
@@ -738,6 +822,7 @@ class PurchaseController extends Controller
                 'units' => $units,
                 'afterCreate' => 'purchase_create',
             ],
+            'purchase' => $purchase,
         ];
     }
 
@@ -940,15 +1025,7 @@ class PurchaseController extends Controller
 
     private function incrementBranchStock(int $branchId, int $productId, float $quantity): void
     {
-        $pb = ProductBranch::query()
-            ->where('branch_id', $branchId)
-            ->where('product_id', $productId)
-            ->lockForUpdate()
-            ->first();
-
-        if (!$pb) {
-            throw new \RuntimeException("El producto {$productId} no está configurado para esta sucursal.");
-        }
+        $pb = $this->ensureProductBranchRecord($branchId, $productId);
 
         $pb->update([
             'stock' => round(((float) $pb->stock) + $quantity, 4),
@@ -957,22 +1034,43 @@ class PurchaseController extends Controller
 
     private function decrementBranchStock(int $branchId, int $productId, float $quantity): void
     {
+        $pb = $this->ensureProductBranchRecord($branchId, $productId);
+
+        $pb->update([
+            'stock' => round(((float) $pb->stock) - $quantity, 4),
+        ]);
+    }
+
+    private function ensureProductBranchRecord(int $branchId, int $productId): ProductBranch
+    {
         $pb = ProductBranch::query()
             ->where('branch_id', $branchId)
             ->where('product_id', $productId)
             ->lockForUpdate()
             ->first();
 
-        if (!$pb) {
-            throw new \RuntimeException("El producto {$productId} no está configurado para esta sucursal.");
+        if ($pb) {
+            return $pb;
         }
 
-        $newStock = round(((float) $pb->stock) - $quantity, 4);
-        if ($newStock < 0) {
-            throw new \RuntimeException("No se puede dejar stock negativo para el producto {$productId}.");
-        }
-
-        $pb->update(['stock' => $newStock]);
+        return ProductBranch::query()->create([
+            'product_id' => $productId,
+            'branch_id' => $branchId,
+            'status' => 'A',
+            'stock' => 0,
+            'price' => 0,
+            'purchase_price' => 0,
+            'stock_minimum' => 0,
+            'stock_maximum' => 0,
+            'minimum_sell' => 0,
+            'minimum_purchase' => 0,
+            'favorite' => 'N',
+            'tax_rate_id' => null,
+            'unit_sale' => 'N',
+            'duration_minutes' => null,
+            'supplier_id' => null,
+            'expiration_date' => null,
+        ]);
     }
 
     private function registerPurchaseCashOutflow(
@@ -1212,6 +1310,22 @@ class PurchaseController extends Controller
             ->addDays((int) ($person->credit_days ?? 0));
     }
 
+    private function deletePurchaseFinancialRecords(Movement $purchase): void
+    {
+        $cashMovements = CashMovements::query()
+            ->with(['details', 'movement'])
+            ->whereHas('movement', fn ($query) => $query->where('parent_movement_id', $purchase->id))
+            ->get();
+
+        foreach ($cashMovements as $cashMovement) {
+            app(AccountReceivablePayableService::class)->removeDebtAccountByCashMovementId((int) $cashMovement->id);
+            $cashMovement->details()->delete();
+            $cashMovementMovement = $cashMovement->movement;
+            $cashMovement->delete();
+            $cashMovementMovement?->delete();
+        }
+    }
+
     private function resolveCashMovementTypeId(): int
     {
         $movementTypeId = MovementType::query()
@@ -1335,3 +1449,5 @@ class PurchaseController extends Controller
         }
     }
 }
+
+
