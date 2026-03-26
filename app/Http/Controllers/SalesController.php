@@ -397,6 +397,9 @@ class SalesController extends Controller
             ->where('status', true)
             ->orderBy('order_num')
             ->get(['id', 'description', 'order_num']);
+        $units = Unit::query()
+            ->orderBy('description')
+            ->get(['id', 'description']);
 
         $cashRegisters = CashRegister::query()
             ->where('branch_id', $branchId)
@@ -444,6 +447,7 @@ class SalesController extends Controller
             'paymentGateways' => $paymentGateways,
             'cards' => $cards,
             'digitalWallets' => $digitalWallets,
+            'units' => $units,
             'cashRegisters' => $cashRegisters,
             'defaultCashRegisterId' => $defaultCashRegisterId,
             'standardCashRegisterId' => $standardCashRegisterId,
@@ -628,10 +632,15 @@ class SalesController extends Controller
                     'qty' => $quantity,
                     'price' => $quantity > 0 ? ($baseGrossLineTotal / $quantity) : 0,
                     'tax_rate' => $taxRatePct,
+                    'unit_id' => $detail->unit_id ? (int) $detail->unit_id : null,
                     'note' => (string) ($detail->comment ?? ''),
                 ];
             })
             ->all();
+
+        $detailType = collect($items)->isNotEmpty() && collect($items)->every(fn (array $item) => ($item['kind'] ?? 'product') === 'glosa')
+            ? 'GLOSA'
+            : 'DETALLADO';
 
         $grossTotalBeforeDiscount = collect($items)->sum(function (array $item) {
             return ((float) ($item['qty'] ?? 0)) * ((float) ($item['price'] ?? 0));
@@ -687,6 +696,7 @@ class SalesController extends Controller
             'discount_type' => $discountPercentage > 0 ? 'PERCENTAGE' : 'NONE',
             'discount_value' => $discountPercentage > 0 ? round($discountPercentage, 6) : 0,
             'discount_amount' => round($discountAmount, 2),
+            'detail_type' => $detailType,
             'items' => $items,
             'payment_methods' => $paymentMethods,
         ];
@@ -873,6 +883,7 @@ class SalesController extends Controller
                 'items.*.name' => 'nullable|string|max:255',
                 'items.*.qty' => 'required|numeric|min:0.000001',
                 'items.*.price' => 'required|numeric|min:0',
+                'items.*.unit_id' => 'nullable|integer|exists:units,id',
                 'items.*.note' => 'nullable|string|max:65535',
                 // Compatibilidad: algunos flujos pueden enviar `comment` en lugar de `note`
                 'items.*.comment' => 'nullable|string|max:65535',
@@ -1296,7 +1307,9 @@ class SalesController extends Controller
                 }
 
                 $defaultUnitId = Unit::query()->value('id');
-                if (!$defaultUnitId) {
+                $manualUnitId = (int) ($item['unit_id'] ?? 0);
+                $unitId = $manualUnitId > 0 ? $manualUnitId : (int) $defaultUnitId;
+                if (!$unitId) {
                     throw new \Exception('No existen unidades registradas para guardar la glosa de la venta.');
                 }
 
@@ -1307,7 +1320,7 @@ class SalesController extends Controller
                     'description' => trim((string) ($item['name'] ?? '')) ?: 'Detalle',
                     'product_id' => null,
                     'product_snapshot' => null,
-                    'unit_id' => $defaultUnitId,
+                    'unit_id' => $unitId,
                     'tax_rate_id' => null,
                     'tax_rate_snapshot' => $lineCalculated['tax_rate_value'] > 0 ? [
                         'description' => 'Manual',
@@ -1563,6 +1576,7 @@ class SalesController extends Controller
                 'items.*.name' => 'nullable|string|max:255',
                 'items.*.qty' => 'required|numeric|min:0.000001',
                 'items.*.price' => 'required|numeric|min:0',
+                'items.*.unit_id' => 'nullable|integer|exists:units,id',
                 'items.*.note' => 'nullable|string|max:65535',
                 // Compatibilidad: algunos flujos pueden enviar `comment` en lugar de `note`
                 'items.*.comment' => 'nullable|string|max:65535',
@@ -1780,7 +1794,9 @@ class SalesController extends Controller
                 }
 
                 $defaultUnitId = Unit::query()->value('id');
-                if (!$defaultUnitId) {
+                $manualUnitId = (int) ($item['unit_id'] ?? 0);
+                $unitId = $manualUnitId > 0 ? $manualUnitId : (int) $defaultUnitId;
+                if (!$unitId) {
                     throw new \Exception('No existen unidades registradas para guardar la glosa del borrador.');
                 }
 
@@ -1791,7 +1807,7 @@ class SalesController extends Controller
                     'description' => trim((string) ($item['name'] ?? '')) ?: 'Detalle',
                     'product_id' => null,
                     'product_snapshot' => null,
-                    'unit_id' => $defaultUnitId,
+                    'unit_id' => $unitId,
                     'tax_rate_id' => null,
                     'tax_rate_snapshot' => $lineCalculated['tax_rate_value'] > 0 ? [
                         'description' => 'Manual',
