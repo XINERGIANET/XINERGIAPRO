@@ -1423,6 +1423,13 @@ class WorkshopMaintenanceBoardController extends Controller
             $branchId,
             collect($formData['documentTypes'] ?? [])
         );
+        $cashRegisters = collect($formData['cashRegisters'] ?? []);
+        $standardCashRegisterId = $this->getBranchConfiguredCashRegisterId($branchId, $cashRegisters, 'caja ventas');
+        $invoiceCashRegisterId = $this->getBranchConfiguredCashRegisterId($branchId, $cashRegisters, 'caja factur')
+            ?: $standardCashRegisterId;
+        $defaultCashRegisterId = $this->isInvoiceDocumentTypeId($defaultDocumentTypeId, collect($formData['documentTypes'] ?? []))
+            ? $invoiceCashRegisterId
+            : $standardCashRegisterId;
 
         return view('workshop.maintenance-board.checkout', array_merge($formData, [
             'order' => $order,
@@ -1435,6 +1442,9 @@ class WorkshopMaintenanceBoardController extends Controller
             'digitalWalletOptions' => $digitalWalletOptions,
             'paymentGatewayOptionsByMethod' => $paymentGatewayOptionsByMethod,
             'defaultDocumentTypeId' => $defaultDocumentTypeId,
+            'defaultCashRegisterId' => $defaultCashRegisterId,
+            'standardCashRegisterId' => $standardCashRegisterId,
+            'invoiceCashRegisterId' => $invoiceCashRegisterId,
         ]));
     }
 
@@ -1899,6 +1909,45 @@ class WorkshopMaintenanceBoardController extends Controller
         }
 
         return $documentTypes->first()?->id ? (int) $documentTypes->first()->id : null;
+    }
+
+    private function getBranchConfiguredCashRegisterId(int $branchId, $cashRegisters, string $needle): ?int
+    {
+        $cashRegisters = collect($cashRegisters);
+
+        if ($branchId <= 0) {
+            return $cashRegisters->firstWhere('status', 'A')->id ?? $cashRegisters->first()->id ?? null;
+        }
+
+        $configuredValue = DB::table('branch_parameters as bp')
+            ->join('parameters as p', 'p.id', '=', 'bp.parameter_id')
+            ->where('bp.branch_id', $branchId)
+            ->whereNull('bp.deleted_at')
+            ->whereNull('p.deleted_at')
+            ->where('p.description', 'ILIKE', '%' . $needle . '%')
+            ->value('bp.value');
+
+        if (is_numeric($configuredValue)) {
+            $configuredId = (int) $configuredValue;
+            $exists = $cashRegisters->contains(fn ($cashRegister) => (int) ($cashRegister->id ?? 0) === $configuredId);
+            if ($exists) {
+                return $configuredId;
+            }
+        }
+
+        return $cashRegisters->firstWhere('status', 'A')->id ?? $cashRegisters->first()->id ?? null;
+    }
+
+    private function isInvoiceDocumentTypeId(?int $documentTypeId, $documentTypes): bool
+    {
+        if ((int) $documentTypeId <= 0) {
+            return false;
+        }
+
+        $documentType = collect($documentTypes)->first(fn ($item) => (int) ($item->id ?? 0) === (int) $documentTypeId);
+        $name = mb_strtolower(trim((string) ($documentType->name ?? '')), 'UTF-8');
+
+        return str_contains($name, 'factura');
     }
 
     private function inferPaymentMethodKind(string $description): string

@@ -712,6 +712,8 @@
             const initialSaleData = @json($initialSaleData ?? null);
             const defaultDocumentTypeId = Number(@json($defaultDocumentTypeId ?? 0)) || null;
             const defaultCashRegisterId = Number(@json($defaultCashRegisterId ?? 0)) || null;
+            const standardCashRegisterId = Number(@json($standardCashRegisterId ?? $defaultCashRegisterId ?? 0)) || null;
+            const invoiceCashRegisterId = Number(@json($invoiceCashRegisterId ?? $defaultCashRegisterId ?? 0)) || null;
             const invoiceDocumentIds = new Set(
                 documentTypes
                     .filter((documentType) => String(documentType.name || '').toLowerCase().includes('factura'))
@@ -806,6 +808,9 @@
 
             if (invoiceMode && invoiceDocumentIds.has(Number(currentSale.document_type_id || 0)) && currentSale.billing_status === 'PENDING') {
                 currentSale.billing_status = 'INVOICED';
+            }
+            if (!isEditMode) {
+                syncCashRegisterForCurrentDocumentType();
             }
 
             const getImageUrl = (imgUrl) => imgUrl && String(imgUrl).trim() !== ''
@@ -1290,6 +1295,22 @@
                 localStorage.setItem('restaurantDB', JSON.stringify(db));
             };
             const isInvoiceDocumentSelected = () => invoiceDocumentIds.has(Number(currentSale.document_type_id || 0));
+            const preferredCashRegisterIdForCurrentDocument = () => {
+                const preferredId = isInvoiceDocumentSelected() ? invoiceCashRegisterId : standardCashRegisterId;
+                return Number(preferredId || 0) || null;
+            };
+            const syncCashRegisterForCurrentDocumentType = () => {
+                const preferredId = preferredCashRegisterIdForCurrentDocument();
+                if (!preferredId) {
+                    return;
+                }
+                currentSale.cash_register_id = preferredId;
+                const cashRegisterSelect = document.getElementById('cash-register-select');
+                if (cashRegisterSelect) {
+                    cashRegisterSelect.value = String(preferredId);
+                    syncAutocompleteDisplay(cashRegisterSelect);
+                }
+            };
             const isDebtSaleSelected = () => String(currentSale.payment_type || 'CONTADO') === 'DEUDA';
             let saleMovedAtDebtListenerBound = false;
             let saleDebtFieldsBound = false;
@@ -2584,6 +2605,7 @@ const total = subtotalBase + tax - discount;
             });
             document.getElementById('document-type-select')?.addEventListener('change', (event) => {
                 currentSale.document_type_id = Number(event.target.value || 0) || null;
+                syncCashRegisterForCurrentDocumentType();
                 normalizeBillingState();
                 syncInvoiceBillingFields();
                 saveDB();

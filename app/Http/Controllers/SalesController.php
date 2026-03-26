@@ -403,7 +403,12 @@ class SalesController extends Controller
             ->orderByRaw("CASE WHEN status = 'A' THEN 0 ELSE 1 END")
             ->orderBy('number')
             ->get(['id', 'number', 'status', 'series']);
-        $defaultCashRegisterId = $this->getBranchConfiguredCashRegisterId($branchId, $cashRegisters, 'caja ventas');
+        $standardCashRegisterId = $this->getBranchConfiguredCashRegisterId($branchId, $cashRegisters, 'caja ventas');
+        $invoiceCashRegisterId = $this->getBranchConfiguredCashRegisterId($branchId, $cashRegisters, 'caja factur')
+            ?: $standardCashRegisterId;
+        $defaultCashRegisterId = $this->isInvoiceDocumentTypeId($defaultDocumentTypeId, $documentTypes)
+            ? $invoiceCashRegisterId
+            : $standardCashRegisterId;
 
         $initialSaleData = null;
         $posMode = 'create';
@@ -441,6 +446,8 @@ class SalesController extends Controller
             'digitalWallets' => $digitalWallets,
             'cashRegisters' => $cashRegisters,
             'defaultCashRegisterId' => $defaultCashRegisterId,
+            'standardCashRegisterId' => $standardCashRegisterId,
+            'invoiceCashRegisterId' => $invoiceCashRegisterId,
             'productsBranches' => $productBranches,
             'initialSaleData' => $initialSaleData,
             'posMode' => $posMode,
@@ -725,7 +732,12 @@ class SalesController extends Controller
             ->orderByRaw("CASE WHEN status = 'A' THEN 0 ELSE 1 END")
             ->orderBy('number')
             ->get(['id', 'number', 'status']);
-        $defaultCashRegisterId = $this->getBranchConfiguredCashRegisterId($branchId, $cashRegisters, 'caja ventas');
+        $standardCashRegisterId = $this->getBranchConfiguredCashRegisterId($branchId, $cashRegisters, 'caja ventas');
+        $invoiceCashRegisterId = $this->getBranchConfiguredCashRegisterId($branchId, $cashRegisters, 'caja factur')
+            ?: $standardCashRegisterId;
+        $defaultCashRegisterId = $this->isInvoiceDocumentTypeId($defaultDocumentTypeId, $documentTypes)
+            ? $invoiceCashRegisterId
+            : $standardCashRegisterId;
 
         $people = Person::query()
             ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
@@ -820,6 +832,8 @@ class SalesController extends Controller
             'digitalWallets' => $digitalWallets,
             'cashRegisters' => $cashRegisters,
             'defaultCashRegisterId' => $defaultCashRegisterId,
+            'standardCashRegisterId' => $standardCashRegisterId,
+            'invoiceCashRegisterId' => $invoiceCashRegisterId,
             'people' => $people,
             'defaultClientId' => $defaultClientId,
             'draftSale' => $draftSale,
@@ -2072,6 +2086,18 @@ class SalesController extends Controller
         }
 
         return $cashRegisters->firstWhere('status', 'A')->id ?? $cashRegisters->first()->id ?? null;
+    }
+
+    private function isInvoiceDocumentTypeId(?int $documentTypeId, $documentTypes): bool
+    {
+        if ((int) $documentTypeId <= 0) {
+            return false;
+        }
+
+        $documentType = collect($documentTypes)->first(fn ($item) => (int) ($item->id ?? 0) === (int) $documentTypeId);
+        $name = mb_strtolower(trim((string) ($documentType->name ?? '')), 'UTF-8');
+
+        return str_contains($name, 'factura');
     }
 
     /**

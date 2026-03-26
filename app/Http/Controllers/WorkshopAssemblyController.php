@@ -164,6 +164,13 @@ class WorkshopAssemblyController extends Controller
             )
             ->orderBy('number')
             ->get();
+        $standardCashRegisterId = $this->getBranchConfiguredCashRegisterId($branchId, $cashRegisters, 'caja ventas');
+        $invoiceCashRegisterId = $this->getBranchConfiguredCashRegisterId($branchId, $cashRegisters, 'caja factur')
+            ?: $standardCashRegisterId;
+        $defaultDocumentTypeId = (int) (optional($documentTypes->first())->id ?? 0);
+        $defaultCashRegisterId = $this->isInvoiceDocumentTypeId($defaultDocumentTypeId, $documentTypes)
+            ? $invoiceCashRegisterId
+            : $standardCashRegisterId;
 
         $paymentMethodsRaw = PaymentMethod::query()->where('status', true)->orderBy('order_num')->get();
 
@@ -211,6 +218,9 @@ class WorkshopAssemblyController extends Controller
             'clients',
             'documentTypes',
             'cashRegisters',
+            'defaultCashRegisterId',
+            'standardCashRegisterId',
+            'invoiceCashRegisterId',
             'paymentMethodOptions',
             'digitalWalletOptions',
             'cardOptions',
@@ -238,6 +248,45 @@ class WorkshopAssemblyController extends Controller
         }
 
         return 'other';
+    }
+
+    private function getBranchConfiguredCashRegisterId(int $branchId, $cashRegisters, string $needle): ?int
+    {
+        $cashRegisters = collect($cashRegisters);
+
+        if ($branchId <= 0) {
+            return $cashRegisters->firstWhere('status', 'A')->id ?? $cashRegisters->first()->id ?? null;
+        }
+
+        $configuredValue = DB::table('branch_parameters as bp')
+            ->join('parameters as p', 'p.id', '=', 'bp.parameter_id')
+            ->where('bp.branch_id', $branchId)
+            ->whereNull('bp.deleted_at')
+            ->whereNull('p.deleted_at')
+            ->where('p.description', 'ILIKE', '%' . $needle . '%')
+            ->value('bp.value');
+
+        if (is_numeric($configuredValue)) {
+            $configuredId = (int) $configuredValue;
+            $exists = $cashRegisters->contains(fn ($cashRegister) => (int) ($cashRegister->id ?? 0) === $configuredId);
+            if ($exists) {
+                return $configuredId;
+            }
+        }
+
+        return $cashRegisters->firstWhere('status', 'A')->id ?? $cashRegisters->first()->id ?? null;
+    }
+
+    private function isInvoiceDocumentTypeId(?int $documentTypeId, $documentTypes): bool
+    {
+        if ((int) $documentTypeId <= 0) {
+            return false;
+        }
+
+        $documentType = collect($documentTypes)->first(fn ($item) => (int) ($item->id ?? 0) === (int) $documentTypeId);
+        $name = mb_strtolower(trim((string) ($documentType->name ?? '')), 'UTF-8');
+
+        return str_contains($name, 'factura');
     }
 
     public function store(Request $request): RedirectResponse

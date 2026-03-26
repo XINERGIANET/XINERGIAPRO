@@ -8,6 +8,9 @@
         productLines: @js(array_values(old('product_lines', []))),
         documentTypeOptions: @js(collect($documentTypes ?? collect())->map(fn ($doc) => ['id' => (int) $doc->id, 'name' => (string) ($doc->name ?? '')])->values()->all()),
         selectedDocumentTypeId: @js((string) old('document_type_id', $defaultDocumentTypeId ?? optional(($documentTypes ?? collect())->first())->id)),
+        selectedCashRegisterId: @js((string) old('cash_register_id', $defaultCashRegisterId ?? optional(($cashRegisters ?? collect())->first())->id)),
+        standardCashRegisterId: @js((string) ($standardCashRegisterId ?? $defaultCashRegisterId ?? '')),
+        invoiceCashRegisterId: @js((string) ($invoiceCashRegisterId ?? $defaultCashRegisterId ?? '')),
         saleHeaderSeries: @js('001'),
         saleHeaderNumber: @js('00000001'),
         billingStatus: @js((string) old('billing_status', 'PENDING')),
@@ -39,6 +42,7 @@
                 this.addPaymentRow(true);
             }
             this.syncInvoiceBillingFields();
+            this.applyCashRegisterByDocumentType();
             this.syncAmount();
             this.refreshSaleHeaderPreview();
         },
@@ -51,6 +55,14 @@
         },
         isDebtPaymentSelected() {
             return String(this.paymentType || 'CONTADO').toUpperCase() === 'DEUDA';
+        },
+        preferredCashRegisterId() {
+            return String(this.isInvoiceDocumentSelected() ? (this.invoiceCashRegisterId || '') : (this.standardCashRegisterId || '')).trim();
+        },
+        applyCashRegisterByDocumentType() {
+            const preferredId = this.preferredCashRegisterId();
+            if (!preferredId) return;
+            this.selectedCashRegisterId = preferredId;
         },
         syncInvoiceBillingFields() {
             if (!this.isInvoiceDocumentSelected()) {
@@ -74,7 +86,7 @@
         },
         async refreshSaleHeaderPreview() {
             const docId = Number(this.selectedDocumentTypeId || 0);
-            const cashId = Number(this.$refs.cashRegisterSelect?.value || 0);
+            const cashId = Number(this.selectedCashRegisterId || this.$refs.cashRegisterSelect?.value || 0);
             if (!docId || !cashId) return;
 
             const url = new URL(@js(route('admin.sales.preview.header')), window.location.origin);
@@ -364,7 +376,7 @@
             <div class="grid grid-cols-1 gap-3 md:grid-cols-5">
                 <div>
                     <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Documento de venta</label>
-                    <select x-model="selectedDocumentTypeId" @change="syncInvoiceBillingFields(); refreshSaleHeaderPreview()" name="document_type_id" required class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                    <select x-model="selectedDocumentTypeId" @change="applyCashRegisterByDocumentType(); syncInvoiceBillingFields(); refreshSaleHeaderPreview()" name="document_type_id" required class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
                         @foreach(($documentTypes ?? collect()) as $doc)
                             <option value="{{ $doc->id }}">
                                 {{ $doc->name }}
@@ -389,9 +401,9 @@
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Caja</label>
-                    <select x-ref="cashRegisterSelect" @change="refreshSaleHeaderPreview()" name="cash_register_id" required class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                    <select x-ref="cashRegisterSelect" x-model="selectedCashRegisterId" @change="refreshSaleHeaderPreview()" name="cash_register_id" required class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
                         @foreach(($cashRegisters ?? collect()) as $cash)
-                            <option value="{{ $cash->id }}" @selected(old('cash_register_id', optional(($cashRegisters ?? collect())->first())->id) == $cash->id)>
+                            <option value="{{ $cash->id }}" @selected(old('cash_register_id', $defaultCashRegisterId ?? optional(($cashRegisters ?? collect())->first())->id) == $cash->id)>
                                 Caja {{ $cash->number }}
                             </option>
                         @endforeach

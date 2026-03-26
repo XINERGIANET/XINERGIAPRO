@@ -91,6 +91,9 @@
     // Payment Logic
     documentTypeOptions: @js(collect($documentTypes ?? collect())->map(fn ($doc) => ['id' => (int) $doc->id, 'name' => (string) ($doc->name ?? '')])->values()->all()),
     selectedDocumentTypeId: @js((string) old('document_type_id', optional(($documentTypes ?? collect())->first())->id)),
+    selectedCashRegisterId: @js((string) old('cash_register_id', $defaultCashRegisterId ?? optional(($cashRegisters ?? collect())->first())->id)),
+    standardCashRegisterId: @js((string) ($standardCashRegisterId ?? $defaultCashRegisterId ?? '')),
+    invoiceCashRegisterId: @js((string) ($invoiceCashRegisterId ?? $defaultCashRegisterId ?? '')),
     billingStatus: @js((string) old('billing_status', 'PENDING')),
     invoiceSeries: @js((string) old('invoice_series', '001')),
     invoiceNumber: @js((string) old('invoice_number', '')),
@@ -113,6 +116,7 @@
         if (this.isDebtPaymentSelected()) this.paymentRows = [];
         if (this.paymentRows.length === 0 && !this.isDebtPaymentSelected()) this.addPaymentRow(true);
         this.syncInvoiceBillingFields();
+        this.applyCashRegisterByDocumentType();
         this.syncAmount();
         if (this.isDebtPaymentSelected()) this.syncDebtDueFromCreditDays();
     },
@@ -127,6 +131,14 @@
     },
     isDebtPaymentSelected() {
         return String(this.paymentType || 'CONTADO').toUpperCase() === 'DEUDA';
+    },
+    preferredCashRegisterId() {
+        return String(this.isInvoiceDocumentSelected() ? (this.invoiceCashRegisterId || '') : (this.standardCashRegisterId || '')).trim();
+    },
+    applyCashRegisterByDocumentType() {
+        const preferredId = this.preferredCashRegisterId();
+        if (!preferredId) return;
+        this.selectedCashRegisterId = preferredId;
     },
     parseBaseDebtDate() {
         return new Date();
@@ -408,7 +420,7 @@
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">Documento de Venta</label>
-                            <select x-model="selectedDocumentTypeId" @change="syncInvoiceBillingFields()" name="document_type_id" class="w-full h-11 rounded-xl border-gray-200 bg-white text-sm shadow-sm focus:border-purple-500 focus:ring-purple-500" required>
+                            <select x-model="selectedDocumentTypeId" @change="applyCashRegisterByDocumentType(); syncInvoiceBillingFields()" name="document_type_id" class="w-full h-11 rounded-xl border-gray-200 bg-white text-sm shadow-sm focus:border-purple-500 focus:ring-purple-500" required>
                                 <template x-for="doc in documentTypeOptions" :key="doc.id">
                                     <option :value="doc.id" x-text="doc.name"></option>
                                 </template>
@@ -456,7 +468,7 @@
                     
                     <div class="mb-3">
                         <label class="mb-1 block text-xs font-bold uppercase text-gray-500">Caja Destino</label>
-                        <select name="cash_register_id" class="w-full h-11 rounded-xl border-gray-200 bg-white text-sm shadow-sm focus:border-purple-500 focus:ring-purple-500">
+                        <select x-model="selectedCashRegisterId" name="cash_register_id" class="w-full h-11 rounded-xl border-gray-200 bg-white text-sm shadow-sm focus:border-purple-500 focus:ring-purple-500">
                             @foreach($cashRegisters as $cr)
                                 <option value="{{ $cr->id }}">Caja #{{ $cr->number }}</option>
                             @endforeach
