@@ -418,6 +418,23 @@
         this.serviceCcOverrideById = next;
         this.refreshServiceLinePrices();
     },
+    servicePriceOptions(service) {
+        const options = [{ value: 'auto', label: 'Automático' }];
+        const basePrice = Number(service?.base_price || 0);
+        if (basePrice > 0) {
+            options.push({
+                value: 'base',
+                label: `Base - S/ ${basePrice.toFixed(2)}`,
+            });
+        }
+        this.orderedServiceTiers(service).forEach((tier) => {
+            options.push({
+                value: `tier:${tier.max_cc}`,
+                label: `Hasta ${Number(tier.max_cc || 0)}cc - S/ ${Number(tier.price || 0).toFixed(2)}`,
+            });
+        });
+        return options;
+    },
     resolveServicePricing(service) {
         const tiers = this.orderedServiceTiers(service);
         const basePrice = Number(service?.base_price || 0);
@@ -1426,6 +1443,21 @@
                                     >
                                 </div>
                             </label>
+                            <template x-if="orderedServiceTiers(service).length > 0">
+                                <div class="mt-2 border-t border-gray-100 pt-2">
+                                    <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">Tarifa por cilindrada</label>
+                                    <select
+                                        :value="getServiceCcOverride(service.id)"
+                                        @click.stop
+                                        @change="setServiceCcOverride(service.id, $event.target.value)"
+                                        class="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-xs text-gray-700"
+                                    >
+                                        <template x-for="option in servicePriceOptions(service)" :key="`${service.id}-${option.value}`">
+                                            <option :value="option.value" x-text="option.label"></option>
+                                        </template>
+                                    </select>
+                                </div>
+                            </template>
                             <template x-if="service.has_validity && isServiceSelected(service.id)">
                                 <div class="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between">
                                     <span class="text-[11px] font-medium text-emerald-700">Vigencia próx. servicio:</span>
