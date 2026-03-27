@@ -2314,12 +2314,13 @@ class SalesController extends Controller
         $printData['autoPrint'] = false;
 
         $html = view('sales.print.ticket', $printData)->render();
-        $pdfBinary = $this->renderPdfWithWkhtmltopdf($html, 'A4', [
-            '--orientation', 'Portrait',
-            '--margin-top', '6mm',
-            '--margin-right', '6mm',
-            '--margin-bottom', '6mm',
-            '--margin-left', '6mm',
+        $pdfBinary = $this->renderPdfWithWkhtmltopdf($html, null, [
+            '--page-width', '80mm',
+            '--page-height', '220mm',
+            '--margin-top', '0',
+            '--margin-right', '0',
+            '--margin-bottom', '0',
+            '--margin-left', '0',
             '--print-media-type',
             '--disable-smart-shrinking',
             '--dpi', '203',

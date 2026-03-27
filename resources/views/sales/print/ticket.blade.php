@@ -13,16 +13,16 @@
         html, body {
             margin: 0;
             padding: 0;
-            width: 100%;
+            width: 80mm;
             background: #fff;
             color: #0f172a;
         }
 
         .ticket-wrapper {
-            width: 100%;
-            max-width: 190mm;
+            width: 79mm;
+            max-width: 79mm;
             margin: 0 auto;
-            padding: 8mm 7mm 6mm;
+            padding: 2mm 1.2mm 2mm;
         }
 
         table {
@@ -168,12 +168,8 @@
         }
 
         @media print {
-            @page { size: A4 portrait; margin: 6mm; }
-            html, body { width: 100%; margin: 0; }
-            .ticket-wrapper {
-                max-width: none;
-                padding: 0;
-            }
+            @page { size: 80mm 220mm; margin: 0; }
+            html, body { width: 80mm; margin: 0; }
         }
     </style>
 </head>
