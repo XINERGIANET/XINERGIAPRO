@@ -170,7 +170,6 @@
     editingClientLabel: @js($editingClientLabel ?? ''),
     selectedServiceIds: @js($selectedIdsFromLines),
     serviceCcOverrideById: {},
-    serviceFrequencyOverrideById: {},
     servicePricesSeeded: false,
     preserveCustomCatalogPriceIds: {},
     totalsTick: 0,
@@ -517,50 +516,18 @@
             .filter((item) => item.km > 0 && Number.isFinite(item.multiplier) && item.multiplier > 0)
             .sort((a, b) => a.km - b.km);
     },
-    serviceFrequencyOptions(service) {
-        const options = [{
-            value: '',
-            label: 'Sin frecuencia',
-        }];
-        return options.concat(
-            this.orderedServiceFrequencies(service).map((item) => ({
-                value: String(item.km),
-                label: `${item.km} km - x${item.multiplier.toFixed(2)}`,
-            }))
-        );
-    },
-    getServiceFrequencyOverride(serviceId) {
-        const key = String(serviceId ?? '').trim();
-        if (!key) {
-            return '';
-        }
-        return String(this.serviceFrequencyOverrideById?.[key] ?? '');
-    },
-    setServiceFrequencyOverride(serviceId, value) {
-        const key = String(serviceId ?? '').trim();
-        if (!key) {
-            return;
-        }
-        const normalized = String(value ?? '').trim();
-        if (normalized === '') {
-            delete this.serviceFrequencyOverrideById[key];
-        } else {
-            this.serviceFrequencyOverrideById = {
-                ...(this.serviceFrequencyOverrideById || {}),
-                [key]: normalized,
-            };
-        }
-        this.refreshServiceLinePrices();
-    },
     resolveServiceFrequencyMultiplier(service) {
         if (!service?.frequency_enabled) {
             return 1;
         }
-        const selectedKm = Number(this.getServiceFrequencyOverride(service?.id) || 0);
-        if (selectedKm <= 0) {
+        const selectedKm = Number(this.resolveServiceFilterKm() || 0);
+        if (!Number.isFinite(selectedKm) || selectedKm <= 0) {
             return 1;
         }
-        const frequency = this.orderedServiceFrequencies(service).find((item) => item.km === selectedKm);
+        const validFrequencies = this.orderedServiceFrequencies(service)
+            .filter((item) => selectedKm % item.km === 0)
+            .sort((a, b) => b.km - a.km);
+        const frequency = validFrequencies[0] || null;
         return frequency ? Number(frequency.multiplier || 1) : 1;
     },
     autoResolvedPricing(service) {
@@ -1520,21 +1487,6 @@
                                         class="h-8 w-[124px] rounded-md border border-gray-200 bg-gray-50 px-2 text-[11px] text-gray-600"
                                     >
                                         <template x-for="option in servicePriceOptions(service)" :key="`${service.id}-${option.value}`">
-                                            <option :value="option.value" x-text="option.label"></option>
-                                        </template>
-                                    </select>
-                                </div>
-                            </template>
-                            <template x-if="service.frequency_enabled && orderedServiceFrequencies(service).length > 0">
-                                <div class="mt-2 flex justify-end pr-7">
-                                    <select
-                                        :value="getServiceFrequencyOverride(service.id)"
-                                        @click.stop
-                                        @change="setServiceFrequencyOverride(service.id, $event.target.value)"
-                                        data-gsa-skip="true"
-                                        class="h-8 w-[150px] rounded-md border border-gray-200 bg-gray-50 px-2 text-[11px] text-gray-600"
-                                    >
-                                        <template x-for="option in serviceFrequencyOptions(service)" :key="`${service.id}-freq-${option.value || 'base'}`">
                                             <option :value="option.value" x-text="option.label"></option>
                                         </template>
                                     </select>
