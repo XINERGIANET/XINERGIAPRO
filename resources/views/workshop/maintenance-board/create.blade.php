@@ -86,6 +86,14 @@
         'frequency_enabled' => (bool) $s->frequency_enabled,
         'frequency_each_km' => $s->frequency_each_km !== null ? (int) $s->frequency_each_km : null,
         'frequency_kms' => $s->frequencies->map(fn ($f) => (int) $f->km)->filter(fn ($k) => $k > 0)->values()->all(),
+        'frequencies' => $s->frequencies
+            ->map(fn ($f) => [
+                'km' => (int) ($f->km ?? 0),
+                'multiplier' => (float) ($f->multiplier ?? 1),
+            ])
+            ->filter(fn ($f) => (int) ($f['km'] ?? 0) > 0)
+            ->values()
+            ->all(),
         'price_tiers' => $s->priceTiers->map(fn($tier) => [
             'max_cc' => (int) $tier->max_cc,
             'price' => (float) $tier->price,
@@ -162,6 +170,7 @@
     editingClientLabel: @js($editingClientLabel ?? ''),
     selectedServiceIds: @js($selectedIdsFromLines),
     serviceCcOverrideById: {},
+    serviceFrequencyOverrideById: {},
     servicePricesSeeded: false,
     preserveCustomCatalogPriceIds: {},
     totalsTick: 0,
@@ -491,10 +500,68 @@
         };
     },
     resolveServicePrice(service) {
-        return Number(this.resolveServicePricing(service).price || 0);
+        const basePrice = Number(this.resolveServicePricing(service).price || 0);
+        const multiplier = Number(this.resolveServiceFrequencyMultiplier(service) || 1);
+        return Number((basePrice * multiplier).toFixed(2));
     },
     servicePricingLabel(service) {
         return this.resolveServicePricing(service).label;
+    },
+    orderedServiceFrequencies(service) {
+        const raw = Array.isArray(service?.frequencies) ? service.frequencies : [];
+        return raw
+            .map((item) => ({
+                km: Number(item?.km || 0),
+                multiplier: Number(item?.multiplier || 1),
+            }))
+            .filter((item) => item.km > 0 && Number.isFinite(item.multiplier) && item.multiplier > 0)
+            .sort((a, b) => a.km - b.km);
+    },
+    serviceFrequencyOptions(service) {
+        const options = [{
+            value: '',
+            label: 'Sin frecuencia',
+        }];
+        return options.concat(
+            this.orderedServiceFrequencies(service).map((item) => ({
+                value: String(item.km),
+                label: `${item.km} km - x${item.multiplier.toFixed(2)}`,
+            }))
+        );
+    },
+    getServiceFrequencyOverride(serviceId) {
+        const key = String(serviceId ?? '').trim();
+        if (!key) {
+            return '';
+        }
+        return String(this.serviceFrequencyOverrideById?.[key] ?? '');
+    },
+    setServiceFrequencyOverride(serviceId, value) {
+        const key = String(serviceId ?? '').trim();
+        if (!key) {
+            return;
+        }
+        const normalized = String(value ?? '').trim();
+        if (normalized === '') {
+            delete this.serviceFrequencyOverrideById[key];
+        } else {
+            this.serviceFrequencyOverrideById = {
+                ...(this.serviceFrequencyOverrideById || {}),
+                [key]: normalized,
+            };
+        }
+        this.refreshServiceLinePrices();
+    },
+    resolveServiceFrequencyMultiplier(service) {
+        if (!service?.frequency_enabled) {
+            return 1;
+        }
+        const selectedKm = Number(this.getServiceFrequencyOverride(service?.id) || 0);
+        if (selectedKm <= 0) {
+            return 1;
+        }
+        const frequency = this.orderedServiceFrequencies(service).find((item) => item.km === selectedKm);
+        return frequency ? Number(frequency.multiplier || 1) : 1;
     },
     autoResolvedPricing(service) {
         const tiers = this.orderedServiceTiers(service);
@@ -1453,6 +1520,21 @@
                                         class="h-8 w-[124px] rounded-md border border-gray-200 bg-gray-50 px-2 text-[11px] text-gray-600"
                                     >
                                         <template x-for="option in servicePriceOptions(service)" :key="`${service.id}-${option.value}`">
+                                            <option :value="option.value" x-text="option.label"></option>
+                                        </template>
+                                    </select>
+                                </div>
+                            </template>
+                            <template x-if="service.frequency_enabled && orderedServiceFrequencies(service).length > 0">
+                                <div class="mt-2 flex justify-end pr-7">
+                                    <select
+                                        :value="getServiceFrequencyOverride(service.id)"
+                                        @click.stop
+                                        @change="setServiceFrequencyOverride(service.id, $event.target.value)"
+                                        data-gsa-skip="true"
+                                        class="h-8 w-[150px] rounded-md border border-gray-200 bg-gray-50 px-2 text-[11px] text-gray-600"
+                                    >
+                                        <template x-for="option in serviceFrequencyOptions(service)" :key="`${service.id}-freq-${option.value || 'base'}`">
                                             <option :value="option.value" x-text="option.label"></option>
                                         </template>
                                     </select>

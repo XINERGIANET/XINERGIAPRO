@@ -332,7 +332,7 @@ class WorkshopMaintenanceBoardController extends Controller
         $services = WorkshopService::query()
             ->with([
                 'priceTiers:id,workshop_service_id,max_cc,price,order_num',
-                'frequencies:id,workshop_service_id,km,order_num',
+                'frequencies:id,workshop_service_id,km,multiplier,order_num',
             ])
             ->where('active', true)
             ->where(function ($query) use ($companyId) {
