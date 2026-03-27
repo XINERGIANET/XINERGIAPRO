@@ -22,7 +22,7 @@
             width: 100%;
             max-width: 100%;
             margin: 0 auto;
-            padding: 0.5mm 0.3mm;
+            padding: 1.4mm 1.2mm 1.6mm;
         }
 
         table {
