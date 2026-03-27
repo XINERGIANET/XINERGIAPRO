@@ -91,7 +91,7 @@
         // -----------------------------------------------------
     @endphp
 
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center justify-between mb-6 print:hidden">
         <div>
             <h1 class="text-2xl font-black text-slate-900">Dashboard Taller</h1>
             <p class="text-xs text-slate-500 font-medium">Vista general de operaciones del taller</p>
@@ -108,7 +108,7 @@
 
     <div class="space-y-6 pb-10" id="workshop-dashboard">
         <!-- CABECERA FORMAL DE REPORTE (SOLO IMPRESIÓN) -->
-        <header class="hidden print:flex flex-col gap-6 mb-10 pb-6 border-b-2 border-slate-900 w-full">
+        <header class="hidden print:flex flex-col gap-3 mb-6 pb-4 border-b-2 border-slate-900 w-full">
             <div class="flex flex-row justify-between items-start w-full">
                 <div class="flex flex-col gap-2">
                     <img src="/images/logo/Xinergia.png" alt="Logo" class="h-12 w-auto mb-2 self-start" />
@@ -154,7 +154,7 @@
         </header>
         
         <!-- KPI CARDS Y ANEXOS DETALLES (AHORA AL PRINCIPIO) -->
-        <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8 hero-kpi-grid print:grid-cols-2 print:gap-4 print:mb-6">
+        <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8 hero-kpi-grid print:grid-cols-4 print:gap-3 print:mb-4">
             <!-- Ingreso Hoy -->
             <article class="bg-white p-6 rounded-[1.5rem] border border-slate-100 transition-all hover:bg-slate-50/50">
                 <div class="flex justify-between items-start mb-6">
@@ -225,7 +225,7 @@
         </section>
 
         <!-- MAIN GRID: TRENDS & BIRTHDAYS -->
-        <section class="grid grid-cols-1 gap-6 xl:grid-cols-12 mb-6 main-trend-grid">
+        <section class="grid grid-cols-1 gap-6 xl:grid-cols-12 mb-6 main-trend-grid print:!block">
             <article class="bg-white rounded-[1.5rem] border border-slate-100 p-8 xl:col-span-8 flex flex-col relative overflow-hidden transition-all hover:shadow-md trend-chart-article">
                 <!-- Header del gráfico -->
                 <div class="flex items-start justify-between mb-8 px-8 pt-6 relative z-10">
@@ -293,7 +293,7 @@
             </article>
 
             <!-- CUMPLEAÑOS -->
-            <article class="rounded-[1.5rem] border border-slate-100 bg-white p-6 xl:col-span-4 h-full flex flex-col overflow-hidden">
+            <article class="rounded-[1.5rem] border border-slate-100 bg-white p-6 xl:col-span-4 h-full flex flex-col overflow-hidden print:!hidden">
                 <div class="mb-8 flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl bg-orange-600 text-white flex items-center justify-center shadow-lg shadow-orange-600/20">
                         <i class="ri-cake-2-fill text-xl"></i>
@@ -517,9 +517,34 @@
         <!-- SECCIÓN DE GRÁFICO YA FUE MOVIDA ARRIBA -->
 
         <!-- SECONDARY GRID: PRODUCTIVITY & FREQUENT CLIENTS -->
-        <section class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <section class="grid grid-cols-1 gap-6 lg:grid-cols-2" 
+                 x-data="{ 
+                    showTechModal: false, 
+                    loadingTech: false, 
+                    techName: '', 
+                    techServices: [],
+                    dateFrom: @js($dashboardData['dateFrom'] ?? ''),
+                    dateTo: @js($dashboardData['dateTo'] ?? ''),
+                    openTechDetail(id, name) {
+                        this.techName = name;
+                        this.showTechModal = true;
+                        this.loadingTech = true;
+                        this.techServices = [];
+                        
+                        fetch(`{{ route('dashboard.tech-detail', ['technicianId' => '__ID__']) }}`.replace('__ID__', id) + `?date_from=${this.dateFrom}&date_to=${this.dateTo}`)
+                            .then(res => res.json())
+                            .then(data => {
+                                this.techServices = data;
+                                this.loadingTech = false;
+                            })
+                            .catch(err => {
+                                console.error(err);
+                                this.loadingTech = false;
+                            });
+                    }
+                 }">
             <!-- PRODUCTIVITY -->
-            <article class="rounded-[1.5rem] border border-slate-100 bg-white p-6 flex flex-col h-full overflow-hidden">
+            <article class="rounded-[1.5rem] border border-slate-100 bg-white p-6 flex flex-col h-full overflow-hidden relative">
                 <div class="mb-8 flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl text-white flex items-center justify-center shadow-lg" style="background-color: #9333ea !important;">
                         <i class="ri-time-fill text-xl"></i>
@@ -539,7 +564,16 @@
                                 </div>
                                 <div>
                                     <p class="text-sm font-black text-slate-800 whitespace-normal break-words">{{ $tech->technician }}</p>
-                                    <p class="text-[10px] text-slate-400 font-bold uppercase">Tiempo promedio: {{ number_format($tech->avg_minutes ?? 0, 0) }} min</p>
+                                    <div class="flex items-center gap-2">
+                                        <p class="text-[10px] text-slate-400 font-bold uppercase">Tiempo promedio: {{ number_format($tech->avg_minutes ?? 0, 0) }} min</p>
+                                        <button type="button" 
+                                                @click="openTechDetail('{{ $tech->technician_id }}', '{{ $tech->technician }}')"
+                                                class="text-purple-600 hover:text-purple-800 transform hover:scale-110 transition-all"
+                                                title="Ver detalle de servicios">
+                                            <i class="ri-information-fill text-sm"></i>
+                                            <span class="text-[9px] font-black underline uppercase">Ver detalle</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             <div class="text-right">
@@ -553,6 +587,96 @@
                             <p class="text-xs font-bold italic">Sin datos</p>
                         </div>
                     @endforelse
+                </div>
+
+                <!-- MODAL DE DETALLES (PREMIUM) -->
+                <div x-show="showTechModal" 
+                     class="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+                     x-transition:enter="transition ease-out duration-300"
+                     x-transition:enter-start="opacity-0"
+                     x-transition:enter-end="opacity-100"
+                     x-cloak>
+                    <div @click.away="showTechModal = false" 
+                         class="bg-white rounded-[2rem] shadow-2xl w-full max-w-4xl overflow-hidden border border-slate-100"
+                         x-transition:enter="transition ease-out duration-300 transform"
+                         x-transition:enter-start="opacity-0 scale-95 translate-y-4"
+                         x-transition:enter-end="opacity-100 scale-100 translate-y-0">
+                        
+                        <!-- Header -->
+                        <div class="p-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-lg">
+                                    <i class="ri-user-settings-line text-xl"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-lg font-black text-slate-800 leading-none mb-1" x-text="techName"></h4>
+                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Historial de Productividad</p>
+                                </div>
+                            </div>
+                            <button @click="showTechModal = false" class="w-8 h-8 rounded-full hover:bg-slate-200 flex items-center justify-center transition-colors">
+                                <i class="ri-close-line text-xl text-slate-500"></i>
+                            </button>
+                        </div>
+
+                        <!-- Content -->
+                        <div class="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                            <template x-if="loadingTech">
+                                <div class="py-20 flex flex-col items-center justify-center opacity-40">
+                                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mb-4"></div>
+                                    <p class="text-xs font-bold italic">Cargando detalles...</p>
+                                </div>
+                            </template>
+
+                            <template x-if="!loadingTech && techServices.length === 0">
+                                <div class="py-20 flex flex-col items-center justify-center opacity-30">
+                                    <i class="ri-inbox-line text-4xl mb-2"></i>
+                                    <p class="text-xs font-bold italic">No hay registros para este periodo</p>
+                                </div>
+                            </template>
+
+                            <template x-if="!loadingTech && techServices.length > 0">
+                                <div class="overflow-hidden rounded-2xl border border-slate-100 shadow-sm">
+                                    <table class="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr class="bg-slate-50 border-b border-slate-100">
+                                                <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Orden</th>
+                                                <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Vehículo</th>
+                                                <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center">Inicio</th>
+                                                <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center">Fin</th>
+                                                <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center">Tiempo</th>
+                                                <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider text-center">Pausa</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-50">
+                                            <template x-for="service in techServices" :key="service.os">
+                                                <tr class="hover:bg-slate-50/50 transition-colors">
+                                                    <td class="px-4 py-3 text-xs font-black text-slate-900" x-text="service.os"></td>
+                                                    <td class="px-4 py-3">
+                                                        <p class="text-xs font-bold text-slate-700 truncate max-w-[180px]" x-text="service.vehicle"></p>
+                                                    </td>
+                                                    <td class="px-4 py-3 text-center text-[10px] font-bold text-slate-500" x-text="service.started_at"></td>
+                                                    <td class="px-4 py-3 text-center text-[10px] font-bold text-slate-500" x-text="service.finished_at"></td>
+                                                    <td class="px-4 py-3 text-center">
+                                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black" x-text="service.net_minutes + ' min'"></span>
+                                                    </td>
+                                                    <td class="px-4 py-3 text-center">
+                                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-black" x-text="service.paused_minutes + ' min'"></span>
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Footer -->
+                        <div class="p-6 bg-slate-50/30 border-t border-slate-50 flex justify-end">
+                            <button @click="showTechModal = false" class="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-black hover:bg-slate-900 transition-all shadow-lg">
+                                Cerrar Detalle
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </article>
 
@@ -599,7 +723,7 @@
         <!-- BOTTOM GRID: TOP SERVICES & RECENT ORDERS -->
         <section class="grid grid-cols-1 gap-6 xl:grid-cols-12">
             <!-- TOP SERVICES -->
-            <article class="rounded-[1.5rem] border border-slate-100 bg-white p-6 xl:col-span-4 h-full flex flex-col overflow-hidden">
+            <article class="rounded-[1.5rem] border border-slate-100 bg-white p-6 xl:col-span-4 h-full flex flex-col overflow-hidden print-hidden">
                 <div class="mb-8 flex items-center gap-3">
                     <div class="w-10 h-10 rounded-xl text-white flex items-center justify-center shadow-lg" style="background-color: #10b981 !important;">
                         <i class="ri-medal-fill text-xl"></i>
@@ -862,28 +986,65 @@
             }
 
             /* 4. Solucionar el corte de listas largas: transformamos las grillas grandes en bloques apilados */
-            #workshop-dashboard section.grid:not(:first-of-type):not(.hero-kpi-grid) {
+            #workshop-dashboard section.grid:not(.hero-kpi-grid):not(.main-trend-grid) {
                 display: block !important;
             }
-            #workshop-dashboard section.grid:not(:first-of-type):not(.hero-kpi-grid) > article {
+            #workshop-dashboard section.grid:not(.hero-kpi-grid):not(.main-trend-grid) > article {
                 display: block !important;
                 width: 100% !important;
                 margin-bottom: 2rem !important;
                 height: auto !important;
             }
 
-            /* Forzar el grid de KPIs a ser 2x2 en impresión */
+            /* Forzar el grid de KPIs a 4 columnas compacto en la primera página */
             .hero-kpi-grid {
                 display: grid !important;
-                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-                gap: 1.5rem !important;
+                grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+                gap: 0.75rem !important;
+                margin-bottom: 0.75rem !important;
             }
             .hero-kpi-grid > article {
                 display: flex !important;
                 flex-direction: column !important;
                 width: auto !important;
                 margin-bottom: 0 !important;
+                padding: 0.75rem !important;
+                border-width: 1px !important;
             }
+            .hero-kpi-grid > article .text-3xl {
+                font-size: 1.25rem !important;
+            }
+            .hero-kpi-grid > article .mb-6 {
+                margin-bottom: 0.5rem !important;
+            }
+
+            /* Sección de tendencia + cumpleaños: mostrar gráfico al 100%, ocultar cumpleaños */
+            .main-trend-grid {
+                display: block !important;
+                margin-bottom: 0.75rem !important;
+            }
+            .main-trend-grid > article.print\:\!hidden {
+                display: none !important;
+            }
+            .trend-chart-article {
+                width: 100% !important;
+                display: block !important;
+                min-height: 200px !important;
+                page-break-inside: avoid !important;
+                margin-bottom: 0.5rem !important;
+                padding: 1rem !important;
+            }
+            .trend-chart-article .mb-8 {
+                margin-bottom: 0.5rem !important;
+            }
+            .trend-chart-article .min-h-\[320px\] {
+                min-height: 180px !important;
+            }
+            .trend-chart-article div[style*="height: 250px"] {
+                height: 160px !important;
+            }
+            /* El dashboard fluye naturalmente: KPIs primero, luego tendencia */
+            .main-trend-grid, .hero-kpi-grid { display: block !important; }
 
             /* 5. Solucionar el corte de contenido interno (los scrollbars) */
             #workshop-dashboard .overflow-y-auto, 
@@ -901,25 +1062,22 @@
             article, .bg-white, .wk-premium-card, section.grid > article {
                 break-inside: avoid !important;
                 page-break-inside: avoid !important;
-                margin-bottom: 2.5rem !important;
+                margin-bottom: 1rem !important;
                 display: block !important;
                 position: relative !important;
-                border: 2px solid #cbd5e1 !important; /* Bordes más fuertes para reportes */
-                padding: 1.5rem !important;
-                border-radius: 1rem !important;
+                border: 2px solid #cbd5e1 !important;
+                padding: 1rem !important;
+                border-radius: 0.75rem !important;
                 background-color: #ffffff !important;
             }
-
-            /* Forzar el gráfico de tendencia a ser visible */
+            /* Ensure trend chart stays on same page */
             .trend-chart-article {
-                width: 100% !important;
-                display: block !important;
-                min-height: 450px !important;
-                page-break-inside: avoid !important;
+                page-break-before: avoid !important;
+                page-break-after: avoid !important;
             }
-            .trend-chart-article svg {
-                min-height: 250px !important;
-                display: block !important;
+            /* Hide birthday section in print */
+            .print-hidden {
+                display: none !important;
             }
 
             /* Los anexos grandes SÍ pueden cortar, pero entre filas */

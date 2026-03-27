@@ -378,7 +378,8 @@
     </div>
 </header>
 
-@if($totalNotifs > 0 && request()->routeIs('dashboard'))
+@if($totalNotifs > 0 && request()->routeIs('dashboard') && !session()->has('service_reminder_shown'))
+    @php session()->put('service_reminder_shown', true); @endphp
     {{-- Welcome Toast Card (Alert on login/load) --}}
     <div x-data="{ show: false }" 
          x-init="setTimeout(() => show = true, 800); setTimeout(() => show = false, 8000)"

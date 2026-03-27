@@ -52,6 +52,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'awaiting_approval',
             'approved',
             'in_progress',
+            'paused',
             'finished',
             'delivered',
             'cancelled',
@@ -126,11 +127,13 @@ class WorkshopMaintenanceBoardController extends Controller
                     });
                 });
             })
-            ->when(
-                $selectedStatus !== 'all',
-                fn ($query) => $query->where('status', $selectedStatus)
-            )
-            ->orderByRaw("CASE status WHEN 'in_progress' THEN 1 WHEN 'approved' THEN 2 WHEN 'awaiting_approval' THEN 3 WHEN 'diagnosis' THEN 4 ELSE 5 END")
+            ->when($selectedStatus !== 'all', function ($query) use ($selectedStatus) {
+                if ($selectedStatus === 'in_progress') {
+                    return $query->whereIn('status', ['in_progress', 'paused']);
+                }
+                return $query->where('status', $selectedStatus);
+            })
+            ->orderByRaw("CASE status WHEN 'in_progress' THEN 1 WHEN 'paused' THEN 2 WHEN 'approved' THEN 3 WHEN 'awaiting_approval' THEN 4 WHEN 'diagnosis' THEN 5 ELSE 6 END")
             ->orderByDesc('id')
             ->paginate(18)
             ->withQueryString();
@@ -1021,9 +1024,9 @@ class WorkshopMaintenanceBoardController extends Controller
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                $editableStatuses = ['awaiting_approval', 'approved', 'in_progress'];
+                $editableStatuses = ['awaiting_approval', 'approved', 'in_progress', 'paused'];
                 if (!in_array((string) $lockedOrder->status, $editableStatuses, true)) {
-                    throw new \RuntimeException('La cotizacion solo se puede editar en espera de aprobacion, aprobado o en reparacion.');
+                    throw new \RuntimeException('La cotizacion solo se puede editar en espera de aprobacion, aprobado, en reparacion o pausado.');
                 }
 
                 $detailsById = $lockedOrder->details()
@@ -1330,6 +1333,58 @@ class WorkshopMaintenanceBoardController extends Controller
         }
 
         return back()->with('status', 'Servicio finalizado. Puede continuar con cobro y entrega.');
+    }
+
+    public function pause(Request $request, WorkshopMovement $order): RedirectResponse
+    {
+        $this->assertOrderScope($order);
+        $validated = $request->validate([
+            'pause_comment' => ['required', 'string', 'max:500'],
+        ]);
+
+        try {
+            if ((string) $order->status !== 'in_progress') {
+                throw new \RuntimeException('Solo se pueden pausar servicios en reparación.');
+            }
+
+            $this->flowService->updateOrder($order, [
+                'status' => 'paused',
+                'paused_at' => now(),
+                'comment' => '[PAUSA] ' . $validated['pause_comment'],
+            ]);
+        } catch (\Throwable $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+
+        return back()->with('status', 'Servicio pausado correctamente.');
+    }
+
+    public function resume(WorkshopMovement $order): RedirectResponse
+    {
+        $this->assertOrderScope($order);
+
+        try {
+            if ((string) $order->status !== 'paused') {
+                throw new \RuntimeException('Solo se pueden reanudar servicios pausados.');
+            }
+
+            $pausedAt = $order->paused_at;
+            $minutes = 0;
+            if ($pausedAt) {
+                $minutes = (int) now()->diffInMinutes($pausedAt);
+            }
+
+            $this->flowService->updateOrder($order, [
+                'status' => 'in_progress',
+                'paused_at' => null,
+                'total_paused_minutes' => (int) ($order->total_paused_minutes ?? 0) + $minutes,
+                'comment' => 'Reanudación de servicio desde tablero',
+            ]);
+        } catch (\Throwable $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+
+        return back()->with('status', 'Servicio reanudado.');
     }
 
     public function checkoutPage(WorkshopMovement $order): \Illuminate\View\View|RedirectResponse

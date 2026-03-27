@@ -150,7 +150,7 @@ class DashboardController extends Controller
         $servicesDone = WorkshopMovementDetail::query()
             ->join('workshop_movements', 'workshop_movements.id', '=', 'workshop_movement_details.workshop_movement_id')
             ->where('workshop_movements.branch_id', $branchId)
-            ->whereBetween('workshop_movements.intake_date', [$dateFrom, $dateTo])
+            ->whereBetween('workshop_movements.finished_at', [$dateFrom, $dateTo])
             ->whereIn('workshop_movement_details.line_type', ['SERVICE', 'SERVCE'])
             ->count();
 
@@ -158,7 +158,7 @@ class DashboardController extends Controller
             ->join('workshop_movements', 'workshop_movements.id', '=', 'workshop_movement_details.workshop_movement_id')
             ->leftJoin('workshop_services', 'workshop_services.id', '=', 'workshop_movement_details.service_id')
             ->where('workshop_movements.branch_id', $branchId)
-            ->whereBetween('workshop_movements.intake_date', [$dateFrom, $dateTo])
+            ->whereBetween('workshop_movements.finished_at', [$dateFrom, $dateTo])
             ->whereIn('workshop_movement_details.line_type', ['SERVICE', 'SERVCE'])
             ->where(function ($query) {
                 $query->where('workshop_services.type', 'preventivo')
@@ -166,24 +166,26 @@ class DashboardController extends Controller
             })
             ->count();
 
-        $avgRepairMinutes = (clone $rangeQuery)
+        $avgRepairMinutes = (clone $baseQuery)
+            ->whereBetween('finished_at', [$dateFrom, $dateTo])
             ->whereNotNull('started_at')
             ->whereNotNull('finished_at')
-            ->get(['started_at', 'finished_at'])
-            ->avg(fn ($row) => max(0, $row->started_at?->diffInMinutes($row->finished_at) ?? 0));
+            ->get(['started_at', 'finished_at', 'total_paused_minutes'])
+            ->avg(fn ($row) => max(0, ($row->started_at?->diffInMinutes($row->finished_at) ?? 0) - (int) ($row->total_paused_minutes ?? 0)));
 
         $techProductivity = WorkshopMovementTechnician::query()
             ->join('workshop_movements', 'workshop_movements.id', '=', 'workshop_movement_technicians.workshop_movement_id')
-            ->join('people', 'people.id', '=', 'workshop_movement_technicians.technician_person_id')
+            ->join('people as tech', 'tech.id', '=', 'workshop_movement_technicians.technician_person_id')
             ->where('workshop_movements.branch_id', $branchId)
-            ->whereBetween('workshop_movements.intake_date', [$dateFrom, $dateTo])
-            ->groupBy('people.id', 'people.first_name', 'people.last_name')
+            ->whereBetween('workshop_movements.finished_at', [$dateFrom, $dateTo])
+            ->groupBy('tech.id', 'tech.first_name', 'tech.last_name')
             ->orderByRaw('COUNT(DISTINCT workshop_movements.id) DESC')
             ->limit(5)
             ->get([
-                DB::raw("CONCAT(COALESCE(people.first_name,''), ' ', COALESCE(people.last_name,'')) as technician"),
+                'tech.id as technician_id',
+                DB::raw("CONCAT(COALESCE(tech.first_name,''), ' ', COALESCE(tech.last_name,'')) as technician"),
                 DB::raw('COUNT(DISTINCT workshop_movements.id) as orders'),
-                DB::raw('AVG(EXTRACT(EPOCH FROM (workshop_movements.finished_at - workshop_movements.started_at))/60) as avg_minutes')
+                DB::raw('AVG((EXTRACT(EPOCH FROM (workshop_movements.finished_at - workshop_movements.started_at))/60) - ABS(COALESCE(workshop_movements.total_paused_minutes, 0))) as avg_minutes')
             ]);
 
         $monthStartClient = now()->startOfMonth();
@@ -341,5 +343,52 @@ class DashboardController extends Controller
         ];
 
         return view('pages.dashboard.ecommerce', compact('dashboardData'));
+    }
+    public function techDetail(Request $request, int $technicianId)
+    {
+        $branchId = (int) $request->session()->get('branch_id');
+        if ($branchId <= 0) {
+            $branchId = (int) (optional($request->user())->person->branch_id ?? 0);
+        }
+        $companyId = (int) Branch::query()->where('id', $branchId)->value('company_id');
+        
+        $dateFrom = Carbon::parse((string) $request->input('date_from', now()->startOfWeek()->toDateString()))->startOfDay();
+        $dateTo = Carbon::parse((string) $request->input('date_to', now()->toDateString()))->endOfDay();
+
+        $details = WorkshopMovementTechnician::query()
+            ->join('workshop_movements', 'workshop_movements.id', '=', 'workshop_movement_technicians.workshop_movement_id')
+            ->leftJoin('vehicles', 'vehicles.id', '=', 'workshop_movements.vehicle_id')
+            ->leftJoin('movements', 'movements.id', '=', 'workshop_movements.movement_id')
+            ->where('workshop_movements.branch_id', $branchId)
+            ->where('workshop_movement_technicians.technician_person_id', $technicianId)
+            ->whereBetween('workshop_movements.finished_at', [$dateFrom, $dateTo])
+            ->orderBy('workshop_movements.finished_at', 'desc')
+            ->get([
+                'movements.number as os_number',
+                'vehicles.plate',
+                'vehicles.brand',
+                'vehicles.model',
+                'workshop_movements.started_at',
+                'workshop_movements.finished_at',
+                'workshop_movements.total_paused_minutes'
+            ])
+            ->map(function($item) {
+                $start = $item->started_at ? Carbon::parse($item->started_at) : null;
+                $finish = $item->finished_at ? Carbon::parse($item->finished_at) : null;
+                $grossMinutes = ($start && $finish) ? $start->diffInMinutes($finish) : 0;
+                $paused = abs((int) ($item->total_paused_minutes ?? 0));
+                $netMinutes = max(0, $grossMinutes - $paused);
+                
+                return [
+                    'os' => $item->os_number ?? 'S/N',
+                    'vehicle' => trim(($item->brand ?? '') . ' ' . ($item->model ?? '')) . ' (' . ($item->plate ?? '-') . ')',
+                    'net_minutes' => round($netMinutes, 2),
+                    'paused_minutes' => $paused,
+                    'started_at' => $start ? $start->format('d/m/Y H:i') : '-',
+                    'finished_at' => $finish ? $finish->format('d/m/Y H:i') : '-'
+                ];
+            });
+
+        return response()->json($details);
     }
 }

@@ -40,6 +40,8 @@ class WorkshopMovement extends Model
         'payment_status',
         'started_at',
         'finished_at',
+        'paused_at',
+        'total_paused_minutes',
         'locked_at',
     ];
 
@@ -48,6 +50,7 @@ class WorkshopMovement extends Model
         'delivery_date' => 'datetime',
         'started_at' => 'datetime',
         'finished_at' => 'datetime',
+        'paused_at' => 'datetime',
         'locked_at' => 'datetime',
         'approved_at' => 'datetime',
         'tow_in' => 'boolean',

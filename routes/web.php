@@ -232,6 +232,7 @@ Route::middleware('auth')->group(function () {
         ->name('kardex.pdf');
     // dashboard pages
     Route::get('/', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/tech-detail/{technicianId}', [\App\Http\Controllers\DashboardController::class, 'techDetail'])->name('dashboard.tech-detail');
 
     // calender pages
     Route::get('/calendar', function () {
@@ -456,6 +457,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/tablero-mantenimiento/vehiculos', [WorkshopMaintenanceBoardController::class, 'storeVehicleQuick'])->name('maintenance-board.vehicles.store');
         Route::post('/tablero-mantenimiento/clientes', [WorkshopMaintenanceBoardController::class, 'storeClientQuick'])->name('maintenance-board.clients.store');
         Route::post('/tablero-mantenimiento/{order}/iniciar', [WorkshopMaintenanceBoardController::class, 'start'])->name('maintenance-board.start');
+        Route::post('/tablero-mantenimiento/{order}/pausar', [WorkshopMaintenanceBoardController::class, 'pause'])->name('maintenance-board.pause');
+        Route::post('/tablero-mantenimiento/{order}/reanudar', [WorkshopMaintenanceBoardController::class, 'resume'])->name('maintenance-board.resume');
         Route::post('/tablero-mantenimiento/{order}/finalizar', [WorkshopMaintenanceBoardController::class, 'finish'])->name('maintenance-board.finish');
         Route::post('/tablero-mantenimiento/{order}/cotizacion', [WorkshopMaintenanceBoardController::class, 'quotation'])->name('maintenance-board.quotation');
         Route::get('/tablero-mantenimiento/{order}/venta-cobro', [WorkshopMaintenanceBoardController::class, 'checkoutPage'])->name('maintenance-board.checkout.page');

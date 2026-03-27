@@ -51,7 +51,8 @@ class WorkshopFlowService
         'diagnosis' => ['awaiting_approval', 'cancelled'],
         'awaiting_approval' => ['approved', 'diagnosis', 'cancelled'],
         'approved' => ['in_progress', 'cancelled'],
-        'in_progress' => ['finished', 'cancelled'],
+        'in_progress' => ['paused', 'finished', 'cancelled'],
+        'paused' => ['in_progress', 'cancelled'],
         'finished' => ['delivered', 'cancelled'],
         'delivered' => [],
         'cancelled' => [],
@@ -219,6 +220,8 @@ class WorkshopFlowService
                 'tow_in' => array_key_exists('tow_in', $data) ? (bool) $data['tow_in'] : $order->tow_in,
                 'diagnosis_text' => $data['diagnosis_text'] ?? $order->diagnosis_text,
                 'observations' => $data['observations'] ?? $order->observations,
+                'paused_at' => array_key_exists('paused_at', $data) ? $data['paused_at'] : $order->paused_at,
+                'total_paused_minutes' => array_key_exists('total_paused_minutes', $data) ? $data['total_paused_minutes'] : $order->total_paused_minutes,
             ];
 
             $order->update($updateData);
@@ -642,8 +645,8 @@ class WorkshopFlowService
             if ($detail->line_type !== 'PART') {
                 throw new \RuntimeException('Solo los repuestos pueden reservar stock.');
             }
-            if (!in_array($order->status, ['approved', 'in_progress'], true)) {
-                throw new \RuntimeException('Solo se puede reservar stock cuando la OS esta aprobada o en reparacion.');
+            if (!in_array($order->status, ['approved', 'in_progress', 'paused'], true)) {
+                throw new \RuntimeException('Solo se puede reservar stock cuando la OS esta aprobada, en reparacion o pausada.');
             }
             if ((bool) $detail->stock_consumed) {
                 throw new \RuntimeException('La linea ya fue consumida.');
@@ -1952,7 +1955,7 @@ class WorkshopFlowService
         $allowed = match ($toStatus) {
             'diagnosis', 'awaiting_approval' => ['RECEPCION', 'RECEPCIÓN', 'JEFE TALLER', 'TECNICO', 'TÉCNICO'],
             'approved' => ['RECEPCION', 'RECEPCIÓN', 'JEFE TALLER'],
-            'in_progress', 'finished' => ['TECNICO', 'TÉCNICO', 'JEFE TALLER'],
+            'in_progress', 'paused', 'finished' => ['TECNICO', 'TÉCNICO', 'JEFE TALLER'],
             'delivered' => ['RECEPCION', 'RECEPCIÓN', 'CAJERO', 'JEFE TALLER'],
             'cancelled' => ['RECEPCION', 'RECEPCIÓN', 'JEFE TALLER'],
             default => [],
