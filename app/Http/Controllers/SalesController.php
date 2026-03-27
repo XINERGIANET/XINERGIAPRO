@@ -2324,6 +2324,7 @@ class SalesController extends Controller
             '--print-media-type',
             '--disable-smart-shrinking',
             '--dpi', '203',
+            '--zoom', '1.22',
         ]);
 
         if ($pdfBinary === null) {
