@@ -13,20 +13,22 @@
         html, body {
             margin: 0;
             padding: 0;
-            width: 80mm;
+            width: 100%;
             background: #fff;
+            color: #0f172a;
         }
 
         .ticket-wrapper {
-            width: 76mm;
+            width: 100%;
+            max-width: 190mm;
             margin: 0 auto;
-            padding: 3mm 2mm 2mm;
+            padding: 8mm 7mm 6mm;
         }
 
         table {
             width: 100%;
-            font-size: small;
             border-collapse: collapse;
+            table-layout: fixed;
         }
 
         tr {
@@ -35,14 +37,16 @@
 
         thead tr td,
         thead tr th {
-            font-weight: bold;
-            font-size: 13px;
+            font-weight: 700;
+            font-size: 14px;
+            padding: 4px 2px 6px;
+            border-bottom: 1px dashed #9fb2cc;
         }
 
         tbody tr td {
-            padding-left: 5px;
-            padding-right: 5px;
-            font-size: 13px;
+            padding: 6px 2px;
+            font-size: 14px;
+            vertical-align: top;
         }
 
         tfoot tr td {
@@ -116,54 +120,60 @@
         }
 
         .center { text-align: center; }
-        .separator { border-top: 1px dashed #8aa0bc; margin: 6px 0; }
-        .meta-row { display: grid; grid-template-columns: 18mm 1fr; gap: 1.5mm; align-items: start; margin-bottom: 1px; }
-        .meta-label { font-weight: bold; font-size: 11px; line-height: 1.2; }
-        .meta-value { font-size: 11px; line-height: 1.2; word-break: break-word; }
-        .totals-row { display: flex; justify-content: space-between; margin: 1px 0; font-size: 13px; }
+        .separator { border-top: 1px dashed #8aa0bc; margin: 10px 0; }
+        .meta-row { display: grid; grid-template-columns: 26mm 1fr; gap: 2mm; align-items: start; margin-bottom: 3px; }
+        .meta-label { font-weight: 700; font-size: 14px; line-height: 1.25; }
+        .meta-value { font-size: 14px; line-height: 1.25; word-break: break-word; }
+        .totals-row { display: flex; justify-content: space-between; margin: 3px 0; font-size: 16px; }
         .grand-total {
             border-top: 1px solid #8aa0bc;
-            margin-top: 2px;
-            padding-top: 2px;
+            margin-top: 6px;
+            padding-top: 6px;
             display: flex;
             justify-content: space-between;
-            font-size: 17px;
+            font-size: 22px;
             font-weight: bold;
         }
         .grand-total .label { letter-spacing: .2px; }
         .grand-total .value { white-space: nowrap; }
         .logo {
             display: block;
-            max-width: 48mm;
-            max-height: 20mm;
-            margin: 0 auto 6px;
+            max-width: 62mm;
+            max-height: 26mm;
+            margin: 0 auto 10px;
             object-fit: contain;
         }
         .prod-col {
-            font-size: 11px;
-            line-height: 1.15;
+            width: 48%;
+            font-size: 14px;
+            line-height: 1.2;
             padding-left: 0 !important;
+            word-break: break-word;
         }
         .num-col {
             text-align: right;
-            font-size: 11px;
+            font-size: 14px;
             white-space: nowrap;
             padding-right: 0 !important;
         }
         .notes-wrap {
-            font-size: 11px;
-            line-height: 1.2;
+            font-size: 14px;
+            line-height: 1.3;
             word-break: break-word;
         }
         .footer {
-            font-size: 11px;
-            line-height: 1.25;
-            margin-top: 3px;
+            font-size: 13px;
+            line-height: 1.35;
+            margin-top: 6px;
         }
 
         @media print {
-            @page { size: 80mm 220mm; margin: 0; }
-            html, body { width: 80mm; margin: 0; }
+            @page { size: A4 portrait; margin: 6mm; }
+            html, body { width: 100%; margin: 0; }
+            .ticket-wrapper {
+                max-width: none;
+                padding: 0;
+            }
         }
     </style>
 </head>
@@ -178,10 +188,10 @@
         @if(!empty($logoDataUri) || !empty($logoFileUrl) || !empty($logoUrl))
             <img src="{{ $logoDataUri ?: ($logoFileUrl ?: $logoUrl) }}" alt="Logo sucursal" class="logo">
         @endif
-        <p class="without-tb bold large" style="font-size: 18px;">{{ strtoupper($branchForLogo->legal_name ?? 'SUCURSAL') }}</p>
-        <p class="without-tb medium" style="font-size: 12px;">RUC: {{ $branchForLogo->ruc ?? '-' }}</p>
-        <p class="without-tb medium" style="font-size: 12px;">{{ $docName }}</p>
-        <p class="without-tb bold large" style="font-size: 15px;">{{ $docCode }}</p>
+        <p class="without-tb bold large" style="font-size: 28px; line-height: 1.1;">{{ strtoupper($branchForLogo->legal_name ?? 'SUCURSAL') }}</p>
+        <p class="without-tb medium" style="font-size: 18px; line-height: 1.2;">RUC: {{ $branchForLogo->ruc ?? '-' }}</p>
+        <p class="without-tb medium" style="font-size: 18px; line-height: 1.2;">{{ $docName }}</p>
+        <p class="without-tb bold large" style="font-size: 24px; line-height: 1.15;">{{ $docCode }}</p>
     </div>
 
     <div class="separator"></div>
