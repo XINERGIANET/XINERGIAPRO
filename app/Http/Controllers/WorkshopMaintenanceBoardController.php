@@ -1662,6 +1662,25 @@ class WorkshopMaintenanceBoardController extends Controller
                     }
                 }
 
+                $pendingPartDetails = \App\Models\WorkshopMovementDetail::query()
+                    ->where('workshop_movement_id', $lockedOrder->id)
+                    ->where('line_type', 'PART')
+                    ->whereNull('sales_movement_id')
+                    ->where('stock_consumed', false)
+                    ->whereNull('deleted_at')
+                    ->orderBy('id')
+                    ->get();
+
+                foreach ($pendingPartDetails as $partDetail) {
+                    $this->flowService->consumePart(
+                        $partDetail,
+                        $branchId,
+                        (int) $user?->id,
+                        (string) ($user?->name ?? 'Sistema'),
+                        'Salida por venta/cobro OS #' . ($lockedOrder->movement?->number ?? $lockedOrder->id)
+                    );
+                }
+
                 $pendingLines = (int) $lockedOrder->details()
                     ->whereNull('sales_movement_id')
                     ->count();
