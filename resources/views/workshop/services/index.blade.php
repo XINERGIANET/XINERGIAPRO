@@ -174,6 +174,24 @@
                                         </div>
                                     @endif
 
+                                    <div class="relative group">
+                                        <x-ui.button
+                                            size="icon"
+                                            variant="primary"
+                                            type="button"
+                                            onclick="window.location='{{ route('workshop.services.details.edit', $service) }}'"
+                                            className="rounded-xl"
+                                            style="background-color: #0EA5E9; color: #FFFFFF;"
+                                            aria-label="Detalle de servicio"
+                                        >
+                                            <i class="ri-list-check-2-line"></i>
+                                        </x-ui.button>
+                                        <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
+                                            Detalle de servicio
+                                            <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
+                                        </span>
+                                    </div>
+
                                     <form
                                         method="POST"
                                         action="{{ route('workshop.services.destroy', $service) }}"

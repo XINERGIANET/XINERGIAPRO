@@ -77,5 +77,11 @@ class WorkshopService extends Model
             ->orderBy('order_num')
             ->orderByDesc('km');
     }
-}
 
+    public function serviceDetails()
+    {
+        return $this->hasMany(WorkshopServiceDetail::class, 'workshop_service_id')
+            ->orderBy('order_num')
+            ->orderBy('id');
+    }
+}

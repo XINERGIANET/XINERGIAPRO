@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\WorkshopService;
+use App\Models\WorkshopServiceDetail;
 use App\Models\WorkshopServiceFrequency;
 use App\Support\WorkshopAuthorization;
 use App\Support\WorkshopServiceSpreadsheetImport;
@@ -308,6 +309,86 @@ class WorkshopServiceCatalogController extends Controller
         });
 
         return back()->with('status', 'Frecuencia del servicio actualizada correctamente.');
+    }
+
+    public function detailsEdit(WorkshopService $service): \Illuminate\View\View
+    {
+        $this->assertServiceScope($service);
+
+        $details = WorkshopServiceDetail::query()
+            ->where('workshop_service_id', $service->id)
+            ->orderBy('order_num')
+            ->orderBy('id')
+            ->get(['id', 'description', 'order_num']);
+
+        return view('workshop.services.details', [
+            'service' => $service,
+            'details' => $details,
+        ]);
+    }
+
+    public function detailsUpdate(Request $request, WorkshopService $service): RedirectResponse
+    {
+        $this->assertServiceScope($service);
+
+        $validated = $request->validate([
+            'descriptions' => ['nullable', 'array'],
+            'descriptions.*' => ['nullable', 'string', 'max:255'],
+            'delete_ids' => ['nullable', 'array'],
+            'delete_ids.*' => ['nullable', 'integer', 'min:1'],
+            'new_description' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        DB::transaction(function () use ($service, $validated) {
+            $deleteIds = collect($validated['delete_ids'] ?? [])
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->values()
+                ->all();
+
+            if ($deleteIds !== []) {
+                WorkshopServiceDetail::query()
+                    ->where('workshop_service_id', $service->id)
+                    ->whereIn('id', $deleteIds)
+                    ->delete();
+            }
+
+            foreach ((array) ($validated['descriptions'] ?? []) as $id => $description) {
+                $id = (int) $id;
+                $description = trim((string) $description);
+
+                if ($id <= 0 || $description === '') {
+                    continue;
+                }
+
+                $detail = WorkshopServiceDetail::query()
+                    ->where('workshop_service_id', $service->id)
+                    ->where('id', $id)
+                    ->first();
+
+                if (!$detail) {
+                    continue;
+                }
+
+                $detail->description = $description;
+                $detail->save();
+            }
+
+            $newDescription = trim((string) ($validated['new_description'] ?? ''));
+            if ($newDescription !== '') {
+                $nextOrderNum = (int) (WorkshopServiceDetail::query()
+                    ->where('workshop_service_id', $service->id)
+                    ->max('order_num') ?? 0) + 1;
+
+                WorkshopServiceDetail::query()->create([
+                    'workshop_service_id' => $service->id,
+                    'description' => $newDescription,
+                    'order_num' => $nextOrderNum,
+                ]);
+            }
+        });
+
+        return back()->with('status', 'Detalle del servicio actualizado correctamente.');
     }
 
     private function assertServiceScope(WorkshopService $service): void

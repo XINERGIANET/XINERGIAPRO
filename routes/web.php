@@ -501,6 +501,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/servicios/{service}/frecuencia', [WorkshopServiceCatalogController::class, 'frequencyEdit'])->name('services.frequencies.edit');
     Route::post('/servicios/{service}/frecuencia', [WorkshopServiceCatalogController::class, 'frequencyUpdate'])->name('services.frequencies.update');
+    Route::get('/servicios/{service}/detalle', [WorkshopServiceCatalogController::class, 'detailsEdit'])->name('services.details.edit');
+    Route::post('/servicios/{service}/detalle', [WorkshopServiceCatalogController::class, 'detailsUpdate'])->name('services.details.update');
 
         Route::get('/armados', [WorkshopAssemblyController::class, 'index'])->name('assemblies.index');
         Route::post('/armados', [WorkshopAssemblyController::class, 'store'])->name('assemblies.store');
