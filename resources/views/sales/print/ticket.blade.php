@@ -19,10 +19,10 @@
         }
 
         .ticket-wrapper {
-            width: 79mm;
-            max-width: 79mm;
+            width: 80mm;
+            max-width: 80mm;
             margin: 0 auto;
-            padding: 2mm 1.2mm 2mm;
+            padding: 0.5mm;
         }
 
         table {
@@ -120,8 +120,8 @@
         }
 
         .center { text-align: center; }
-        .separator { border-top: 1px dashed #8aa0bc; margin: 10px 0; }
-        .meta-row { display: grid; grid-template-columns: 26mm 1fr; gap: 2mm; align-items: start; margin-bottom: 3px; }
+        .separator { border-top: 1px dashed #8aa0bc; margin: 8px 0; }
+        .meta-row { display: grid; grid-template-columns: 22mm 1fr; gap: 1mm; align-items: start; margin-bottom: 2px; }
         .meta-label { font-weight: 700; font-size: 14px; line-height: 1.25; }
         .meta-value { font-size: 14px; line-height: 1.25; word-break: break-word; }
         .totals-row { display: flex; justify-content: space-between; margin: 3px 0; font-size: 16px; }
@@ -138,13 +138,13 @@
         .grand-total .value { white-space: nowrap; }
         .logo {
             display: block;
-            max-width: 62mm;
+            max-width: 64mm;
             max-height: 26mm;
-            margin: 0 auto 10px;
+            margin: 0 auto 8px;
             object-fit: contain;
         }
         .prod-col {
-            width: 48%;
+            width: 45%;
             font-size: 14px;
             line-height: 1.2;
             padding-left: 0 !important;
@@ -181,8 +181,8 @@
 
 <div class="ticket-wrapper">
     <div class="center">
-        @if(!empty($logoDataUri) || !empty($logoFileUrl) || !empty($logoUrl))
-            <img src="{{ $logoDataUri ?: ($logoFileUrl ?: $logoUrl) }}" alt="Logo sucursal" class="logo">
+        @if(!empty($logoFileUrl) || !empty($logoDataUri) || !empty($logoUrl))
+            <img src="{{ $logoFileUrl ?: ($logoDataUri ?: $logoUrl) }}" alt="Logo sucursal" class="logo">
         @endif
         <p class="without-tb bold large" style="font-size: 28px; line-height: 1.1;">{{ strtoupper($branchForLogo->legal_name ?? 'SUCURSAL') }}</p>
         <p class="without-tb medium" style="font-size: 18px; line-height: 1.2;">RUC: {{ $branchForLogo->ruc ?? '-' }}</p>
