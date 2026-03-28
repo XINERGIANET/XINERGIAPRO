@@ -147,7 +147,7 @@
             </div>
 
             <!-- RESUMEN EJECUTIVO (KPIs) -->
-            <div class="grid grid-cols-4 gap-6 mt-4 w-full">
+            <div class="grid grid-cols-5 gap-6 mt-4 w-full">
                 <div class="p-5 bg-white border-2 border-emerald-600 rounded-2xl shadow-sm">
                     <p class="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Ingresos Hoy</p>
                     <p class="text-2xl font-black text-slate-900 mt-1">S/ {{ number_format($dashboardData['todayInvoiced'] ?? 0, 2) }}</p>
@@ -164,11 +164,15 @@
                     <p class="text-[10px] font-black text-purple-600 uppercase tracking-widest mb-1">Servicios Semana</p>
                     <p class="text-2xl font-black text-slate-900 mt-1">{{ number_format($dashboardData['maintenancesWeek'] ?? 0) }}</p>
                 </div>
+                <div class="p-5 bg-white border-2 border-amber-500 rounded-2xl shadow-sm">
+                    <p class="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Producción</p>
+                    <p class="text-2xl font-black text-slate-900 mt-1">S/ {{ number_format($dashboardData['productionAmount'] ?? 0, 2) }}</p>
+                </div>
             </div>
         </header>
         
         <!-- KPI CARDS Y ANEXOS DETALLES (AHORA AL PRINCIPIO) -->
-        <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8 hero-kpi-grid print:grid-cols-4 print:gap-3 print:mb-4">
+        <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6 mb-8 hero-kpi-grid print:grid-cols-5 print:gap-3 print:mb-4">
             <!-- Ingreso Hoy -->
             <article class="bg-white p-6 rounded-[1.5rem] border border-slate-100 transition-all hover:bg-slate-50/50">
                 <div class="flex justify-between items-start mb-6">
@@ -234,6 +238,24 @@
                     <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Mantenimientos</p>
                     <p class="text-3xl font-black text-slate-900 leading-none mb-1">{{ number_format((int) ($d['maintenancesWeek'] ?? 0)) }}</p>
                     <p class="text-[10px] font-bold text-slate-400">Esta semana</p>
+                </div>
+            </article>
+
+            <!-- Produccion -->
+            <article class="bg-white p-6 rounded-[1.5rem] border border-slate-100 transition-all hover:bg-slate-50/50">
+                <div class="flex justify-between items-start mb-6">
+                    <div class="w-10 h-10 rounded-xl text-amber-500 flex items-center justify-center bg-[#FFF7ED] border border-amber-100">
+                        <i class="ri-hammer-fill text-xl"></i>
+                    </div>
+                    <div class="flex items-center gap-1 text-[10px] font-black text-amber-600">
+                        <i class="ri-checkbox-circle-line"></i>
+                        <span>{{ number_format((int) ($d['ordersClosedToday'] ?? 0)) }} cerradas</span>
+                    </div>
+                </div>
+                <div>
+                    <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Produccion del periodo</p>
+                    <p class="text-3xl font-black text-slate-900 leading-none mb-1">S/ {{ number_format((float) ($d['productionAmount'] ?? 0), 2) }}</p>
+                    <p class="text-[10px] font-bold text-slate-400">{{ $periodLabel }}</p>
                 </div>
             </article>
         </section>

@@ -159,6 +159,17 @@ class DashboardController extends Controller
             ->whereIn('workshop_movement_details.line_type', ['SERVICE', 'SERVCE'])
             ->count();
 
+        $productionAmount = (clone $baseQuery)
+            ->whereIn('status', $closedStatuses)
+            ->where(function ($query) use ($dateFrom, $dateTo) {
+                $query->whereBetween('finished_at', [$dateFrom, $dateTo])
+                    ->orWhere(function ($inner) use ($dateFrom, $dateTo) {
+                        $inner->whereNull('finished_at')
+                            ->whereBetween('updated_at', [$dateFrom, $dateTo]);
+                    });
+            })
+            ->sum('total');
+
         $maintenancesWeek = WorkshopMovementDetail::query()
             ->join('workshop_movements', 'workshop_movements.id', '=', 'workshop_movement_details.workshop_movement_id')
             ->leftJoin('workshop_services', 'workshop_services.id', '=', 'workshop_movement_details.service_id')
@@ -329,6 +340,7 @@ class DashboardController extends Controller
             'utility' => $utility,
             'ordersInRepair' => (clone $baseQuery)->where('status', 'in_progress')->count(),
             'servicesDone' => (int) $servicesDone,
+            'productionAmount' => (float) $productionAmount,
             'maintenancesWeek' => (int) $maintenancesWeek,
             'avgRepairMinutes' => (float) ($avgRepairMinutes ?? 0),
             'techProductivity' => $techProductivity,
