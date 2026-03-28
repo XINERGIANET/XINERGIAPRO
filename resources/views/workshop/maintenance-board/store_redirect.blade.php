@@ -16,13 +16,7 @@
         (function () {
             const reportUrl = @js($reportUrl);
             const redirectUrl = @js($redirectUrl);
-            const reportWindow = window.open('', 'workshop-initial-report');
-
-            if (reportWindow) {
-                reportWindow.location = reportUrl;
-            } else {
-                window.open(reportUrl, '_blank');
-            }
+            window.open(reportUrl, '_blank', 'noopener');
 
             window.location.replace(redirectUrl);
         })();
