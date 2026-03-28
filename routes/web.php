@@ -505,6 +505,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/servicios/{service}/detalle', [WorkshopServiceCatalogController::class, 'detailsUpdate'])->name('services.details.update');
 
         Route::get('/armados', [WorkshopAssemblyController::class, 'index'])->name('assemblies.index');
+        Route::get('/armados/{assembly}/editar', [WorkshopAssemblyController::class, 'edit'])->name('assemblies.edit');
         Route::post('/armados', [WorkshopAssemblyController::class, 'store'])->name('assemblies.store');
         Route::put('/armados/{assembly}', [WorkshopAssemblyController::class, 'update'])->name('assemblies.update');
         Route::delete('/armados/{assembly}', [WorkshopAssemblyController::class, 'destroy'])->name('assemblies.destroy');

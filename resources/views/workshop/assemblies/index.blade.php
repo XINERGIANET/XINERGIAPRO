@@ -346,6 +346,12 @@
                                 </button>
                             @endif
 
+                            @if(!$assembly->sales_movement_id)
+                                <a href="{{ route('workshop.assemblies.edit', request('view_id') ? ['assembly' => $assembly, 'view_id' => request('view_id')] : ['assembly' => $assembly]) }}" class="flex h-9 w-9 items-center justify-center rounded-xl border transition-all hover:bg-amber-500 hover:text-white hover:border-amber-500" style="background-color: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); color: #94A3B8;" title="Editar">
+                                    <i class="ri-pencil-line text-lg"></i>
+                                </a>
+                            @endif
+
                             <form method="POST" action="{{ route('workshop.assemblies.destroy', $assembly) }}" onsubmit="return confirm('Eliminar este registro?')" class="flex items-center">
                                 @csrf
                                 @method('DELETE')
@@ -451,6 +457,12 @@
                                             <button @click="$dispatch('open-massive-sale-modal'); selectedAssemblies = [{{ $assembly->id }}]" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Generar Venta">
                                                 <i class="ri-shopping-cart-2-line text-lg"></i>
                                             </button>
+                                        @endif
+
+                                        @if(!$assembly->sales_movement_id)
+                                            <a href="{{ route('workshop.assemblies.edit', request('view_id') ? ['assembly' => $assembly, 'view_id' => request('view_id')] : ['assembly' => $assembly]) }}" class="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" title="Editar">
+                                                <i class="ri-pencil-line text-lg"></i>
+                                            </a>
                                         @endif
 
                                         <form method="POST" action="{{ route('workshop.assemblies.destroy', $assembly) }}" onsubmit="return confirm('¿Eliminar?')">

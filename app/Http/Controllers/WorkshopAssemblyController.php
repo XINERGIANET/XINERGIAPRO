@@ -123,6 +123,61 @@ class WorkshopAssemblyController extends Controller
         ));
     }
 
+    public function edit(WorkshopAssembly $assembly): \Illuminate\View\View
+    {
+        [$branchId, $companyId] = $this->resolveContext();
+        $this->assertScope($assembly, $branchId, $companyId);
+
+        if ($assembly->sales_movement_id) {
+            return redirect()
+                ->route('workshop.assemblies.index')
+                ->withErrors(['error' => 'No se puede editar un armado que ya fue vendido.']);
+        }
+
+        $costTable = WorkshopAssemblyCost::query()
+            ->where('company_id', $companyId)
+            ->where(function ($query) use ($branchId) {
+                $query->whereNull('branch_id')->orWhere('branch_id', $branchId);
+            })
+            ->where('active', true)
+            ->orderBy('brand_company')
+            ->orderBy('vehicle_type')
+            ->get();
+
+        $assemblyLocations = WorkshopAssemblyLocation::query()
+            ->where('company_id', $companyId)
+            ->where('active', true)
+            ->where(function ($query) use ($branchId) {
+                $query->whereNull('branch_id')->orWhere('branch_id', $branchId);
+            })
+            ->orderBy('name')
+            ->get();
+
+        $technicians = Person::query()
+            ->whereHas('roles', function ($query) {
+                $query->where('roles.id', 2);
+            })
+            ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get();
+
+        $vehicleTypes = \App\Models\VehicleType::query()
+            ->where('company_id', $companyId)
+            ->where('active', true)
+            ->orderBy('order_num')
+            ->orderBy('name')
+            ->get();
+
+        return view('workshop.assemblies.edit', compact(
+            'assembly',
+            'costTable',
+            'assemblyLocations',
+            'technicians',
+            'vehicleTypes'
+        ));
+    }
+
     public function checkoutPage(Request $request): \Illuminate\View\View|RedirectResponse
     {
         [$branchId, $companyId] = $this->resolveContext();
@@ -363,6 +418,10 @@ class WorkshopAssemblyController extends Controller
     {
         [$branchId, $companyId] = $this->resolveContext();
         $this->assertScope($assembly, $branchId, $companyId);
+
+        if ($assembly->sales_movement_id) {
+            return back()->withErrors(['error' => 'No se puede editar un armado que ya fue vendido.']);
+        }
 
         $data = $request->validate([
             'brand_company' => ['required', 'string', 'max:120'],
