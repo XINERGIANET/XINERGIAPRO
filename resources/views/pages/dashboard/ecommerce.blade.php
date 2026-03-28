@@ -38,6 +38,11 @@
         $birthdays = collect($d['birthdays'] ?? []);
         $frequentClients = collect($d['frequentClients'] ?? []);
         $techProductivity = collect($d['techProductivity'] ?? []);
+        $rangeStart = \Carbon\Carbon::parse($d['dateFrom'] ?? now()->toDateString());
+        $rangeEnd = \Carbon\Carbon::parse($d['dateTo'] ?? now()->toDateString());
+        $isSingleDay = $rangeStart->isSameDay($rangeEnd);
+        $periodLabel = $isSingleDay ? $rangeStart->format('d/m/Y') : ($rangeStart->format('d/m/Y') . ' - ' . $rangeEnd->format('d/m/Y'));
+        $chartLabel = $isSingleDay ? 'Dia seleccionado' : 'Rango seleccionado';
 
         // Cálculo de Crecimiento de Ingresos (Real)
         $todayIncome = (float) ($d['todayInvoiced'] ?? 0);
@@ -45,9 +50,7 @@
         $incomeGrowth = $yesterdayIncome > 0 ? (($todayIncome - $yesterdayIncome) / $yesterdayIncome) * 100 : ($todayIncome > 0 ? 100 : 0);
 
         // Cálculo de Órdenes Nuevas Hoy (Real)
-        $newOrdersToday = $recentOrders->filter(function($order) {
-            return \Carbon\Carbon::parse($order->created_at)->isToday();
-        })->count();
+        $newOrdersToday = (int) ($d['newOrdersInRange'] ?? 0);
 
         $statusLabels = [
             'DRAFT' => 'BORRADOR',
@@ -96,14 +99,25 @@
             <h1 class="text-2xl font-black text-slate-900">Dashboard Taller</h1>
             <p class="text-xs text-slate-500 font-medium">Vista general de operaciones del taller</p>
         </div>
-        <div class="flex items-center gap-3 print:hidden">
-            <button onclick="window.print()" class="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-xl text-xs font-black shadow-sm flex items-center gap-2 hover:bg-slate-50 transition-all">
+        <form method="GET" action="{{ route('dashboard') }}" class="flex flex-wrap items-center gap-3 print:hidden">
+            @if (request('view_id'))
+                <input type="hidden" name="view_id" value="{{ request('view_id') }}">
+            @endif
+            <input type="date" name="date_from" value="{{ $d['dateFrom'] ?? now()->toDateString() }}" class="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm">
+            <input type="date" name="date_to" value="{{ $d['dateTo'] ?? now()->toDateString() }}" class="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm">
+            <button type="submit" class="bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-black shadow-sm flex items-center gap-2 hover:bg-slate-900 transition-all h-11">
+                <i class="ri-search-line"></i> Filtrar
+            </button>
+            <a href="{{ route('dashboard', request('view_id') ? ['view_id' => request('view_id')] : []) }}" class="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-xl text-xs font-black shadow-sm flex items-center gap-2 hover:bg-slate-50 transition-all h-11">
+                <i class="ri-refresh-line"></i> Limpiar
+            </a>
+            <a href="{{ route('dashboard', array_filter(['date_from' => now()->toDateString(), 'date_to' => now()->toDateString(), 'view_id' => request('view_id')])) }}" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-black shadow-sm flex items-center gap-2 hover:bg-blue-700 transition-all h-11">
+                <i class="ri-calendar-check-fill"></i> Hoy
+            </a>
+            <button type="button" onclick="window.print()" class="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-xl text-xs font-black shadow-sm flex items-center gap-2 hover:bg-slate-50 transition-all h-11">
                 <i class="ri-download-2-line"></i> Exportar
             </button>
-            <button class="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-black shadow-sm flex items-center gap-2 hover:bg-blue-700 transition-all">
-                <i class="ri-calendar-check-fill"></i> Hoy
-            </button>
-        </div>
+        </form>
     </div>
 
     <div class="space-y-6 pb-10" id="workshop-dashboard">
@@ -167,9 +181,9 @@
                     </div>
                 </div>
                 <div>
-                    <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Ingreso Hoy</p>
+                    <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Ingreso periodo</p>
                     <p class="text-3xl font-black text-slate-900 leading-none mb-1">S/ {{ number_format((float) ($d['todayInvoiced'] ?? 0), 2) }}</p>
-                    <p class="text-[10px] font-bold text-slate-400">Taller Directo</p>
+                    <p class="text-[10px] font-bold text-slate-400">{{ $periodLabel }}</p>
                 </div>
             </article>
 
@@ -185,9 +199,9 @@
                     </div>
                 </div>
                 <div>
-                    <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Egreso Hoy</p>
+                    <p class="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Egreso periodo</p>
                     <p class="text-3xl font-black text-slate-900 leading-none mb-1">S/ {{ number_format((float) ($d['expensesToday'] ?? 0), 2) }}</p>
-                    <p class="text-[10px] font-bold text-slate-400">Caja y Compras</p>
+                    <p class="text-[10px] font-bold text-slate-400">{{ $periodLabel }}</p>
                 </div>
             </article>
 
@@ -199,7 +213,7 @@
                     </div>
                     <div class="flex items-center gap-1 text-[10px] font-black text-blue-500">
                         <i class="ri-add-line"></i>
-                        <span>+{{ $newOrdersToday }} hoy</span>
+                        <span>+{{ $newOrdersToday }} en rango</span>
                     </div>
                 </div>
                 <div>
@@ -235,11 +249,11 @@
                         </div>
                         <div>
                             <h3 class="text-lg font-bold text-slate-900 leading-tight">Tendencia de Ingresos</h3>
-                            <p class="text-sm text-slate-500">Últimos 7 días</p>
+                            <p class="text-sm text-slate-500">{{ $chartLabel }}</p>
                         </div>
                     </div>
                     <div class="text-right bg-[#F4F6FA] px-4 py-3 rounded-xl border border-slate-100">
-                        <p class="text-[10px] text-blue-600 font-bold uppercase tracking-wider mb-1">Total Semana</p>
+                        <p class="text-[10px] text-blue-600 font-bold uppercase tracking-wider mb-1">Total periodo</p>
                         <p class="text-2xl font-bold text-blue-700 leading-none">S/ {{ number_format((float) ($incomeByDay->sum('amount')), 2) }}</p>
                     </div>
                 </div>

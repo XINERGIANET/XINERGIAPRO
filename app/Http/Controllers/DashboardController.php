@@ -47,11 +47,11 @@ class DashboardController extends Controller
         $ordersActive = (clone $baseQuery)->whereIn('status', $activeStatuses)->count();
         $ordersClosedToday = (clone $baseQuery)
             ->whereIn('status', $closedStatuses)
-            ->where(function ($query) use ($now) {
-                $query->whereDate('finished_at', $now->toDateString())
-                    ->orWhere(function ($inner) use ($now) {
+            ->where(function ($query) use ($dateFrom, $dateTo) {
+                $query->whereBetween('finished_at', [$dateFrom, $dateTo])
+                    ->orWhere(function ($inner) use ($dateFrom, $dateTo) {
                         $inner->whereNull('finished_at')
-                            ->whereDate('updated_at', $now->toDateString());
+                            ->whereBetween('updated_at', [$dateFrom, $dateTo]);
                     });
             })
             ->count();
@@ -60,7 +60,7 @@ class DashboardController extends Controller
 
         $todayInvoiced = SalesMovement::query()
             ->where('branch_id', $branchId)
-            ->whereHas('movement', fn ($query) => $query->whereDate('moved_at', $today))
+            ->whereHas('movement', fn ($query) => $query->whereBetween('moved_at', [$dateFrom, $dateTo]))
             ->sum('total');
             
         $pendingCollection = (clone $baseQuery)->get(['total', 'paid_total'])->sum(function ($row) {
@@ -70,7 +70,7 @@ class DashboardController extends Controller
         $appointmentsToday = Appointment::query()
             ->when($companyId > 0, fn ($q) => $q->where('company_id', $companyId))
             ->when($branchId > 0, fn ($q) => $q->where('branch_id', $branchId))
-            ->whereDate('start_at', $now->toDateString())
+            ->whereBetween('start_at', [$dateFrom, $dateTo])
             ->count();
 
         $statusBreakdown = (clone $baseQuery)
@@ -79,12 +79,11 @@ class DashboardController extends Controller
             ->pluck('total', 'status')
             ->toArray();
 
-        $monthStart = $dateFrom->copy()->startOfMonth();
         $topServices = WorkshopMovementDetail::query()
             ->join('workshop_movements as wm', 'wm.id', '=', 'workshop_movement_details.workshop_movement_id')
             ->leftJoin('workshop_services as ws', 'ws.id', '=', 'workshop_movement_details.service_id')
             ->whereIn('workshop_movement_details.line_type', ['SERVICE', 'SERVCE'])
-            ->whereDate('wm.created_at', '>=', $monthStart->toDateString())
+            ->whereBetween('wm.created_at', [$dateFrom, $dateTo])
             ->when($companyId > 0, fn ($q) => $q->where('wm.company_id', $companyId))
             ->when($branchId > 0, fn ($q) => $q->where('wm.branch_id', $branchId))
             ->groupBy('ws.name', 'workshop_movement_details.description')
@@ -96,7 +95,13 @@ class DashboardController extends Controller
                 DB::raw('SUM(workshop_movement_details.total) as amount'),
             ]);
 
-        $days = collect(range(6, 0))->map(fn ($offset) => now()->copy()->subDays($offset));
+        $days = collect();
+        $cursor = $dateFrom->copy()->startOfDay();
+        $lastDay = $dateTo->copy()->startOfDay();
+        while ($cursor->lte($lastDay)) {
+            $days->push($cursor->copy());
+            $cursor->addDay();
+        }
         $incomeByDay = [];
         foreach ($days as $day) {
             $incomeByDay[] = [
@@ -110,7 +115,7 @@ class DashboardController extends Controller
 
         $salesToday = SalesMovement::query()
             ->where('branch_id', $branchId)
-            ->whereHas('movement', fn ($query) => $query->whereDate('moved_at', $today))
+            ->whereHas('movement', fn ($query) => $query->whereBetween('moved_at', [$dateFrom, $dateTo]))
             ->sum('total');
 
         $cashMovements = CashMovements::query()
@@ -134,14 +139,14 @@ class DashboardController extends Controller
 
         $expenses = $expensesCash + $expensesPurchases;
 
-        $expensesTodayCash = (float) $cashMovements->filter(function ($row) use ($today) {
+        $expensesTodayCash = (float) $cashMovements->filter(function ($row) use ($dateFrom, $dateTo) {
             return strtoupper((string) ($row->paymentConcept->type ?? '')) === 'E'
-                && optional($row->created_at)->toDateString() === $today;
+                && optional($row->created_at)?->between($dateFrom, $dateTo);
         })->sum('total');
 
         $expensesTodayPurchases = (float) \App\Models\WorkshopPurchaseRecord::query()
             ->where('branch_id', $branchId)
-            ->whereDate('issued_at', $today)
+            ->whereBetween('issued_at', [$dateFrom, $dateTo])
             ->sum('total');
 
         $expensesToday = $expensesTodayCash + $expensesTodayPurchases;
@@ -188,11 +193,9 @@ class DashboardController extends Controller
                 DB::raw('AVG((EXTRACT(EPOCH FROM (workshop_movements.finished_at - workshop_movements.started_at))/60) - ABS(COALESCE(workshop_movements.total_paused_minutes, 0))) as avg_minutes')
             ]);
 
-        $monthStartClient = now()->startOfMonth();
-        $monthEndClient = now()->endOfMonth();
         $frequentClients = (clone $baseQuery)
             ->join('people', 'people.id', '=', 'workshop_movements.client_person_id')
-            ->whereBetween('workshop_movements.intake_date', [$monthStartClient, $monthEndClient])
+            ->whereBetween('workshop_movements.intake_date', [$dateFrom, $dateTo])
             ->groupBy('people.id', 'people.first_name', 'people.last_name', 'people.document_number')
             ->orderByRaw('COUNT(*) DESC')
             ->limit(5)
@@ -242,25 +245,29 @@ class DashboardController extends Controller
 
         $totalOrdersCount = (clone $baseQuery)->count();
 
-        $recentOrders = (clone $baseQuery)
+        $recentOrders = (clone $rangeQuery)
             ->with(['movement:id,number,moved_at', 'vehicle:id,brand,model,plate', 'client:id,first_name,last_name,document_number'])
             ->latest('id')
             ->limit(6)
             ->get();
 
+        $newOrdersInRange = (clone $baseQuery)
+            ->whereBetween('intake_date', [$dateFrom, $dateTo])
+            ->count();
+
         $salesTodayDetails = SalesMovement::query()
             ->with(['movement.documentType', 'movement.person', 'movement.branch'])
             ->where('branch_id', $branchId)
-            ->whereHas('movement', fn ($query) => $query->whereDate('moved_at', $today))
+            ->whereHas('movement', fn ($query) => $query->whereBetween('moved_at', [$dateFrom, $dateTo]))
             ->get()
             ->sortByDesc(fn ($sale) => optional(optional($sale->movement)->moved_at)->timestamp)
             ->values();
 
         $expensesTodayDetails = collect([]);
         // Gastos de caja hoy
-        $cashMovements->filter(function ($row) use ($today) {
+        $cashMovements->filter(function ($row) use ($dateFrom, $dateTo) {
             return strtoupper((string) ($row->paymentConcept->type ?? '')) === 'E'
-                && optional($row->created_at)->toDateString() === $today;
+                && optional($row->created_at)?->between($dateFrom, $dateTo);
         })->each(function($row) use ($expensesTodayDetails) {
             $expensesTodayDetails->push([
                 'type' => 'CAJA',
@@ -273,7 +280,7 @@ class DashboardController extends Controller
         // Compras hoy
         \App\Models\WorkshopPurchaseRecord::query()
             ->where('branch_id', $branchId)
-            ->whereDate('issued_at', $today)
+            ->whereBetween('issued_at', [$dateFrom, $dateTo])
             ->get()
             ->each(function($row) use ($expensesTodayDetails) {
                 $expensesTodayDetails->push([
@@ -338,6 +345,7 @@ class DashboardController extends Controller
             'activeOrdersDetails' => $activeOrdersDetails,
             'maintenanceWeekDetails' => $maintenanceWeekDetails,
             'totalOrdersCount' => $totalOrdersCount,
+            'newOrdersInRange' => (int) $newOrdersInRange,
             'dateFrom' => $dateFrom->toDateString(),
             'dateTo' => $dateTo->toDateString(),
         ];
