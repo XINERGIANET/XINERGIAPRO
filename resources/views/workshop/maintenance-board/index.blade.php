@@ -2,6 +2,19 @@
 
 @section('content')
 <div x-data="{}">
+    @if (session('open_initial_report_url'))
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const url = @js(session('open_initial_report_url'));
+                if (!url) return;
+                const reportWindow = window.open('', 'workshop-initial-report');
+                if (reportWindow) {
+                    reportWindow.location = url;
+                    reportWindow.focus();
+                }
+            });
+        </script>
+    @endif
     <x-common.page-breadcrumb pageTitle="Tablero de Mantenimiento" />
 
     <x-common.component-card title="Tablero Circular de Servicios" desc="Inicia y finaliza mantenimientos con visual de moto y cliente en tiempo real.">

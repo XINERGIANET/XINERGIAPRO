@@ -200,7 +200,7 @@ class WorkshopReportController extends Controller
     public function serviceOrderPdf(WorkshopMovement $order)
     {
         $this->assertOrderScope($order);
-        $order->load(['movement', 'vehicle', 'client', 'details.product', 'checklists.items', 'damages', 'intakeInventory']);
+        $order->load(['movement', 'vehicle', 'client', 'details.product', 'checklists.items', 'damages.photos', 'intakeInventory']);
 
         $html = view('workshop.pdf.order', compact('order'))->render();
         $pdfBinary = $this->renderPdfWithWkhtmltopdf($html, 'A4', [

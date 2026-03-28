@@ -1019,6 +1019,17 @@
             name: file.name,
             url: URL.createObjectURL(file),
         }));
+    },
+    prepareInitialReportWindow() {
+        if (this.editingMode) {
+            return true;
+        }
+        try {
+            window.open('about:blank', 'workshop-initial-report');
+        } catch (error) {
+            // no-op
+        }
+        return true;
     }
 })" x-init="$nextTick(() => { if (editingMode && editingVehicleLabel) { vehicleSearch = editingVehicleLabel; } if (selectedVehicleId) { syncVehicle() } else { refreshVehicleFilter(); } ensureQuickVehicleClient(); syncHistoryUrl(); initSignaturePad(); seedServiceCcOverridesFromLines(); servicePricesSeeded = true; refreshServiceLinePrices(); const __ep = @js($editingDamagePhotoPreviews ?? [0 => [], 1 => [], 2 => [], 3 => []]); [0,1,2,3].forEach((i) => { if (__ep && __ep[i] && __ep[i].length) { damagePreviews[i] = __ep[i]; } }); })">
     <x-common.page-breadcrumb
@@ -1039,7 +1050,7 @@
 
    
 
-        <form method="POST" action="{{ $editingOrder ? route('workshop.maintenance-board.update', $editingOrder) : route('workshop.maintenance-board.store') }}" enctype="multipart/form-data" @submit="syncSignature()" class="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <form method="POST" action="{{ $editingOrder ? route('workshop.maintenance-board.update', $editingOrder) : route('workshop.maintenance-board.store') }}" enctype="multipart/form-data" @submit="syncSignature(); prepareInitialReportWindow()" class="grid grid-cols-1 gap-3 md:grid-cols-3">
             @csrf
             @if($editingOrder)
                 @method('PUT')

@@ -61,6 +61,27 @@
             height: 22px;
             margin-bottom: 6px;
         }
+        .damage-block {
+            margin-bottom: 10px;
+            page-break-inside: avoid;
+        }
+        .damage-title {
+            margin-bottom: 4px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .damage-photos {
+            margin-top: 6px;
+            font-size: 0;
+        }
+        .damage-photos img {
+            display: inline-block;
+            width: 118px;
+            height: 88px;
+            margin: 0 8px 8px 0;
+            border: 1px solid #cbd5e0;
+            object-fit: cover;
+        }
 
         .table-econ { width: 100%; border-collapse: collapse; margin-top: 6px; }
         .table-econ th, .table-econ td { border: 1px solid #718096; padding: 5px 6px; }
@@ -93,6 +114,46 @@
     $services = $order->details->where('line_type', 'SERVICE')->values();
     $inventory = $order->intakeInventory->values();
     $damages = $order->damages->values();
+    $damageSides = collect([
+        'FRONT' => 'Frontal',
+        'RIGHT' => 'Derecho',
+        'LEFT' => 'Izquierdo',
+        'BACK' => 'Posterior',
+    ])->map(function ($label, $side) use ($damages) {
+        $damage = $damages->first(fn ($item) => strtoupper((string) $item->side) === $side);
+        $photos = collect($damage?->photos ?? [])
+            ->map(function ($photo) {
+                $path = (string) ($photo->photo_path ?? '');
+                if ($path === '') {
+                    return null;
+                }
+
+                $publicStoragePath = public_path('storage/' . ltrim($path, '/'));
+                if (is_file($publicStoragePath)) {
+                    return 'file:///' . str_replace('\\', '/', $publicStoragePath);
+                }
+
+                return asset('storage/' . ltrim($path, '/'));
+            })
+            ->filter()
+            ->values();
+
+        if ($photos->isEmpty() && $damage?->photo_path) {
+            $fallbackPath = (string) $damage->photo_path;
+            $publicStoragePath = public_path('storage/' . ltrim($fallbackPath, '/'));
+            if (is_file($publicStoragePath)) {
+                $photos = collect(['file:///' . str_replace('\\', '/', $publicStoragePath)]);
+            } else {
+                $photos = collect([asset('storage/' . ltrim($fallbackPath, '/'))]);
+            }
+        }
+
+        return [
+            'label' => $label,
+            'damage' => $damage,
+            'photos' => $photos,
+        ];
+    })->values();
 
     $signaturePath = (string) ($order->intake_client_signature_path ?? '');
     $signatureUrl = null;
@@ -177,10 +238,28 @@
 @if($damages->isEmpty())
     <div class="obs-line"></div>
 @else
-    @foreach($damages as $damage)
-        <div class="line-item">
-            <span class="label">{{ $damage->side }}:</span>
-            <span class="fill w-xl">{{ $damage->description }} {{ $damage->severity ? '(' . $damage->severity . ')' : '' }}</span>
+    @foreach($damageSides as $sideData)
+        @php
+            $damage = $sideData['damage'];
+            $photos = $sideData['photos'];
+        @endphp
+        <div class="damage-block">
+            <div class="damage-title">{{ $sideData['label'] }}</div>
+            <div class="line-item">
+                <span class="label">Descripcion:</span>
+                <span class="fill w-xl">{{ $damage?->description ?? '' }}</span>
+            </div>
+            <div class="line-item">
+                <span class="label">Severidad:</span>
+                <span class="fill w-sm">{{ $damage?->severity ?? '' }}</span>
+            </div>
+            @if($photos->isNotEmpty())
+                <div class="damage-photos">
+                    @foreach($photos as $photoUrl)
+                        <img src="{{ $photoUrl }}" alt="Dano {{ $sideData['label'] }}">
+                    @endforeach
+                </div>
+            @endif
         </div>
     @endforeach
 @endif

@@ -474,7 +474,7 @@ class WorkshopMaintenanceBoardController extends Controller
 
         $showDamagesPreexistingDefault = true;
         $showDamagesPreexistingBaseParameter = DB::table('parameters')
-            ->where('description', 'Mostrar daños preexistentes')
+            ->where('description', 'Mostrar daÃ±os preexistentes')
             ->first();
 
         if ($showDamagesPreexistingBaseParameter) {
@@ -588,7 +588,7 @@ class WorkshopMaintenanceBoardController extends Controller
                 'diagnosis_text' => $validated['diagnosis_text'] ?? null,
                 'observations' => $validated['observations'] ?? null,
                 'status' => 'awaiting_approval',
-                'comment' => 'OS creada desde tablero y enviada a espera de aprobación',
+                'comment' => 'OS creada desde tablero y enviada a espera de aprobaciÃ³n',
             ], $branchId, (int) $user?->id, (string) ($user?->name ?? 'Sistema'));
 
             $this->flowService->syncIntakeAndDamages(
@@ -690,7 +690,8 @@ class WorkshopMaintenanceBoardController extends Controller
 
         return redirect()
             ->route('workshop.maintenance-board.index')
-            ->with('status', 'Servicio registrado y enviado a espera de aprobación.');
+            ->with('status', 'Servicio registrado y enviado a espera de aprobacion.')
+            ->with('open_initial_report_url', route('workshop.pdf.order', $workshop));
     }
 
     public function update(Request $request, WorkshopMovement $order): RedirectResponse
@@ -1074,7 +1075,7 @@ class WorkshopMaintenanceBoardController extends Controller
                     ]);
                 }
 
-                // Al aprobar cotización desde tablero, la OS pasa a estado aprobado.
+                // Al aprobar cotizaciÃ³n desde tablero, la OS pasa a estado aprobado.
                 if ((string) $lockedOrder->status === 'awaiting_approval') {
                     $this->flowService->updateOrder($lockedOrder, [
                         'status' => 'approved',
@@ -1086,7 +1087,7 @@ class WorkshopMaintenanceBoardController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
 
-        return back()->with('status', 'Cotización aprobada correctamente.');
+        return back()->with('status', 'CotizaciÃ³n aprobada correctamente.');
     }
 
     public function storeVehicleQuick(Request $request): JsonResponse
@@ -1344,7 +1345,7 @@ class WorkshopMaintenanceBoardController extends Controller
 
         try {
             if ((string) $order->status !== 'in_progress') {
-                throw new \RuntimeException('Solo se pueden pausar servicios en reparación.');
+                throw new \RuntimeException('Solo se pueden pausar servicios en reparaciÃ³n.');
             }
 
             $this->flowService->updateOrder($order, [
@@ -1378,7 +1379,7 @@ class WorkshopMaintenanceBoardController extends Controller
                 'status' => 'in_progress',
                 'paused_at' => null,
                 'total_paused_minutes' => (int) ($order->total_paused_minutes ?? 0) + $minutes,
-                'comment' => 'Reanudación de servicio desde tablero',
+                'comment' => 'ReanudaciÃ³n de servicio desde tablero',
             ]);
         } catch (\Throwable $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
@@ -1584,7 +1585,7 @@ class WorkshopMaintenanceBoardController extends Controller
                     $allowedGateways = $gatewayMethodMap->get((int) $payment['payment_method_id'], []);
                     if (!in_array((int) $payment['payment_gateway_id'], $allowedGateways, true)) {
                         throw ValidationException::withMessages([
-                            "payment_methods.{$index}.payment_gateway_id" => 'La pasarela no corresponde al método de pago seleccionado.',
+                            "payment_methods.{$index}.payment_gateway_id" => 'La pasarela no corresponde al mÃ©todo de pago seleccionado.',
                         ]);
                     }
                 }
@@ -1685,8 +1686,8 @@ class WorkshopMaintenanceBoardController extends Controller
                     ->whereNull('sales_movement_id')
                     ->count();
 
-                // Mantener la misma lógica operativa del módulo de ventas:
-                // si aún no existe venta asociada o hay líneas pendientes, primero se factura.
+                // Mantener la misma lÃ³gica operativa del mÃ³dulo de ventas:
+                // si aÃºn no existe venta asociada o hay lÃ­neas pendientes, primero se factura.
                 $mustGenerateSale = (bool) ($validated['generate_sale'] ?? false);
                 if ((int) ($lockedOrder->sales_movement_id ?? 0) <= 0 || $pendingLines > 0) {
                     $mustGenerateSale = true;
@@ -2032,7 +2033,7 @@ class WorkshopMaintenanceBoardController extends Controller
             str_contains($normalized, 'tarjeta')
             || str_contains($normalized, 'card')
             || str_contains($normalized, 'credito')
-            || str_contains($normalized, 'débito')
+            || str_contains($normalized, 'dÃ©bito')
             || str_contains($normalized, 'debito')
         ) {
             return 'card';
@@ -2103,3 +2104,4 @@ class WorkshopMaintenanceBoardController extends Controller
         return $path;
     }
 }
+
