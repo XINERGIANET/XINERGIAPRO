@@ -1115,7 +1115,7 @@
 
    
 
-        <form method="POST" action="{{ $editingOrder ? route('workshop.maintenance-board.update', $editingOrder) : route('workshop.maintenance-board.store') }}" enctype="multipart/form-data" @submit="syncSignature()" class="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <form method="POST" action="{{ $editingOrder ? route('workshop.maintenance-board.update', $editingOrder) : route('workshop.maintenance-board.store') }}" enctype="multipart/form-data" data-turbo="false" @submit="syncSignature()" class="grid grid-cols-1 gap-3 md:grid-cols-3">
             @csrf
             @if($editingOrder)
                 @method('PUT')
