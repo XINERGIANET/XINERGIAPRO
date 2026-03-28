@@ -688,10 +688,14 @@ class WorkshopMaintenanceBoardController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
 
-        return redirect()
-            ->route('workshop.maintenance-board.index')
-            ->with('status', 'Servicio registrado y enviado a espera de aprobacion.')
-            ->with('open_initial_report_url', route('workshop.pdf.order', $workshop));
+        session()->flash('status', 'Servicio registrado y enviado a espera de aprobacion.');
+
+        return response()->view('workshop.maintenance-board.store_redirect', [
+            'reportUrl' => route('workshop.pdf.order', $workshop),
+            'redirectUrl' => route('workshop.maintenance-board.index', array_filter([
+                'view_id' => $request->query('view_id'),
+            ])),
+        ]);
     }
 
     public function update(Request $request, WorkshopMovement $order): RedirectResponse

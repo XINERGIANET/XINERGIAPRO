@@ -169,7 +169,7 @@
 
 <div class="page-title">
     <h1>ORDEN DE SERVICIO</h1>
-    <h2>Mantenimiento y Reparacion de Motocicletas</h2>
+ 
 </div>
 
 <table class="row-2">
@@ -207,6 +207,14 @@
         @endfor
     </tr>
 </table>
+
+<div class="section-title">Diagnostico</div>
+@if(trim((string) $order->diagnosis_text) !== '')
+    <div style="margin-bottom:10px;">{{ $order->diagnosis_text }}</div>
+@else
+    <div class="obs-line"></div>
+    <div class="obs-line"></div>
+@endif
 
 <div class="section-title">Observaciones</div>
 @if(trim((string) $order->observations) !== '')
