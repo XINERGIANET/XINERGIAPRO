@@ -1013,9 +1013,85 @@
         this.clientSignatureData = this.signatureCanvas.toDataURL('image/png');
     },
     damagePreviews: { 0: [], 1: [], 2: [], 3: [] },
-    updateDamagePreviews(index, event) {
-        const files = Array.from(event?.target?.files || []);
-        this.damagePreviews[index] = files.map(file => ({
+    async compressDamageImage(file) {
+        if (!(file instanceof File) || !String(file.type || '').startsWith('image/')) {
+            return file;
+        }
+
+        const maxDimension = 1600;
+        const quality = 0.76;
+
+        const imageUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+
+        const image = await new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = imageUrl;
+        });
+
+        let width = image.width || 0;
+        let height = image.height || 0;
+
+        if (width <= 0 || height <= 0) {
+            return file;
+        }
+
+        if (width > maxDimension || height > maxDimension) {
+            const ratio = Math.min(maxDimension / width, maxDimension / height);
+            width = Math.max(1, Math.round(width * ratio));
+            height = Math.max(1, Math.round(height * ratio));
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            return file;
+        }
+
+        ctx.drawImage(image, 0, 0, width, height);
+
+        const blob = await new Promise((resolve) => {
+            canvas.toBlob(resolve, 'image/jpeg', quality);
+        });
+
+        if (!blob || blob.size >= file.size) {
+            return file;
+        }
+
+        const nextName = String(file.name || 'damage.jpg').replace(/\.(png|webp|jpeg|jpg)$/i, '') + '.jpg';
+        return new File([blob], nextName, {
+            type: 'image/jpeg',
+            lastModified: Date.now(),
+        });
+    },
+    async updateDamagePreviews(index, event) {
+        const input = event?.target;
+        const files = Array.from(input?.files || []);
+        const processedFiles = [];
+
+        for (const file of files) {
+            try {
+                processedFiles.push(await this.compressDamageImage(file));
+            } catch (error) {
+                processedFiles.push(file);
+            }
+        }
+
+        if (input) {
+            const dataTransfer = new DataTransfer();
+            processedFiles.forEach(file => dataTransfer.items.add(file));
+            input.files = dataTransfer.files;
+        }
+
+        this.damagePreviews[index] = processedFiles.map(file => ({
             name: file.name,
             url: URL.createObjectURL(file),
         }));
