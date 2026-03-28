@@ -154,6 +154,14 @@
             'photos' => $photos,
         ];
     })->values();
+    $damageSidesWithData = $damageSides->filter(function ($sideData) {
+        $damage = $sideData['damage'];
+        $photos = $sideData['photos'];
+
+        return trim((string) ($damage?->description ?? '')) !== ''
+            || trim((string) ($damage?->severity ?? '')) !== ''
+            || $photos->isNotEmpty();
+    })->values();
 
     $signaturePath = (string) ($order->intake_client_signature_path ?? '');
     $signatureUrl = null;
@@ -243,10 +251,10 @@
 </table>
 
 <div class="section-title">Danos pre-existentes de la unidad</div>
-@if($damages->isEmpty())
+@if($damageSidesWithData->isEmpty())
     <div class="obs-line"></div>
 @else
-    @foreach($damageSides as $sideData)
+    @foreach($damageSidesWithData as $sideData)
         @php
             $damage = $sideData['damage'];
             $photos = $sideData['photos'];

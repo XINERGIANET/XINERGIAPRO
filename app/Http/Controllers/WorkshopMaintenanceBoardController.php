@@ -512,7 +512,7 @@ class WorkshopMaintenanceBoardController extends Controller
     }
             
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): \Illuminate\Http\Response|RedirectResponse
     {
         [$branchId, $companyId] = $this->branchScope();
         $validated = $request->validate([
