@@ -179,12 +179,22 @@
             </template>
         </div>
 
-        <form method="GET" action="{{ route('workshop.assemblies.index') }}" class="mb-4 grid grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-white p-4 md:grid-cols-5 dark:border-gray-800 dark:bg-white/[0.02]">
+        <form method="GET" action="{{ route('workshop.assemblies.index') }}" class="mb-4 grid grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-white p-4 md:grid-cols-6 dark:border-gray-800 dark:bg-white/[0.02]">
+            @if(request('view_id'))
+                <input type="hidden" name="view_id" value="{{ request('view_id') }}">
+            @endif
             <input type="month" name="month" value="{{ $month }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
             <input name="brand_company" value="{{ $brandCompany }}" placeholder="Empresa/Marca" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
             <input name="vehicle_type" value="{{ $vehicleType }}" placeholder="Tipo vehiculo" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
+            <select name="status" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
+                <option value="all" @selected(($status ?? 'all') === 'all')>Todos los estados</option>
+                <option value="pending" @selected(($status ?? 'all') === 'pending')>Pendiente</option>
+                <option value="in_progress" @selected(($status ?? 'all') === 'in_progress')>En proceso</option>
+                <option value="finished" @selected(($status ?? 'all') === 'finished')>Finalizado</option>
+                <option value="delivered" @selected(($status ?? 'all') === 'delivered')>Entregado</option>
+            </select>
             <button class="h-11 rounded-lg bg-[#244BB3] px-4 text-sm font-medium text-white">Filtrar</button>
-            <a href="{{ route('workshop.assemblies.index') }}" class="h-11 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 inline-flex items-center justify-center">Limpiar</a>
+            <a href="{{ route('workshop.assemblies.index', request('view_id') ? ['view_id' => request('view_id')] : []) }}" class="h-11 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 inline-flex items-center justify-center">Limpiar</a>
         </form>
 
 

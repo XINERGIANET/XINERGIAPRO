@@ -52,6 +52,7 @@ class WorkshopAssemblyController extends Controller
         $month = (string) $request->input('month', now()->format('Y-m'));
         $brandCompany = trim((string) $request->input('brand_company', ''));
         $vehicleType = trim((string) $request->input('vehicle_type', ''));
+        $status = trim((string) $request->input('status', 'all'));
 
         $assemblies = WorkshopAssembly::query()
             ->with(['location:id,name,address', 'responsibleTechnician:id,first_name,last_name,document_number'])
@@ -60,6 +61,10 @@ class WorkshopAssemblyController extends Controller
             ->whereRaw("to_char(assembled_at, 'YYYY-MM') = ?", [$month])
             ->when($brandCompany !== '', fn ($query) => $query->where('brand_company', 'ILIKE', "%{$brandCompany}%"))
             ->when($vehicleType !== '', fn ($query) => $query->where('vehicle_type', 'ILIKE', "%{$vehicleType}%"))
+            ->when($status === 'pending', fn ($query) => $query->whereNull('started_at'))
+            ->when($status === 'in_progress', fn ($query) => $query->whereNotNull('started_at')->whereNull('finished_at'))
+            ->when($status === 'finished', fn ($query) => $query->whereNotNull('finished_at')->whereNull('exit_at'))
+            ->when($status === 'delivered', fn ($query) => $query->whereNotNull('exit_at'))
             ->orderByDesc('assembled_at')
             ->orderByDesc('id')
             ->paginate(20)
@@ -116,7 +121,8 @@ class WorkshopAssemblyController extends Controller
             'summaryByType',
             'month',
             'brandCompany',
-            'vehicleType', 
+            'vehicleType',
+            'status',
             'assemblyLocations',
             'technicians',
             'vehicleTypes'
