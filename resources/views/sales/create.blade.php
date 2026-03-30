@@ -10,7 +10,7 @@
         $pageTitle = $invoiceMode && $isEditMode ? 'Facturar venta' : ($isEditMode ? 'Editar venta' : 'Nueva venta');
         $cardDescription = $isEditMode
             ? 'Actualiza la venta con la misma interfaz del punto de venta.'
-            : 'Interfaz de venta rapida. Puedes seguir agregando productos aunque el stock mostrado sea 0.';
+            : 'Interfaz de venta r?pida. Puedes seguir agregando productos aunque el stock mostrado sea 0.';
         $secondaryActionLabel = $isEditMode ? 'Cancelar' : 'Guardar';
         $secondaryActionIcon = $isEditMode ? 'ri-close-line' : 'ri-save-line';
         $primaryActionLabel = $invoiceMode && $isEditMode ? 'Guardar factura' : ($isEditMode ? 'Guardar cambios' : 'Cobrar');
@@ -21,7 +21,7 @@
         <x-common.page-breadcrumb :pageTitle="$pageTitle" />
 
         <x-common.component-card title="Punto de Venta"
-            desc="Interfaz de venta rÃ¡pida. Puedes seguir agregando productos aunque el stock mostrado sea 0.">
+            desc="Interfaz de venta rápida. Puedes seguir agregando productos aunque el stock mostrado sea 0.">
             <div class="flex items-start gap-6" style="display:flex; align-items:flex-start; gap:1.5rem;">
                 <section class="min-w-0 space-y-5" style="flex: 0 0 60%; max-width: 60%; width: 60%;">
 
@@ -79,7 +79,7 @@
                                 <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
                                     <i class="ri-search-line text-lg"></i>
                                 </span>
-                                <input id="product-search-legacy" type="text" placeholder="Buscar por nombre o categorÃ­a"
+                                <input id="product-search-legacy" type="text" placeholder="Buscar por nombre o categoría"
                                     class="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-12 pr-4 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100">
                             </div>
                             <div class="flex flex-wrap gap-2">
@@ -100,7 +100,7 @@
                     <div class="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                         <div class="mb-5 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                             <div>
-                                <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Catalogo</p>
+                                <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Catálogo</p>
                                 <h3 class="mt-1 text-lg font-bold text-slate-900">Productos</h3>
                             </div>
                             <div id="category-filters" class="flex flex-wrap gap-3"></div>
@@ -112,7 +112,7 @@
                                         <i class="ri-search-line text-[22px]"></i>
                                     </span>
                                     <input id="product-search" type="text"
-                                        placeholder="Buscar por codigo de barras, nombre o categoria"
+                                        placeholder="Buscar por código de barras, nombre o categoría"
                                         class="h-14 w-full rounded-[22px] border border-slate-200 bg-slate-50 pl-14 pr-4 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100">
                                 </div>
                                 <button type="button" id="clear-sale-button"
@@ -126,9 +126,9 @@
                         <div id="sale-glosa-panel" class="hidden rounded-2xl border border-slate-200 bg-slate-50 p-5">
                             <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
-                                    <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Detalle</p>
+                                <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Cat?logo</p>
                                     <h4 class="text-base font-bold text-slate-900">Venta por glosa</h4>
-                                    <p class="mt-1 text-sm text-slate-500">Registra conceptos manuales sin obligar un producto del catalogo.</p>
+                                    <p class="mt-1 text-sm text-slate-500">Registra conceptos manuales sin obligar un producto del catÃ¡logo.</p>
                                 </div>
                                 <button type="button" id="add-glosa-button"
                                     class="inline-flex h-11 items-center gap-2 rounded-2xl px-4 text-sm font-bold text-white shadow-theme-xs"
@@ -260,11 +260,11 @@
 
                                     <div id="sale-debt-notice"
                                         class="hidden space-y-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-                                        <p>Esta venta se registrara como deuda y se enviara a cuentas por cobrar.</p>
+                                        <p>Esta venta se registrará como deuda y se enviará a cuentas por cobrar.</p>
                                         <div class="grid gap-3 sm:grid-cols-2">
                                             <div class="space-y-2">
                                                 <label for="sale-debt-credit-days"
-                                                    class="block text-[10px] font-bold uppercase tracking-[0.18em] text-amber-800">Dias de credito</label>
+                                                    class="block text-[10px] font-bold uppercase tracking-[0.18em] text-amber-800">Días de crédito</label>
                                                 <input type="number" id="sale-debt-credit-days" min="0" step="1" value="0"
                                                     class="h-12 w-full rounded-2xl border border-amber-200 bg-white px-4 text-sm font-bold text-slate-700 outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-200">
                                             </div>
@@ -318,7 +318,7 @@
                                 <div id="payment-methods-section">
                                     <div class="mb-3 flex items-center justify-between">
                                         <div>
-                                            <p class="mt-1 text-sm font-bold text-slate-900">MÃ©todos de pago</p>
+                                            <p class="mt-1 text-sm font-bold text-slate-900">Métodos de pago</p>
                                         </div>
                                         <button type="button" id="add-payment-row-button"
                                             class="inline-flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-bold text-white shadow-theme-xs"
@@ -1660,8 +1660,8 @@
             };
             const cardTypeLabel = (type) => {
                 const c = String(type || '').trim().toUpperCase();
-                if (c === 'C') return 'CrÃ©dito';
-                if (c === 'D') return 'DÃ©bito';
+                if (c === 'C') return 'Crédito';
+                if (c === 'D') return 'Débito';
                 return '';
             };
             const buildPaymentMethodVariants = () => paymentMethods.flatMap((method) => {
@@ -1715,7 +1715,7 @@
             };
             const getMethodName = (methodId) => {
                 const method = paymentMethods.find((pm) => Number(pm.id) === Number(methodId));
-                return method?.description || 'Metodo';
+                return method?.description || 'Método';
             };
 
             function getCategories() {
@@ -1979,7 +1979,7 @@
             function addPaymentRow(prefillAmount = null) {
                 const fallbackVariant = getDefaultPaymentVariant();
                 if (!fallbackVariant) {
-                    showNotice('No hay metodos de pago disponibles.');
+                    showNotice('No hay métodos de pago disponibles.');
                     return;
                 }
 
@@ -2010,7 +2010,7 @@
                 if (!container) return;
 
                 if (!paymentRows.length) {
-                    container.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-center text-xs font-medium text-slate-500">Agrega al menos un metodo de pago.</div>';
+                    container.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-center text-xs font-medium text-slate-500">Agrega al menos un m?todo de pago.</div>';
                     updatePaymentSummary();
                     return;
                 }
@@ -2036,7 +2036,7 @@
                             <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
                                 <div style="${layoutStyle}">
                                     <div class="space-y-1 js-payment-method-ac relative" data-index="${index}">
-                                        <label class="block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Metodo</label>
+                                        <label class="block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Método</label>
                                         <button type="button" class="payment-method-ac-trigger flex h-11 w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 text-left text-sm font-semibold text-slate-700 outline-none transition hover:border-orange-200 focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                                             <span class="payment-method-ac-label min-w-0 flex-1 truncate">${methodLabel}</span>
                                             <span class="shrink-0 text-slate-400"><i class="ri-arrow-down-s-line text-lg"></i></span>
@@ -2428,7 +2428,7 @@
                 let totalItems = 0;
 
                 if (!currentSale.items.length) {
-                    container.innerHTML = '<div class="flex min-h-[240px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-center"><div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-sm"><i class="ri-shopping-bag-3-line text-3xl"></i></div><p class="mt-4 text-base font-bold text-slate-800">Sin productos en la orden</p><p class="mt-1 text-sm text-slate-500">Agrega productos desde el catÃ¡logo.</p></div>';
+                    container.innerHTML = '<div class="flex min-h-[240px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-center"><div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-sm"><i class="ri-shopping-bag-3-line text-3xl"></i></div><p class="mt-4 text-base font-bold text-slate-800">Sin productos en la orden</p><p class="mt-1 text-sm text-slate-500">Agrega productos desde el catálogo.</p></div>';
                 } else {
                     currentSale.items.forEach((item, index) => {
                         const isManualLine = Number(item.pId || 0) <= 0 || String(item.kind || '') === 'glosa';
@@ -2577,7 +2577,7 @@ const total = subtotalBase + tax - discount;
                 }
 
                 if (!isDebtSaleSelected() && !paymentRows.length) {
-                    showNotice('Agrega al menos un metodo de pago.');
+                    showNotice('Agrega al menos un método de pago.');
                     return;
                 }
 
@@ -2948,7 +2948,7 @@ document.getElementById('sale-discount-save-button')?.addEventListener('click', 
     saveDB();
 
     renderTicket();
-    updatePaymentSummary(); // ðŸ”´ IMPORTANTE
+    updatePaymentSummary(); // ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â´ IMPORTANTE
 
     document.getElementById('sale-discount-modal')?.classList.add('hidden');
 
