@@ -91,6 +91,8 @@ class WorkshopClientController extends Controller
             'userName' => old('user_name'),
             'branch' => $branch,
             'company' => $branch->company,
+            'firstNameRequired' => strtoupper((string) $this->branchParameter('Nombres obligatorios', $branchId, 'Si')) === 'SI',
+            'lastNameRequired' => strtoupper((string) $this->branchParameter('Apellidos obligatorios', $branchId, 'Si')) === 'SI',
         ] + $this->getLocationData(null, $branch->location_id));
     }
 
@@ -419,5 +421,21 @@ class WorkshopClientController extends Controller
             'selectedProvinceId' => $selectedProvinceId,
             'selectedDistrictId' => $selectedDistrictId,
         ];
+    }
+
+    private function branchParameter(string $key, int $branchId, string $default): string
+    {
+        $parameter = \Illuminate\Support\Facades\DB::table('parameters')->where('description', $key)->first();
+        if (!$parameter) {
+            return $default;
+        }
+
+        $branchValue = \Illuminate\Support\Facades\DB::table('branch_parameters')
+            ->where('parameter_id', $parameter->id)
+            ->where('branch_id', $branchId)
+            ->whereNull('deleted_at')
+            ->value('value');
+
+        return $branchValue ?? $parameter->value ?? $default;
     }
 }

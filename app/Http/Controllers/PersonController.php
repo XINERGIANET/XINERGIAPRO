@@ -84,10 +84,11 @@ class PersonController extends Controller
             'perPage' => $perPage,
             'roles' => $roles,
             'profiles' => $profiles,
-            'selectedRoleIds' => old('roles', []),
             'selectedProfileId' => old('profile_id'),
             'userName' => old('user_name'),
             'operaciones' => $operaciones,
+            'firstNameRequired' => strtoupper((string) $this->branchParameter('Nombres obligatorios', $branch->id, 'Si')) === 'SI',
+            'lastNameRequired' => strtoupper((string) $this->branchParameter('Apellidos obligatorios', $branch->id, 'Si')) === 'SI',
         ] + $this->getLocationData(null, $branch->location_id));
     }
 
@@ -347,6 +348,8 @@ class PersonController extends Controller
             'selectedRoleIds' => $selectedRoleIds,
             'selectedProfileId' => old('profile_id', $user?->profile_id),
             'userName' => old('user_name', $user?->name),
+            'firstNameRequired' => strtoupper((string) $this->branchParameter('Nombres obligatorios', $branch->id, 'Si')) === 'SI',
+            'lastNameRequired' => strtoupper((string) $this->branchParameter('Apellidos obligatorios', $branch->id, 'Si')) === 'SI',
         ] + $this->getLocationData($person));
     }
 
@@ -458,14 +461,19 @@ class PersonController extends Controller
 
     private function validatePerson(Request $request, Branch $branch, ?Person $currentPerson = null): array
     {
+        $firstNameRequired = $this->branchParameter('Nombres obligatorios', $branch->id, 'Si');
+        $lastNameRequired = $this->branchParameter('Apellidos obligatorios', $branch->id, 'Si');
+
+        $firstNameRule = (strtoupper((string) $firstNameRequired) === 'SI') ? 'required' : 'nullable';
+        
         return $request->validate([
-            'first_name' => ['required', 'string', 'max:255'],
+            'first_name' => [$firstNameRule, 'string', 'max:255'],
             'last_name' => [
                 'nullable',
                 'string',
                 'max:255',
-                function ($attribute, $value, $fail) use ($request) {
-                    if (strtoupper((string) $request->input('person_type')) !== 'RUC' && trim((string) $value) === '') {
+                function ($attribute, $value, $fail) use ($request, $lastNameRequired) {
+                    if (strtoupper((string) $lastNameRequired) === 'SI' && strtoupper((string) $request->input('person_type')) !== 'RUC' && trim((string) $value) === '') {
                         $fail('El campo apellidos es obligatorio.');
                     }
                 },
@@ -621,5 +629,21 @@ class PersonController extends Controller
             'selectedProvinceId' => $selectedProvinceId,
             'selectedDistrictId' => $selectedDistrictId,
         ];
+    }
+
+    private function branchParameter(string $key, int $branchId, string $default): string
+    {
+        $parameter = \Illuminate\Support\Facades\DB::table('parameters')->where('description', $key)->first();
+        if (!$parameter) {
+            return $default;
+        }
+
+        $branchValue = \Illuminate\Support\Facades\DB::table('branch_parameters')
+            ->where('parameter_id', $parameter->id)
+            ->where('branch_id', $branchId)
+            ->whereNull('deleted_at')
+            ->value('value');
+
+        return $branchValue ?? $parameter->value ?? $default;
     }
 }
