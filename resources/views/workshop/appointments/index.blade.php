@@ -26,7 +26,7 @@
         @endif
 
         <div class="mb-4 flex flex-wrap items-center gap-2">
-            <x-ui.button size="md" variant="primary" type="button" style="background-color:#00A389;color:#fff" @click="$dispatch('open-appointment-modal')">
+            <x-ui.button size="md" variant="primary" type="button" style="background-color:#00A389;color:#fff" @click="$dispatch('open-type-selection-modal')">
                 <i class="ri-add-line"></i><span>Nueva cita</span>
             </x-ui.button>
             <x-ui.link-button size="md" variant="primary" href="{{ route('workshop.orders.index') }}" style="background-color:#4f46e5;color:#fff">
@@ -167,6 +167,36 @@
             .fc-event:hover {
                 transform: scale(1.02);
             }
+            /* Estilos para eventos más compactos */
+            .fc-v-event, .fc-h-event {
+                border: none !important;
+            }
+            .fc-daygrid-event {
+                margin: 1px 2px !important;
+                padding: 1px 4px !important;
+                border-radius: 5px !important;
+                min-height: 20px !important;
+                display: flex !important;
+                align-items: center !important;
+            }
+            .fc-event-main {
+                font-size: 0.72rem !important;
+                font-weight: 500 !important;
+                line-height: 1.2 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                white-space: nowrap !important;
+            }
+            .fc-event-time {
+                font-weight: 700 !important;
+                margin-right: 3px !important;
+                font-size: 0.65rem !important;
+            }
+            .fc-event-title {
+                font-weight: 600 !important;
+            }
         </style>
 
         <div class="grid grid-cols-1 gap-6">
@@ -190,11 +220,16 @@
                                         <div class="text-[10px] text-gray-500 font-medium">{{ $appointment->start_at?->format('H:i') }} - {{ $appointment->end_at?->format('H:i') }}</div>
                                     </td>
                                     <td class="px-4 py-2 text-xs">
-                                        <div class="font-bold text-gray-800 truncate max-w-[120px]">{{ $appointment->client?->first_name }} {{ $appointment->client?->last_name }}</div>
-                                        <div class="text-[10px] text-gray-500 flex items-center gap-1">
-                                            <i class="ri-motorbike-line"></i>
-                                            <span>{{ $appointment->vehicle?->plate }}</span>
-                                        </div>
+                                        @if($appointment->type === 'other')
+                                            <div class="font-bold text-amber-700 uppercase">[Otros]</div>
+                                            <div class="text-[10px] text-gray-600 font-medium">{{ $appointment->reason }}</div>
+                                        @else
+                                            <div class="font-bold text-gray-800 truncate max-w-[120px]">{{ $appointment->client?->first_name }} {{ $appointment->client?->last_name }}</div>
+                                            <div class="text-[10px] text-gray-500 flex items-center gap-1">
+                                                <i class="ri-motorbike-line"></i>
+                                                <span>{{ $appointment->vehicle?->plate }}</span>
+                                            </div>
+                                        @endif
                                     </td>
                                     <td class="px-4 py-2">
                                         @php
@@ -221,26 +256,50 @@
                                         </span>
                                     </td>
                                     <td class="px-4 py-2">
-                                        <div class="flex items-center justify-end gap-2">
-                                            @if(!$appointment->movement_id)
-                                                <form method="POST" action="{{ route('workshop.appointments.convert', $appointment) }}" class="relative group">
-                                                    @csrf
-                                                    <x-ui.button
-                                                        size="icon"
-                                                        variant="primary"
-                                                        type="submit"
-                                                        className="rounded-xl w-8 h-8"
-                                                        style="background-color: #3B82F6; color: #FFFFFF;"
-                                                        aria-label="Convertir a OS"
-                                                    >
-                                                        <i class="ri-refresh-line"></i>
-                                                    </x-ui.button>
-                                                    <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
-                                                        Convertir a OS
-                                                        <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
-                                                    </span>
-                                                </form>
-                                            @endif
+                                            <div class="flex items-center justify-end gap-2">
+                                                @if($appointment->type === 'service' && !$appointment->movement_id)
+                                                    <a href="{{ route('workshop.maintenance-board.create', [
+                                                        'vehicle_id' => $appointment->vehicle_id,
+                                                        'client_person_id' => $appointment->client_person_id,
+                                                        'diagnosis' => $appointment->reason,
+                                                        'appointment_id' => $appointment->id
+                                                    ]) }}" class="relative group">
+                                                        <x-ui.button
+                                                            size="icon"
+                                                            variant="primary"
+                                                            type="button"
+                                                            className="rounded-xl w-8 h-8"
+                                                            style="background-color: #8B5CF6; color: #FFFFFF;"
+                                                            aria-label="Ir a Tablero"
+                                                        >
+                                                            <i class="ri-dashboard-fill"></i>
+                                                        </x-ui.button>
+                                                        <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
+                                                            Ir a Tablero
+                                                            <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
+                                                        </span>
+                                                    </a>
+                                                @endif
+
+                                                @if(!$appointment->movement_id)
+                                                    <form method="POST" action="{{ route('workshop.appointments.convert', $appointment) }}" class="relative group">
+                                                        @csrf
+                                                        <x-ui.button
+                                                            size="icon"
+                                                            variant="primary"
+                                                            type="submit"
+                                                            className="rounded-xl w-8 h-8"
+                                                            style="background-color: #3B82F6; color: #FFFFFF;"
+                                                            aria-label="Convertir a OS"
+                                                        >
+                                                            <i class="ri-refresh-line"></i>
+                                                        </x-ui.button>
+                                                        <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
+                                                            Convertir a OS
+                                                            <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
+                                                        </span>
+                                                    </form>
+                                                @endif
 
                                             <div class="relative group">
                                                 <x-ui.button
@@ -311,8 +370,31 @@
         </div>
     </x-common.component-card>
 
+    <x-ui.modal x-data="{ open: false }" x-on:open-type-selection-modal.window="open = true" :isOpen="false" :showCloseButton="true" class="max-w-xl">
+        <div class="p-6 text-center">
+            <h3 class="mb-6 text-lg font-bold text-gray-800 dark:text-white/90">Seleccionar tipo de cita</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button @click="open = false; $dispatch('open-appointment-modal', { type: 'service' })" class="flex flex-col items-center justify-center p-6 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 rounded-2xl border-2 border-blue-200 dark:border-blue-800 transition-all group">
+                    <div class="w-14 h-14 bg-blue-500 rounded-full flex items-center justify-center text-white mb-3 group-hover:scale-110 transition-transform shadow-lg shadow-blue-500/30">
+                        <i class="ri-service-line text-2xl"></i>
+                    </div>
+                    <span class="font-bold text-blue-800 dark:text-blue-300 text-base">Servicio</span>
+                    <span class="text-[10px] text-blue-600 dark:text-blue-400 mt-1">Reparación o mantenimiento</span>
+                </button>
+                <button @click="open = false; $dispatch('open-appointment-modal', { type: 'other' })" class="flex flex-col items-center justify-center p-6 bg-amber-50 hover:bg-amber-100 dark:bg-amber-900/20 dark:hover:bg-amber-900/30 rounded-2xl border-2 border-amber-200 dark:border-amber-800 transition-all group">
+                    <div class="w-14 h-14 bg-amber-500 rounded-full flex items-center justify-center text-white mb-3 group-hover:scale-110 transition-transform shadow-lg shadow-amber-500/30">
+                        <i class="ri-more-line text-2xl"></i>
+                    </div>
+                    <span class="font-bold text-amber-800 dark:text-amber-300 text-base">Otros</span>
+                    <span class="text-[10px] text-amber-600 dark:text-amber-400 mt-1">Reuniones o actividades generales</span>
+                </button>
+            </div>
+        </div>
+    </x-ui.modal>
+
     <x-ui.modal x-data="{
         open: false,
+        appointmentType: 'service',
         selectedVehicleId: '',
         vehicleSearch: '',
         vehicleDropdownOpen: false,
@@ -332,14 +414,24 @@
             this.selectedVehicleId = vehicle.id;
             this.vehicleSearch = vehicle.label || '';
             this.vehicleDropdownOpen = false;
+            
             if (vehicle.client_person_id) {
+                const clientId = String(vehicle.client_person_id);
                 if (this.$refs && this.$refs.clientSelect) {
-                    let exists = Array.from(this.$refs.clientSelect.options).some(opt => opt.value === vehicle.client_person_id);
+                    let exists = Array.from(this.$refs.clientSelect.options).some(opt => String(opt.value) === clientId);
                     if (!exists && vehicle.client_name) {
-                        this.$refs.clientSelect.add(new Option(vehicle.client_name, vehicle.client_person_id));
+                        const newOpt = new Option(vehicle.client_name, clientId);
+                        this.$refs.clientSelect.add(newOpt);
                     }
                 }
-                this.selectedClient = vehicle.client_person_id;
+                this.selectedClient = clientId;
+                
+                // Disparar evento de cambio por si hay librerías externas (Select2, etc.)
+                this.$nextTick(() => {
+                    if (this.$refs.clientSelect) {
+                        this.$refs.clientSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                });
             } else {
                 this.selectedClient = '';
             }
@@ -351,10 +443,13 @@
                 this.selectedClient = '';
             }
         }
-    }" x-on:open-appointment-modal.window="open = true; selectedVehicleId = ''; vehicleSearch = ''; selectedClient = '';" :isOpen="false" :showCloseButton="false" class="max-w-5xl">
+    }" x-on:open-appointment-modal.window="open = true; appointmentType = $event.detail.type || 'service'; selectedVehicleId = ''; vehicleSearch = ''; selectedClient = '';" :isOpen="false" :showCloseButton="false" class="max-w-5xl">
         <div class="p-6 sm:p-8">
             <div class="mb-6 flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Registrar cita</h3>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Registrar cita</h3>
+                    <p class="text-xs text-brand-500 font-medium mt-0.5" x-text="appointmentType === 'service' ? 'Tipo: Servicio Técnico' : 'Tipo: Cita General / Otra'"></p>
+                </div>
                 <button type="button" @click="open = false" class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
                     <i class="ri-close-line text-xl"></i>
                 </button>
@@ -362,7 +457,9 @@
 
             <form method="POST" action="{{ route('workshop.appointments.store') }}" class="grid grid-cols-1 gap-4 md:grid-cols-3">
                 @csrf
-                <div>
+                <input type="hidden" name="type" x-model="appointmentType">
+                
+                <div x-show="appointmentType === 'service'">
                     <label class="mb-1 block text-sm font-medium text-gray-700">Vehiculo</label>
                     <div class="relative" x-on:click.outside="vehicleDropdownOpen = false">
                         <input type="hidden" name="vehicle_id" x-model="selectedVehicleId">
@@ -375,7 +472,7 @@
                             @blur="setTimeout(() => { vehicleDropdownOpen = false }, 200)"
                             class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
                             placeholder="Buscar vehiculo o cliente..."
-                            required
+                            :required="appointmentType === 'service'"
                         >
                         <div
                             x-show="vehicleDropdownOpen && filteredVehicles.length > 0"
@@ -401,9 +498,9 @@
                         </div>
                     </div>
                 </div>
-                <div>
+                <div x-show="appointmentType === 'service'">
                     <label class="mb-1 block text-sm font-medium text-gray-700">Cliente</label>
-                    <select x-ref="clientSelect" name="client_person_id" x-model="selectedClient" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm flex-1 dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" required>
+                    <select x-ref="clientSelect" name="client_person_id" x-model="selectedClient" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm flex-1 dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" :required="appointmentType === 'service'">
                         <option value="">Seleccione cliente</option>
                         @foreach($clients as $client)
                             <option value="{{ $client->id }}">{{ $client->first_name }} {{ $client->last_name }}</option>
@@ -411,7 +508,7 @@
                     </select>
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">Tecnico</label>
+                    <label class="mb-1 block text-sm font-medium text-gray-700" x-text="appointmentType === 'service' ? 'Tecnico' : 'Responsable'"></label>
                     <select name="technician_person_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
                         <option value="">Seleccione tecnico</option>
                         @foreach($technicians as $tech)
@@ -425,7 +522,7 @@
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Fin</label>
-                    <input type="datetime-local" name="end_at" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                    <input type="datetime-local" name="end_at" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Motivo</label>
@@ -457,6 +554,7 @@
         <x-ui.modal x-data="{
             open: false,
             selectedVehicleId: '{{ $appointment->vehicle_id }}',
+            appointmentType: '{{ $appointment->type ?? 'service' }}',
             vehicleSearch: '{{ $appointment->vehicle ? $appointment->vehicle->brand . ' ' . $appointment->vehicle->model . ' - ' . $appointment->vehicle->plate : '' }}',
             vehicleDropdownOpen: false,
             selectedClient: '{{ $appointment->client_person_id }}',
@@ -475,14 +573,24 @@
                 this.selectedVehicleId = vehicle.id;
                 this.vehicleSearch = vehicle.label || '';
                 this.vehicleDropdownOpen = false;
+                
                 if (vehicle.client_person_id) {
+                    const clientId = String(vehicle.client_person_id);
                     if (this.$refs && this.$refs.clientSelect) {
-                        let exists = Array.from(this.$refs.clientSelect.options).some(opt => opt.value === vehicle.client_person_id);
+                        let exists = Array.from(this.$refs.clientSelect.options).some(opt => String(opt.value) === clientId);
                         if (!exists && vehicle.client_name) {
-                            this.$refs.clientSelect.add(new Option(vehicle.client_name, vehicle.client_person_id));
+                            const newOpt = new Option(vehicle.client_name, clientId);
+                            this.$refs.clientSelect.add(newOpt);
                         }
                     }
-                    this.selectedClient = vehicle.client_person_id;
+                    this.selectedClient = clientId;
+                    
+                    // Disparar evento de cambio
+                    this.$nextTick(() => {
+                        if (this.$refs.clientSelect) {
+                            this.$refs.clientSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    });
                 } else {
                     this.selectedClient = '';
                 }
@@ -497,7 +605,10 @@
         }" x-on:open-edit-appointment-modal.window="if ($event.detail === {{ $appointment->id }}) { open = true }" :isOpen="false" :showCloseButton="false" class="max-w-5xl">
             <div class="p-6 sm:p-8">
                 <div class="mb-6 flex items-center justify-between">
-                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Editar cita</h3>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Editar cita</h3>
+                        <p class="text-xs text-brand-500 font-medium mt-0.5" x-text="appointmentType === 'service' ? 'Tipo: Servicio Técnico' : 'Tipo: Cita General / Otra'"></p>
+                    </div>
                     <button type="button" @click="open = false" class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
                         <i class="ri-close-line text-xl"></i>
                     </button>
@@ -506,7 +617,9 @@
                 <form method="POST" action="{{ route('workshop.appointments.update', $appointment) }}" class="grid grid-cols-1 gap-4 md:grid-cols-3">
                     @csrf
                     @method('PUT')
-                    <div>
+                    <input type="hidden" name="type" x-model="appointmentType">
+
+                    <div x-show="appointmentType === 'service'">
                         <label class="mb-1 block text-sm font-medium text-gray-700">Vehiculo</label>
                         <div class="relative" x-on:click.outside="vehicleDropdownOpen = false">
                             <input type="hidden" name="vehicle_id" x-model="selectedVehicleId">
@@ -519,7 +632,7 @@
                                 @blur="setTimeout(() => { vehicleDropdownOpen = false }, 200)"
                                 class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
                                 placeholder="Buscar vehiculo o cliente..."
-                                required
+                                :required="appointmentType === 'service'"
                             >
                             <div
                                 x-show="vehicleDropdownOpen && filteredVehicles.length > 0"
@@ -545,16 +658,16 @@
                             </div>
                         </div>
                     </div>
-                    <div>
+                    <div x-show="appointmentType === 'service'">
                         <label class="mb-1 block text-sm font-medium text-gray-700">Cliente</label>
-                        <select x-ref="clientSelect" name="client_person_id" x-model="selectedClient" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm flex-1 dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" required>
+                        <select x-ref="clientSelect" name="client_person_id" x-model="selectedClient" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm flex-1 dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90" :required="appointmentType === 'service'">
                             @foreach($clients as $client)
                                 <option value="{{ $client->id }}">{{ $client->first_name }} {{ $client->last_name }}</option>
                             @endforeach
                         </select>
                     </div>
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-gray-700">Tecnico</label>
+                        <label class="mb-1 block text-sm font-medium text-gray-700" x-text="appointmentType === 'service' ? 'Tecnico' : 'Responsable'"></label>
                         <select name="technician_person_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
                             <option value="">Seleccione tecnico</option>
                             @foreach($technicians as $tech)
@@ -568,7 +681,7 @@
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">Fin</label>
-                        <input type="datetime-local" name="end_at" value="{{ optional($appointment->end_at)->format('Y-m-d\\TH:i') }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                        <input type="datetime-local" name="end_at" value="{{ optional($appointment->end_at)->format('Y-m-d\\TH:i') }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">Motivo</label>
@@ -588,7 +701,18 @@
                             <option value="no_show" @selected($appointment->status === 'no_show')>No se presentó</option>
                         </select>
                     </div>
-                    <div class="md:col-span-3 mt-2 flex gap-2">
+                    <div class="md:col-span-3 mt-2 flex flex-wrap gap-2">
+                        @if($appointment->type === 'service' && !$appointment->movement_id)
+                            <a href="{{ route('workshop.maintenance-board.create', [
+                                'vehicle_id' => $appointment->vehicle_id,
+                                'client_person_id' => $appointment->client_person_id,
+                                'diagnosis' => $appointment->reason,
+                                'appointment_id' => $appointment->id
+                            ]) }}" class="inline-flex h-11 items-center gap-2 rounded-xl bg-purple-600 px-4 text-xs font-bold uppercase tracking-wider text-white hover:bg-purple-700 transition shadow-sm">
+                                <i class="ri-dashboard-fill text-lg"></i>
+                                <span>Ir a Tablero</span>
+                            </a>
+                        @endif
                         <x-ui.button type="submit" size="md" variant="primary"><i class="ri-save-line"></i><span>Guardar cambios</span></x-ui.button>
                         <x-ui.button type="button" size="md" variant="outline" @click="open = false"><i class="ri-close-line"></i><span>Cancelar</span></x-ui.button>
                     </div>

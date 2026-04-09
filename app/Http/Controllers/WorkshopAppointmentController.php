@@ -43,10 +43,13 @@ class WorkshopAppointmentController extends Controller
             ->get();
 
         $events = $appointments->map(function ($app) {
-            $title = ($app->client?->first_name ?? 'Cita') . ' - ' . ($app->vehicle?->plate ?? '');
+            $prefix = $app->type === 'other' ? '[OTRO] ' : '';
+            $title = $prefix . ($app->type === 'other' 
+                ? $app->reason 
+                : (($app->client?->first_name ?? 'Cita') . ' - ' . ($app->vehicle?->plate ?? '')));
             
             $start = $app->start_at;
-            $end = $start->copy()->addHour();
+            $end = $app->end_at ?: $start->copy()->addHour();
 
             return [
                 'id' => (string) $app->id,
@@ -71,11 +74,11 @@ class WorkshopAppointmentController extends Controller
     private function getStatusColor(string $status): string
     {
         return match ($status) {
-            'pending' => '#f59e0b',   // Amber
-            'confirmed' => '#10b981', // Emerald
-            'arrived' => '#3b82f6',   // Blue
-            'cancelled' => '#ef4444', // Red
-            'no_show' => '#6b7280',   // Gray
+            'pending' => '#f59e0b',   // Amber (Pendiente)
+            'confirmed' => '#10b981', // Emerald (Confirmado)
+            'arrived' => '#3b82f6',   // Blue (Llegó)
+            'cancelled' => '#ef4444', // Red (Cancelado)
+            'no_show' => '#6b7280',   // Gray (No se presentó)
             default => '#244BB3',     // Default Blue
         };
     }

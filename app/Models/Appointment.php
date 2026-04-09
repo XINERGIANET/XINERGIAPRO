@@ -22,6 +22,7 @@ class Appointment extends Model
         'technician_person_id',
         'status',
         'source',
+        'type',
         'movement_id',
     ];
 

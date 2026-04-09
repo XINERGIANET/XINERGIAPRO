@@ -100,6 +100,13 @@
                 $notifMonths = is_numeric($notifMonths) ? (int) $notifMonths : 2;
                 $notifDays = is_numeric($notifDays) ? (int) $notifDays : 0;
                 $cutoffDate = now()->subMonths($notifMonths)->subDays($notifDays);
+
+                $notifAppDays = \Illuminate\Support\Facades\DB::table('branch_parameters as bp')
+                    ->join('parameters as p', 'p.id', '=', 'bp.parameter_id')
+                    ->where('bp.branch_id', $branchId > 0 ? $branchId : 1)
+                    ->where('p.description', 'Días previos para notificar citas')
+                    ->value('bp.value');
+                $notifAppDays = is_numeric($notifAppDays) ? (int) $notifAppDays : 2;
                 
                 $recommendedVehiclesQuery = \App\Models\Vehicle::query()
                     ->with('client')
@@ -127,17 +134,31 @@
                     }], \DB::raw('COALESCE(delivery_date, finished_at)'))
                     ->orderBy('last_service_date', 'asc')
                     ->limit(15);
+
+                $upcomingAppointmentsQuery = \App\Models\Appointment::query()
+                    ->with(['vehicle', 'client'])
+                    ->when($branchId > 0, fn($q) => $q->where('branch_id', $branchId))
+                    ->whereIn('status', ['pending', 'confirmed'])
+                    ->where('start_at', '>=', now()->startOfDay())
+                    ->where('start_at', '<=', now()->addDays($notifAppDays)->endOfDay())
+                    ->whereNull('movement_id')
+                    ->orderBy('start_at', 'asc')
+                    ->limit(10);
                     
                 // Safe query handling in case table is not migrated yet
                 try {
                     $expiringVehicles = collect($expiringVehiclesQuery->get());
                     $recommendedVehicles = collect($recommendedVehiclesQuery->get());
+                    $upcomingAppointments = collect($upcomingAppointmentsQuery->get());
+                    
+                    $todaysAppCount = $upcomingAppointments->filter(fn($app) => \Carbon\Carbon::parse($app->start_at)->isToday())->count();
                 } catch (\Throwable $e) {
                     $expiringVehicles = collect([]);
                     $recommendedVehicles = collect([]);
+                    $upcomingAppointments = collect([]);
                 }
                 
-                $totalNotifs = $expiringVehicles->count() + $recommendedVehicles->count();
+                $totalNotifs = $expiringVehicles->count() + $recommendedVehicles->count() + $upcomingAppointments->count();
             @endphp
 
             <!-- Mobile Menu Toggle Button -->
@@ -248,6 +269,56 @@
                         
                         <div class="max-h-[380px] overflow-y-auto overscroll-contain">
                             
+                            {{-- TAB: Citas Próximas --}}
+                            @if($upcomingAppointments->count() > 0)
+                                <div class="bg-gray-50 px-4 py-2 border-b border-gray-100 dark:bg-gray-800/80 dark:border-gray-700 flex justify-between items-center sticky top-0 z-10">
+                                    <h3 class="text-[11px] font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300">Próximas Citas</h3>
+                                    <span class="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">{{ $upcomingAppointments->count() }}</span>
+                                </div>
+                                <div class="divide-y divide-gray-100 dark:divide-gray-700">
+                                    @foreach($upcomingAppointments as $app)
+                                        @php
+                                            $appTime = \Carbon\Carbon::parse($app->start_at);
+                                            $timeLabel = '';
+                                            if ($appTime->isToday()) {
+                                                $timeLabel = 'Hoy ' . $appTime->format('H:i');
+                                            } elseif ($appTime->isTomorrow()) {
+                                                $timeLabel = 'Mañana ' . $appTime->format('H:i');
+                                            } else {
+                                                $timeLabel = $appTime->format('d/m H:i');
+                                            }
+                                        @endphp
+                                        <a href="{{ route('workshop.appointments.index') }}" class="group block px-4 py-3 hover:bg-blue-50/40 dark:hover:bg-gray-700/50 transition-all duration-200">
+                                            <div class="flex items-center gap-3">
+                                                <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
+                                                    <i class="ri-calendar-event-line text-xl"></i>
+                                                </div>
+                                                <div class="min-w-0 flex-grow">
+                                                    <div class="flex items-center justify-between gap-2 mb-1">
+                                                        <p class="text-[13px] font-bold text-gray-900 dark:text-gray-100 truncate leading-tight">
+                                                            @if($app->type === 'service')
+                                                                {{ $app->vehicle ? $app->vehicle->brand . ' ' . $app->vehicle->model : 'Servicio' }}
+                                                            @else
+                                                                {{ $app->reason }}
+                                                            @endif
+                                                        </p>
+                                                        <span class="inline-flex items-center rounded-full bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 text-[9px] font-bold text-indigo-700 dark:text-indigo-300 ring-1 ring-inset ring-indigo-600/10 whitespace-nowrap">
+                                                            {{ $timeLabel }}
+                                                        </span>
+                                                    </div>
+                                                    <p class="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                                                        {{ $app->client?->first_name }} {{ $app->client?->last_name }} 
+                                                        @if($app->type === 'service' && $app->vehicle?->plate)
+                                                            • {{ $app->vehicle->plate }}
+                                                        @endif
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            @endif
+
                             {{-- TAB: Revisiones Vencidas --}}
                             @if($expiringVehicles->count() > 0)
                                 <div class="bg-gray-50 px-4 py-2 border-y border-gray-100 dark:bg-gray-800/80 dark:border-gray-700 flex justify-between items-center sticky top-0 z-10">
@@ -426,4 +497,44 @@
             animation: bounce-slow 2s infinite ease-in-out;
         }
     </style>
+@endif
+
+@if($todaysAppCount > 0 && (
+    (request()->routeIs('dashboard') && !session()->has('today_apps_notified_dash')) || 
+    request()->routeIs('workshop.appointments.index')
+))
+    @if(request()->routeIs('dashboard'))
+        @php session()->put('today_apps_notified_dash', true); @endphp
+    @endif
+    {{-- Today's Appointments Bubble --}}
+    <div x-data="{ show: false }" 
+         x-init="setTimeout(() => show = true, 1000); setTimeout(() => show = false, 5000)"
+         x-show="show"
+         x-transition:enter="transition ease-out duration-700"
+         x-transition:enter-start="opacity-0 translate-y-20"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-800"
+         x-transition:leave-start="opacity-100 translate-y-0"
+         x-transition:leave-end="opacity-0 -translate-y-24"
+         class="fixed bottom-40 right-8 z-[9999] p-1"
+         style="display: none;"
+    >
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full shadow-[0_10px_30px_rgba(37,99,235,0.4)] px-6 py-3 flex items-center gap-3 border border-white/20 backdrop-blur-sm">
+            {{-- Animated Icon --}}
+            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white ring-2 ring-white/30 animate-pulse">
+                <i class="ri-calendar-check-line text-lg"></i>
+            </div>
+            
+            {{-- Text --}}
+            <div class="flex flex-col">
+                <span class="text-xs font-black text-white/80 uppercase tracking-widest leading-none">Hoy</span>
+                <p class="text-[13px] font-bold text-white whitespace-nowrap">Tienes {{ $todaysAppCount }} {{ $todaysAppCount > 1 ? 'citas programadas' : 'cita programada' }}</p>
+            </div>
+
+            {{-- Close button --}}
+            <button @click="show = false" class="ml-2 text-white/60 hover:text-white transition-colors">
+                <i class="ri-close-line text-lg"></i>
+            </button>
+        </div>
+    </div>
 @endif

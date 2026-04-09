@@ -45,8 +45,11 @@
     } else {
         $inventoryForUi = $initialInventoryChecks ?? [];
     }
-    $vehicleIdDefault = (string) old('vehicle_id', $editing ? (string) $editing->vehicle_id : '');
-    $clientIdDefault = (string) old('client_person_id', $editing ? (string) $editing->client_person_id : '');
+    $vehicleIdDefault = (string) old('vehicle_id', $editing ? (string) $editing->vehicle_id : ($preFilledVehicleId ?? ''));
+    $clientIdDefault = (string) old('client_person_id', $editing ? (string) $editing->client_person_id : ($preFilledClientId ?? ''));
+    $appointmentIdDefault = (string) old('appointment_id', $editing ? (string) $editing->appointment_id : ($preFilledAppointmentId ?? ''));
+    $diagnosisDefault = (string) old('diagnosis_text', $editing ? (string) $editing->diagnosis_text : ($preFilledDiagnosis ?? ''));
+
     if (old('mileage_in', null) !== null && old('mileage_in', null) !== '') {
         $mileageDefault = (string) old('mileage_in');
     } elseif ($editing && $editing->mileage_in !== null) {
@@ -177,8 +180,15 @@
     inventoryItemsByVehicleType: @js($inventoryItemsByVehicleType ?? []),
     inventoryChecks: @js($inventoryForUi),
     selectedVehicleTypeId: '',
-    showInventory: @js($showInventoryDefault ?? true),
     showDamagesPreexisting: @js($showDamagesPreexistingDefault ?? true),
+    diagnosisText: @js($diagnosisDefault),
+    init() {
+        if (this.selectedVehicleId) {
+            this.$nextTick(() => {
+                this.syncVehicle();
+            });
+        }
+    },
     syncVehicle() {
         const selected = this.vehicles.find(v => String(v.id) === String(this.selectedVehicleId));
         if (!selected) return;
@@ -1252,6 +1262,7 @@
                 <div class="w-full min-w-0 md:flex-[2.4_1_0%]">
                     <div class="relative flex w-full items-end gap-2">
                         <input type="hidden" name="vehicle_id" x-model="selectedVehicleId" required>
+                        <input type="hidden" name="appointment_id" value="{{ $appointmentIdDefault }}">
                         <div class="relative min-w-0 flex-1" @click.outside="closeVehicleDropdown()">
                             <label class="mb-1 block text-sm font-medium text-gray-700">Vehiculo</label>
                             <input
@@ -1331,7 +1342,7 @@
                 </div>
                 <div class="min-w-0 w-full md:flex-[2.5_1_0%]">
                     <label class="mb-1 block text-sm font-medium text-gray-700">Diagnostico</label>
-                    <input name="diagnosis_text" value="{{ old('diagnosis_text', optional($editingOrder)->diagnosis_text ?? '') }}" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Diagnostico inicial (opcional)">
+                    <input name="diagnosis_text" x-model="diagnosisText" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Diagnostico inicial (opcional)">
                 </div>
 
                 <div class="flex flex-col">

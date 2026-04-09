@@ -147,10 +147,15 @@ class WorkshopMaintenanceBoardController extends Controller
         ) + $formData);
     }
 
-    public function create(): \Illuminate\View\View
+    public function create(Request $request): \Illuminate\View\View
     {
         [$branchId, $companyId] = $this->branchScope();
         $formData = $this->maintenanceFormData($branchId, $companyId);
+
+        $preFilledVehicleId = (string) $request->query('vehicle_id', '');
+        $preFilledClientId = (string) $request->query('client_person_id', '');
+        $preFilledDiagnosis = (string) $request->query('diagnosis', '');
+        $preFilledAppointmentId = (string) $request->query('appointment_id', '');
 
         return view('workshop.maintenance-board.create', $formData + [
             'editingOrder' => null,
@@ -162,6 +167,10 @@ class WorkshopMaintenanceBoardController extends Controller
             'editingDamageRows' => [],
             'editingDamagePhotoPreviews' => [0 => [], 1 => [], 2 => [], 3 => []],
             'editingSignatureUrl' => null,
+            'preFilledVehicleId' => $preFilledVehicleId,
+            'preFilledClientId' => $preFilledClientId,
+            'preFilledDiagnosis' => $preFilledDiagnosis,
+            'preFilledAppointmentId' => $preFilledAppointmentId,
         ]);
     }
 
@@ -519,6 +528,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'vehicle_id' => ['required', 'integer', 'exists:vehicles,id'],
             'client_person_id' => ['nullable', 'integer', 'exists:people,id'],
             'mileage_in' => ['nullable', 'integer', 'min:0'],
+            'appointment_id' => ['nullable', 'integer', 'exists:appointments,id'],
             'tow_in' => ['nullable', 'boolean'],
             'diagnosis_text' => ['nullable', 'string'],
             'observations' => ['nullable', 'string'],
@@ -582,13 +592,14 @@ class WorkshopMaintenanceBoardController extends Controller
             $workshop = $this->flowService->createOrder([
                 'vehicle_id' => (int) $validated['vehicle_id'],
                 'client_person_id' => $clientPersonId,
+                'appointment_id' => !empty($validated['appointment_id']) ? (int) $validated['appointment_id'] : null,
                 'intake_date' => now()->format('Y-m-d H:i:s'),
                 'mileage_in' => $validated['mileage_in'] ?? null,
                 'tow_in' => (bool) ($validated['tow_in'] ?? false),
                 'diagnosis_text' => $validated['diagnosis_text'] ?? null,
                 'observations' => $validated['observations'] ?? null,
                 'status' => 'awaiting_approval',
-                'comment' => 'OS creada desde tablero y enviada a espera de aprobaciÃ³n',
+                'comment' => 'OS creada desde tablero y enviada a espera de aprobación',
             ], $branchId, (int) $user?->id, (string) ($user?->name ?? 'Sistema'));
 
             $this->flowService->syncIntakeAndDamages(

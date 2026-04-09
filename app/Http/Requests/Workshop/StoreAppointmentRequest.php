@@ -18,10 +18,11 @@ class StoreAppointmentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'vehicle_id' => ['required', 'integer', 'exists:vehicles,id'],
-            'client_person_id' => ['required', 'integer', 'exists:people,id'],
+            'type' => ['required', 'in:service,other'],
+            'vehicle_id' => ['required_if:type,service', 'nullable', 'integer', 'exists:vehicles,id'],
+            'client_person_id' => ['required_if:type,service', 'nullable', 'integer', 'exists:people,id'],
             'start_at' => ['required', 'date'],
-            'end_at' => ['required', 'date', 'after:start_at'],
+            'end_at' => ['nullable', 'date', 'after:start_at'],
             'reason' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
             'technician_person_id' => ['nullable', 'integer', 'exists:people,id'],
@@ -58,12 +59,14 @@ class StoreAppointmentRequest extends FormRequest
                     ->whereNotIn('status', ['cancelled', 'no_show'])
                     ->whereNull('deleted_at')
                     ->where(function ($query) use ($startAt, $endAt) {
-                        $query->whereBetween('start_at', [$startAt, $endAt])
-                            ->orWhereBetween('end_at', [$startAt, $endAt])
-                            ->orWhere(function ($inner) use ($startAt, $endAt) {
-                                $inner->where('start_at', '<=', $startAt)
-                                    ->where('end_at', '>=', $endAt);
-                            });
+                        $query->where(function ($q) use ($startAt, $endAt) {
+                            $q->whereBetween('start_at', [$startAt, $endAt])
+                                ->orWhereBetween('end_at', [$startAt, $endAt]);
+                        })
+                        ->orWhere(function ($inner) use ($startAt, $endAt) {
+                            $inner->where('start_at', '<=', $startAt)
+                                ->where('end_at', '>=', $endAt);
+                        });
                     })
                     ->exists();
 

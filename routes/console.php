@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('workshop:sync-maintenance-reminders')->dailyAt('07:00');
+Schedule::command('workshop:cleanup-appointments')->daily();

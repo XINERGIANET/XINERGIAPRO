@@ -46,7 +46,8 @@
                                 $isMaintenanceDaysParameter = str_contains($parameterDescription, 'periodo de mantenimiento')
                                     || str_contains($parameterDescription, 'dias previos de recordatorio')
                                     || str_contains($parameterDescription, 'días previos de recordatorio')
-                                    || str_contains($parameterDescription, 'notificar próximo servicio');
+                                    || str_contains($parameterDescription, 'notificar próximo servicio')
+                                    || str_contains($parameterDescription, 'notificar citas');
                                     
                                 if ($isMaintenanceDaysParameter) {
                                     $isBoolean = false;
