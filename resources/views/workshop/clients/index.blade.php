@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div x-data="{ historyModalOpen: false, historyUrl: '' }">
+<div>
     <x-common.page-breadcrumb pageTitle="Personas Taller" />
 
     <x-common.component-card title="Personas Taller" desc="Gestiona personas del taller (clientes y personal tecnico).">
@@ -134,7 +134,7 @@
                                             size="icon"
                                             variant="primary"
                                             type="button"
-                                            @click="historyUrl = '{{ route('workshop.clients.history', $client) }}?modal=1'; historyModalOpen = true"
+                                            @click="$dispatch('open-workshop-client-history', { url: {{ \Illuminate\Support\Js::from(route('workshop.clients.history', $client) . '?modal=1') }} })"
                                             className="rounded-xl"
                                             style="background-color: #334155; color: #FFFFFF;"
                                             aria-label="Ver historial"
@@ -274,15 +274,22 @@
         </x-ui.modal>
     @endforeach
 
-    <x-ui.modal x-data="{ open: false }" x-effect="open = historyModalOpen" :isOpen="false" :showCloseButton="false" class="max-w-7xl">
+    <x-ui.modal
+        x-data="{ open: false, historyUrl: '' }"
+        x-on:open-workshop-client-history.window="historyUrl = $event.detail.url; open = true"
+        :isOpen="false"
+        :showCloseButton="false"
+        class="max-w-7xl">
         <div class="p-4 sm:p-6">
             <div class="mb-4 flex items-center justify-between">
                 <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Historial del cliente</h3>
-                <button type="button" @click="historyModalOpen = false; historyUrl = ''; open = false" class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
+                <button type="button" @click="open = false; historyUrl = ''" class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
                     <i class="ri-close-line text-xl"></i>
                 </button>
             </div>
-            <iframe :src="historyUrl" class="h-[75vh] w-full rounded-2xl border border-gray-200 bg-white"></iframe>
+            <template x-if="historyUrl">
+                <iframe x-bind:src="historyUrl" class="h-[75vh] w-full rounded-2xl border border-gray-200 bg-white"></iframe>
+            </template>
         </div>
     </x-ui.modal>
 </div>

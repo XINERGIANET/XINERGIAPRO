@@ -31,6 +31,48 @@ class StoreAppointmentRequest extends FormRequest
         ];
     }
 
+    public function attributes(): array
+    {
+        return [
+            'type' => 'tipo de cita',
+            'vehicle_id' => 'vehículo',
+            'client_person_id' => 'cliente',
+            'start_at' => 'fecha y hora de inicio',
+            'end_at' => 'fecha y hora de fin',
+            'reason' => 'motivo',
+            'notes' => 'notas',
+            'technician_person_id' => 'técnico o responsable',
+            'status' => 'estado',
+            'source' => 'origen',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'type.required' => 'Debe indicar el tipo de cita.',
+            'type.in' => 'El tipo de cita debe ser servicio u otro.',
+            'vehicle_id.required_if' => 'Para citas de servicio debe seleccionar un vehículo.',
+            'vehicle_id.integer' => 'El vehículo seleccionado no es válido.',
+            'vehicle_id.exists' => 'El vehículo seleccionado no existe o fue eliminado.',
+            'client_person_id.required_if' => 'Para citas de servicio debe seleccionar un cliente.',
+            'client_person_id.integer' => 'El cliente seleccionado no es válido.',
+            'client_person_id.exists' => 'El cliente seleccionado no existe o fue eliminado.',
+            'start_at.required' => 'La fecha y hora de inicio es obligatoria.',
+            'start_at.date' => 'La fecha y hora de inicio no es válida.',
+            'end_at.date' => 'La fecha y hora de fin no es válida.',
+            'end_at.after' => 'La fecha y hora de fin debe ser posterior a la de inicio.',
+            'reason.required' => 'El motivo de la cita es obligatorio.',
+            'reason.string' => 'El motivo debe ser texto.',
+            'reason.max' => 'El motivo no puede superar :max caracteres.',
+            'notes.string' => 'Las notas deben ser texto.',
+            'technician_person_id.integer' => 'El técnico o responsable seleccionado no es válido.',
+            'technician_person_id.exists' => 'El técnico o responsable seleccionado no existe o fue eliminado.',
+            'status.in' => 'El estado seleccionado no es válido.',
+            'source.in' => 'El origen de la cita no es válido.',
+        ];
+    }
+
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
@@ -43,7 +85,7 @@ class StoreAppointmentRequest extends FormRequest
 
             $vehicle = Vehicle::query()->find($vehicleId);
             if ($vehicle && (int) $vehicle->client_person_id !== $clientId) {
-                $validator->errors()->add('client_person_id', 'El vehiculo no pertenece al cliente seleccionado.');
+                $validator->errors()->add('client_person_id', 'El vehículo no pertenece al cliente seleccionado.');
             }
 
             if ($startAt && strtotime($startAt) < now()->timestamp && !$this->isAdminUser()) {
@@ -71,7 +113,7 @@ class StoreAppointmentRequest extends FormRequest
                     ->exists();
 
                 if ($overlap) {
-                    $validator->errors()->add('technician_person_id', 'El tecnico ya tiene una cita en ese rango horario.');
+                    $validator->errors()->add('technician_person_id', 'El técnico ya tiene una cita en ese rango horario.');
                 }
             }
 
