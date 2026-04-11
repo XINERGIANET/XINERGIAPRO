@@ -260,28 +260,30 @@ class WorkshopClientController extends Controller
         $totalPayments = (float) $payments->sum('total');
 
         if ($request->boolean('modal')) {
-            return response(view('workshop.clients._history_content', array_merge(
-                compact(
-                    'person',
-                    'vehicles',
-                    'appointments',
-                    'orders',
-                    'sales',
-                    'purchases',
-                    'payments',
-                    'totalOrders',
-                    'totalPaidOrders',
-                    'debtOrders',
-                    'totalSales',
-                    'totalPurchases',
-                    'totalPayments'
-                ),
-                ['isModal' => true]
-            ))->render(), 200, [
-                'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
-                'Pragma' => 'no-cache',
-                'Expires' => '0',
-            ]);
+            return response()
+                ->view('workshop.clients.history_iframe', array_merge(
+                    compact(
+                        'person',
+                        'vehicles',
+                        'appointments',
+                        'orders',
+                        'sales',
+                        'purchases',
+                        'payments',
+                        'totalOrders',
+                        'totalPaidOrders',
+                        'debtOrders',
+                        'totalSales',
+                        'totalPurchases',
+                        'totalPayments'
+                    ),
+                    ['isModal' => true]
+                ))
+                ->withHeaders([
+                    'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+                    'Pragma' => 'no-cache',
+                    'Expires' => '0',
+                ]);
         }
 
         return view('workshop.clients.history', compact(

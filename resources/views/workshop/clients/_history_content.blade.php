@@ -1,8 +1,28 @@
 @if (!empty($isModal))
-<div>
-    <div class="mx-auto max-w-[1600px]">
+<div class="mx-auto max-w-[1600px] space-y-5">
+    <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div class="flex flex-wrap items-start gap-4">
+            <span class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                <i class="ri-user-3-line text-2xl"></i>
+            </span>
+            <div class="min-w-0 flex-1">
+                <p class="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Historial técnico</p>
+                <h2 class="mt-1 text-xl font-bold tracking-tight text-slate-900">
+                    {{ trim(($person->first_name ?? '') . ' ' . ($person->last_name ?? '')) ?: 'Cliente' }}
+                </h2>
+                <p class="mt-1 text-sm text-slate-500">
+                    Documento: {{ $person->document_number ?: 'No registrado' }}
+                    @if ($vehicles->count())
+                        <span class="mx-2 text-slate-300">·</span>
+                        {{ $vehicles->count() }} vehículo(s)
+                    @endif
+                </p>
+            </div>
+        </div>
+    </section>
+    <section class="rounded-2xl border border-slate-200 bg-white p-1 shadow-sm sm:p-2">
         @include('workshop.clients._history_technical')
-    </div>
+    </section>
 </div>
 @else
 <div class="{{ !empty($isModal) ? 'p-5 sm:p-6' : '' }}">

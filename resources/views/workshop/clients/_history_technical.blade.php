@@ -1,4 +1,4 @@
-<section>
+<section class="font-sans text-slate-800">
     @php
         $statusLabels = [
             'draft' => 'Borrador',
