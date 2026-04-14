@@ -43,6 +43,14 @@ class WorkshopMovement extends Model
         'paused_at',
         'total_paused_minutes',
         'locked_at',
+        'quotation_source',
+        'quotation_correlative',
+        'quotation_result',
+        'quotation_lost_reason',
+        'quotation_sent_at',
+        'quotation_client_email',
+        'quotation_vehicle_note',
+        'quotation_commercial_terms',
     ];
 
     protected $casts = [
@@ -53,6 +61,8 @@ class WorkshopMovement extends Model
         'paused_at' => 'datetime',
         'locked_at' => 'datetime',
         'approved_at' => 'datetime',
+        'quotation_sent_at' => 'datetime',
+        'quotation_commercial_terms' => 'array',
         'tow_in' => 'boolean',
         'subtotal' => 'decimal:6',
         'tax' => 'decimal:6',

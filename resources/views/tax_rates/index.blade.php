@@ -173,6 +173,14 @@
                     </thead>
                     <tbody>
                         @forelse ($taxRates as $taxRate)
+                            @php
+                                $taxRateEditUrl = route('admin.tax_rates.edit', $taxRate);
+                                $taxRateDestroyUrl = route('admin.tax_rates.destroy', $taxRate);
+                                if (!empty($viewId)) {
+                                    $taxRateEditUrl .= (str_contains($taxRateEditUrl, '?') ? '&' : '?') . 'view_id=' . urlencode((string) $viewId);
+                                    $taxRateDestroyUrl .= (str_contains($taxRateDestroyUrl, '?') ? '&' : '?') . 'view_id=' . urlencode((string) $viewId);
+                                }
+                            @endphp
                             <tr class="group/row border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5 relative hover:z-[60]">
                                 <td class="px-3 py-4 sm:px-6 sticky-left">
                                     <p class="font-medium text-gray-800 text-theme-sm dark:text-white/90 truncate" title="{{ $taxRate->code }}">{{ $taxRate->code }}</p>
@@ -190,13 +198,18 @@
                                     <p class="text-gray-500 text-theme-sm dark:text-gray-400">{{ $taxRate->status ? 'Activo' : 'Inactivo' }}</p>
                                 </td>
                                 <td class="px-5 py-4 sm:px-6">
-                                    <div class="flex items-center justify-end gap-2">
+                                    <div class="flex items-center justify-center gap-2">
                                         @foreach ($rowOperations as $operation)
                                             @php
                                                 $action = $operation->action ?? '';
                                                 $isDelete = str_contains($action, 'destroy');
                                                 $isEdit = $isEditOp($operation);
                                                 $actionUrl = $resolveActionUrl($action, $taxRate, $operation);
+                                                if ($isEdit) {
+                                                    $actionUrl = $taxRateEditUrl;
+                                                } elseif ($isDelete) {
+                                                    $actionUrl = $taxRateDestroyUrl;
+                                                }
                                                 $textColor = $resolveTextColor($operation);
                                                 $buttonColor = $operation->color ?: '#3B82F6';
                                                 $buttonStyle = "background-color: {$buttonColor}; color: {$textColor};";
@@ -223,7 +236,7 @@
                                                         size="icon"
                                                         variant="{{ $variant }}"
                                                         type="submit"
-                                                        className="rounded-xl"
+                                                        className="bg-error-500 text-white hover:bg-error-600 ring-0 rounded-xl"
                                                         style="{{ $buttonStyle }}"
                                                         aria-label="{{ $operation->name }}"
                                                     >
@@ -236,37 +249,25 @@
                                                 </form>
                                             @elseif ($isEdit)
                                                 <div class="relative group">
-                                                    <x-ui.link-button
-                                                        size="icon"
-                                                        variant="{{ $variant }}"
-                                                        href="{{ $actionUrl }}"
+                                                    <x-ui.link-button size="icon" variant="{{ $variant }}"
+                                                        href="{{ $taxRateEditUrl }}"
                                                         className="rounded-xl"
                                                         style="{{ $buttonStyle }}"
-                                                        aria-label="{{ $operation->name }}"
-                                                    >
+                                                        aria-label="{{ $operation->name }}">
                                                         <i class="{{ $operation->icon }}"></i>
                                                     </x-ui.link-button>
-                                                    <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
-                                                        {{ $operation->name }}
-                                                        <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
-                                                    </span>
+                                                    <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">{{ $operation->name }}</span>
                                                 </div>
                                             @else
                                                 <div class="relative group">
-                                                    <x-ui.link-button
-                                                        size="icon"
-                                                        variant="{{ $variant }}"
-                                                        href="{{ $actionUrl }}"
+                                                    <x-ui.link-button size="icon" variant="{{ $variant }}"
+                                                        href="{{ $taxRateEditUrl }}"
                                                         className="rounded-xl"
                                                         style="{{ $buttonStyle }}"
-                                                        aria-label="{{ $operation->name }}"
-                                                    >
+                                                        aria-label="{{ $operation->name }}">
                                                         <i class="{{ $operation->icon }}"></i>
                                                     </x-ui.link-button>
-                                                    <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
-                                                        {{ $operation->name }}
-                                                        <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
-                                                    </span>
+                                                    <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50" style="transition-delay: 0.5s;">{{ $operation->name }}</span>
                                                 </div>
                                             @endif
                                         @endforeach

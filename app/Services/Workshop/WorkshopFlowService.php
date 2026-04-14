@@ -267,9 +267,6 @@ class WorkshopFlowService
             if ($unitPrice < 0) {
                 throw new \RuntimeException('El precio unitario no puede ser negativo.');
             }
-            if ($lineType === 'PART' && empty($data['product_id'])) {
-                throw new \RuntimeException('La linea de repuesto requiere producto.');
-            }
 
             $taxRateValue = 0;
             if (!empty($data['tax_rate_id'])) {
@@ -558,6 +555,7 @@ class WorkshopFlowService
                 'approved_at' => now(),
                 'approved_by' => $userId,
                 'approval_note' => $approvalNote,
+                'quotation_result' => 'won',
             ]);
 
             return $order->fresh();
@@ -591,6 +589,7 @@ class WorkshopFlowService
                     'approved_at' => now(),
                     'approved_by' => $userId,
                     'approval_note' => $note,
+                    'quotation_result' => 'won',
                 ]);
 
                 return $order->fresh();
@@ -600,6 +599,8 @@ class WorkshopFlowService
             $order->update([
                 'approval_status' => 'rejected',
                 'approval_note' => $note,
+                'quotation_result' => 'lost',
+                'quotation_lost_reason' => $note,
             ]);
 
             return $order->fresh();
@@ -623,9 +624,192 @@ class WorkshopFlowService
                 $this->changeStatus($order, 'awaiting_approval', $userId, $note ?: 'Cotizacion enviada a cliente');
             }
 
-            $order->update([
+            $correlativePatch = [];
+            if (Schema::hasColumn('workshop_movements', 'quotation_correlative') && empty($order->quotation_correlative)) {
+                $correlativePatch['quotation_correlative'] = $this->allocateQuotationCorrelative((int) $order->branch_id);
+            }
+            if (Schema::hasColumn('workshop_movements', 'quotation_source') && empty($order->quotation_source)) {
+                $correlativePatch['quotation_source'] = 'internal';
+            }
+            if (Schema::hasColumn('workshop_movements', 'quotation_result') && (($order->quotation_result ?? '') === '')) {
+                $correlativePatch['quotation_result'] = 'open';
+            }
+
+            $order->update(array_merge([
                 'approval_status' => 'pending',
                 'approval_note' => $note ?: $order->approval_note,
+            ], $correlativePatch));
+
+            return $order->fresh();
+        });
+    }
+
+    /**
+     * Cotización creada desde la vista de cotizaciones (sin flujo previo de OS).
+     *
+     * @param  array{
+     *   client_person_id:int,
+     *   vehicle_id?:int|null,
+     *   quotation_client_email?:string|null,
+     *   quotation_vehicle_note?:string|null,
+     *   diagnosis_text?:string|null,
+     *   observations?:string|null,
+     *   quotation_delivery_time?:string|null,
+     *   quotation_offer_validity?:string|null,
+     *   quotation_service_warranty?:string|null,
+     *   quotation_delivery_place?:string|null,
+     *   quotation_prices_note?:string|null,
+     *   quotation_payment_condition?:string|null,
+     *   quotation_bank_account_bcp?:string|null,
+     *   quotation_bank_cci?:string|null,
+     *   items:list<array{line_type:string,description:string,qty:float,unit_price:float,product_id?:int|null,service_id?:int|null,tax_rate_id?:int|null,discount_amount?:float}>
+     * }  $data
+     */
+    public function createExternalQuotation(array $data, int $branchId, int $userId, string $userName): WorkshopMovement
+    {
+        return DB::transaction(function () use ($data, $branchId, $userId, $userName) {
+            $branch = Branch::query()->findOrFail($branchId);
+            $client = Person::query()->findOrFail((int) $data['client_person_id']);
+            if ((int) $client->branch_id !== (int) $branchId) {
+                throw new \RuntimeException('El cliente no pertenece a la sucursal actual.');
+            }
+
+            $vehicleId = !empty($data['vehicle_id']) ? (int) $data['vehicle_id'] : null;
+            if ($vehicleId) {
+                $vehicle = Vehicle::query()
+                    ->where('id', $vehicleId)
+                    ->where('company_id', (int) $branch->company_id)
+                    ->firstOrFail();
+                if ((int) $vehicle->client_person_id !== (int) $client->id) {
+                    throw new \RuntimeException('El vehiculo no pertenece al cliente seleccionado.');
+                }
+            }
+
+            $movementTypeId = $this->resolveMovementTypeId('TALLER_OS');
+            $documentTypeId = $this->resolveDocumentTypeId($movementTypeId, 'Cotizacion externa', 'none');
+            $correlative = Schema::hasColumn('workshop_movements', 'quotation_correlative')
+                ? $this->allocateQuotationCorrelative($branchId)
+                : null;
+
+            $movement = Movement::query()->create([
+                'number' => $this->generateMovementNumber($branchId, $documentTypeId),
+                'moved_at' => now(),
+                'user_id' => $userId,
+                'user_name' => $userName,
+                'person_id' => $client->id,
+                'person_name' => trim(($client->first_name ?? '') . ' ' . ($client->last_name ?? '')),
+                'responsible_id' => $userId,
+                'responsible_name' => $userName,
+                'comment' => 'Cotizacion externa' . ($correlative ? (' ' . $correlative) : ''),
+                'status' => 'A',
+                'movement_type_id' => $movementTypeId,
+                'document_type_id' => $documentTypeId,
+                'branch_id' => $branchId,
+                'parent_movement_id' => null,
+            ]);
+
+            $workshopAttrs = [
+                'movement_id' => $movement->id,
+                'previous_workshop_movement_id' => null,
+                'company_id' => (int) $branch->company_id,
+                'branch_id' => $branchId,
+                'vehicle_id' => $vehicleId,
+                'client_person_id' => $client->id,
+                'appointment_id' => null,
+                'intake_date' => now(),
+                'delivery_date' => null,
+                'mileage_in' => null,
+                'mileage_out' => null,
+                'tow_in' => false,
+                'diagnosis_text' => $data['diagnosis_text'] ?? null,
+                'observations' => $data['observations'] ?? null,
+                'status' => 'awaiting_approval',
+                'approval_status' => 'pending',
+                'payment_status' => 'pending',
+                'subtotal' => 0,
+                'tax' => 0,
+                'total' => 0,
+                'paid_total' => 0,
+            ];
+            if (Schema::hasColumn('workshop_movements', 'quotation_source')) {
+                $workshopAttrs['quotation_source'] = 'external';
+            }
+            if (Schema::hasColumn('workshop_movements', 'quotation_correlative')) {
+                $workshopAttrs['quotation_correlative'] = $correlative;
+            }
+            if (Schema::hasColumn('workshop_movements', 'quotation_result')) {
+                $workshopAttrs['quotation_result'] = 'open';
+            }
+            if (Schema::hasColumn('workshop_movements', 'quotation_client_email')) {
+                $workshopAttrs['quotation_client_email'] = $data['quotation_client_email'] ?? null;
+            }
+            if (Schema::hasColumn('workshop_movements', 'quotation_vehicle_note')) {
+                $workshopAttrs['quotation_vehicle_note'] = $data['quotation_vehicle_note'] ?? null;
+            }
+            if (Schema::hasColumn('workshop_movements', 'quotation_commercial_terms')) {
+                $workshopAttrs['quotation_commercial_terms'] = [
+                    'delivery_time' => isset($data['quotation_delivery_time']) ? trim((string) $data['quotation_delivery_time']) : '',
+                    'offer_validity' => isset($data['quotation_offer_validity']) ? trim((string) $data['quotation_offer_validity']) : '',
+                    'service_warranty' => isset($data['quotation_service_warranty']) ? trim((string) $data['quotation_service_warranty']) : '',
+                    'delivery_place' => isset($data['quotation_delivery_place']) ? trim((string) $data['quotation_delivery_place']) : '',
+                    'prices_note' => isset($data['quotation_prices_note']) ? trim((string) $data['quotation_prices_note']) : '',
+                    'payment_condition' => isset($data['quotation_payment_condition']) ? trim((string) $data['quotation_payment_condition']) : '',
+                    'bank_account_bcp' => isset($data['quotation_bank_account_bcp']) ? trim((string) $data['quotation_bank_account_bcp']) : '',
+                    'bank_cci' => isset($data['quotation_bank_cci']) ? trim((string) $data['quotation_bank_cci']) : '',
+                ];
+            }
+
+            $workshop = WorkshopMovement::query()->create($workshopAttrs);
+
+            $this->recordStatusChange($workshop->id, null, 'awaiting_approval', $userId, 'Cotizacion externa creada');
+            $this->audit((int) $workshop->id, $userId, 'EXTERNAL_QUOTATION_CREATED', [
+                'movement_id' => (int) $movement->id,
+                'correlative' => $correlative,
+            ]);
+
+            foreach ($data['items'] as $item) {
+                $this->addDetail($workshop, [
+                    'line_type' => (string) $item['line_type'],
+                    'description' => (string) $item['description'],
+                    'qty' => (float) $item['qty'],
+                    'unit_price' => (float) $item['unit_price'],
+                    'product_id' => $item['product_id'] ?? null,
+                    'service_id' => $item['service_id'] ?? null,
+                    'tax_rate_id' => $item['tax_rate_id'] ?? null,
+                    'discount_amount' => (float) ($item['discount_amount'] ?? 0),
+                ]);
+            }
+
+            return $workshop->fresh(['movement', 'details']);
+        });
+    }
+
+    public function updateQuotationResult(WorkshopMovement $order, string $result, ?string $lostReason, int $userId): WorkshopMovement
+    {
+        if (!Schema::hasColumn('workshop_movements', 'quotation_result')) {
+            throw new \RuntimeException('El seguimiento de cotizaciones no esta disponible. Ejecute las migraciones.');
+        }
+
+        $result = strtolower(trim($result));
+        if (!in_array($result, ['open', 'won', 'lost', 'converted'], true)) {
+            throw new \RuntimeException('Resultado de cotizacion invalido.');
+        }
+
+        return DB::transaction(function () use ($order, $result, $lostReason, $userId) {
+            $order = WorkshopMovement::query()->lockForUpdate()->findOrFail($order->id);
+            $this->assertWorkshopInCurrentBranch($order);
+
+            $patch = [
+                'quotation_result' => $result,
+            ];
+            if (Schema::hasColumn('workshop_movements', 'quotation_lost_reason')) {
+                $patch['quotation_lost_reason'] = $result === 'lost' ? ($lostReason ?: null) : null;
+            }
+
+            $order->update($patch);
+
+            $this->audit((int) $order->id, $userId, 'QUOTATION_RESULT_UPDATED', [
+                'result' => $result,
             ]);
 
             return $order->fresh();
@@ -650,6 +834,9 @@ class WorkshopFlowService
             }
             if ((bool) $detail->stock_consumed) {
                 throw new \RuntimeException('La linea ya fue consumida.');
+            }
+            if (!$detail->product_id) {
+                throw new \RuntimeException('Esta linea es repuesto sin producto de catalogo; no se puede reservar stock hasta asociar un producto del almacen.');
             }
 
             $required = (float) $detail->qty;
@@ -1028,7 +1215,12 @@ class WorkshopFlowService
                 ->exists();
 
             if (!$remainingUninvoiced || !$order->sales_movement_id) {
-                $order->update(['sales_movement_id' => $sale->id]);
+                $order->update([
+                    'sales_movement_id' => $sale->id,
+                    'quotation_result' => 'converted',
+                ]);
+            } else {
+                $order->update(['quotation_result' => 'converted']);
             }
 
             $this->audit((int) $order->id, $userId, 'SALE_GENERATED', [
@@ -2019,6 +2211,41 @@ class WorkshopFlowService
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    private function allocateQuotationCorrelative(int $branchId): string
+    {
+        $year = (int) date('Y');
+
+        return (string) DB::transaction(function () use ($branchId, $year) {
+            if (!Schema::hasTable('workshop_quotation_counters')) {
+                throw new \RuntimeException('Ejecute las migraciones para habilitar el correlativo de cotizaciones.');
+            }
+
+            $row = DB::table('workshop_quotation_counters')
+                ->where('branch_id', $branchId)
+                ->where('year', $year)
+                ->lockForUpdate()
+                ->first();
+
+            $next = (int) ($row->last_seq ?? 0) + 1;
+
+            if ($row) {
+                DB::table('workshop_quotation_counters')
+                    ->where('id', (int) $row->id)
+                    ->update(['last_seq' => $next, 'updated_at' => now()]);
+            } else {
+                DB::table('workshop_quotation_counters')->insert([
+                    'branch_id' => $branchId,
+                    'year' => $year,
+                    'last_seq' => $next,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            return sprintf('COT-%d-%05d', $year, $next);
+        });
     }
 
     private function resolveSaleMovementTypeId(): int

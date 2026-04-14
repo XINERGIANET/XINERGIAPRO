@@ -1,31 +1,102 @@
 @extends('layouts.app')
 
 @section('content')
-    <div x-data="{ 
-        showModal: false, 
+    <div x-data="{
+        showModal: false,
         selectedQuotation: null,
         totalQuotation: 0,
+        showSendModal: false,
+        sendQuotation: null,
+        sendEmail: '',
+        showResultModal: false,
+        resultQuotation: null,
+        resultPayload: { quotation_result: 'open', quotation_lost_reason: '' },
+        overflowSync() {
+            if (this.showModal || this.showSendModal || this.showResultModal) {
+                document.body.classList.add('overflow-hidden');
+            } else {
+                document.body.classList.remove('overflow-hidden');
+            }
+        },
         calculateTotal() {
             if (!this.selectedQuotation) return;
             this.totalQuotation = this.selectedQuotation.details.reduce((acc, d) => acc + (parseFloat(d.qty) * parseFloat(d.unit_price)), 0);
         },
         openModal(quotation) {
-            this.selectedQuotation = JSON.parse(JSON.stringify(quotation)); // Deep copy to avoid mutating original list until save
+            this.selectedQuotation = JSON.parse(JSON.stringify(quotation));
             this.calculateTotal();
             this.showModal = true;
-        }
-    }" x-init="$watch('showModal', value => {
-        if (value) {
-            document.body.classList.add('overflow-hidden');
-        } else {
-            document.body.classList.remove('overflow-hidden');
-        }
-    })">
+            this.overflowSync();
+        },
+        openSendModal(q) {
+            this.sendQuotation = q;
+            this.sendEmail = q.default_email || '';
+            this.showSendModal = true;
+            this.overflowSync();
+        },
+        closeSendModal() {
+            this.showSendModal = false;
+            this.overflowSync();
+        },
+        openResultModal(q) {
+            this.resultQuotation = q;
+            this.resultPayload = {
+                quotation_result: q.current_result || 'open',
+                quotation_lost_reason: q.lost_reason || '',
+            };
+            this.showResultModal = true;
+            this.overflowSync();
+        },
+        closeResultModal() {
+            this.showResultModal = false;
+            this.overflowSync();
+        },
+    }" x-init="
+        $watch('showModal', () => $data.overflowSync());
+        $watch('showSendModal', () => $data.overflowSync());
+        $watch('showResultModal', () => $data.overflowSync());
+    ">
         <x-common.page-breadcrumb pageTitle="Gestión de Cotizaciones" />
 
         <x-common.component-card title="Listado de Cotizaciones" desc="Seguimiento y aprobación de cotizaciones de taller.">
+            @if (session('status'))
+                <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-800">
+                    {{ session('status') }}
+                </div>
+            @endif
+            @if ($errors->any())
+                <div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-bold text-red-800">
+                    {{ $errors->first() }}
+                </div>
+            @endif
+
+            @if ($showQuotationStats ?? false)
+                <div class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 px-1">
+                    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Total cotizaciones</p>
+                        <p class="mt-1 text-2xl font-black text-slate-800">{{ (int) ($stats['total'] ?? 0) }}</p>
+                    </div>
+                    <div class="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 shadow-sm">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-emerald-700">Ganadas / convertidas</p>
+                        <p class="mt-1 text-2xl font-black text-emerald-800">{{ (int) ($stats['won'] ?? 0) }}</p>
+                    </div>
+                    <div class="rounded-2xl border border-red-100 bg-red-50/60 p-4 shadow-sm">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-red-700">No concretadas</p>
+                        <p class="mt-1 text-2xl font-black text-red-800">{{ (int) ($stats['lost'] ?? 0) }}</p>
+                    </div>
+                    <div class="rounded-2xl border border-amber-100 bg-amber-50/60 p-4 shadow-sm">
+                        <p class="text-[10px] font-black uppercase tracking-widest text-amber-800">Abiertas</p>
+                        <p class="mt-1 text-2xl font-black text-amber-900">{{ (int) ($stats['open'] ?? 0) }}</p>
+                    </div>
+                </div>
+            @endif
+
+            @php
+                $colCount = ($showQuotationExtras ?? false) ? 10 : 7;
+            @endphp
+
             <div class="mb-5 px-1">
-                <form action="{{ route('admin.sales.quotations.index') }}" method="GET" class="flex flex-row items-center gap-2">
+                <form action="{{ route('admin.sales.quotations.index') }}" method="GET" class="quotation-filters flex flex-row flex-wrap items-center gap-2">
                     <input type="hidden" name="view_id" value="{{ request('view_id') }}">
                     
                     <!-- Per Page Select -->
@@ -35,13 +106,12 @@
                             <option value="25" {{ $perPage == 25 ? 'selected' : '' }}>25 / página</option>
                             <option value="50" {{ $perPage == 50 ? 'selected' : '' }}>50 / página</option>
                         </select>
-                        <i class="ri-arrow-down-s-line absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
                     </div>
 
                     <!-- Search Input -->
                     <div class="relative flex-1 group">
                         <i class="ri-search-line absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#465fff] transition-colors"></i>
-                        <input type="text" name="search" value="{{ $search }}" placeholder="Buscar vista..." 
+                        <input type="text" name="search" value="{{ $search }}" placeholder="Número OS, correlativo, placa o cliente…"
                             class="w-full h-11 pl-11 pr-4 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:border-[#465fff] transition-all placeholder:text-slate-300">
                     </div>
 
@@ -56,11 +126,21 @@
                                 </option>
                             @endforeach
                         </select>
-                        <i class="ri-arrow-down-s-line absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
                     </div>
 
+                    @if ($showQuotationExtras ?? false)
+                        <div class="w-44 shrink-0 relative">
+                            <i class="ri-filter-3-line absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                            <select name="quotation_source" class="w-full h-11 pl-11 pr-10 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:border-[#465fff] transition-all appearance-none cursor-pointer" onchange="this.form.submit()">
+                                <option value="">Tipo: todas</option>
+                                <option value="internal" {{ ($sourceFilter ?? '') === 'internal' ? 'selected' : '' }}>Internas (OS)</option>
+                                <option value="external" {{ ($sourceFilter ?? '') === 'external' ? 'selected' : '' }}>Externas</option>
+                            </select>
+                        </div>
+                    @endif
+
                     <!-- Actions -->
-                    <div class="flex items-center gap-2 shrink-0">
+                    <div class="flex flex-wrap items-center gap-2 shrink-0">
                         <button type="submit" class="h-11 bg-[#1e293b] text-white px-6 rounded-xl text-xs font-black hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
                             <i class="ri-search-line"></i> Buscar
                         </button>
@@ -68,16 +148,25 @@
                            class="h-11 bg-white border border-slate-200 text-slate-500 px-6 rounded-xl text-xs font-black hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
                             <i class="ri-refresh-line"></i> Limpiar
                         </a>
+                        <a href="{{ route('admin.sales.quotations.create-external', array_filter(['view_id' => request('view_id')])) }}"
+                           class="h-11 bg-indigo-600 text-white px-6 rounded-xl text-xs font-black hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20">
+                            <i class="ri-file-add-line"></i> Cotización externa
+                        </a>
                     </div>
                 </form>
             </div>
 
             <div class="overflow-hidden rounded-2xl border border-slate-200 shadow-sm bg-white">
                 <div class="overflow-x-auto overflow-y-hidden custom-scrollbar">
-                    <table class="w-full text-left min-w-[1000px] border-collapse">
+                    <table class="w-full text-left min-w-[1100px] border-collapse">
                         <thead>
                             <tr class="bg-[#1e293b] text-white text-[11px] uppercase font-black tracking-[0.15em]">
                                 <th class="px-6 py-5 rounded-tl-xl">OS / Número</th>
+                                @if ($showQuotationExtras ?? false)
+                                    <th class="px-6 py-5">Correlativo</th>
+                                    <th class="px-6 py-5 text-center">Tipo</th>
+                                    <th class="px-6 py-5 text-center">Resultado</th>
+                                @endif
                                 <th class="px-6 py-5">Vehículo</th>
                                 <th class="px-6 py-5">Cliente</th>
                                 <th class="px-6 py-5 text-center">Estado / Aprobación</th>
@@ -93,6 +182,28 @@
                                         <h5 class="font-black text-slate-800 tracking-tight leading-none mb-1.5">{{ $quotation->movement?->number ?? sprintf("%08d", $quotation->id) }}</h5>
                                         <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{{ $quotation->intake_date?->format('d/m/Y H:i') }}</p>
                                     </td>
+                                    @if ($showQuotationExtras ?? false)
+                                        <td class="px-6 py-5">
+                                            <span class="font-mono text-xs font-black text-slate-700">{{ $quotation->quotation_correlative ?? '—' }}</span>
+                                        </td>
+                                        <td class="px-6 py-5 text-center">
+                                            @if (($quotation->quotation_source ?? 'internal') === 'external')
+                                                <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 text-[9px] font-black uppercase tracking-widest">Externa</span>
+                                            @else
+                                                <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 text-[9px] font-black uppercase tracking-widest">Interna</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-6 py-5 text-center">
+                                            @php $qr = $quotation->quotation_result ?? 'open'; @endphp
+                                            @if ($qr === 'won' || $qr === 'converted')
+                                                <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-black uppercase tracking-widest">Ganada</span>
+                                            @elseif ($qr === 'lost')
+                                                <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-red-50 text-red-700 border border-red-100 text-[9px] font-black uppercase tracking-widest">Perdida</span>
+                                            @else
+                                                <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-100 text-[9px] font-black uppercase tracking-widest">Abierta</span>
+                                            @endif
+                                        </td>
+                                    @endif
                                     <td class="px-6 py-5">
                                         <p class="text-[13px] font-black text-slate-700 uppercase leading-none mb-1.5">{{ $quotation->vehicle?->plate ?? '-' }}</p>
                                         <p class="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{{ $quotation->vehicle?->brand }} {{ $quotation->vehicle?->model }}</p>
@@ -123,8 +234,34 @@
                                     <td class="px-6 py-5">
                                         <p class="text-sm font-black text-slate-900 leading-none">S/ {{ number_format($quotation->total, 2) }}</p>
                                     </td>
-                                    <td class="px-6 py-5 text-right">
-                                        <div class="flex items-center justify-end gap-2">
+                                    <td class="px-6 py-5 text-right whitespace-nowrap">
+                                        <div class="inline-flex flex-nowrap items-center justify-end gap-2">
+                                            @if ($showQuotationExtras ?? false)
+                                                <a href="{{ route('admin.sales.quotations.excel', $quotation) }}"
+                                                   class="w-10 h-10 rounded-xl bg-slate-700 text-white flex items-center justify-center shadow-lg shadow-slate-500/20 hover:scale-105 transition-all"
+                                                   title="Descargar Excel">
+                                                    <i class="ri-file-excel-2-line text-lg"></i>
+                                                </a>
+                                                <button type="button"
+                                                    @click="openSendModal({{ \Illuminate\Support\Js::from([
+                                                        'send_url' => route('admin.sales.quotations.send', $quotation),
+                                                        'default_email' => $quotation->quotation_client_email ?? '',
+                                                    ]) }})"
+                                                    class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20 hover:scale-105 transition-all cursor-pointer"
+                                                    title="Enviar por correo">
+                                                    <i class="ri-mail-send-line text-lg"></i>
+                                                </button>
+                                                <button type="button"
+                                                    @click="openResultModal({{ \Illuminate\Support\Js::from([
+                                                        'result_url' => route('admin.sales.quotations.update-result', $quotation),
+                                                        'current_result' => $quotation->quotation_result ?? 'open',
+                                                        'lost_reason' => $quotation->quotation_lost_reason ?? '',
+                                                    ]) }})"
+                                                    class="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/20 hover:scale-105 transition-all cursor-pointer"
+                                                    title="Resultado de cotización">
+                                                    <i class="ri-pie-chart-line text-lg"></i>
+                                                </button>
+                                            @endif
                                             <button type="button" 
                                                 @click="openModal({{ json_encode([
                                                     'id' => $quotation->id,
@@ -133,14 +270,16 @@
                                                     'status' => $quotation->status,
                                                     'status_label' => $quotation->status === 'approved' ? 'Aprobada' : 'Esperando aprobación',
                                                     'approve_url' => route('workshop.orders.approve', $quotation->id),
-                                                    'details' => $quotation->details->whereIn('line_type', ['SERVICE', 'LABOR'])->map(fn($d) => [
+                                                    'details' => $quotation->details->whereIn('line_type', ['PART', 'SERVICE', 'LABOR'])->map(fn($d) => [
                                                         'id' => $d->id,
+                                                        'line_type' => $d->line_type,
                                                         'description' => $d->description,
                                                         'qty' => (float)$d->qty,
                                                         'unit_price' => (float)$d->unit_price,
                                                         'total' => (float)$d->total,
                                                     ])->values()->toArray(),
-                                                    'deleted_details' => $quotation->deletedDetails->whereIn('line_type', ['SERVICE', 'LABOR'])->map(fn($d) => [
+                                                    'deleted_details' => $quotation->deletedDetails->whereIn('line_type', ['PART', 'SERVICE', 'LABOR'])->map(fn($d) => [
+                                                        'line_type' => $d->line_type,
                                                         'description' => $d->description,
                                                         'qty' => (float)$d->qty,
                                                         'unit_price' => (float)$d->unit_price,
@@ -156,7 +295,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="py-20 text-center">
+                                    <td colspan="{{ $colCount }}" class="py-20 text-center">
                                         <div class="flex flex-col items-center justify-center opacity-30">
                                             <i class="ri-inbox-line text-5xl mb-4 text-slate-300"></i>
                                             <p class="text-sm font-bold italic text-slate-500">No se encontraron cotizaciones registradas.</p>
@@ -244,7 +383,8 @@
                                         <table class="w-full text-sm">
                                             <thead>
                                                 <tr class="bg-slate-50/50 border-b border-slate-100">
-                                                    <th class="px-6 py-3 text-left text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Servicio</th>
+                                                    <th class="px-3 py-3 text-center text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Tipo</th>
+                                                    <th class="px-6 py-3 text-left text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Concepto</th>
                                                     <th class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Cant</th>
                                                     <th class="px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Precio</th>
                                                     <th class="px-6 py-3 text-right text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Subtotal</th>
@@ -255,6 +395,9 @@
                                                 <!-- Active Items -->
                                                 <template x-for="(detail, index) in selectedQuotation?.details" :key="detail.id">
                                                     <tr class="group hover:bg-slate-50/50 transition-colors">
+                                                        <td class="px-3 py-3.5 text-center">
+                                                            <span class="inline-flex px-2 py-0.5 rounded-md bg-slate-100 text-[9px] font-black uppercase tracking-wider text-slate-500 border border-slate-200" x-text="(detail.line_type || 'LABOR') === 'PART' ? 'Rep.' : ((detail.line_type || 'LABOR') === 'LABOR' ? 'M.O.' : 'Serv.')"></span>
+                                                        </td>
                                                         <td class="px-6 py-3.5">
                                                             <p class="text-sm font-bold text-slate-700 leading-tight" x-text="detail.description"></p>
                                                             <input type="hidden" :name="`details[${index}][id]`" :value="detail.id">
@@ -291,6 +434,9 @@
                                                 <!-- Rejected History -->
                                                 <template x-for="deleted in selectedQuotation?.deleted_details" :key="'deleted-' + Math.random()">
                                                     <tr class="bg-red-50/5 opacity-60 backdrop-blur-[2px]">
+                                                        <td class="px-3 py-3.5 text-center">
+                                                            <span class="inline-flex px-2 py-0.5 rounded-md bg-red-50 text-[9px] font-black uppercase tracking-wider text-red-300 border border-red-100" x-text="(deleted.line_type || 'LABOR') === 'PART' ? 'Rep.' : ((deleted.line_type || 'LABOR') === 'LABOR' ? 'M.O.' : 'Serv.')"></span>
+                                                        </td>
                                                         <td class="px-6 py-3.5">
                                                             <p class="text-[12px] font-semibold text-red-900/40 line-through decoration-red-200/50 italic" x-text="deleted.description"></p>
                                                         </td>
@@ -336,9 +482,117 @@
                 </div>
             </div>
         </template>
+
+        <template x-teleport="body">
+            <div x-show="showSendModal" class="relative z-[999999]" role="dialog" aria-modal="true">
+                <div x-show="showSendModal"
+                    x-transition:enter="ease-out duration-200"
+                    x-transition:enter-start="opacity-0"
+                    x-transition:enter-end="opacity-100"
+                    x-transition:leave="ease-in duration-150"
+                    x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0"
+                    @click="closeSendModal()"
+                    class="fixed inset-0 bg-slate-950/60 backdrop-blur-[12px] cursor-pointer"></div>
+                <div class="fixed inset-0 flex items-center justify-center p-4 pointer-events-none">
+                    <div x-show="showSendModal"
+                        x-transition:enter="ease-out duration-200"
+                        x-transition:enter-start="opacity-0 scale-95"
+                        x-transition:enter-end="opacity-100 scale-100"
+                        @click.stop
+                        class="pointer-events-auto w-full max-w-md rounded-[1.5rem] border border-slate-200 bg-white p-8 shadow-2xl">
+                        <h3 class="text-lg font-black text-slate-800 tracking-tight">Enviar cotización por correo</h3>
+                        <p class="mt-1 text-[11px] font-medium text-slate-400">Se adjunta el Excel generado para el cliente.</p>
+                        <form method="POST" :action="sendQuotation?.send_url" class="mt-6 space-y-4">
+                            @csrf
+                            <input type="hidden" name="view_id" value="{{ request('view_id') }}">
+                            <div>
+                                <label class="text-[10px] font-black uppercase tracking-widest text-slate-400">Correo electrónico</label>
+                                <input type="email" name="email" x-model="sendEmail" required
+                                    class="mt-1 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-800 focus:border-emerald-500 focus:outline-none">
+                            </div>
+                            <div class="flex justify-end gap-2 pt-2">
+                                <button type="button" @click="closeSendModal()"
+                                    class="h-10 rounded-xl border border-slate-200 px-5 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50">Cancelar</button>
+                                <button type="submit"
+                                    class="h-10 rounded-xl bg-emerald-600 px-6 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-700">Enviar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <template x-teleport="body">
+            <div x-show="showResultModal" class="relative z-[999999]" role="dialog" aria-modal="true">
+                <div x-show="showResultModal"
+                    x-transition:enter="ease-out duration-200"
+                    x-transition:enter-start="opacity-0"
+                    x-transition:enter-end="opacity-100"
+                    x-transition:leave="ease-in duration-150"
+                    x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0"
+                    @click="closeResultModal()"
+                    class="fixed inset-0 bg-slate-950/60 backdrop-blur-[12px] cursor-pointer"></div>
+                <div class="fixed inset-0 flex items-center justify-center p-4 pointer-events-none">
+                    <div x-show="showResultModal"
+                        x-transition:enter="ease-out duration-200"
+                        x-transition:enter-start="opacity-0 scale-95"
+                        x-transition:enter-end="opacity-100 scale-100"
+                        @click.stop
+                        class="pointer-events-auto w-full max-w-lg rounded-[1.5rem] border border-slate-200 bg-white p-8 shadow-2xl">
+                        <h3 class="text-lg font-black text-slate-800 tracking-tight">Resultado comercial</h3>
+                        <p class="mt-1 text-[11px] font-medium text-slate-400">Registre si la cotización se concretó o el motivo cuando no.</p>
+                        <form method="POST" :action="resultQuotation?.result_url" class="mt-6 space-y-4">
+                            @csrf
+                            @method('PATCH')
+                            <input type="hidden" name="view_id" value="{{ request('view_id') }}">
+                            <div>
+                                <label class="text-[10px] font-black uppercase tracking-widest text-slate-400">Estado</label>
+                                <select name="quotation_result" x-model="resultPayload.quotation_result"
+                                    class="mt-1 h-11 w-full rounded-xl border border-slate-200 px-3 text-xs font-black text-slate-800 focus:border-amber-500 focus:outline-none">
+                                    <option value="open">Abierta</option>
+                                    <option value="won">Ganada</option>
+                                    <option value="lost">No concretada</option>
+                                    <option value="converted">Convertida en venta</option>
+                                </select>
+                            </div>
+                            <div x-show="resultPayload.quotation_result === 'lost'" x-cloak>
+                                <label class="text-[10px] font-black uppercase tracking-widest text-slate-400">Motivo</label>
+                                <textarea name="quotation_lost_reason" x-model="resultPayload.quotation_lost_reason" rows="4"
+                                    class="mt-1 w-full rounded-xl border border-slate-200 p-3 text-xs font-medium text-slate-700 focus:border-amber-500 focus:outline-none"
+                                    placeholder="Precio, demora, competencia, etc."></textarea>
+                            </div>
+                            <div class="flex justify-end gap-2 pt-2">
+                                <button type="button" @click="closeResultModal()"
+                                    class="h-10 rounded-xl border border-slate-200 px-5 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50">Cancelar</button>
+                                <button type="submit"
+                                    class="h-10 rounded-xl bg-amber-500 px-6 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-amber-500/25 hover:bg-amber-600">Guardar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </template>
     </div>
 
     <style>
+        .quotation-filters select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-color: #ffffff;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            background-size: 1rem 1rem;
+        }
+        .quotation-filters select::-ms-expand {
+            display: none;
+        }
+        [x-cloak] {
+            display: none !important;
+        }
         .custom-scrollbar::-webkit-scrollbar {
             height: 6px;
         }

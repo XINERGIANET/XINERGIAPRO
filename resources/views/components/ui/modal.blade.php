@@ -3,15 +3,19 @@
     'showCloseButton' => true,
     'bodyScrollable' => true,
     'bodyClass' => '',
+    'teleport' => true,
 ])
 
 @php
     $customData = $attributes->get('x-data');
     $defaultData = "{ open: ".\Illuminate\Support\Js::from($isOpen)." }";
     $xData = $customData ?: $defaultData;
+    $useTeleport = filter_var($teleport, FILTER_VALIDATE_BOOLEAN);
 @endphp
 
+@if ($useTeleport)
 <template x-teleport="body">
+@endif
     <div
         x-data="{{ $xData }}"
         x-show="open"
@@ -19,7 +23,7 @@
         x-effect="document.body.style.overflow = open ? 'hidden' : 'unset'; open && ($el.scrollTop = 0)"
         class="modal fixed inset-0 z-99999 flex items-center justify-center overflow-hidden p-3 sm:p-6"
         style="position: fixed; inset: 0; z-index: 100000; display: flex; align-items: center; justify-content: center; overflow: hidden;"
-        {{ $attributes->except(['class', 'x-data']) }}>
+        {{ $attributes->except(['class', 'x-data', 'teleport']) }}>
 
         <!-- Backdrop -->
         <div @click="typeof close === 'function' ? close() : (open = false)" class="fixed inset-0 h-full w-full bg-gray-400/30 backdrop-blur-[32px]"
@@ -58,7 +62,9 @@
             </div>
         </div>
     </div>
+@if ($useTeleport)
 </template>
+@endif
 
 <style>
     [x-cloak] {

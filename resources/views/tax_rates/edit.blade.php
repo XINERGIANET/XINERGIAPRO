@@ -1,12 +1,13 @@
 @extends('layouts.app')
 
 @section('content')
-    @php
-        $viewId = request('view_id');
-    @endphp
+@php
+    $viewId = request('view_id');
+@endphp
     <x-common.page-breadcrumb pageTitle="Tasas de impuesto" />
 
     <x-ui.modal
+        :teleport="false"
         x-data="{
             open: true,
             close() {
