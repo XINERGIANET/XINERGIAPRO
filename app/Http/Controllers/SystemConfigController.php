@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Operation;
 use App\Models\ParameterCategories;
+use App\Models\TaxRate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -70,6 +71,12 @@ class SystemConfigController extends Controller
             ->orderBy('number')
             ->get(['id', 'number']);
 
+        $taxRates = TaxRate::query()
+            ->where('status', true)
+            ->orderBy('order_num')
+            ->orderBy('description')
+            ->get(['id', 'description', 'tax_rate']);
+
         return view('system_config.index', [
             'title' => 'Configuracion de sistema',
             'categories' => $categories,
@@ -77,6 +84,7 @@ class SystemConfigController extends Controller
             'viewId' => $viewId,
             'saleDocumentTypes' => $saleDocumentTypes,
             'cashRegisters' => $cashRegisters,
+            'taxRates' => $taxRates,
         ]);
     }
 

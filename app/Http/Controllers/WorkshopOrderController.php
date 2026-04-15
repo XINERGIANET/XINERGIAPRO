@@ -1273,6 +1273,13 @@ class WorkshopOrderController extends Controller
         return WorkshopMovement::query()
             ->when($companyId > 0, fn ($query) => $query->where('company_id', $companyId))
             ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
+            ->when(
+                Schema::hasColumn('workshop_movements', 'quotation_source'),
+                fn ($query) => $query->where(function ($scope) {
+                    $scope->whereNull('quotation_source')
+                        ->orWhere('quotation_source', '!=', 'external');
+                })
+            )
             ->when($selectedStatus !== 'all', fn ($query) => $query->where('status', $selectedStatus))
             ->when($dateFrom, fn ($query) => $query->whereDate('intake_date', '>=', $dateFrom))
             ->when($dateTo, fn ($query) => $query->whereDate('intake_date', '<=', $dateTo))

@@ -80,6 +80,11 @@ class WorkshopMovement extends Model
         return $this->belongsTo(self::class, 'previous_workshop_movement_id');
     }
 
+    public function generatedOrder()
+    {
+        return $this->hasOne(self::class, 'previous_workshop_movement_id');
+    }
+
     public function company()
     {
         return $this->belongsTo(Company::class);

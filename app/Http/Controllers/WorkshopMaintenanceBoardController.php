@@ -83,6 +83,13 @@ class WorkshopMaintenanceBoardController extends Controller
             ], 'total')
             ->where('company_id', $companyId)
             ->where('branch_id', $branchId)
+            ->when(
+                Schema::hasColumn('workshop_movements', 'quotation_source'),
+                fn ($query) => $query->where(function ($scope) {
+                    $scope->whereNull('quotation_source')
+                        ->orWhere('quotation_source', '!=', 'external');
+                })
+            )
             ->when($search !== '', function ($query) use ($search) {
                 $needle = mb_strtolower($search, 'UTF-8');
                 $query->where(function ($inner) use ($needle) {

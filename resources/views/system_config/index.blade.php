@@ -42,6 +42,8 @@
                                 $normalized = strtolower(trim((string) $currentValue));
                                 $isBoolean = in_array($normalized, ['si', 'no', 'yes', 'true', 'false', '1', '0'], true);
                                 $isDefaultSaleDocType = str_contains($parameterDescription, 'tipo venta por defecto');
+                                $isDefaultIgvParameter = str_contains($parameterDescription, 'igv defecto')
+                                    || str_contains($parameterDescription, 'igv por defecto');
                                 $isCashRegisterParameter = str_contains($parameterDescription, 'caja ventas del') || str_contains($parameterDescription, 'caja factur');
                                 $isMaintenanceDaysParameter = str_contains($parameterDescription, 'periodo de mantenimiento')
                                     || str_contains($parameterDescription, 'dias previos de recordatorio')
@@ -68,6 +70,24 @@
                                             </option>
                                         @empty
                                             <option value="">Sin tipos de documento de venta</option>
+                                        @endforelse
+                                    </select>
+                                @elseif ($isDefaultIgvParameter)
+                                    <select
+                                        name="values[{{ $parameter->id }}]"
+                                        class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-700 focus:border-orange-400 focus:outline-none"
+                                    >
+                                        @forelse (($taxRates ?? collect()) as $rate)
+                                            @php
+                                                $rateValue = rtrim(rtrim(number_format((float) $rate->tax_rate, 6, '.', ''), '0'), '.');
+                                                $selectedRate = (float) $currentValue;
+                                                $optionRate = (float) $rate->tax_rate;
+                                            @endphp
+                                            <option value="{{ $rateValue }}" @selected(abs($selectedRate - $optionRate) < 0.000001)>
+                                                {{ $rate->description }} ({{ rtrim(rtrim(number_format((float) $rate->tax_rate, 2, '.', ''), '0'), '.') }}%)
+                                            </option>
+                                        @empty
+                                            <option value="{{ $currentValue }}">{{ $currentValue }}</option>
                                         @endforelse
                                     </select>
                                 @elseif ($isCashRegisterParameter)

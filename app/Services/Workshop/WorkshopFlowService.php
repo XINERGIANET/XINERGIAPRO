@@ -784,6 +784,199 @@ class WorkshopFlowService
         });
     }
 
+    public function generateOrderFromExternalQuotation(WorkshopMovement $quotation, int $branchId, int $userId, string $userName): WorkshopMovement
+    {
+        return DB::transaction(function () use ($quotation, $branchId, $userId, $userName) {
+            $quotation = WorkshopMovement::query()->lockForUpdate()->findOrFail($quotation->id);
+            $this->assertWorkshopInCurrentBranch($quotation);
+
+            if ((string) ($quotation->quotation_source ?? '') !== 'external') {
+                throw new \RuntimeException('Solo las cotizaciones externas permiten generar una OS desde este flujo.');
+            }
+            if ((string) $quotation->status !== 'approved') {
+                throw new \RuntimeException('Primero debe aprobar la cotizacion externa para generar la OS.');
+            }
+            if (!$quotation->vehicle_id || !$quotation->client_person_id) {
+                throw new \RuntimeException('La cotizacion externa requiere vehiculo y cliente para generar una OS.');
+            }
+
+            $existingOrder = WorkshopMovement::query()
+                ->where('previous_workshop_movement_id', $quotation->id)
+                ->where('id', '!=', $quotation->id)
+                ->orderByDesc('id')
+                ->first();
+            if ($existingOrder) {
+                return $existingOrder->fresh(['movement']);
+            }
+
+            $order = $this->createOrder([
+                'vehicle_id' => (int) $quotation->vehicle_id,
+                'client_person_id' => (int) $quotation->client_person_id,
+                'intake_date' => now(),
+                'mileage_in' => $quotation->mileage_in,
+                'diagnosis_text' => $quotation->diagnosis_text,
+                'observations' => $quotation->observations,
+                'status' => 'approved',
+                'previous_workshop_movement_id' => $quotation->id,
+                'comment' => 'OS generada desde cotizacion externa ' . ($quotation->quotation_correlative ?: ('#' . $quotation->id)),
+            ], $branchId, $userId, $userName);
+
+            $details = WorkshopMovementDetail::query()
+                ->where('workshop_movement_id', $quotation->id)
+                ->whereNull('deleted_at')
+                ->get();
+
+            foreach ($details as $detail) {
+                $this->addDetail($order, [
+                    'line_type' => (string) $detail->line_type,
+                    'description' => (string) $detail->description,
+                    'qty' => (float) $detail->qty,
+                    'unit_price' => (float) $detail->unit_price,
+                    'discount_amount' => (float) $detail->discount_amount,
+                    'product_id' => $detail->product_id ?: null,
+                    'service_id' => $detail->service_id ?: null,
+                    'tax_rate_id' => $detail->tax_rate_id ?: null,
+                    'technician_person_id' => $detail->technician_person_id ?: null,
+                    'validity_months' => $detail->validity_months,
+                ]);
+            }
+
+            $order->update([
+                'approval_status' => 'approved',
+                'approved_at' => now(),
+                'approved_by' => $userId,
+                'approval_note' => 'OS generada desde cotizacion externa aprobada',
+            ]);
+
+            if (Schema::hasColumn('workshop_movements', 'quotation_result')) {
+                $quotation->update(['quotation_result' => 'converted']);
+            }
+
+            return $order->fresh(['movement']);
+        });
+    }
+
+    public function updateExternalQuotation(WorkshopMovement $quotation, array $data, int $branchId, int $userId, string $userName): WorkshopMovement
+    {
+        return DB::transaction(function () use ($quotation, $data, $branchId, $userId, $userName) {
+            $quotation = WorkshopMovement::query()->lockForUpdate()->findOrFail($quotation->id);
+            $this->assertWorkshopInCurrentBranch($quotation);
+
+            if ((string) ($quotation->quotation_source ?? '') !== 'external') {
+                throw new \RuntimeException('Solo las cotizaciones externas pueden editarse desde este flujo.');
+            }
+            if (WorkshopMovement::query()->where('previous_workshop_movement_id', $quotation->id)->where('id', '!=', $quotation->id)->exists()) {
+                throw new \RuntimeException('No se puede editar: ya se genero una orden de servicio para esta cotizacion.');
+            }
+
+            $branch = Branch::query()->findOrFail($branchId);
+            $client = Person::query()->findOrFail((int) $data['client_person_id']);
+            if ((int) $client->branch_id !== (int) $branchId) {
+                throw new \RuntimeException('El cliente no pertenece a la sucursal actual.');
+            }
+
+            $vehicleId = !empty($data['vehicle_id']) ? (int) $data['vehicle_id'] : null;
+            if ($vehicleId) {
+                $vehicle = Vehicle::query()
+                    ->where('id', $vehicleId)
+                    ->where('company_id', (int) $branch->company_id)
+                    ->firstOrFail();
+                if ((int) $vehicle->client_person_id !== (int) $client->id) {
+                    throw new \RuntimeException('El vehiculo no pertenece al cliente seleccionado.');
+                }
+            }
+
+            $terms = [
+                'delivery_time' => isset($data['quotation_delivery_time']) ? trim((string) $data['quotation_delivery_time']) : '',
+                'offer_validity' => isset($data['quotation_offer_validity']) ? trim((string) $data['quotation_offer_validity']) : '',
+                'service_warranty' => isset($data['quotation_service_warranty']) ? trim((string) $data['quotation_service_warranty']) : '',
+                'delivery_place' => isset($data['quotation_delivery_place']) ? trim((string) $data['quotation_delivery_place']) : '',
+                'prices_note' => isset($data['quotation_prices_note']) ? trim((string) $data['quotation_prices_note']) : '',
+                'payment_condition' => isset($data['quotation_payment_condition']) ? trim((string) $data['quotation_payment_condition']) : '',
+                'bank_account_bcp' => isset($data['quotation_bank_account_bcp']) ? trim((string) $data['quotation_bank_account_bcp']) : '',
+                'bank_cci' => isset($data['quotation_bank_cci']) ? trim((string) $data['quotation_bank_cci']) : '',
+            ];
+
+            $patch = [
+                'vehicle_id' => $vehicleId,
+                'client_person_id' => $client->id,
+                'diagnosis_text' => $data['diagnosis_text'] ?? null,
+                'observations' => $data['observations'] ?? null,
+            ];
+            if (Schema::hasColumn('workshop_movements', 'quotation_client_email')) {
+                $patch['quotation_client_email'] = $data['quotation_client_email'] ?? null;
+            }
+            if (Schema::hasColumn('workshop_movements', 'quotation_vehicle_note')) {
+                $patch['quotation_vehicle_note'] = $data['quotation_vehicle_note'] ?? null;
+            }
+            if (Schema::hasColumn('workshop_movements', 'quotation_commercial_terms')) {
+                $patch['quotation_commercial_terms'] = $terms;
+            }
+            $quotation->update($patch);
+
+            $quotation->movement?->update([
+                'person_id' => $client->id,
+                'person_name' => trim(($client->first_name ?? '') . ' ' . ($client->last_name ?? '')),
+                'comment' => 'Cotizacion externa actualizada' . ($quotation->quotation_correlative ? (' ' . $quotation->quotation_correlative) : ''),
+                'user_id' => $userId,
+                'user_name' => $userName,
+                'responsible_id' => $userId,
+                'responsible_name' => $userName,
+            ]);
+
+            WorkshopMovementDetail::query()
+                ->where('workshop_movement_id', $quotation->id)
+                ->delete();
+
+            foreach ((array) $data['items'] as $item) {
+                $this->addDetail($quotation, [
+                    'line_type' => (string) $item['line_type'],
+                    'description' => (string) $item['description'],
+                    'qty' => (float) $item['qty'],
+                    'unit_price' => (float) $item['unit_price'],
+                    'product_id' => $item['product_id'] ?? null,
+                    'service_id' => $item['service_id'] ?? null,
+                    'tax_rate_id' => $item['tax_rate_id'] ?? null,
+                    'discount_amount' => (float) ($item['discount_amount'] ?? 0),
+                ]);
+            }
+
+            $this->audit((int) $quotation->id, $userId, 'EXTERNAL_QUOTATION_UPDATED', [
+                'items' => count((array) $data['items']),
+            ]);
+
+            return $quotation->fresh(['movement', 'details']);
+        });
+    }
+
+    public function deleteExternalQuotation(WorkshopMovement $quotation): void
+    {
+        DB::transaction(function () use ($quotation) {
+            $quotation = WorkshopMovement::query()->lockForUpdate()->findOrFail($quotation->id);
+            $this->assertWorkshopInCurrentBranch($quotation);
+
+            if ((string) ($quotation->quotation_source ?? '') !== 'external') {
+                throw new \RuntimeException('Solo las cotizaciones externas pueden eliminarse desde este flujo.');
+            }
+            if (WorkshopMovement::query()->where('previous_workshop_movement_id', $quotation->id)->where('id', '!=', $quotation->id)->exists()) {
+                throw new \RuntimeException('No se puede eliminar: la cotizacion ya tiene una orden de servicio generada.');
+            }
+            if ($quotation->sales_movement_id || $quotation->cash_movement_id) {
+                throw new \RuntimeException('No se puede eliminar una cotizacion con venta o pago asociado.');
+            }
+
+            WorkshopMovementDetail::query()
+                ->where('workshop_movement_id', $quotation->id)
+                ->delete();
+
+            $movement = $quotation->movement;
+            $quotation->delete();
+            if ($movement) {
+                $movement->delete();
+            }
+        });
+    }
+
     public function updateQuotationResult(WorkshopMovement $order, string $result, ?string $lostReason, int $userId): WorkshopMovement
     {
         if (!Schema::hasColumn('workshop_movements', 'quotation_result')) {

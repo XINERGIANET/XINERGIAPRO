@@ -154,11 +154,15 @@ Route::middleware('auth')->group(function () {
     // Gestión de Cotizaciones (Taller)
     Route::get('/admin/ventas/cotizaciones', [WorkshopQuotationController::class, 'index'])->name('admin.sales.quotations.index');
     Route::get('/admin/ventas/cotizaciones/crear-externa', [WorkshopQuotationController::class, 'createExternal'])->name('admin.sales.quotations.create-external');
+    Route::get('/admin/ventas/cotizaciones/{quotation}/editar-externa', [WorkshopQuotationController::class, 'editExternal'])->name('admin.sales.quotations.edit-external');
     Route::get('/admin/ventas/cotizaciones/vehiculos-por-cliente', [WorkshopQuotationController::class, 'vehiclesForClient'])->name('admin.sales.quotations.vehicles-for-client');
     Route::post('/admin/ventas/cotizaciones/externa', [WorkshopQuotationController::class, 'storeExternal'])->name('admin.sales.quotations.store-external');
+    Route::put('/admin/ventas/cotizaciones/{quotation}/externa', [WorkshopQuotationController::class, 'updateExternal'])->name('admin.sales.quotations.update-external');
+    Route::delete('/admin/ventas/cotizaciones/{quotation}/externa', [WorkshopQuotationController::class, 'destroyExternal'])->name('admin.sales.quotations.destroy-external');
     Route::get('/admin/ventas/cotizaciones/{quotation}/excel', [WorkshopQuotationController::class, 'excel'])->name('admin.sales.quotations.excel');
     Route::post('/admin/ventas/cotizaciones/{quotation}/enviar', [WorkshopQuotationController::class, 'send'])->name('admin.sales.quotations.send');
     Route::patch('/admin/ventas/cotizaciones/{quotation}/resultado', [WorkshopQuotationController::class, 'updateResult'])->name('admin.sales.quotations.update-result');
+    Route::post('/admin/ventas/cotizaciones/{quotation}/generar-os', [WorkshopQuotationController::class, 'generateOrder'])->name('admin.sales.quotations.generate-order');
 
     // POS: Pedidos
     Route::group(['prefix' => 'admin/pedidos', 'as' => 'admin.orders.'], function () {

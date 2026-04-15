@@ -177,9 +177,19 @@
                         </thead>
                         <tbody class="divide-y divide-slate-100 italic-rows">
                             @forelse($quotations as $quotation)
+                                @php
+                                    $isExternalQuotation = (($quotation->quotation_source ?? 'internal') === 'external');
+                                    $generatedOrder = $quotation->generatedOrder;
+                                @endphp
                                 <tr class="group hover:bg-slate-50/80 transition-all duration-200">
                                     <td class="px-6 py-5">
-                                        <h5 class="font-black text-slate-800 tracking-tight leading-none mb-1.5">{{ $quotation->movement?->number ?? sprintf("%08d", $quotation->id) }}</h5>
+                                        @if ($isExternalQuotation && !$generatedOrder)
+                                            <h5 class="font-black text-slate-500 tracking-tight leading-none mb-1.5">-</h5>
+                                        @elseif ($isExternalQuotation && $generatedOrder)
+                                            <h5 class="font-black text-slate-800 tracking-tight leading-none mb-1.5">{{ $generatedOrder->movement?->number ?? sprintf("%08d", $generatedOrder->id) }}</h5>
+                                        @else
+                                            <h5 class="font-black text-slate-800 tracking-tight leading-none mb-1.5">{{ $quotation->movement?->number ?? sprintf("%08d", $quotation->id) }}</h5>
+                                        @endif
                                         <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{{ $quotation->intake_date?->format('d/m/Y H:i') }}</p>
                                     </td>
                                     @if ($showQuotationExtras ?? false)
@@ -237,8 +247,27 @@
                                     <td class="px-6 py-5 text-right whitespace-nowrap">
                                         <div class="inline-flex flex-nowrap items-center justify-end gap-2">
                                             @if ($showQuotationExtras ?? false)
+                                                @if ($isExternalQuotation && !$generatedOrder)
+                                                    <a href="{{ route('admin.sales.quotations.edit-external', array_filter(['quotation' => $quotation->id, 'view_id' => request('view_id')])) }}"
+                                                       class="w-10 h-10 rounded-xl bg-slate-600 text-white flex items-center justify-center shadow-lg shadow-slate-500/20 hover:scale-105 transition-all"
+                                                       title="Editar cotización externa">
+                                                        <i class="ri-edit-line text-lg"></i>
+                                                    </a>
+                                                    <form method="POST" action="{{ route('admin.sales.quotations.destroy-external', $quotation) }}" onsubmit="return confirm('¿Eliminar cotización externa? Esta acción no se puede deshacer.');">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <input type="hidden" name="view_id" value="{{ request('view_id') }}">
+                                                        <button type="submit"
+                                                            class="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-lg shadow-red-500/20 hover:scale-105 transition-all cursor-pointer"
+                                                            title="Eliminar cotización externa">
+                                                            <i class="ri-delete-bin-line text-lg"></i>
+                                                        </button>
+                                                    </form>
+                                                @endif
                                                 <a href="{{ route('admin.sales.quotations.excel', $quotation) }}"
                                                    class="w-10 h-10 rounded-xl bg-slate-700 text-white flex items-center justify-center shadow-lg shadow-slate-500/20 hover:scale-105 transition-all"
+                                                   data-no-loading="true"
+                                                   data-turbo="false"
                                                    title="Descargar Excel">
                                                     <i class="ri-file-excel-2-line text-lg"></i>
                                                 </a>
@@ -262,10 +291,29 @@
                                                     <i class="ri-pie-chart-line text-lg"></i>
                                                 </button>
                                             @endif
+                                            @if ($isExternalQuotation && $quotation->status === 'approved' && !$generatedOrder)
+                                                <form method="POST" action="{{ route('admin.sales.quotations.generate-order', $quotation) }}">
+                                                    @csrf
+                                                    <input type="hidden" name="view_id" value="{{ request('view_id') }}">
+                                                    <button type="submit"
+                                                        class="w-10 h-10 rounded-xl bg-violet-600 text-white flex items-center justify-center shadow-lg shadow-violet-500/20 hover:scale-105 transition-all cursor-pointer"
+                                                        title="Generar orden de servicio">
+                                                        <i class="ri-tools-line text-lg"></i>
+                                                    </button>
+                                                </form>
+                                            @elseif ($isExternalQuotation && $generatedOrder)
+                                                <a href="{{ route('workshop.orders.show', $generatedOrder) }}"
+                                                    class="w-10 h-10 rounded-xl bg-violet-100 text-violet-700 border border-violet-200 flex items-center justify-center hover:scale-105 transition-all"
+                                                    title="Ver orden de servicio generada">
+                                                    <i class="ri-file-list-3-line text-lg"></i>
+                                                </a>
+                                            @endif
                                             <button type="button" 
                                                 @click="openModal({{ json_encode([
                                                     'id' => $quotation->id,
-                                                    'number' => $quotation->movement?->number ?? sprintf('%08d', $quotation->id),
+                                                    'number' => $isExternalQuotation
+                                                        ? ($generatedOrder?->movement?->number ?? 'SIN OS')
+                                                        : ($quotation->movement?->number ?? sprintf('%08d', $quotation->id)),
                                                     'vehicle' => $quotation->vehicle?->brand . ' ' . $quotation->vehicle?->model,
                                                     'status' => $quotation->status,
                                                     'status_label' => $quotation->status === 'approved' ? 'Aprobada' : 'Esperando aprobación',

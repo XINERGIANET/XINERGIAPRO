@@ -21,8 +21,10 @@ use App\Support\WorkshopQuotationExcelExport;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class WorkshopQuotationController extends Controller
@@ -87,7 +89,7 @@ class WorkshopQuotationController extends Controller
         }
 
         $quotations = $quotationsQuery
-            ->with(['movement', 'vehicle', 'client', 'details', 'deletedDetails'])
+            ->with(['movement', 'vehicle', 'client', 'details', 'deletedDetails', 'generatedOrder.movement'])
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
@@ -140,6 +142,7 @@ class WorkshopQuotationController extends Controller
         }
 
         $taxRates = TaxRate::query()->orderBy('description')->get(['id', 'description', 'tax_rate']);
+        $defaultTaxRateId = $this->resolveDefaultTaxRateId($branchId);
 
         $productOptions = ProductBranch::query()
             ->join('products', 'products.id', '=', 'product_branch.product_id')
@@ -200,6 +203,107 @@ class WorkshopQuotationController extends Controller
             'quickClientStoreUrl' => route('admin.sales.clients.store'),
             'vehicleTypes' => $vehicleTypes,
             'defaultVehicleTypeId' => $defaultVehicleTypeId,
+            'defaultTaxRateId' => $defaultTaxRateId,
+        ]);
+    }
+
+    public function editExternal(Request $request, WorkshopMovement $quotation)
+    {
+        $this->assertQuotationScope($quotation);
+
+        if ((string) ($quotation->quotation_source ?? '') !== 'external') {
+            return redirect()
+                ->route('admin.sales.quotations.index', array_filter(['view_id' => $request->input('view_id')]))
+                ->withErrors(['error' => 'Solo las cotizaciones externas se editan desde este formulario.']);
+        }
+
+        $branchId = (int) session('branch_id');
+        $branch = $branchId > 0 ? Branch::query()->with('location.parent.parent')->find($branchId) : null;
+        $locationData = $this->getLocationData((int) ($branch?->location_id ?? 0));
+
+        $quotation->loadMissing(['details']);
+
+        $clients = Person::query()
+            ->where('branch_id', $branchId)
+            ->whereHas('roles', fn ($q) => $q->where('roles.id', 3))
+            ->orderBy('first_name')
+            ->get();
+
+        $clientId = (int) old('client_person_id', (int) $quotation->client_person_id);
+
+        $vehicles = collect();
+        if ($clientId > 0) {
+            $vehicles = Vehicle::query()
+                ->where('client_person_id', $clientId)
+                ->when($branchId > 0, fn ($q) => $q->where('branch_id', $branchId))
+                ->orderBy('plate')
+                ->get();
+        }
+
+        $taxRates = TaxRate::query()->orderBy('description')->get(['id', 'description', 'tax_rate']);
+        $defaultTaxRateId = $this->resolveDefaultTaxRateId($branchId);
+
+        $productOptions = ProductBranch::query()
+            ->join('products', 'products.id', '=', 'product_branch.product_id')
+            ->where('product_branch.branch_id', $branchId)
+            ->whereNull('product_branch.deleted_at')
+            ->whereNull('products.deleted_at')
+            ->orderBy('products.description')
+            ->get([
+                'product_branch.product_id',
+                'product_branch.price',
+                'product_branch.tax_rate_id',
+                'products.code',
+                'products.description',
+            ]);
+
+        $services = WorkshopService::query()
+            ->where('branch_id', $branchId)
+            ->where('active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'base_price']);
+
+        $companyId = (int) ($branch?->company_id ?? 0);
+        $vehicleTypes = VehicleType::query()
+            ->where(function ($query) use ($companyId, $branchId) {
+                $query->whereNull('company_id')
+                    ->orWhere(function ($scope) use ($companyId, $branchId) {
+                        $scope->where('company_id', $companyId)
+                            ->where(function ($branchScope) use ($branchId) {
+                                $branchScope->whereNull('branch_id')
+                                    ->orWhere('branch_id', $branchId);
+                            });
+                    });
+            })
+            ->where('active', true)
+            ->orderBy('company_id')
+            ->orderBy('branch_id')
+            ->orderBy('order_num')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $defaultVehicleTypeId = (int) (optional($vehicleTypes->firstWhere('name', 'moto lineal'))->id
+            ?? optional($vehicleTypes->first())->id
+            ?? 0);
+
+        return view('workshop.quotations.create-external', [
+            'quotation' => $quotation,
+            'clients' => $clients,
+            'vehicles' => $vehicles,
+            'clientId' => $clientId,
+            'taxRates' => $taxRates,
+            'productOptions' => $productOptions,
+            'services' => $services,
+            'departments' => $locationData['departments'],
+            'provinces' => $locationData['provinces'],
+            'districts' => $locationData['districts'],
+            'branchDepartmentId' => $locationData['selectedDepartmentId'],
+            'branchProvinceId' => $locationData['selectedProvinceId'],
+            'branchDistrictId' => $locationData['selectedDistrictId'],
+            'quickClientStoreUrl' => route('admin.sales.clients.store'),
+            'vehicleTypes' => $vehicleTypes,
+            'defaultVehicleTypeId' => $defaultVehicleTypeId,
+            'defaultTaxRateId' => $defaultTaxRateId,
         ]);
     }
 
@@ -254,6 +358,50 @@ class WorkshopQuotationController extends Controller
             ->with('status', 'Cotizacion externa registrada correctamente.');
     }
 
+    public function updateExternal(StoreExternalQuotationRequest $request, WorkshopMovement $quotation): RedirectResponse
+    {
+        $this->assertQuotationScope($quotation);
+
+        $branchId = (int) session('branch_id');
+        $user = $request->user();
+        $userName = (string) ($user?->name ?? 'Sistema');
+
+        try {
+            $this->flowService->updateExternalQuotation(
+                $quotation,
+                $request->validated(),
+                $branchId,
+                (int) $user?->id,
+                $userName
+            );
+        } catch (\Throwable $e) {
+            return back()->withInput()->withErrors(['error' => $e->getMessage()]);
+        }
+
+        $q = array_filter(['view_id' => $request->input('view_id')]);
+
+        return redirect()
+            ->route('admin.sales.quotations.index', $q)
+            ->with('status', 'Cotizacion externa actualizada correctamente.');
+    }
+
+    public function destroyExternal(Request $request, WorkshopMovement $quotation): RedirectResponse
+    {
+        $this->assertQuotationScope($quotation);
+
+        try {
+            $this->flowService->deleteExternalQuotation($quotation);
+        } catch (\Throwable $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+
+        $q = array_filter(['view_id' => $request->input('view_id')]);
+
+        return redirect()
+            ->route('admin.sales.quotations.index', $q)
+            ->with('status', 'Cotizacion externa eliminada correctamente.');
+    }
+
     public function excel(Request $request, WorkshopMovement $quotation): BinaryFileResponse|RedirectResponse
     {
         $this->assertQuotationScope($quotation);
@@ -283,6 +431,24 @@ class WorkshopQuotationController extends Controller
 
         $email = (string) $request->validated('email');
         $fileName = 'cotizacion_' . preg_replace('/[^A-Za-z0-9_-]+/', '_', (string) ($quotation->quotation_correlative ?: $quotation->id)) . '.xlsx';
+        $mailer = (string) config('mail.default', 'smtp');
+
+        if (in_array($mailer, ['log', 'array'], true)) {
+            @unlink($path);
+
+            return back()->withErrors([
+                'error' => "No se envio el correo: el mailer activo es '{$mailer}' (modo de prueba). Configura SMTP real en .env.",
+            ]);
+        }
+
+        $fromAddress = (string) config('mail.from.address', '');
+        if ($fromAddress === '' || Str::endsWith(Str::lower($fromAddress), '@example.com')) {
+            @unlink($path);
+
+            return back()->withErrors([
+                'error' => 'No se envio el correo: revisa MAIL_FROM_ADDRESS en .env (actualmente no es valido para produccion).',
+            ]);
+        }
 
         try {
             Mail::to($email)->send(new WorkshopQuotationSentMail($quotation, $path, $fileName));
@@ -290,6 +456,18 @@ class WorkshopQuotationController extends Controller
             @unlink($path);
 
             return back()->withErrors(['error' => 'No se pudo enviar el correo: ' . $e->getMessage()]);
+        }
+
+        $mailerRoot = Mail::getFacadeRoot();
+        if ($mailerRoot && method_exists($mailerRoot, 'failures')) {
+            $failures = (array) $mailerRoot->failures();
+            if ($failures !== []) {
+                @unlink($path);
+
+                return back()->withErrors([
+                    'error' => 'No se pudo enviar el correo. Destinatarios rechazados: ' . implode(', ', $failures),
+                ]);
+            }
         }
 
         @unlink($path);
@@ -334,6 +512,29 @@ class WorkshopQuotationController extends Controller
             ->with('status', 'Resultado de cotizacion actualizado.');
     }
 
+    public function generateOrder(Request $request, WorkshopMovement $quotation): RedirectResponse
+    {
+        $this->assertQuotationScope($quotation);
+
+        $user = $request->user();
+        $branchId = (int) session('branch_id');
+
+        try {
+            $order = $this->flowService->generateOrderFromExternalQuotation(
+                $quotation,
+                $branchId,
+                (int) $user?->id,
+                (string) ($user?->name ?? 'Sistema')
+            );
+        } catch (\Throwable $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+
+        return redirect()
+            ->route('workshop.orders.show', $order)
+            ->with('status', 'Orden de servicio generada desde cotizacion externa.');
+    }
+
     private function assertQuotationScope(WorkshopMovement $quotation): void
     {
         $branchId = (int) session('branch_id');
@@ -368,6 +569,53 @@ class WorkshopQuotationController extends Controller
                             ->orWhere('last_name', 'ILIKE', "%{$search}%"));
                 });
             });
+    }
+
+    private function resolveDefaultTaxRateId(int $branchId): ?int
+    {
+        $configuredIgv = DB::table('parameters')
+            ->leftJoin('branch_parameters', function ($join) use ($branchId) {
+                $join->on('branch_parameters.parameter_id', '=', 'parameters.id')
+                    ->where('branch_parameters.branch_id', $branchId)
+                    ->whereNull('branch_parameters.deleted_at');
+            })
+            ->where(function ($query) {
+                $query->whereRaw('LOWER(TRIM(parameters.description)) = ?', ['igv defecto'])
+                    ->orWhereRaw('LOWER(TRIM(parameters.description)) = ?', ['igv por defecto'])
+                    ->orWhereRaw('LOWER(TRIM(parameters.description)) = ?', ['ws_default_igv']);
+            })
+            ->where('parameters.status', 1)
+            ->whereNull('parameters.deleted_at')
+            ->orderByRaw("
+                CASE
+                    WHEN LOWER(TRIM(parameters.description)) = 'igv defecto' THEN 1
+                    WHEN LOWER(TRIM(parameters.description)) = 'igv por defecto' THEN 2
+                    WHEN LOWER(TRIM(parameters.description)) = 'ws_default_igv' THEN 3
+                    ELSE 9
+                END
+            ")
+            ->selectRaw('COALESCE(branch_parameters.value, parameters.value) as configured_igv')
+            ->value('configured_igv');
+
+        $configuredIgvValue = is_numeric($configuredIgv) ? (float) $configuredIgv : null;
+
+        if ($configuredIgvValue !== null) {
+            $match = TaxRate::query()
+                ->where('status', true)
+                ->whereRaw('ABS(tax_rate - ?) < 0.000001', [$configuredIgvValue])
+                ->orderBy('order_num')
+                ->value('id');
+            if ($match) {
+                return (int) $match;
+            }
+        }
+
+        $fallback = TaxRate::query()
+            ->where('status', true)
+            ->orderBy('order_num')
+            ->value('id');
+
+        return $fallback ? (int) $fallback : null;
     }
 
     /**
