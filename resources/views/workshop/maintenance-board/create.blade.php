@@ -115,9 +115,11 @@
     filteredVehicleList: [],
     vehicleDropdownOpen: false,
     selectedClientId: @js($clientIdDefault),
+    plateLookupUrl: @js(route('workshop.maintenance-board.vehicles.lookup-plate')),
     mileageIn: @js($mileageDefault),
     creatingVehicle: false,
     creatingVehicleLoading: false,
+    lookingUpPlate: false,
     quickVehicleError: '',
     quickVehicleClientSearch: '',
     quickVehicleClientDropdownOpen: false,
@@ -775,6 +777,44 @@
         this.quickVehicleError = '';
         this.syncQuickVehicleClientSearch();
     },
+    normalizePlateForLookup(value) {
+        return String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').trim();
+    },
+    async lookupQuickVehicleByPlate() {
+        this.quickVehicleError = '';
+        const normalizedPlate = this.normalizePlateForLookup(this.quickVehicle.plate);
+        this.quickVehicle.plate = normalizedPlate;
+        if (normalizedPlate.length < 5) {
+            this.quickVehicleError = 'Ingrese una placa valida para buscar.';
+            return;
+        }
+        this.lookingUpPlate = true;
+        try {
+            const response = await fetch(`${this.plateLookupUrl}?plate=${encodeURIComponent(normalizedPlate)}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+            const payload = await response.json();
+            if (!response.ok || !payload?.status) {
+                throw new Error(payload?.message || 'No se encontraron datos para la placa ingresada.');
+            }
+            this.quickVehicle.brand = String(payload.brand || this.quickVehicle.brand || '');
+            this.quickVehicle.model = String(payload.model || this.quickVehicle.model || '');
+            this.quickVehicle.year = String(payload.year || this.quickVehicle.year || '');
+            this.quickVehicle.color = String(payload.color || this.quickVehicle.color || '');
+            this.quickVehicle.vin = String(payload.vin || this.quickVehicle.vin || '');
+            this.quickVehicle.engine_number = String(payload.engine_number || this.quickVehicle.engine_number || '');
+            this.quickVehicle.chassis_number = String(payload.chassis_number || this.quickVehicle.chassis_number || '');
+            this.quickVehicle.serial_number = String(payload.serial_number || this.quickVehicle.serial_number || '');
+        } catch (error) {
+            this.quickVehicleError = error?.message || 'No se pudo consultar la placa.';
+        } finally {
+            this.lookingUpPlate = false;
+        }
+    },
     toggleQuickVehicle() {
         this.creatingVehicle = !this.creatingVehicle;
         if (this.creatingVehicle) {
@@ -1211,7 +1251,20 @@
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">Placa <span class="text-red-600">*</span></label>
-                        <input x-model="quickVehicle.plate" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Placa">
+                        <div class="flex items-center gap-2">
+                            <input x-model="quickVehicle.plate"
+                                @blur="lookupQuickVehicleByPlate()"
+                                @input="quickVehicle.plate = normalizePlateForLookup(quickVehicle.plate)"
+                                class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                                placeholder="Placa">
+                            <button type="button"
+                                @click="lookupQuickVehicleByPlate()"
+                                :disabled="lookingUpPlate"
+                                class="inline-flex h-10 shrink-0 items-center rounded-lg border border-blue-300 bg-blue-50 px-3 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60">
+                                <i class="ri-search-line mr-1"></i>
+                                <span x-text="lookingUpPlate ? 'Buscando...' : 'Buscar placa'"></span>
+                            </button>
+                        </div>
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">VIN <span class="text-red-600">*</span></label>

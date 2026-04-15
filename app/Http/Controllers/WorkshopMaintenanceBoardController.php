@@ -25,6 +25,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -1231,6 +1232,174 @@ class WorkshopMaintenanceBoardController extends Controller
         ]);
     }
 
+    public function lookupVehicleByPlate(Request $request): JsonResponse
+    {
+        $rawPlate = strtoupper(trim((string) $request->query('plate', '')));
+        $plate = preg_replace('/[^A-Z0-9]/', '', $rawPlate) ?? '';
+        if (strlen($plate) < 5) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Ingrese una placa valida.',
+            ], 422);
+        }
+
+        $enabled = filter_var((string) config('vehicle_lookup.enabled', ''), FILTER_VALIDATE_BOOLEAN);
+        $url = trim((string) config('vehicle_lookup.url', ''));
+        $token = trim((string) config('vehicle_lookup.token', ''));
+        $timeout = (int) config('vehicle_lookup.timeout', 15);
+        $driver = trim((string) config('vehicle_lookup.driver', 'json_pe'));
+
+        if (!$enabled || $url === '') {
+            return response()->json([
+                'status' => false,
+                'message' => 'Consulta por placa no configurada. Define VEHICLE_PLATE_LOOKUP_* en .env.',
+            ], 422);
+        }
+
+        if ($driver === 'json_pe') {
+            if ($token === '') {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Falta VEHICLE_PLATE_LOOKUP_TOKEN en .env (Bearer de json.pe).',
+                ], 422);
+            }
+
+            $bodyKey = trim((string) config('vehicle_lookup.body_plate_key', 'placa'));
+            if ($bodyKey === '') {
+                $bodyKey = 'placa';
+            }
+
+            try {
+                $response = Http::timeout($timeout > 0 ? $timeout : 15)
+                    ->withToken($token)
+                    ->acceptJson()
+                    ->post($url, [$bodyKey => strtolower($plate)]);
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No se pudo conectar al proveedor json.pe.',
+                ], 422);
+            }
+
+            $payload = (array) $response->json();
+            $apiMessage = trim((string) ($payload['message'] ?? ''));
+
+            if (!$response->successful()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => $apiMessage !== '' ? $apiMessage : 'El proveedor no pudo resolver la placa.',
+                ], 422);
+            }
+
+            $ok = (bool) ($payload['success'] ?? false);
+            if (!$ok) {
+                return response()->json([
+                    'status' => false,
+                    'message' => $apiMessage !== '' ? $apiMessage : 'No se encontro informacion para esa placa.',
+                ], 422);
+            }
+
+            $data = (array) ($payload['data'] ?? []);
+            $brand = trim((string) ($data['marca'] ?? ''));
+            $model = trim((string) ($data['modelo'] ?? ''));
+            $color = trim((string) ($data['color'] ?? ''));
+            $vin = trim((string) ($data['vin'] ?? ''));
+            $engineNumber = trim((string) ($data['motor'] ?? ''));
+            $serie = trim((string) ($data['serie'] ?? ''));
+            $serialNumber = $serie;
+            $chassisNumber = ($serie !== '' && $serie !== $vin) ? $serie : '';
+
+            if ($brand === '' && $model === '' && $color === '' && $vin === '' && $engineNumber === '' && $serie === '') {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'No se encontraron datos vehiculares para esa placa.',
+                ], 422);
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => $apiMessage !== '' ? $apiMessage : 'Datos de placa encontrados.',
+                'plate' => strtoupper((string) ($data['placa'] ?? $plate)),
+                'brand' => $brand,
+                'model' => $model,
+                'year' => '',
+                'color' => $color,
+                'vin' => $vin,
+                'engine_number' => $engineNumber,
+                'chassis_number' => $chassisNumber,
+                'serial_number' => $serialNumber,
+                'raw' => $data,
+            ]);
+        }
+
+        $plateKey = trim((string) config('vehicle_lookup.query_plate_key', 'numero'));
+        $tokenKey = trim((string) config('vehicle_lookup.query_token_key', 'token'));
+
+        $query = [$plateKey !== '' ? $plateKey : 'numero' => $plate];
+        if ($token !== '') {
+            $query[$tokenKey !== '' ? $tokenKey : 'token'] = $token;
+        }
+
+        try {
+            $response = Http::timeout($timeout > 0 ? $timeout : 15)->get($url, $query);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'No se pudo conectar al proveedor de consulta vehicular.',
+            ], 422);
+        }
+
+        if (!$response->successful()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'El proveedor no pudo resolver la placa.',
+            ], 422);
+        }
+
+        $payload = (array) $response->json();
+        $source = (array) ($payload['resultado'] ?? $payload['result'] ?? $payload['data'] ?? $payload['vehicle'] ?? $payload);
+
+        $brand = $this->plateLookupValue($source, ['marca', 'brand', 'vehicle.brand', 'data.marca']);
+        $model = $this->plateLookupValue($source, ['modelo', 'model', 'vehicle.model', 'data.modelo']);
+        $year = $this->plateLookupValue($source, ['anio', 'año', 'year', 'fabricacion', 'vehicle.year', 'data.anio']);
+        $color = $this->plateLookupValue($source, ['color', 'vehicle.color', 'data.color']);
+        $vin = $this->plateLookupValue($source, ['vin', 'nro_vin', 'numero_vin', 'vehicle.vin', 'data.vin']);
+        $engineNumber = $this->plateLookupValue($source, ['motor', 'numero_motor', 'nro_motor', 'engine_number', 'vehicle.engine_number', 'data.motor']);
+        $chassisNumber = $this->plateLookupValue($source, ['chasis', 'chassis', 'numero_chasis', 'nro_chasis', 'vehicle.chassis_number', 'data.chasis']);
+        $serialNumber = $this->plateLookupValue($source, ['serie', 'serial', 'serial_number', 'vehicle.serial_number', 'data.serie']);
+
+        if (
+            $brand === ''
+            && $model === ''
+            && $year === ''
+            && $color === ''
+            && $vin === ''
+            && $engineNumber === ''
+            && $chassisNumber === ''
+            && $serialNumber === ''
+        ) {
+            return response()->json([
+                'status' => false,
+                'message' => 'No se encontraron datos vehiculares para esa placa.',
+            ], 422);
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Datos de placa encontrados.',
+            'plate' => $plate,
+            'brand' => $brand,
+            'model' => $model,
+            'year' => $year,
+            'color' => $color,
+            'vin' => $vin,
+            'engine_number' => $engineNumber,
+            'chassis_number' => $chassisNumber,
+            'serial_number' => $serialNumber,
+            'raw' => $source,
+        ]);
+    }
+
     public function storeClientQuick(Request $request): JsonResponse
     {
         [$branchId, $companyId] = $this->branchScope();
@@ -2045,6 +2214,19 @@ class WorkshopMaintenanceBoardController extends Controller
         $name = mb_strtolower(trim((string) ($documentType->name ?? '')), 'UTF-8');
 
         return str_contains($name, 'factura');
+    }
+
+    private function plateLookupValue(array $source, array $keys): string
+    {
+        foreach ($keys as $key) {
+            $value = data_get($source, $key);
+            $text = trim((string) ($value ?? ''));
+            if ($text !== '' && $text !== '-' && strtoupper($text) !== 'NULL') {
+                return $text;
+            }
+        }
+
+        return '';
     }
 
     private function inferPaymentMethodKind(string $description): string
