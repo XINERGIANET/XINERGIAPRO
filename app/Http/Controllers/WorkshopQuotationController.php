@@ -455,7 +455,13 @@ class WorkshopQuotationController extends Controller
         } catch (\Throwable $e) {
             @unlink($path);
 
-            return back()->withErrors(['error' => 'No se pudo enviar el correo: ' . $e->getMessage()]);
+            $detail = $e->getMessage();
+            if (str_contains($detail, 'You can only send testing emails') || str_contains($detail, 'verify a domain')) {
+                $detail = 'Resend en modo prueba (onboarding@resend.dev): solo puedes enviar a tu correo de cuenta de Resend. '
+                    . 'Para enviar a clientes, verifica un dominio en https://resend.com/domains y pon MAIL_FROM_ADDRESS con un correo de ese dominio (ej. noreply@tudominio.com).';
+            }
+
+            return back()->withErrors(['error' => 'No se pudo enviar el correo: ' . $detail]);
         }
 
         $mailerRoot = Mail::getFacadeRoot();
