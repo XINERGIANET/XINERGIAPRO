@@ -84,6 +84,11 @@
             </div>
 
             <div>
+                <label class="mb-1 block text-sm font-medium text-gray-700">Guía de remisión</label>
+                <input name="guia_remision" value="{{ old('guia_remision', $assembly->guia_remision) }}" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Número de guía">
+            </div>
+
+            <div>
                 <label class="mb-1 block text-sm font-medium text-gray-700">Cantidad</label>
                 <input type="number" min="1" name="quantity" value="{{ old('quantity', $assembly->quantity) }}" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
             </div>

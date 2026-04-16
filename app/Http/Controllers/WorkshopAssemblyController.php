@@ -52,6 +52,7 @@ class WorkshopAssemblyController extends Controller
         $month = (string) $request->input('month', now()->format('Y-m'));
         $brandCompany = trim((string) $request->input('brand_company', ''));
         $vehicleType = trim((string) $request->input('vehicle_type', ''));
+        $guiaRemision = trim((string) $request->input('guia_remision', ''));
         $status = trim((string) $request->input('status', 'all'));
 
         $assemblies = WorkshopAssembly::query()
@@ -61,6 +62,7 @@ class WorkshopAssemblyController extends Controller
             ->whereRaw("to_char(assembled_at, 'YYYY-MM') = ?", [$month])
             ->when($brandCompany !== '', fn ($query) => $query->where('brand_company', 'ILIKE', "%{$brandCompany}%"))
             ->when($vehicleType !== '', fn ($query) => $query->where('vehicle_type', 'ILIKE', "%{$vehicleType}%"))
+            ->when($guiaRemision !== '', fn ($query) => $query->where('guia_remision', 'ILIKE', "%{$guiaRemision}%"))
             ->when($status === 'pending', fn ($query) => $query->whereNull('started_at'))
             ->when($status === 'in_progress', fn ($query) => $query->whereNotNull('started_at')->whereNull('finished_at'))
             ->when($status === 'finished', fn ($query) => $query->whereNotNull('finished_at')->whereNull('exit_at'))
@@ -122,6 +124,7 @@ class WorkshopAssemblyController extends Controller
             'month',
             'brandCompany',
             'vehicleType',
+            'guiaRemision',
             'status',
             'assemblyLocations',
             'technicians',
@@ -361,6 +364,7 @@ class WorkshopAssemblyController extends Controller
             'displacement' => ['nullable', 'string', 'max:20'],
             'color' => ['nullable', 'string', 'max:40'],
             'vin' => ['nullable', 'string', 'max:100'],
+            'guia_remision' => ['nullable', 'string', 'max:120'],
             'workshop_assembly_location_id' => ['nullable', 'integer', 'exists:workshop_assembly_locations,id'],
             'responsible_technician_person_id' => [
                 'nullable',
@@ -395,6 +399,9 @@ class WorkshopAssemblyController extends Controller
         }
         $resolvedUnitCost = round((float) $resolvedUnitCost, 6);
 
+        $guiaRemisionVal = isset($data['guia_remision']) ? trim((string) $data['guia_remision']) : '';
+        $guiaRemisionVal = $guiaRemisionVal !== '' ? $guiaRemisionVal : null;
+
         WorkshopAssembly::query()->create([
             'company_id' => $companyId,
             'branch_id' => $branchId,
@@ -404,6 +411,7 @@ class WorkshopAssemblyController extends Controller
             'displacement' => $data['displacement'] ?? null,
             'color' => $data['color'] ?? null,
             'vin' => $data['vin'] ?? null,
+            'guia_remision' => $guiaRemisionVal,
             'workshop_assembly_location_id' => $data['workshop_assembly_location_id'] ?? null,
             'responsible_technician_person_id' => $data['responsible_technician_person_id'] ?? null,
             'quantity' => (int) $data['quantity'],
@@ -436,6 +444,7 @@ class WorkshopAssemblyController extends Controller
             'displacement' => ['nullable', 'string', 'max:20'],
             'color' => ['nullable', 'string', 'max:40'],
             'vin' => ['nullable', 'string', 'max:100'],
+            'guia_remision' => ['nullable', 'string', 'max:120'],
             'workshop_assembly_location_id' => ['nullable', 'integer', 'exists:workshop_assembly_locations,id'],
             'responsible_technician_person_id' => [
                 'nullable',
@@ -458,6 +467,9 @@ class WorkshopAssemblyController extends Controller
         $unitCost = round((float) $data['unit_cost'], 6);
         $quantity = (int) $data['quantity'];
 
+        $guiaRemisionVal = isset($data['guia_remision']) ? trim((string) $data['guia_remision']) : '';
+        $guiaRemisionVal = $guiaRemisionVal !== '' ? $guiaRemisionVal : null;
+
         $assembly->update([
             'brand_company' => $data['brand_company'],
             'vehicle_type' => $data['vehicle_type'],
@@ -465,6 +477,7 @@ class WorkshopAssemblyController extends Controller
             'displacement' => $data['displacement'] ?? null,
             'color' => $data['color'] ?? null,
             'vin' => $data['vin'] ?? null,
+            'guia_remision' => $guiaRemisionVal,
             'workshop_assembly_location_id' => $data['workshop_assembly_location_id'] ?? null,
             'responsible_technician_person_id' => $data['responsible_technician_person_id'] ?? null,
             'quantity' => $quantity,
@@ -507,7 +520,7 @@ class WorkshopAssemblyController extends Controller
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Fecha', 'Empresa/Marca', 'Tipo Vehiculo', 'Modelo', 'Cilindrada', 'Color', 'VIN', 'Ubicacion', 'Tecnico', 'Ingreso', 'Entrega estimada', 'Inicio', 'Fin', 'Tiempo estimado', 'Tiempo real', 'Diferencia', 'Salida', 'Cantidad', 'Costo Unitario', 'Costo Total', 'Observaciones']);
+            fputcsv($out, ['Fecha', 'Empresa/Marca', 'Tipo Vehiculo', 'Modelo', 'Cilindrada', 'Color', 'VIN', 'Guia remision', 'Ubicacion', 'Tecnico', 'Ingreso', 'Entrega estimada', 'Inicio', 'Fin', 'Tiempo estimado', 'Tiempo real', 'Diferencia', 'Salida', 'Cantidad', 'Costo Unitario', 'Costo Total', 'Observaciones']);
             foreach ($rows as $row) {
                 fputcsv($out, [
                     optional($row->assembled_at)->format('Y-m-d'),
@@ -517,6 +530,7 @@ class WorkshopAssemblyController extends Controller
                     (string) $row->displacement,
                     (string) $row->color,
                     (string) $row->vin,
+                    (string) ($row->guia_remision ?? ''),
                     optional($row->location)->name,
                     trim((string) optional($row->responsibleTechnician)->first_name . ' ' . (string) optional($row->responsibleTechnician)->last_name),
                     optional($row->entry_at)->format('Y-m-d H:i'),

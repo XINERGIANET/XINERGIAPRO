@@ -179,13 +179,14 @@
             </template>
         </div>
 
-        <form method="GET" action="{{ route('workshop.assemblies.index') }}" class="mb-4 grid grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-white p-4 md:grid-cols-6 dark:border-gray-800 dark:bg-white/[0.02]">
+        <form method="GET" action="{{ route('workshop.assemblies.index') }}" class="mb-4 grid grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-7 dark:border-gray-800 dark:bg-white/[0.02]">
             @if(request('view_id'))
                 <input type="hidden" name="view_id" value="{{ request('view_id') }}">
             @endif
             <input type="month" name="month" value="{{ $month }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
             <input name="brand_company" value="{{ $brandCompany }}" placeholder="Empresa/Marca" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
             <input name="vehicle_type" value="{{ $vehicleType }}" placeholder="Tipo vehiculo" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
+            <input name="guia_remision" value="{{ $guiaRemision }}" placeholder="Guía de remisión" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
             <select name="status" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
                 <option value="all" @selected(($status ?? 'all') === 'all')>Todos los estados</option>
                 <option value="pending" @selected(($status ?? 'all') === 'pending')>Pendiente</option>
@@ -269,6 +270,9 @@
                                     <span class="font-semibold uppercase">{{ $assembly->brand_company ?: 'Sin marca' }}</span>
                                     <span class="text-slate-400">{{ $assembly->vehicle_type ?: 'Sin tipo' }}</span>
                                     <span class="truncate font-mono text-slate-300">{{ $assembly->vin ?: 'No asignado' }}</span>
+                                    @if($assembly->guia_remision)
+                                        <span class="truncate text-slate-100" title="Guía de remisión">GR: {{ $assembly->guia_remision }}</span>
+                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -393,6 +397,7 @@
                     <thead>
                         <tr class="bg-gray-50/50 dark:bg-gray-800/50">
                             <th class="px-5 py-4 font-bold text-gray-700 dark:text-gray-300">Orden</th>
+                            <th class="px-5 py-4 font-bold text-gray-700 dark:text-gray-300">Guía remisión</th>
                             <th class="px-5 py-4 font-bold text-gray-700 dark:text-gray-300">Vehículo / Marca</th>
                             <th class="px-5 py-4 font-bold text-gray-700 dark:text-gray-300">Técnico / Ubicación</th>
                             <th class="px-5 py-4 font-bold text-gray-700 dark:text-gray-300 text-center">Cant.</th>
@@ -417,6 +422,9 @@
                                             <span class="text-[10px] text-gray-500">{{ optional($assembly->entry_at)->format('d/m/y') }}</span>
                                         </div>
                                     </div>
+                                </td>
+                                <td class="px-5 py-4 font-mono text-xs text-gray-700 dark:text-gray-300">
+                                    {{ $assembly->guia_remision ?: '—' }}
                                 </td>
                                 <td class="px-5 py-4">
                                     <div class="flex flex-col">
@@ -521,6 +529,9 @@
 
             <form method="POST" action="{{ route('workshop.assemblies.store') }}" class="grid grid-cols-1 gap-4 md:grid-cols-2">
                 @csrf
+                @if(request('view_id'))
+                    <input type="hidden" name="view_id" value="{{ request('view_id') }}">
+                @endif
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Tipo de Vehículo</label>
                     <select name="vehicle_type" x-model="selectedType" @change="updateUnitCost()" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm" required>
@@ -554,6 +565,10 @@
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">VIN / Código Motor</label>
                     <input name="vin" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Ingrese VIN o código">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Guía de remisión</label>
+                    <input name="guia_remision" class="w-full h-11 rounded-lg border border-gray-300 px-3 text-sm" placeholder="Número de guía">
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Cantidad</label>

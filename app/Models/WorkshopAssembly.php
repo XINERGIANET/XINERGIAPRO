@@ -20,6 +20,7 @@ class WorkshopAssembly extends Model
         'displacement',
         'color',
         'vin',
+        'guia_remision',
         'responsible_technician_person_id',
         'quantity',
         'unit_cost',
