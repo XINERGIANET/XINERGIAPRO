@@ -77,10 +77,17 @@
         }
 
         $points = [];
+        $chartPoints = [];
         foreach($incomeByDay as $index => $row) {
             $x = ($index / (max(1, $count - 1))) * 1000;
             $y = 100 - (($row['amount'] / $yMax) * 100);
             $points[] = ['x' => $x, 'y' => $y];
+            $chartPoints[] = [
+                'x' => round($x, 2),
+                'y' => round($y, 2),
+                'label' => (string) ($row['label'] ?? ''),
+                'amount' => (float) ($row['amount'] ?? 0),
+            ];
         }
         
         $path = "M " . $points[0]['x'] . " " . $points[0]['y'];
@@ -94,12 +101,12 @@
         // -----------------------------------------------------
     @endphp
 
-    <div class="flex items-center justify-between mb-6 print:hidden">
+    <div class="dashboard-toolbar flex items-center justify-between mb-6 print:hidden">
         <div>
             <h1 class="text-2xl font-black text-slate-900">Dashboard Taller</h1>
             <p class="text-xs text-slate-500 font-medium">Vista general de operaciones del taller</p>
         </div>
-        <form method="GET" action="{{ route('dashboard') }}" class="flex flex-wrap items-center gap-3 print:hidden">
+        <form method="GET" action="{{ route('dashboard') }}" class="dashboard-filter-form flex flex-wrap items-center gap-3 print:hidden">
             @if (request('view_id'))
                 <input type="hidden" name="view_id" value="{{ request('view_id') }}">
             @endif
@@ -262,9 +269,16 @@
 
         <!-- MAIN GRID: TRENDS & BIRTHDAYS -->
         <section class="grid grid-cols-1 gap-6 xl:grid-cols-12 mb-6 main-trend-grid print:!block">
-            <article class="bg-white rounded-[1.5rem] border border-slate-100 p-8 xl:col-span-8 flex flex-col relative overflow-hidden transition-all hover:shadow-md trend-chart-article">
+            <article class="bg-white rounded-[1.5rem] border border-slate-100 p-4 sm:p-6 xl:col-span-8 flex flex-col relative overflow-hidden transition-all hover:shadow-md trend-chart-article"
+                x-data="{
+                    points: @js($chartPoints),
+                    activeIndex: {{ max(0, count($chartPoints) - 1) }},
+                    selectPoint(index) { this.activeIndex = index; },
+                    get activePoint() { return this.points[this.activeIndex] ?? null; },
+                    formatAmount(value) { return Number(value || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+                }">
                 <!-- Header del gráfico -->
-                <div class="flex items-start justify-between mb-8 px-8 pt-6 relative z-10">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-5 sm:mb-6 relative z-10">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-lg bg-[#F4F6FA] border border-slate-100 flex items-center justify-center shadow-sm">
                             <i class="ri-line-chart-line text-blue-600 text-xl"></i>
@@ -274,24 +288,30 @@
                             <p class="text-sm text-slate-500">{{ $chartLabel }}</p>
                         </div>
                     </div>
-                    <div class="text-right bg-[#F4F6FA] px-4 py-3 rounded-xl border border-slate-100">
+                    <div class="text-right bg-[#F4F6FA] px-4 py-3 rounded-xl border border-slate-100 w-full sm:w-auto">
                         <p class="text-[10px] text-blue-600 font-bold uppercase tracking-wider mb-1">Total periodo</p>
                         <p class="text-2xl font-bold text-blue-700 leading-none">S/ {{ number_format((float) ($incomeByDay->sum('amount')), 2) }}</p>
+                        <template x-if="activePoint">
+                            <p class="mt-2 text-[11px] font-bold text-slate-500">
+                                <span x-text="activePoint.label"></span>:
+                                <span class="text-slate-700" x-text="'S/ ' + formatAmount(activePoint.amount)"></span>
+                            </p>
+                        </template>
                     </div>
                 </div>
                 <!-- Contenedor del Gráfico -->
-                <div class="flex-1 flex flex-col min-h-[320px] px-8 pb-6">
-                    <div class="flex flex-1 items-stretch">
+                <div class="flex-1 flex flex-col min-h-[240px] sm:min-h-[300px]">
+                    <div class="flex flex-1 items-stretch gap-2 sm:gap-4">
 
                         <!-- Eje Y (Labels) -->
-                        <div class="flex flex-col justify-between text-[11px] text-slate-400 font-medium pr-6 mb-8 mt-1">
+                        <div class="hidden sm:flex flex-col justify-between text-[11px] text-slate-400 font-medium pr-2 mb-6 mt-1">
                             @foreach($ticks as $tick)
                                 <span>{{ number_format($tick, 0) }}</span>
                             @endforeach
                         </div>
 
                         <!-- Área del Gráfico -->
-                        <div class="relative flex-1 mb-8" style="height: 250px !important;">
+                        <div class="relative flex-1 h-[220px] sm:h-[260px] mb-3 sm:mb-4">
                             <!-- Grid Lines -->
                             <div class="absolute inset-0 flex flex-col justify-between h-full pointer-events-none">
                                 @foreach($ticks as $tick)
@@ -310,20 +330,41 @@
                                     </defs>
                                     <path d="{{ $areaPath }}" fill="url(#colorValueMain)" />
                                     <path d="{{ $path }}" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                                    
-                                    @foreach($points as $p)
-                                        <circle cx="{{ $p['x'] }}" cy="{{ $p['y'] }}" r="3" fill="#2563eb" stroke="white" stroke-width="2" />
-                                    @endforeach
+                                    <template x-if="activePoint">
+                                        <line :x1="activePoint.x" :x2="activePoint.x" y1="0" y2="100" stroke="#93c5fd" stroke-width="1" stroke-dasharray="3 3"></line>
+                                    </template>
+                                    <template x-for="(point, index) in points" :key="index">
+                                        <circle
+                                            :cx="point.x"
+                                            :cy="point.y"
+                                            :r="activeIndex === index ? 4.5 : 3"
+                                            :fill="activeIndex === index ? '#1d4ed8' : '#2563eb'"
+                                            stroke="white"
+                                            stroke-width="2"
+                                            class="cursor-pointer transition-all duration-150"
+                                            @mouseenter="selectPoint(index)"
+                                            @click="selectPoint(index)">
+                                        </circle>
+                                    </template>
                                 </svg>
                             </div>
                         </div>
                     </div>
 
                     <!-- Eje X (Dates) -->
-                    <div class="flex justify-between pl-[40px] border-t border-slate-50 pt-4">
-                        @foreach($incomeByDay as $row)
-                            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{{ $row['label'] }}</span>
-                        @endforeach
+                    <div class="border-t border-slate-50 pt-3 sm:pt-4">
+                        <div class="flex gap-2 overflow-x-auto custom-scrollbar pb-1 sm:justify-between">
+                            <template x-for="(point, index) in points" :key="'label-' + index">
+                                <button type="button"
+                                    class="px-2.5 py-1 rounded-lg text-[10px] font-black tracking-tight whitespace-nowrap border transition-all"
+                                    :class="activeIndex === index
+                                        ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                        : 'bg-white text-slate-400 border-transparent hover:border-slate-200 hover:text-slate-600'"
+                                    @click="selectPoint(index)"
+                                    x-text="point.label">
+                                </button>
+                            </template>
+                        </div>
                     </div>
                 </div>
             </article>
@@ -671,8 +712,8 @@
                             </template>
 
                             <template x-if="!loadingTech && techServices.length > 0">
-                                <div class="overflow-hidden rounded-2xl border border-slate-100 shadow-sm">
-                                    <table class="w-full text-left border-collapse">
+                                <div class="overflow-x-auto overflow-y-hidden rounded-2xl border border-slate-100 shadow-sm custom-scrollbar">
+                                    <table class="w-full min-w-[640px] text-left border-collapse">
                                         <thead>
                                             <tr class="bg-slate-50 border-b border-slate-100">
                                                 <th class="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider">Orden</th>
@@ -823,12 +864,34 @@
 
             <article x-data="{
                 search: '',
+                selectedStatus: 'all',
+                showStatusMenu: false,
                 orders: {{ \Illuminate\Support\Js::from($ordersData) }},
                 totalCount: {{ $dashboardData['totalOrdersCount'] ?? 0 }},
+                get statusOptions() {
+                    const map = new Map();
+                    this.orders.forEach(order => {
+                        if (!map.has(order.status)) {
+                            map.set(order.status, order.displayStatus);
+                        }
+                    });
+                    return [{ value: 'all', label: 'Todos los estados' }, ...Array.from(map, ([value, label]) => ({ value, label }))];
+                },
+                get selectedStatusLabel() {
+                    const selected = this.statusOptions.find(option => option.value === this.selectedStatus);
+                    return selected ? selected.label : 'Todos los estados';
+                },
+                setStatus(value) {
+                    this.selectedStatus = value;
+                    this.showStatusMenu = false;
+                },
                 get filteredOrders() {
-                    if (!this.search.trim()) return this.orders;
-                    const q = this.search.toLowerCase();
-                    return this.orders.filter(o => o.searchText.includes(q));
+                    const q = this.search.trim().toLowerCase();
+                    return this.orders.filter(order => {
+                        const matchesSearch = q === '' || order.searchText.includes(q);
+                        const matchesStatus = this.selectedStatus === 'all' || order.status === this.selectedStatus;
+                        return matchesSearch && matchesStatus;
+                    });
                 }
             }" class="rounded-[1.5rem] border border-slate-200 bg-white p-6 xl:col-span-8 flex flex-col h-full overflow-hidden">
                 <div class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -847,10 +910,38 @@
                             <i class="ri-search-line absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm group-focus-within:text-[#465fff] transition-colors"></i>
                             <input type="text" x-model="search" placeholder="Buscar..." class="pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:border-[#465fff] focus:bg-white transition-all w-full md:w-56 placeholder:text-slate-300">
                         </div>
-                        <button class="p-2.5 bg-slate-50 border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-100 transition-all">
-                            <i class="ri-filter-3-line"></i>
-                        </button>
+                        <div class="relative" @click.away="showStatusMenu = false">
+                            <button type="button" @click="showStatusMenu = !showStatusMenu" class="p-2.5 border rounded-xl transition-all"
+                                :class="showStatusMenu || selectedStatus !== 'all'
+                                    ? 'bg-blue-50 border-blue-200 text-blue-600'
+                                    : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'">
+                                <i class="ri-filter-3-line"></i>
+                            </button>
+                            <div x-show="showStatusMenu" x-transition class="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-lg z-20 overflow-hidden" x-cloak>
+                                <div class="px-3 py-2 border-b border-slate-100">
+                                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Filtrar por estado</p>
+                                </div>
+                                <div class="max-h-64 overflow-y-auto custom-scrollbar">
+                                    <template x-for="option in statusOptions" :key="option.value">
+                                        <button type="button" @click="setStatus(option.value)" class="w-full px-3 py-2.5 text-left text-xs font-bold transition-colors flex items-center justify-between"
+                                            :class="selectedStatus === option.value ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'">
+                                            <span x-text="option.label"></span>
+                                            <i class="ri-check-line text-sm" x-show="selectedStatus === option.value"></i>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
                     </div>
+                </div>
+                <div class="mb-4 print:hidden" x-show="selectedStatus !== 'all'">
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 text-blue-700 text-[10px] font-black uppercase tracking-wider border border-blue-100">
+                        <i class="ri-filter-3-line"></i>
+                        <span x-text="selectedStatusLabel"></span>
+                        <button type="button" @click="setStatus('all')" class="hover:text-blue-900">
+                            <i class="ri-close-line text-sm"></i>
+                        </button>
+                    </span>
                 </div>
 
                 <div class="overflow-x-auto -mx-6 px-6 print:mx-0 print:px-0">
@@ -952,6 +1043,49 @@
             -webkit-line-clamp: 1;
             -webkit-box-orient: vertical;
             overflow: hidden;
+        }
+
+        @media (max-width: 768px) {
+            #workshop-dashboard {
+                margin: -12px;
+                padding: 12px;
+            }
+
+            .dashboard-toolbar {
+                flex-direction: column !important;
+                align-items: stretch !important;
+                gap: 0.75rem;
+                margin-bottom: 1rem;
+            }
+
+            .dashboard-toolbar h1 {
+                font-size: 1.75rem;
+                line-height: 1.1;
+            }
+
+            .dashboard-filter-form {
+                display: grid !important;
+                grid-template-columns: 1fr;
+                gap: 0.6rem;
+                width: 100%;
+            }
+
+            .dashboard-filter-form > input,
+            .dashboard-filter-form > button,
+            .dashboard-filter-form > a {
+                width: 100%;
+                min-height: 44px;
+                justify-content: center;
+            }
+
+            .hero-kpi-grid {
+                gap: 0.9rem !important;
+                margin-bottom: 1rem !important;
+            }
+
+            .hero-kpi-grid > article {
+                padding: 1rem;
+            }
         }
 
         @media print {
