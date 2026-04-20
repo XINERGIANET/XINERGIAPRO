@@ -217,6 +217,8 @@ Route::middleware('auth')->group(function () {
         ->only(['index', 'store', 'edit', 'update', 'destroy']);
     Route::post('/admin/herramientas/productos/import-excel', [ProductController::class, 'importExcel'])
         ->name('admin.products.import-excel');
+    Route::get('/admin/herramientas/productos/plantilla-importacion', [ProductController::class, 'downloadImportTemplate'])
+        ->name('admin.products.import-template');
     Route::resource('/admin/herramientas/productos', ProductController::class)
         ->names('admin.products')
         ->parameters(['productos' => 'product'])

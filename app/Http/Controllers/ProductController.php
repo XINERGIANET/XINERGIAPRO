@@ -27,6 +27,8 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\File;
 use Illuminate\Validation\ValidationException;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class ProductController extends Controller
 {
@@ -306,6 +308,36 @@ class ProductController extends Controller
         return redirect()
             ->route('admin.products.index', $viewId ? ['view_id' => $viewId] : [])
             ->with('status', "Importación lista: {$imported} producto(s) creados en esta sucursal.");
+    }
+
+    public function downloadImportTemplate()
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Productos');
+
+        $sheet->setCellValue('A1', 'CATEGORÍA');
+        $sheet->setCellValue('B1', 'DESCRIPCIÓN');
+        $sheet->setCellValue('C1', 'MARCA');
+        $sheet->setCellValue('D1', 'STOCK ACTUAL');
+
+        $sheet->setCellValue('A2', 'REPUESTOS VARIOS');
+        $sheet->setCellValue('B2', 'EJEMPLO: descripción del producto');
+        $sheet->setCellValue('C2', 'MARCA EJEMPLO');
+        $sheet->setCellValue('D2', 0);
+
+        foreach (['A', 'B', 'C', 'D'] as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $filename = 'plantilla_importacion_productos.xlsx';
+
+        return response()->streamDownload(function () use ($spreadsheet) {
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
     }
 
     public function store(Request $request)

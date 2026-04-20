@@ -188,18 +188,24 @@
                             <span>Nuevo producto</span>
                         </x-ui.button>
                     @endif
-                    <form method="POST" action="{{ route('admin.products.import-excel') }}" enctype="multipart/form-data" class="inline" data-turbo="false">
-                        @csrf
-                        @if ($viewId)
-                            <input type="hidden" name="view_id" value="{{ $viewId }}">
-                        @endif
-                        <input type="file" name="file" id="product-excel-import-input" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" class="hidden" onchange="if (this.files.length) this.form.submit();">
-                        <x-ui.button size="md" variant="outline" type="button" class="h-11 border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-white/5"
-                            onclick="document.getElementById('product-excel-import-input').click();">
-                            <i class="ri-file-excel-2-line"></i>
-                            <span>Importar Excel</span>
-                        </x-ui.button>
-                    </form>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <x-ui.link-button size="md" variant="outline" href="{{ route('admin.products.import-template', $viewId ? ['view_id' => $viewId] : []) }}" class="h-11 border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-white/5">
+                            <i class="ri-download-2-line"></i>
+                            <span>Descargar plantilla</span>
+                        </x-ui.link-button>
+                        <form method="POST" action="{{ route('admin.products.import-excel') }}" enctype="multipart/form-data" class="inline" data-turbo="false">
+                            @csrf
+                            @if ($viewId)
+                                <input type="hidden" name="view_id" value="{{ $viewId }}">
+                            @endif
+                            <input type="file" name="file" id="product-excel-import-input" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" class="hidden" onchange="if (this.files.length) this.form.submit();">
+                            <x-ui.button size="md" variant="outline" type="button" class="h-11 border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-white/5"
+                                onclick="document.getElementById('product-excel-import-input').click();">
+                                <i class="ri-file-excel-2-line"></i>
+                                <span>Importar Excel</span>
+                            </x-ui.button>
+                        </form>
+                    </div>
                 </div>
             </div>
 
