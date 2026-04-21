@@ -446,12 +446,17 @@
                                                             <span class="text-sm font-black text-slate-800" x-text="'S/ ' + (detail.qty * detail.unit_price).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
                                                         </td>
                                                         <td class="px-6 py-3.5 text-center">
-                                                            <template x-if="selectedQuotation?.status === 'awaiting_approval'">
+                                                            <template x-if="selectedQuotation?.approval_status === 'rejected'">
+                                                                <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-red-50 text-red-600 border border-red-100 text-[9px] font-black uppercase tracking-widest">
+                                                                    Rechazado
+                                                                </span>
+                                                            </template>
+                                                            <template x-if="selectedQuotation?.approval_status !== 'rejected' && selectedQuotation?.status === 'awaiting_approval'">
                                                                 <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-amber-50 text-amber-600 border border-amber-100 text-[9px] font-black uppercase tracking-widest">
                                                                     Esperando
                                                                 </span>
                                                             </template>
-                                                            <template x-if="selectedQuotation?.status !== 'awaiting_approval'">
+                                                            <template x-if="selectedQuotation?.approval_status !== 'rejected' && selectedQuotation?.status !== 'awaiting_approval'">
                                                                 <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 text-[9px] font-black uppercase tracking-widest">
                                                                     Aprobado
                                                                 </span>
