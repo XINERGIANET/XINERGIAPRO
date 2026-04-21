@@ -38,6 +38,7 @@
             'product_id' => (int) $p->product_id,
             'price' => (float) ($p->price ?? 0),
             'tax_rate_id' => $p->tax_rate_id ? (int) $p->tax_rate_id : null,
+            'description' => (string) $p->description,
             'label' => trim(($p->code ? $p->code . ' - ' : '') . (string) $p->description),
         ])->values();
         $serviceRows = $services->map(fn ($s) => [
@@ -370,9 +371,7 @@
                     if (!p) {
                         return;
                     }
-                    if (!row.description || row.description.trim() === '') {
-                        row.description = p.label;
-                    }
+                    row.description = (p.description && String(p.description).trim() !== '') ? p.description : p.label;
                     row.unit_price = p.price;
                     if (p.tax_rate_id) {
                         row.tax_rate_id = String(p.tax_rate_id);
