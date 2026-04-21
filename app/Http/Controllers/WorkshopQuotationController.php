@@ -153,6 +153,7 @@ class WorkshopQuotationController extends Controller
             ->get([
                 'product_branch.product_id',
                 'product_branch.price',
+                'product_branch.purchase_price',
                 'product_branch.tax_rate_id',
                 'products.code',
                 'products.description',
@@ -252,6 +253,7 @@ class WorkshopQuotationController extends Controller
             ->get([
                 'product_branch.product_id',
                 'product_branch.price',
+                'product_branch.purchase_price',
                 'product_branch.tax_rate_id',
                 'products.code',
                 'products.description',
