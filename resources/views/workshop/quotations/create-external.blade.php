@@ -38,6 +38,7 @@
             'product_id' => (int) $p->product_id,
             'price' => (float) ($p->price ?? 0),
             'purchase_price' => (float) ($p->purchase_price ?? 0),
+            'avg_cost' => (float) ($p->avg_cost ?? 0),
             'tax_rate_id' => $p->tax_rate_id ? (int) $p->tax_rate_id : null,
             'description' => (string) $p->description,
             'label' => trim(($p->code ? $p->code . ' - ' : '') . (string) $p->description),
@@ -179,7 +180,7 @@
                         <div class="overflow-visible quotation-lines-root">
                             <table class="w-full min-w-[980px] border-collapse text-left text-xs">
                                 <thead>
-                                    <tr class="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                    <tr class="bg-slate-50 text-[11px] font-black uppercase tracking-wide text-slate-400">
                                         <th class="px-3 py-3">Tipo <span class="text-red-500">*</span></th>
                                         <th class="px-3 py-3">Catálogo</th>
                                         <th class="px-3 py-3">Descripción <span class="text-red-500">*</span></th>
@@ -203,7 +204,7 @@
                                             </td>
                                             <td class="px-3 py-2 align-top relative-dropdown-host">
                                                 <template x-if="row.line_type === 'PART'">
-                                                    <select class="h-10 w-full rounded-lg border border-slate-200 px-2 text-xs font-medium text-slate-700 quotation-front-select focus:outline-none focus:ring-2 focus:ring-[#465fff]/20" x-model="row.product_id" :name="`items[${index}][product_id]`" @change="onProductChange(index)">
+                                                <select class="h-10 w-full rounded-lg border border-slate-200 px-2 text-xs font-semibold text-slate-700 quotation-front-select focus:outline-none focus:ring-2 focus:ring-[#465fff]/20" x-model="row.product_id" :name="`items[${index}][product_id]`" @change="onProductChange(index)">
                                                         <option value="">Sin catalogo (solo descripcion)</option>
                                                         @foreach ($productOptions as $p)
                                                             <option value="{{ $p->product_id }}">{{ $p->code }} - {{ $p->description }}</option>
@@ -211,7 +212,7 @@
                                                     </select>
                                                 </template>
                                                 <template x-if="row.line_type === 'SERVICE'">
-                                                    <select class="h-10 w-full rounded-lg border border-slate-200 px-2 text-xs font-medium text-slate-700 quotation-front-select focus:outline-none focus:ring-2 focus:ring-[#465fff]/20" x-model="row.service_id" :name="`items[${index}][service_id]`" @change="onServiceChange(index)">
+                                                    <select class="h-10 w-full rounded-lg border border-slate-200 px-2 text-xs font-semibold text-slate-700 quotation-front-select focus:outline-none focus:ring-2 focus:ring-[#465fff]/20" x-model="row.service_id" :name="`items[${index}][service_id]`" @change="onServiceChange(index)">
                                                         <option value="">Seleccione servicio</option>
                                                         @foreach ($services as $s)
                                                             <option value="{{ $s->id }}">{{ $s->name }}</option>
@@ -234,12 +235,12 @@
                                                 <input type="number" step="0.01" min="0" class="h-10 w-full rounded-lg border border-slate-200 px-2 text-right text-xs font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#465fff]/20" x-model.number="row.unit_price" :name="`items[${index}][unit_price]`">
                                             </td>
                                             <td class="px-3 py-2 align-top relative-dropdown-host">
-                                                <select class="h-10 w-full rounded-lg border border-slate-200 px-2 text-xs font-medium text-slate-700 quotation-front-select focus:outline-none focus:ring-2 focus:ring-[#465fff]/20" x-model="row.tax_rate_id" :name="`items[${index}][tax_rate_id]`">
+                                                <select class="h-10 w-full rounded-lg border border-slate-200 px-2 text-xs font-semibold text-slate-700 quotation-front-select focus:outline-none focus:ring-2 focus:ring-[#465fff]/20" x-model="row.tax_rate_id" :name="`items[${index}][tax_rate_id]`">
                                                     @if ($taxRates->isEmpty())
                                                         <option value="">Sin tasas de impuesto</option>
                                                     @endif
                                                     @foreach ($taxRates as $tr)
-                                                        <option value="{{ $tr->id }}">{{ $tr->description }} ({{ $tr->tax_rate }}%)</option>
+                                                        <option value="{{ $tr->id }}">{{ $tr->description }}</option>
                                                     @endforeach
                                                 </select>
                                             </td>
@@ -368,14 +369,15 @@
                     if (!pid) {
                         return;
                     }
-                    const p = this.products.find((x) => x.product_id === pid);
+                    const p = this.products.find((x) => Number(x.product_id) === pid);
                     if (!p) {
                         return;
                     }
                     row.description = (p.description && String(p.description).trim() !== '') ? p.description : p.label;
                     const salePrice = this.toNumber(p.price);
                     const purchasePrice = this.toNumber(p.purchase_price);
-                    row.unit_price = salePrice > 0 ? salePrice : purchasePrice;
+                    const avgCost = this.toNumber(p.avg_cost);
+                    row.unit_price = salePrice > 0 ? salePrice : (purchasePrice > 0 ? purchasePrice : avgCost);
                     if (p.tax_rate_id) {
                         row.tax_rate_id = String(p.tax_rate_id);
                     }
