@@ -153,7 +153,6 @@
                                 @if ($showQuotationExtras ?? false)
                                     <th class="px-6 py-5">Correlativo</th>
                                     <th class="px-6 py-5 text-center">Tipo</th>
-                                    <th class="px-6 py-5 text-center">Resultado</th>
                                 @endif
                                 <th class="px-6 py-5">Vehículo</th>
                                 <th class="px-6 py-5">Cliente</th>
@@ -191,16 +190,6 @@
                                                 <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 border border-slate-200 text-[9px] font-black uppercase tracking-widest">Interna</span>
                                             @endif
                                         </td>
-                                        <td class="px-6 py-5 text-center">
-                                            @php $qr = $quotation->quotation_result ?? 'open'; @endphp
-                                            @if ($qr === 'won' || $qr === 'converted')
-                                                <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-black uppercase tracking-widest">Ganada</span>
-                                            @elseif ($qr === 'lost')
-                                                <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-red-50 text-red-700 border border-red-100 text-[9px] font-black uppercase tracking-widest">Perdida</span>
-                                            @else
-                                                <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-100 text-[9px] font-black uppercase tracking-widest">Abierta</span>
-                                            @endif
-                                        </td>
                                     @endif
                                     <td class="px-6 py-5">
                                         <p class="text-[13px] font-black text-slate-700 uppercase leading-none mb-1.5">{{ $quotation->vehicle?->plate ?? '-' }}</p>
@@ -210,14 +199,26 @@
                                         <p class="text-[13px] font-black text-slate-800 uppercase leading-none">{{ $quotation->client?->first_name }} {{ $quotation->client?->last_name }}</p>
                                     </td>
                                     <td class="px-6 py-5 text-center">
-                                        <span class="inline-flex items-center px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border
-                                            {{ $quotation->status === 'approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : ($quotation->status === 'diagnosis' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-orange-50 text-orange-600 border-orange-100') }}">
-                                            @switch($quotation->status)
-                                                @case('awaiting_approval') <i class="ri-time-line mr-1"></i> Esperando aprobación @break
-                                                @case('approved') <i class="ri-check-double-line mr-1"></i> Aprobada @break
-                                                @case('diagnosis') <i class="ri-microscope-line mr-1"></i> En diagnóstico @break
-                                                @default {{ $quotation->status }}
-                                            @endswitch
+                                        @php
+                                            $approvalStatus = (string) ($quotation->approval_status ?? '');
+                                            $workflowStatus = (string) ($quotation->status ?? '');
+
+                                            if ($approvalStatus === 'rejected' || $workflowStatus === 'diagnosis') {
+                                                $approvalLabel = 'Rechazada';
+                                                $approvalClass = 'bg-red-50 text-red-600 border-red-100';
+                                                $approvalIcon = 'ri-close-circle-line';
+                                            } elseif ($workflowStatus === 'awaiting_approval' || $approvalStatus === 'pending' || $approvalStatus === '') {
+                                                $approvalLabel = 'Esperando aprobación';
+                                                $approvalClass = 'bg-amber-50 text-amber-700 border-amber-100';
+                                                $approvalIcon = 'ri-time-line';
+                                            } else {
+                                                $approvalLabel = 'Aprobada';
+                                                $approvalClass = 'bg-emerald-50 text-emerald-600 border-emerald-100';
+                                                $approvalIcon = 'ri-check-double-line';
+                                            }
+                                        @endphp
+                                        <span class="inline-flex items-center px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border {{ $approvalClass }}">
+                                            <i class="{{ $approvalIcon }} mr-1"></i> {{ $approvalLabel }}
                                         </span>
                                     </td>
                                     <td class="px-6 py-5 text-center">
