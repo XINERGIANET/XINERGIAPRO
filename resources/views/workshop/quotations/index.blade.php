@@ -8,11 +8,9 @@
         showSendModal: false,
         sendQuotation: null,
         sendEmail: '',
-        showResultModal: false,
-        resultQuotation: null,
-        resultPayload: { quotation_result: 'open', quotation_lost_reason: '' },
+        decisionPayload: { decision: 'approved', approval_note: '' },
         overflowSync() {
-            if (this.showModal || this.showSendModal || this.showResultModal) {
+            if (this.showModal || this.showSendModal) {
                 document.body.classList.add('overflow-hidden');
             } else {
                 document.body.classList.remove('overflow-hidden');
@@ -24,6 +22,10 @@
         },
         openModal(quotation) {
             this.selectedQuotation = JSON.parse(JSON.stringify(quotation));
+            this.decisionPayload = {
+                decision: (quotation.approval_status === 'rejected') ? 'rejected' : 'approved',
+                approval_note: quotation.approval_note || '',
+            };
             this.calculateTotal();
             this.showModal = true;
             this.overflowSync();
@@ -38,23 +40,9 @@
             this.showSendModal = false;
             this.overflowSync();
         },
-        openResultModal(q) {
-            this.resultQuotation = q;
-            this.resultPayload = {
-                quotation_result: q.current_result || 'open',
-                quotation_lost_reason: q.lost_reason || '',
-            };
-            this.showResultModal = true;
-            this.overflowSync();
-        },
-        closeResultModal() {
-            this.showResultModal = false;
-            this.overflowSync();
-        },
     }" x-init="
         $watch('showModal', () => $data.overflowSync());
         $watch('showSendModal', () => $data.overflowSync());
-        $watch('showResultModal', () => $data.overflowSync());
     ">
         <x-common.page-breadcrumb pageTitle="Gestión de Cotizaciones" />
 
@@ -280,16 +268,6 @@
                                                     title="Enviar por correo">
                                                     <i class="ri-mail-send-line text-lg"></i>
                                                 </button>
-                                                <button type="button"
-                                                    @click="openResultModal({{ \Illuminate\Support\Js::from([
-                                                        'result_url' => route('admin.sales.quotations.update-result', $quotation),
-                                                        'current_result' => $quotation->quotation_result ?? 'open',
-                                                        'lost_reason' => $quotation->quotation_lost_reason ?? '',
-                                                    ]) }})"
-                                                    class="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/20 hover:scale-105 transition-all cursor-pointer"
-                                                    title="Resultado de cotización">
-                                                    <i class="ri-pie-chart-line text-lg"></i>
-                                                </button>
                                             @endif
                                             @if ($isExternalQuotation && $quotation->status === 'approved' && !$generatedOrder)
                                                 <form method="POST" action="{{ route('admin.sales.quotations.generate-order', $quotation) }}">
@@ -318,6 +296,8 @@
                                                     'status' => $quotation->status,
                                                     'status_label' => $quotation->status === 'approved' ? 'Aprobada' : 'Esperando aprobación',
                                                     'approve_url' => route('workshop.orders.approve', $quotation->id),
+                                                    'approval_status' => $quotation->approval_status ?? 'pending',
+                                                    'approval_note' => $quotation->approval_note ?? ($quotation->quotation_lost_reason ?? ''),
                                                     'details' => $quotation->details->whereIn('line_type', ['PART', 'SERVICE', 'LABOR'])->map(fn($d) => [
                                                         'id' => $d->id,
                                                         'line_type' => $d->line_type,
@@ -506,7 +486,28 @@
                                 <!-- Integrated Footer Area -->
                                 <div class="flex flex-col md:flex-row gap-5 items-stretch mb-2">
                                     <div class="flex-grow">
-                                        <textarea name="notes" placeholder="Comentarios..." class="w-full h-full min-h-[80px] p-4 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-medium text-slate-700 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 transition-all outline-none resize-none shadow-sm"></textarea>
+                                        <template x-if="selectedQuotation?.status === 'awaiting_approval'">
+                                            <div class="space-y-3">
+                                                <div>
+                                                    <label class="text-[10px] font-black uppercase tracking-widest text-slate-400">Decisión</label>
+                                                    <select name="decision" x-model="decisionPayload.decision"
+                                                        class="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-xs font-black text-slate-700 focus:border-blue-500 focus:outline-none">
+                                                        <option value="approved">Aprobar cotización</option>
+                                                        <option value="rejected">Rechazar cotización</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label class="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                        Motivo
+                                                        <span x-show="decisionPayload.decision === 'rejected'" class="normal-case font-medium">(opcional en rechazo)</span>
+                                                    </label>
+                                                    <textarea name="approval_note" x-model="decisionPayload.approval_note" placeholder="Comentario o motivo..." class="mt-1 w-full min-h-[84px] p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-medium text-slate-700 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 transition-all outline-none resize-none shadow-sm"></textarea>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <template x-if="selectedQuotation?.status !== 'awaiting_approval'">
+                                            <textarea placeholder="Comentarios..." class="w-full h-full min-h-[80px] p-4 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-medium text-slate-500 outline-none resize-none shadow-sm" readonly></textarea>
+                                        </template>
                                     </div>
                                     <div class="w-full md:w-56 p-4 rounded-xl bg-blue-600 shadow-lg shadow-blue-600/20 flex flex-col justify-center text-center relative overflow-hidden group">
                                         <div class="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
@@ -519,7 +520,8 @@
                             <!-- Action Buttons (Fixed) -->
                             <div class="px-8 py-6 flex items-center justify-end gap-3 border-t border-slate-100 bg-white shrink-0">
                                 <button type="submit" x-show="selectedQuotation?.status === 'awaiting_approval'" class="h-10 px-8 bg-blue-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-600/20 transition-all flex items-center gap-2">
-                                    <i class="ri-checkbox-circle-fill text-lg"></i> Aprobar Cotización
+                                    <i class="ri-checkbox-circle-fill text-lg"></i>
+                                    <span x-text="decisionPayload.decision === 'rejected' ? 'Guardar rechazo' : 'Aprobar cotización'"></span>
                                 </button>
                                 <button type="button" x-show="selectedQuotation?.status !== 'awaiting_approval'" @click="showModal = false" class="h-10 px-8 bg-slate-800 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-slate-900 transition-all flex items-center gap-2">
                                     <i class="ri-eye-line text-lg"></i> Cerrar Vista
@@ -571,57 +573,6 @@
             </div>
         </template>
 
-        <template x-teleport="body">
-            <div x-show="showResultModal" class="relative z-[999999]" role="dialog" aria-modal="true">
-                <div x-show="showResultModal"
-                    x-transition:enter="ease-out duration-200"
-                    x-transition:enter-start="opacity-0"
-                    x-transition:enter-end="opacity-100"
-                    x-transition:leave="ease-in duration-150"
-                    x-transition:leave-start="opacity-100"
-                    x-transition:leave-end="opacity-0"
-                    @click="closeResultModal()"
-                    class="fixed inset-0 bg-slate-950/60 backdrop-blur-[12px] cursor-pointer"></div>
-                <div class="fixed inset-0 flex items-center justify-center p-4 pointer-events-none">
-                    <div x-show="showResultModal"
-                        x-transition:enter="ease-out duration-200"
-                        x-transition:enter-start="opacity-0 scale-95"
-                        x-transition:enter-end="opacity-100 scale-100"
-                        @click.stop
-                        class="pointer-events-auto w-full max-w-lg rounded-[1.5rem] border border-slate-200 bg-white p-8 shadow-2xl">
-                        <h3 class="text-lg font-black text-slate-800 tracking-tight">Resultado comercial</h3>
-                        <p class="mt-1 text-[11px] font-medium text-slate-400">Registre si la cotización se concretó o el motivo cuando no.</p>
-                        <form method="POST" :action="resultQuotation?.result_url" class="mt-6 space-y-4">
-                            @csrf
-                            @method('PATCH')
-                            <input type="hidden" name="view_id" value="{{ request('view_id') }}">
-                            <div>
-                                <label class="text-[10px] font-black uppercase tracking-widest text-slate-400">Estado</label>
-                                <select name="quotation_result" x-model="resultPayload.quotation_result"
-                                    class="mt-1 h-11 w-full rounded-xl border border-slate-200 px-3 text-xs font-black text-slate-800 focus:border-amber-500 focus:outline-none">
-                                    <option value="open">Abierta</option>
-                                    <option value="won">Ganada</option>
-                                    <option value="lost">No concretada</option>
-                                    <option value="converted">Convertida en venta</option>
-                                </select>
-                            </div>
-                            <div x-show="resultPayload.quotation_result === 'lost'" x-cloak>
-                                <label class="text-[10px] font-black uppercase tracking-widest text-slate-400">Motivo</label>
-                                <textarea name="quotation_lost_reason" x-model="resultPayload.quotation_lost_reason" rows="4"
-                                    class="mt-1 w-full rounded-xl border border-slate-200 p-3 text-xs font-medium text-slate-700 focus:border-amber-500 focus:outline-none"
-                                    placeholder="Precio, demora, competencia, etc."></textarea>
-                            </div>
-                            <div class="flex justify-end gap-2 pt-2">
-                                <button type="button" @click="closeResultModal()"
-                                    class="h-10 rounded-xl border border-slate-200 px-5 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50">Cancelar</button>
-                                <button type="submit"
-                                    class="h-10 rounded-xl bg-amber-500 px-6 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-amber-500/25 hover:bg-amber-600">Guardar</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </template>
     </div>
 
     <style>
