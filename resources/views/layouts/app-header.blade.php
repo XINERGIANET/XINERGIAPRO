@@ -1,5 +1,5 @@
 <header
-    style="height: 55px; background: linear-gradient(105deg, #0f172a 0%, #1e293b 46%, #b45309 100%) !important;"
+    style="min-height: 55px; background: linear-gradient(105deg, #0f172a 0%, #1e293b 46%, #b45309 100%) !important;"
     class="sticky top-0 flex w-full z-40 dark:border-gray-800 dark:bg-gray-900 min-w-0"
     x-data="{
         isApplicationMenuOpen: false,
@@ -206,7 +206,7 @@
 
         <!-- Application Menu (mobile) and Right Side Actions (desktop) -->
         <div :class="isApplicationMenuOpen ? 'flex' : 'hidden'"
-            class="items-center justify-between w-full xl:w-auto gap-4 px-5 py-4 xl:flex shadow-theme-md xl:justify-end xl:px-0 xl:shadow-none border-t border-white/5 xl:border-0 min-w-0">
+            class="items-center justify-between w-full xl:w-auto gap-4 px-5 py-4 xl:flex shadow-theme-md xl:justify-end xl:px-0 xl:shadow-none border-t border-white/5 xl:border-0 min-w-0 bg-[#1e293b]/95 backdrop-blur-md xl:bg-transparent">
             <div class="flex items-center gap-2 2xsm:gap-3">
                 @if (!empty($quickOptions) && $quickOptions->count())
                     <div class="hidden xl:flex items-center gap-2">
