@@ -281,7 +281,7 @@ class WorkshopQuotationExcelExport
         return $r;
     }
 
-    private static function resolveBranchLogoPath(?Branch $branch): ?string
+    public static function resolveBranchLogoPath(?Branch $branch): ?string
     {
         $logo = trim((string) ($branch?->logo ?? ''));
         if ($logo === '') {

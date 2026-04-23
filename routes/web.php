@@ -159,6 +159,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/admin/ventas/cotizaciones/externa', [WorkshopQuotationController::class, 'storeExternal'])->name('admin.sales.quotations.store-external');
     Route::put('/admin/ventas/cotizaciones/{quotation}/externa', [WorkshopQuotationController::class, 'updateExternal'])->name('admin.sales.quotations.update-external');
     Route::delete('/admin/ventas/cotizaciones/{quotation}/externa', [WorkshopQuotationController::class, 'destroyExternal'])->name('admin.sales.quotations.destroy-external');
+    Route::get('/admin/ventas/cotizaciones/{quotation}/pdf', [WorkshopQuotationController::class, 'pdf'])->name('admin.sales.quotations.pdf');
     Route::get('/admin/ventas/cotizaciones/{quotation}/excel', [WorkshopQuotationController::class, 'excel'])->name('admin.sales.quotations.excel');
     Route::post('/admin/ventas/cotizaciones/{quotation}/enviar', [WorkshopQuotationController::class, 'send'])->name('admin.sales.quotations.send');
     Route::patch('/admin/ventas/cotizaciones/{quotation}/resultado', [WorkshopQuotationController::class, 'updateResult'])->name('admin.sales.quotations.update-result');

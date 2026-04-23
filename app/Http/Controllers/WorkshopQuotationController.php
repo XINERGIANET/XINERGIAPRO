@@ -22,10 +22,12 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\Process\Process;
 
 class WorkshopQuotationController extends Controller
 {
@@ -423,6 +425,116 @@ class WorkshopQuotationController extends Controller
         ])->deleteFileAfterSend(true);
     }
 
+    public function pdf(Request $request, WorkshopMovement $quotation): \Illuminate\Contracts\View\View|\Illuminate\Http\Response
+    {
+        $this->assertQuotationScope($quotation);
+        $quotation->loadMissing([
+            'movement',
+            'vehicle',
+            'client',
+            'branch.company',
+            'branch.location.parent',
+            'details.product',
+            'details.service',
+            'details.technician',
+            'technicians.technician',
+        ]);
+
+        $branch = $quotation->branch instanceof Branch ? $quotation->branch : Branch::query()->with('company', 'location.parent')->find($quotation->branch_id);
+        $terms = is_array($quotation->quotation_commercial_terms ?? null) ? $quotation->quotation_commercial_terms : [];
+
+        $serviceLines = $quotation->details->filter(function ($d) {
+            $t = strtoupper((string) $d->line_type);
+
+            return $t === 'SERVICE' || $t === 'LABOR';
+        })->values();
+        $partLines = $quotation->details->filter(fn ($d) => strtoupper((string) $d->line_type) === 'PART')->values();
+
+        $subtotalServices = (float) $serviceLines->sum(fn ($d) => (float) $d->total);
+        $subtotalParts = (float) $partLines->sum(fn ($d) => (float) $d->total);
+
+        $logoPath = WorkshopQuotationExcelExport::resolveBranchLogoPath($branch);
+        $logoFileUri = null;
+        if ($logoPath) {
+            $normalized = str_replace('\\', '/', $logoPath);
+            if (preg_match('/^[A-Za-z]:\//', $normalized)) {
+                $logoFileUri = 'file:///' . $normalized;
+            } else {
+                $logoFileUri = 'file://' . $normalized;
+            }
+        }
+
+        $cityName = trim((string) data_get($branch, 'location.parent.name', ''));
+        if ($cityName === '') {
+            $cityName = trim((string) ($branch?->location?->name ?? ''));
+        }
+        if ($cityName === '') {
+            $cityName = 'Lima';
+        }
+
+        $intake = $quotation->intake_date;
+        if ($intake) {
+            $dateLine = $cityName . ', ' . $intake->locale('es')->translatedFormat('d \d\e F \d\e\l Y');
+        } else {
+            $dateLine = $cityName . ', ' . now()->locale('es')->translatedFormat('d \d\e F \d\e\l Y');
+        }
+
+        $docNumber = 'N°' . (string) ($quotation->quotation_correlative ?: ($quotation->movement?->number ?? str_pad((string) $quotation->id, 5, '0', STR_PAD_LEFT)));
+
+        $branchDireccion = trim((string) data_get($branch, 'direccion', ''));
+        $branchAddress = trim((string) data_get($branch, 'address', ''));
+        $address = $branchDireccion !== '' ? $branchDireccion : $branchAddress;
+
+        $branchPhone = $this->resolveQuotationTermContact($terms, ['branch_phone', 'phone', 'telefono', 'tel']);
+        $branchEmail = $this->resolveQuotationTermContact($terms, ['branch_email', 'email', 'correo']);
+
+        $companyName = $branch?->company?->legal_name ?? $branch?->legal_name ?? 'Empresa';
+
+        $technicianNames = $quotation->technicians
+            ->map(fn ($row) => trim(($row->technician?->first_name ?? '') . ' ' . ($row->technician?->last_name ?? '')))
+            ->filter()
+            ->values();
+        $technicianLine = $technicianNames->isNotEmpty() ? $technicianNames->implode(', ') : '';
+
+        $viewData = compact(
+            'quotation',
+            'branch',
+            'terms',
+            'serviceLines',
+            'partLines',
+            'subtotalServices',
+            'subtotalParts',
+            'logoFileUri',
+            'dateLine',
+            'docNumber',
+            'address',
+            'branchPhone',
+            'branchEmail',
+            'companyName',
+            'technicianLine'
+        );
+
+        $html = view('workshop.quotations.pdf-liquidacion', $viewData)->render();
+        $pdfBinary = $this->renderQuotationPdfWithWkhtmltopdf($html, 'A4', [
+            '--orientation', 'Portrait',
+            '--margin-top', '8',
+            '--margin-right', '8',
+            '--margin-bottom', '8',
+            '--margin-left', '8',
+        ]);
+
+        if ($pdfBinary === null) {
+            return view('workshop.quotations.pdf-liquidacion', $viewData);
+        }
+
+        $safe = preg_replace('/[^A-Za-z0-9_-]+/', '_', (string) ($quotation->quotation_correlative ?: $quotation->id)) ?? 'cotizacion';
+
+        return response($pdfBinary, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="liquidacion-servicio-' . $safe . '.pdf"',
+        ]);
+    }
+
     public function send(SendWorkshopQuotationRequest $request, WorkshopMovement $quotation): RedirectResponse
     {
         $this->assertQuotationScope($quotation);
@@ -543,6 +655,117 @@ class WorkshopQuotationController extends Controller
         return redirect()
             ->route('workshop.orders.show', $order)
             ->with('status', 'Orden de servicio generada desde cotizacion externa.');
+    }
+
+    private function resolveQuotationTermContact(array $terms, array $keys): string
+    {
+        foreach ($keys as $key) {
+            if (!array_key_exists($key, $terms)) {
+                continue;
+            }
+            $value = trim((string) ($terms[$key] ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
+    }
+
+    private function renderQuotationPdfWithWkhtmltopdf(string $html, ?string $pageSize = 'A4', array $extraArgs = []): ?string
+    {
+        $binary = $this->resolveWkhtmltopdfBinary();
+        if (!$binary) {
+            return null;
+        }
+
+        $tmpDir = storage_path('app/tmp');
+        if (!is_dir($tmpDir)) {
+            @mkdir($tmpDir, 0775, true);
+        }
+
+        $htmlFile = tempnam($tmpDir, 'quotation_html_');
+        $pdfFile = tempnam($tmpDir, 'quotation_pdf_');
+
+        if ($htmlFile === false || $pdfFile === false) {
+            return null;
+        }
+
+        $htmlPath = $htmlFile . '.html';
+        $pdfPath = $pdfFile . '.pdf';
+        @rename($htmlFile, $htmlPath);
+        @rename($pdfFile, $pdfPath);
+        file_put_contents($htmlPath, $html);
+
+        $args = array_merge([
+            $binary,
+            '--enable-local-file-access',
+            '--disable-javascript',
+            '--load-error-handling', 'ignore',
+            '--load-media-error-handling', 'ignore',
+            '--encoding', 'utf-8',
+            '--margin-top', '10',
+            '--margin-right', '10',
+            '--margin-bottom', '10',
+            '--margin-left', '10',
+        ], $extraArgs);
+
+        if (!empty($pageSize)) {
+            $args[] = '--page-size';
+            $args[] = $pageSize;
+        }
+
+        $args[] = $htmlPath;
+        $args[] = $pdfPath;
+        $process = new Process($args);
+
+        try {
+            $process->setTimeout(120);
+            $process->run();
+            if (!file_exists($pdfPath) || filesize($pdfPath) <= 0) {
+                Log::warning('wkhtmltopdf fallo al generar PDF de cotizacion', [
+                    'error' => $process->getErrorOutput(),
+                    'output' => $process->getOutput(),
+                ]);
+
+                return null;
+            }
+
+            $content = file_get_contents($pdfPath);
+
+            return $content === false ? null : $content;
+        } catch (\Throwable $e) {
+            Log::warning('Error ejecutando wkhtmltopdf en cotizacion: ' . $e->getMessage());
+
+            return null;
+        } finally {
+            @unlink($htmlPath);
+            @unlink($pdfPath);
+        }
+    }
+
+    private function resolveWkhtmltopdfBinary(): ?string
+    {
+        $candidates = array_filter([
+            env('WKHTML_PDF_BINARY'),
+            env('WKHTMLTOPDF_BINARY'),
+            '/usr/bin/wkhtmltopdf',
+            '/usr/local/bin/wkhtmltopdf',
+            '/opt/bin/wkhtmltopdf',
+            '/opt/wkhtmltopdf/bin/wkhtmltopdf',
+            '/var/www/Snappy/wkhtmltopdf',
+            base_path('wkhtmltopdf/bin/wkhtmltopdf.exe'),
+            'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe',
+            'C:\Snappy\wkhtmltopdf.exe',
+        ]);
+
+        foreach ($candidates as $candidate) {
+            if (is_string($candidate) && file_exists($candidate) && is_executable($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     private function assertQuotationScope(WorkshopMovement $quotation): void

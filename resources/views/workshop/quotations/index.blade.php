@@ -270,6 +270,14 @@
                                                     <i class="ri-mail-send-line text-lg"></i>
                                                 </button>
                                             @endif
+                                            <a href="{{ route('admin.sales.quotations.pdf', array_filter(['quotation' => $quotation, 'view_id' => request('view_id')])) }}"
+                                               class="w-10 h-10 rounded-xl bg-rose-700 text-white flex items-center justify-center shadow-lg shadow-rose-500/20 hover:scale-105 transition-all"
+                                               target="_blank" rel="noopener noreferrer"
+                                               data-no-loading="true"
+                                               data-turbo="false"
+                                               title="Ver en PDF">
+                                                <i class="ri-file-pdf-2-line text-lg"></i>
+                                            </a>
                                             @if ($isExternalQuotation && $quotation->status === 'approved' && !$generatedOrder)
                                                 <form method="POST" action="{{ route('admin.sales.quotations.generate-order', $quotation) }}">
                                                     @csrf
