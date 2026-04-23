@@ -1426,6 +1426,71 @@ class WorkshopFlowService
         });
     }
 
+    public function getDefaultWorkshopSaleDocumentTypeId(): int
+    {
+        $movementTypeId = $this->resolveSaleMovementTypeId();
+        $doc = DocumentType::query()
+            ->where('movement_type_id', $movementTypeId)
+            ->orderBy('id')
+            ->first();
+        if (!$doc) {
+            throw new \RuntimeException('No hay tipo de documento de venta configurado.');
+        }
+
+        return (int) $doc->id;
+    }
+
+    public function generatePartsSaleFromApprovedExternalQuotationWithoutVehicle(
+        WorkshopMovement $quotation,
+        int $branchId,
+        int $userId,
+        string $userName
+    ): SalesMovement {
+        $quotation->load(['details' => function ($q) {
+            $q->whereNull('deleted_at');
+        }]);
+
+        if ((string) ($quotation->quotation_source ?? '') !== 'external') {
+            throw new \RuntimeException('Solo aplica a cotizaciones externas.');
+        }
+        if ((string) $quotation->status !== 'approved') {
+            throw new \RuntimeException('La cotizacion debe estar aprobada.');
+        }
+        if ($quotation->vehicle_id) {
+            throw new \RuntimeException('Use el flujo de generar orden de servicio: esta cotizacion tiene vehiculo asignado.');
+        }
+        if (!$quotation->client_person_id) {
+            throw new \RuntimeException('La cotizacion requiere un cliente.');
+        }
+        if ($quotation->details->isEmpty()) {
+            throw new \RuntimeException('La cotizacion no tiene lineas para facturar.');
+        }
+
+        $hasGlosaPart = $quotation->details->contains(function ($d) {
+            $isPart = strtoupper((string) ($d->line_type ?? '')) === 'PART';
+
+            return $isPart && empty($d->product_id);
+        });
+        $terms = is_array($quotation->quotation_commercial_terms ?? null) ? $quotation->quotation_commercial_terms : [];
+        if ($hasGlosaPart && empty($terms['parts_purchase_recorded'])) {
+            throw new \RuntimeException(
+                'Hay repuestos ingresados a glosa (sin producto de catalogo). Registre la compra a proveedor o use el boton "Compra atendida" antes de generar la venta.'
+            );
+        }
+
+        $docId = $this->getDefaultWorkshopSaleDocumentTypeId();
+        $correlative = (string) ($quotation->quotation_correlative ?: $quotation->id);
+
+        return $this->generateSale(
+            $quotation,
+            $docId,
+            $branchId,
+            $userId,
+            $userName,
+            'Venta por repuestos desde cotizacion ' . $correlative . ' (sin vehiculo)'
+        );
+    }
+
     private function isInvoiceDocumentType(?DocumentType $documentType): bool
     {
         $name = mb_strtolower((string) ($documentType?->name ?? ''), 'UTF-8');
