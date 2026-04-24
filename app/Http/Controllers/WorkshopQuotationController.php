@@ -91,7 +91,7 @@ class WorkshopQuotationController extends Controller
         }
 
         $quotations = $quotationsQuery
-            ->with(['movement', 'vehicle', 'client', 'details', 'deletedDetails', 'generatedOrder.movement'])
+            ->with(['movement', 'vehicle', 'client', 'details', 'deletedDetails', 'generatedOrder.movement', 'sale.movement'])
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
@@ -655,6 +655,57 @@ class WorkshopQuotationController extends Controller
         return redirect()
             ->route('workshop.orders.show', $order)
             ->with('status', 'Orden de servicio generada desde cotizacion externa.');
+    }
+
+    public function confirmPartsPurchase(Request $request, WorkshopMovement $quotation): RedirectResponse
+    {
+        $this->assertQuotationScope($quotation);
+        if ((string) ($quotation->quotation_source ?? '') !== 'external') {
+            abort(404);
+        }
+        if ($quotation->vehicle_id) {
+            return back()->withErrors(['error' => 'Esta accion solo aplica cuando la cotizacion no tiene vehiculo.']);
+        }
+        if (!$quotation->client_person_id) {
+            return back()->withErrors(['error' => 'La cotizacion requiere cliente.']);
+        }
+
+        $terms = is_array($quotation->quotation_commercial_terms ?? null) ? $quotation->quotation_commercial_terms : [];
+        $terms['parts_purchase_recorded'] = true;
+        $quotation->update(['quotation_commercial_terms' => $terms]);
+
+        $q = array_filter(['view_id' => $request->input('view_id')]);
+
+        return redirect()
+            ->route('admin.sales.quotations.index', $q)
+            ->with('status', 'Se marco la compra de repuestos como atendida. Ya puede generar la venta.');
+    }
+
+    public function generatePartsSale(Request $request, WorkshopMovement $quotation): RedirectResponse
+    {
+        $this->assertQuotationScope($quotation);
+        $user = $request->user();
+        $branchId = (int) session('branch_id');
+
+        try {
+            $sale = $this->flowService->generatePartsSaleFromApprovedExternalQuotationWithoutVehicle(
+                $quotation,
+                $branchId,
+                (int) $user?->id,
+                (string) ($user?->name ?? 'Sistema')
+            );
+        } catch (\Throwable $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+
+        $movementId = (int) ($sale->movement_id ?? 0);
+        if ($movementId <= 0) {
+            return back()->with('status', 'Venta generada correctamente. ID venta: ' . (int) $sale->id);
+        }
+
+        return redirect()
+            ->route('admin.sales.edit', $movementId)
+            ->with('status', 'Venta generada desde la cotizacion (sin vehiculo).');
     }
 
     private function resolveQuotationTermContact(array $terms, array $keys): string

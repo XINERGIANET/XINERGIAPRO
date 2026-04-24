@@ -164,6 +164,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/admin/ventas/cotizaciones/{quotation}/enviar', [WorkshopQuotationController::class, 'send'])->name('admin.sales.quotations.send');
     Route::patch('/admin/ventas/cotizaciones/{quotation}/resultado', [WorkshopQuotationController::class, 'updateResult'])->name('admin.sales.quotations.update-result');
     Route::post('/admin/ventas/cotizaciones/{quotation}/generar-os', [WorkshopQuotationController::class, 'generateOrder'])->name('admin.sales.quotations.generate-order');
+    Route::post('/admin/ventas/cotizaciones/{quotation}/venta-repuestos', [WorkshopQuotationController::class, 'generatePartsSale'])->name('admin.sales.quotations.generate-parts-sale');
+    Route::post('/admin/ventas/cotizaciones/{quotation}/compra-repuestos-confirmar', [WorkshopQuotationController::class, 'confirmPartsPurchase'])->name('admin.sales.quotations.confirm-parts-purchase');
 
     // POS: Pedidos
     Route::group(['prefix' => 'admin/pedidos', 'as' => 'admin.orders.'], function () {

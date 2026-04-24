@@ -22,6 +22,7 @@ use App\Models\ProductBranch;
 use App\Models\ProductType;
 use App\Models\PurchaseMovement;
 use App\Models\PurchaseMovementDetail;
+use App\Models\WorkshopMovement;
 use App\Models\Shift;
 use App\Models\TaxRate;
 use App\Models\Unit;
@@ -723,6 +724,12 @@ class PurchaseController extends Controller
                 'comment' => (string) ($detail->comment ?? ''),
             ])->values()->all()
             : []);
+        if ($initialItems === [] && !$isEditing) {
+            $initialItems = $this->buildInitialItemsFromWorkshopQuotation(
+                (int) $request->input('workshop_quotation_id', 0),
+                $branchId
+            );
+        }
         $initialPaymentRows = old('payment_methods', $isEditing
             ? $purchaseCashDetails->map(fn ($detail) => [
                 'payment_method_id' => $detail->payment_method_id,
@@ -1327,6 +1334,50 @@ class PurchaseController extends Controller
 
         return \Carbon\Carbon::parse((string) $validated['moved_at'])
             ->addDays((int) ($person->credit_days ?? 0));
+    }
+
+    private function buildInitialItemsFromWorkshopQuotation(int $quotationId, int $branchId): array
+    {
+        if ($quotationId <= 0 || $branchId <= 0) {
+            return [];
+        }
+
+        $wm = WorkshopMovement::query()
+            ->with(['details' => function ($q) {
+                $q->whereNull('deleted_at');
+            }, 'details.product'])
+            ->find($quotationId);
+
+        if (
+            !$wm
+            || (int) $wm->branch_id !== $branchId
+            || (string) ($wm->quotation_source ?? '') !== 'external'
+            || $wm->vehicle_id
+        ) {
+            return [];
+        }
+
+        $defaultUnitId = (int) (Unit::query()->orderBy('id')->value('id') ?? 0);
+
+        return $wm->details
+            ->filter(fn ($d) => strtoupper((string) ($d->line_type ?? '')) === 'PART')
+            ->values()
+            ->map(function ($d) use ($defaultUnitId) {
+                $uid = (int) ($d->product?->base_unit_id ?? 0);
+                if ($uid <= 0) {
+                    $uid = $defaultUnitId;
+                }
+
+                return [
+                    'product_id' => $d->product_id ? (int) $d->product_id : null,
+                    'unit_id' => $uid,
+                    'description' => (string) $d->description,
+                    'quantity' => (float) $d->qty,
+                    'amount' => (float) $d->total,
+                    'comment' => '',
+                ];
+            })
+            ->all();
     }
 
     private function deletePurchaseFinancialRecords(Movement $purchase): void

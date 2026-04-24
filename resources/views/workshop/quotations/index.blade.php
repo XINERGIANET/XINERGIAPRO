@@ -167,6 +167,22 @@
                                 @php
                                     $isExternalQuotation = (($quotation->quotation_source ?? 'internal') === 'external');
                                     $generatedOrder = $quotation->generatedOrder;
+                                    $hasVehicle = (bool) $quotation->vehicle_id;
+                                    $qTerms = is_array($quotation->quotation_commercial_terms ?? null) ? $quotation->quotation_commercial_terms : [];
+                                    $partsPurchaseRecorded = !empty($qTerms['parts_purchase_recorded']);
+                                    $partDetails = $quotation->details->filter(fn ($d) => strtoupper((string) ($d->line_type ?? '')) === 'PART');
+                                    $hasPartLine = $partDetails->isNotEmpty();
+                                    $hasGlosaPart = $partDetails->contains(fn ($d) => empty($d->product_id));
+                                    $canStartPartsFlow = $isExternalQuotation
+                                        && $quotation->status === 'approved'
+                                        && !$hasVehicle
+                                        && !$quotation->sales_movement_id
+                                        && (bool) $quotation->client_person_id;
+                                    $showPartsRegisterPurchase = $canStartPartsFlow && $hasPartLine;
+                                    $showPartsPurchaseConfirm = $canStartPartsFlow && $hasGlosaPart && !$partsPurchaseRecorded;
+                                    $canGeneratePartsSale = $canStartPartsFlow
+                                        && $quotation->details->isNotEmpty()
+                                        && (!$hasGlosaPart || $partsPurchaseRecorded);
                                 @endphp
                                 <tr class="group hover:bg-slate-50/80 transition-all duration-200">
                                     <td class="px-6 py-5">
@@ -279,20 +295,59 @@
                                                 <i class="ri-file-pdf-2-line text-lg"></i>
                                             </a>
                                             @if ($isExternalQuotation && $quotation->status === 'approved' && !$generatedOrder)
-                                                <form method="POST" action="{{ route('admin.sales.quotations.generate-order', $quotation) }}">
-                                                    @csrf
-                                                    <input type="hidden" name="view_id" value="{{ request('view_id') }}">
-                                                    <button type="submit"
-                                                        class="w-10 h-10 rounded-xl bg-violet-600 text-white flex items-center justify-center shadow-lg shadow-violet-500/20 hover:scale-105 transition-all cursor-pointer"
-                                                        title="Generar orden de servicio">
-                                                        <i class="ri-tools-line text-lg"></i>
-                                                    </button>
-                                                </form>
+                                                @if ($hasVehicle)
+                                                    <form method="POST" action="{{ route('admin.sales.quotations.generate-order', $quotation) }}">
+                                                        @csrf
+                                                        <input type="hidden" name="view_id" value="{{ request('view_id') }}">
+                                                        <button type="submit"
+                                                            class="w-10 h-10 rounded-xl bg-violet-600 text-white flex items-center justify-center shadow-lg shadow-violet-500/20 hover:scale-105 transition-all cursor-pointer"
+                                                            title="Generar orden de servicio">
+                                                            <i class="ri-tools-line text-lg"></i>
+                                                        </button>
+                                                    </form>
+                                                @else
+                                                    @if ($showPartsRegisterPurchase)
+                                                        <a href="{{ route('admin.purchases.create', array_filter(['workshop_quotation_id' => $quotation->id, 'view_id' => request('view_id')])) }}"
+                                                            class="w-10 h-10 rounded-xl bg-amber-600 text-white flex items-center justify-center shadow-lg shadow-amber-500/20 hover:scale-105 transition-all"
+                                                            title="Registrar compra de repuestos">
+                                                            <i class="ri-shopping-basket-2-line text-lg"></i>
+                                                        </a>
+                                                    @endif
+                                                    @if ($showPartsPurchaseConfirm)
+                                                        <form method="POST" action="{{ route('admin.sales.quotations.confirm-parts-purchase', $quotation) }}">
+                                                            @csrf
+                                                            <input type="hidden" name="view_id" value="{{ request('view_id') }}">
+                                                            <button type="submit"
+                                                                class="w-10 h-10 rounded-xl bg-orange-600 text-white flex items-center justify-center shadow-lg shadow-orange-500/20 hover:scale-105 transition-all cursor-pointer"
+                                                                title="Compra a glosa atendida: liberar generación de venta">
+                                                                <i class="ri-checkbox-circle-line text-lg"></i>
+                                                            </button>
+                                                        </form>
+                                                    @endif
+                                                    @if ($canGeneratePartsSale)
+                                                        <form method="POST" action="{{ route('admin.sales.quotations.generate-parts-sale', $quotation) }}">
+                                                            @csrf
+                                                            <input type="hidden" name="view_id" value="{{ request('view_id') }}">
+                                                            <button type="submit"
+                                                                class="w-10 h-10 rounded-xl bg-fuchsia-700 text-white flex items-center justify-center shadow-lg shadow-fuchsia-500/20 hover:scale-105 transition-all cursor-pointer"
+                                                                title="Generar venta con los repuestos (sin vehículo)">
+                                                                <i class="ri-shopping-bag-3-line text-lg"></i>
+                                                            </button>
+                                                        </form>
+                                                    @endif
+                                                @endif
                                             @elseif ($isExternalQuotation && $generatedOrder)
                                                 <a href="{{ route('workshop.orders.show', $generatedOrder) }}"
                                                     class="w-10 h-10 rounded-xl bg-violet-100 text-violet-700 border border-violet-200 flex items-center justify-center hover:scale-105 transition-all"
                                                     title="Ver orden de servicio generada">
                                                     <i class="ri-file-list-3-line text-lg"></i>
+                                                </a>
+                                            @endif
+                                            @if ($isExternalQuotation && !$hasVehicle && $quotation->sales_movement_id && $quotation->sale?->movement_id)
+                                                <a href="{{ route('admin.sales.edit', $quotation->sale->movement_id) }}"
+                                                    class="w-10 h-10 rounded-xl bg-teal-600 text-white flex items-center justify-center shadow-lg shadow-teal-500/20 hover:scale-105 transition-all"
+                                                    title="Ver venta generada">
+                                                    <i class="ri-bill-line text-lg"></i>
                                                 </a>
                                             @endif
                                             <button type="button" 
