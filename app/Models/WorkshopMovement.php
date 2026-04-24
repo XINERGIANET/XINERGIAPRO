@@ -51,6 +51,8 @@ class WorkshopMovement extends Model
         'quotation_client_email',
         'quotation_vehicle_note',
         'quotation_commercial_terms',
+        'last_status',
+        'finished_photo_path',
     ];
 
     protected $casts = [

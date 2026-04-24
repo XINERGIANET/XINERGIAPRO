@@ -14,6 +14,7 @@
                 'description' => (string) ($l['description'] ?? ''),
                 'qty' => (float) ($l['qty'] ?? 1),
                 'unit_price' => (float) ($l['unit_price'] ?? 0),
+                'is_terciarizado' => (bool) ($l['is_terciarizado'] ?? false),
             ];
         })->values()->all();
     } else {
@@ -37,7 +38,16 @@
             ];
         })->values()->all();
     } else {
-        $productLinesForUi = $initialProductLines ?? [];
+        $productLinesForUi = collect($initialProductLines ?? [])->map(function ($d) {
+            return [
+                'detail_id' => $d->detail_id,
+                'product_id' => (string) ($d->product_id ?? ''),
+                'qty' => (float) ($d->qty ?? 1),
+                'unit_price' => (float) $d->unit_price,
+                'validity_months' => $d->validity_months,
+                'is_terciarizado' => (bool) $d->is_terciarizado,
+            ];
+        })->toArray();
     }
     $invOld = old('inventory');
     if ($hasFormOld && is_array($invOld)) {
@@ -184,6 +194,12 @@
     selectedVehicleTypeId: '',
     showDamagesPreexisting: @js($showDamagesPreexistingDefault ?? true),
     diagnosisText: @js($diagnosisDefault),
+    externalServiceModal: {
+        open: false,
+        description: '',
+        price: '',
+        error: ''
+    },
     init() {
         if (this.selectedVehicleId) {
             this.$nextTick(() => {
@@ -666,8 +682,37 @@
             description: '',
             qty: 1,
             unit_price: 0,
+            is_terciarizado: false,
             line_uid: 'glosa_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9),
         });
+    },
+    openExternalServiceModal() {
+        this.externalServiceModal.description = '';
+        this.externalServiceModal.price = '';
+        this.externalServiceModal.error = '';
+        window.dispatchEvent(new CustomEvent('open-external-service-modal'));
+    },
+    addExternalServiceLine() {
+        if (!this.externalServiceModal.description.trim()) {
+            this.externalServiceModal.error = 'Ingrese una descripción.';
+            return;
+        }
+        const price = parseFloat(this.externalServiceModal.price);
+        if (isNaN(price) || price < 0) {
+            this.externalServiceModal.error = 'Ingrese un precio válido.';
+            return;
+        }
+
+        this.serviceLines.push({
+            detail_id: null,
+            service_id: '',
+            description: this.externalServiceModal.description.trim(),
+            qty: 1,
+            unit_price: price,
+            is_terciarizado: true,
+            line_uid: 'ext_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9),
+        });
+        this.$dispatch('close-external-modal');
     },
     removeServiceLineAt(index) {
         this.serviceLines.splice(index, 1);
@@ -1653,17 +1698,30 @@
                 <div class="mt-4 rounded-lg border border-dashed border-indigo-200 bg-indigo-50/50 p-3 md:col-span-3">
                     <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
                         <h5 class="text-xs font-semibold uppercase tracking-wide text-indigo-900">Servicio por glosa (texto libre)</h5>
-                        <button type="button" @click="addGlosaLine()" class="inline-flex items-center rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50">
-                            <i class="ri-add-line"></i><span class="ml-1">Agregar glosa</span>
-                        </button>
+                        <div class="flex gap-2">
+                            <button type="button" @click="addGlosaLine()" class="inline-flex items-center rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50">
+                                <i class="ri-add-line"></i><span class="ml-1">Agregar glosa</span>
+                            </button>
+                            @if($externalServicesEnabled)
+                                <button type="button" @click="openExternalServiceModal(); $dispatch('open-external-service-modal')" class="inline-flex items-center rounded-lg border border-purple-300 bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-100">
+                                    <i class="ri-external-link-line"></i><span class="ml-1">Agregar servicio externo</span>
+                                </button>
+                            @endif
+                        </div>
                     </div>
                     <template x-for="(line, index) in serviceLines" :key="'glosa-' + lineKey(line, index)">
                         <template x-if="isGlosaLine(line)">
                             <div class="mb-2 flex flex-col gap-2 rounded-lg border border-indigo-100 bg-white p-2 sm:flex-row sm:flex-wrap sm:items-end">
                                 <input type="hidden" :name="`service_lines[${index}][detail_id]`" :value="line.detail_id || ''">
                                 <input type="hidden" :name="`service_lines[${index}][service_id]`" value="">
+                                <input type="hidden" :name="`service_lines[${index}][is_terciarizado]`" :value="line.is_terciarizado ? 1 : 0">
                                 <div class="min-w-0 flex-1 sm:flex-[2]">
-                                    <label class="mb-0.5 block text-[11px] font-semibold text-gray-600">Descripcion</label>
+                                    <div class="flex items-center gap-2 mb-0.5">
+                                        <label class="block text-[11px] font-semibold text-gray-600">Descripcion</label>
+                                        <template x-if="line.is_terciarizado">
+                                            <span class="rounded bg-purple-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-purple-700">Externo</span>
+                                        </template>
+                                    </div>
                                     <input type="text" x-model="line.description" maxlength="255" :name="`service_lines[${index}][description]`" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Ej. Trabajo especial / otro concepto">
                                 </div>
                                 <div class="w-full sm:w-24">
@@ -1689,6 +1747,7 @@
                             <input type="hidden" :name="`service_lines[${index}][qty]`" x-model="line.qty">
                             <input type="hidden" :name="`service_lines[${index}][unit_price]`" x-model="line.unit_price">
                             <input type="hidden" :name="`service_lines[${index}][description]`" :value="line.description || ''">
+                            <input type="hidden" :name="`service_lines[${index}][is_terciarizado]`" :value="line.is_terciarizado ? 1 : 0">
                             <template x-if="line.validity_months">
                                 <input type="hidden" :name="`service_lines[${index}][validity_months]`" :value="line.validity_months">
                             </template>
@@ -1868,6 +1927,41 @@
                         Seleccione un cliente para ver su historial.
                     </div>
                 </template>
+            </div>
+        </div>
+    </x-ui.modal>
+
+    <x-ui.modal
+        x-data="{ open: false }"
+        x-on:open-external-service-modal.window="open = true"
+        x-on:close-external-modal.window="open = false"
+        :isOpen="false"
+        class="max-w-md"
+        title="Agregar Servicio Externo">
+        <div class="space-y-4 p-4">
+            <template x-if="externalServiceModal.error">
+                <div class="rounded-lg bg-red-50 p-2.5 text-xs font-semibold text-red-700">
+                    <i class="ri-error-warning-line"></i> <span x-text="externalServiceModal.error"></span>
+                </div>
+            </template>
+            <div>
+                <label class="mb-1.5 block text-sm font-medium text-gray-700">Descripción / Glosa</label>
+                <input type="text" x-model="externalServiceModal.description" maxlength="255" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20" placeholder="Ej. Rectificado de culata">
+            </div>
+            <div>
+                <label class="mb-1.5 block text-sm font-medium text-gray-700">Precio</label>
+                <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">S/</span>
+                    <input type="number" step="0.01" min="0" x-model="externalServiceModal.price" class="h-11 w-full rounded-lg border border-gray-300 pl-8 pr-3 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20" placeholder="0.00">
+                </div>
+            </div>
+            <div class="flex gap-2 pt-2">
+                <x-ui.button type="button" variant="primary" class="flex-1" @click="addExternalServiceLine()">
+                    <i class="ri-add-line"></i><span>Agregar</span>
+                </x-ui.button>
+                <x-ui.button type="button" variant="outline" @click="open = false">
+                    <span>Cancelar</span>
+                </x-ui.button>
             </div>
         </div>
     </x-ui.modal>

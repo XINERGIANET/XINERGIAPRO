@@ -473,10 +473,13 @@ Route::middleware('auth')->group(function () {
         Route::post('/tablero-mantenimiento/{order}/iniciar', [WorkshopMaintenanceBoardController::class, 'start'])->name('maintenance-board.start');
         Route::post('/tablero-mantenimiento/{order}/pausar', [WorkshopMaintenanceBoardController::class, 'pause'])->name('maintenance-board.pause');
         Route::post('/tablero-mantenimiento/{order}/reanudar', [WorkshopMaintenanceBoardController::class, 'resume'])->name('maintenance-board.resume');
+        Route::post('/tablero-mantenimiento/{order}/finalizar-externo', [WorkshopMaintenanceBoardController::class, 'finishExternal'])->name('maintenance-board.finish.external');
         Route::post('/tablero-mantenimiento/{order}/finalizar', [WorkshopMaintenanceBoardController::class, 'finish'])->name('maintenance-board.finish');
         Route::post('/tablero-mantenimiento/{order}/cotizacion', [WorkshopMaintenanceBoardController::class, 'quotation'])->name('maintenance-board.quotation');
         Route::get('/tablero-mantenimiento/{order}/venta-cobro', [WorkshopMaintenanceBoardController::class, 'checkoutPage'])->name('maintenance-board.checkout.page');
         Route::post('/tablero-mantenimiento/{order}/venta-cobro', [WorkshopMaintenanceBoardController::class, 'checkout'])->name('maintenance-board.checkout');
+        Route::get('/tablero-mantenimiento/{order}/seguimiento', [WorkshopMaintenanceBoardController::class, 'tracking'])->name('maintenance-board.tracking');
+
         Route::get('/clientes', [WorkshopClientController::class, 'index'])->name('clients.index');
         Route::post('/clientes', [WorkshopClientController::class, 'store'])->name('clients.store');
         Route::put('/clientes/{person}', [WorkshopClientController::class, 'update'])->name('clients.update');

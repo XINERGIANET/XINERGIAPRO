@@ -56,6 +56,7 @@
                     <option value="awaiting_approval" @selected(($selectedStatus ?? 'in_progress') === 'awaiting_approval')>Esperando aprobación</option>
                     <option value="approved" @selected(($selectedStatus ?? 'in_progress') === 'approved')>Aprobado</option>
                     <option value="in_progress" @selected(($selectedStatus ?? 'in_progress') === 'in_progress')>En reparación / Pausa</option>
+                    <option value="in_progress_external" @selected(($selectedStatus ?? 'in_progress') === 'in_progress_external')>Servicios Externos</option>
                     <option value="paused" @selected(($selectedStatus ?? 'in_progress') === 'paused')>Pausados (Solo)</option>
                     <option value="finished" @selected(($selectedStatus ?? 'in_progress') === 'finished')>Terminado</option>
                     <option value="delivered" @selected(($selectedStatus ?? 'in_progress') === 'delivered')>Entregado</option>
@@ -117,12 +118,16 @@
                         'awaiting_approval' => ['Esperando aprobación', 'bg-amber-100 text-amber-700 border-amber-200'],
                         'approved' => ['Aprobado', 'bg-emerald-100 text-emerald-700 border-emerald-200'],
                         'in_progress' => ['En reparación', 'bg-orange-100 text-orange-700 border-orange-200'],
+                        'in_progress_external' => ['Servicio Externo', 'bg-purple-100 text-purple-700 border-purple-200'],
                         'paused' => ['Pausado', 'bg-slate-200 text-slate-800 border-slate-300'],
                         'finished' => ['Terminado', 'bg-cyan-100 text-cyan-700 border-cyan-200'],
                         'delivered' => ['Entregado', 'bg-green-100 text-green-700 border-green-200'],
                         'cancelled' => ['Anulado', 'bg-rose-100 text-rose-700 border-rose-200'],
                     ];
                     [$statusLabel, $statusClass] = $statusMap[$status] ?? [strtoupper($status), 'bg-gray-100 text-gray-700 border-gray-200'];
+                    $hasOutsourced = $card->details->contains(function ($d) {
+                        return filter_var($d->is_terciarizado, FILTER_VALIDATE_BOOLEAN) || ($d->service && $d->service->is_terciarizado);
+                    });
                 @endphp
                 <div class="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg">
                     <div class="absolute -right-14 -top-14 h-40 w-40 rounded-full bg-gradient-to-br from-amber-300/20 to-indigo-300/20 blur-xl"></div>
@@ -133,7 +138,20 @@
                             <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Orden de servicio</p>
                             <p class="text-sm font-bold text-slate-800">OS {{ $card->movement?->number ?? ('#' . $card->id) }}</p>
                         </div>
-                        <span class="rounded-full border px-3 py-1 text-xs font-semibold {{ $statusClass }}">{{ $statusLabel }}</span>
+                        <div class="flex flex-col items-end gap-1.5">
+                            <span class="rounded-full border px-3 py-1 text-xs font-semibold {{ $statusClass }}">{{ $statusLabel }}</span>
+                            @if($card->status === 'in_progress_external')
+                                <span class="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-purple-700 shadow-sm">
+                                    <i class="ri-external-link-line"></i>
+                                    Ext. en proceso
+                                </span>
+                            @elseif($hasOutsourced && str_contains($card->observations ?? '', '[SERVICIO EXTERNO'))
+                                <span class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-600 shadow-sm">
+                                    <i class="ri-checkbox-circle-line"></i>
+                                    Ext. finalizado
+                                </span>
+                            @endif
+                        </div>
                     </div>
 
                     <div class="relative z-10 mt-3 rounded-2xl border border-slate-200 px-3 py-2.5 text-white"
@@ -206,9 +224,36 @@
                                     class="rounded-xl bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700"
                                     @click="$dispatch('open-start-service-modal', {
                                         action: @js(route('workshop.maintenance-board.start', $card)),
-                                        order_label: @js('OS ' . ($card->movement?->number ?? ('#' . $card->id)) . ' - ' . trim(($card->vehicle?->brand ?? '') . ' ' . ($card->vehicle?->model ?? '')))
+                                        order_label: @js('OS ' . ($card->movement?->number ?? ('#' . $card->id)) . ' - ' . trim(($card->vehicle?->brand ?? '') . ' ' . ($card->vehicle?->model ?? ''))),
+                                        type: 'internal'
                                     })">
                                 Iniciar servicio
+                            </button>
+                        @endif
+
+                        @if($externalServicesEnabled && $hasOutsourced && in_array($card->status, ['approved', 'in_progress', 'paused']))
+                            <button type="button"
+                                    class="rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-purple-700"
+                                    @click="$dispatch('open-start-service-modal', {
+                                        action: @js(route('workshop.maintenance-board.start', $card)),
+                                        order_label: @js('OS ' . ($card->movement?->number ?? ('#' . $card->id)) . ' - ' . trim(($card->vehicle?->brand ?? '') . ' ' . ($card->vehicle?->model ?? ''))),
+                                        type: 'external'
+                                    })">
+                                Iniciar servicio externo
+                            </button>
+                        @endif
+
+                        @if($externalServicesEnabled && $card->status === 'in_progress_external')
+                            <button type="button"
+                                    class="rounded-xl bg-purple-800 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-purple-900"
+                                    @click="$dispatch('open-finish-service-modal', {
+                                        action: @js(route('workshop.maintenance-board.finish.external', $card)),
+                                        order_label: @js('OS ' . ($card->movement?->number ?? ('#' . $card->id)) . ' - ' . trim(($card->vehicle?->brand ?? '') . ' ' . ($card->vehicle?->model ?? ''))),
+                                        title: 'Finalizar Servicio Externo',
+                                        is_external: true
+                                    })">
+
+                                Finalizar servicio externo
                             </button>
                         @endif
                         @if($card->status === 'in_progress')
@@ -222,7 +267,9 @@
                             </button>
                             <form method="POST" action="{{ route('workshop.maintenance-board.finish', $card) }}">
                                 @csrf
-                                <button class="rounded-xl bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-800">Finalizar servicio</button>
+                                <button type="submit" class="rounded-xl bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-800">
+                                    Finalizar servicio
+                                </button>
                             </form>
                         @endif
                         @if($card->status === 'paused')
@@ -252,7 +299,11 @@
                                 Editar
                             </a>
                         @endif
+                        <a href="{{ route('workshop.maintenance-board.tracking', $card) }}" class="rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700">
+                            <i class="ri-history-line"></i> Seguimiento
+                        </a>
                         <a href="{{ route('workshop.pdf.order', $card) }}" target="_blank" rel="noopener" class="rounded-xl bg-slate-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800">I. inicial</a>
+
                     </div>
                 </div>
             @empty
@@ -400,20 +451,24 @@
             action: '',
             order_label: '',
             technician_id: '',
+            service_type: 'internal',
+            glosa: ''
         }"
         x-on:open-start-service-modal.window="
             open = true;
             action = $event.detail.action;
             order_label = $event.detail.order_label;
+            service_type = $event.detail.type || 'internal';
             technician_id = '';
+            glosa = '';
         "
         :isOpen="false"
         class="max-w-md">
         <div class="p-6">
             <div class="mb-5 flex items-center justify-between">
                 <div>
-                    <p class="text-[10px] font-bold uppercase tracking-wider text-orange-600">Comenzar Trabajo</p>
-                    <h3 class="text-xl font-extrabold text-slate-800">Asignar Técnico</h3>
+                    <p class="text-[10px] font-bold uppercase tracking-wider" :class="service_type === 'internal' ? 'text-orange-600' : 'text-purple-600'" x-text="service_type === 'internal' ? 'Comenzar Trabajo' : 'Servicio Tercerizado'"></p>
+                    <h3 class="text-xl font-extrabold text-slate-800" x-text="service_type === 'internal' ? 'Asignar Técnico' : 'Iniciar Servicio Externo'"></h3>
                     <p class="text-sm text-slate-500" x-text="order_label"></p>
                 </div>
                 <button type="button" @click="open = false" class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
@@ -423,10 +478,12 @@
 
             <form method="POST" :action="action" class="space-y-6">
                 @csrf
-                <div>
+                <input type="hidden" name="service_type" x-model="service_type">
+
+                <div x-show="service_type === 'internal'" x-transition>
                     <label class="mb-2 block text-sm font-bold text-slate-700">¿Quién se encargará de este servicio?</label>
                     <div class="relative">
-                        <select name="technician_person_id" x-model="technician_id" required
+                        <select name="technician_person_id" x-model="technician_id" :required="service_type === 'internal'"
                                 class="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 py-3.5 pl-4 pr-10 text-sm font-medium text-slate-700 transition-all focus:border-orange-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-orange-500/10">
                             <option value="">Seleccione un técnico...</option>
                             @foreach($technicians ?? [] as $tech)
@@ -439,11 +496,20 @@
                     </div>
                 </div>
 
+                <div x-show="service_type === 'external'" x-transition>
+                    <label class="mb-2 block text-sm font-bold text-slate-700">Descripción del servicio externo (Glosa)</label>
+                    <textarea name="glosa" x-model="glosa" :required="service_type === 'external'"
+                              class="w-full rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-medium text-slate-700 transition-all focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-purple-500/10"
+                              placeholder="Describa el trabajo externo a realizar..."
+                              rows="3"></textarea>
+                </div>
+
                 <div class="flex flex-col gap-3 pt-2">
-                    <button type="submit" :disabled="!technician_id"
-                            class="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-600 py-3.5 text-sm font-bold text-white shadow-lg shadow-orange-600/20 transition-all hover:bg-orange-700 hover:shadow-orange-600/30 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">
+                    <button type="submit" :disabled="(service_type === 'internal' && !technician_id) || (service_type === 'external' && !glosa.trim())"
+                            class="flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white shadow-lg transition-all disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
+                            :class="service_type === 'internal' ? 'bg-orange-600 shadow-orange-600/20 hover:bg-orange-700 hover:shadow-orange-600/30' : 'bg-purple-600 shadow-purple-600/20 hover:bg-purple-700 hover:shadow-purple-600/30'">
                         <i class="ri-play-circle-line text-lg"></i>
-                        <span>Iniciar Servicio Ahora</span>
+                        <span x-text="service_type === 'internal' ? 'Iniciar Servicio Interno' : 'Iniciar Servicio Externo'"></span>
                     </button>
                     <button type="button" @click="open = false"
                             class="w-full rounded-xl border border-slate-200 py-3 text-sm font-bold text-slate-500 transition-all hover:bg-slate-50 hover:text-slate-700">
@@ -454,6 +520,92 @@
         </div>
     </x-ui.modal>
 
+    <x-ui.modal
+        x-data="{
+            open: false,
+            action: '',
+            order_label: '',
+            title: '',
+            is_external: false,
+            image: null,
+            previewUrl: null
+        }"
+
+        x-on:open-finish-service-modal.window="
+            open = true;
+            action = $event.detail.action;
+            order_label = $event.detail.order_label;
+            title = $event.detail.title || 'Finalizar Servicio';
+            is_external = $event.detail.is_external || false;
+            image = null;
+            previewUrl = null;
+        "
+
+        :isOpen="false"
+        class="max-w-md">
+        <div class="p-6">
+            <div class="mb-5 flex items-center justify-between">
+                <div>
+                    <p class="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Completar Trabajo</p>
+                    <h3 class="text-xl font-extrabold text-slate-800" x-text="title"></h3>
+                    <p class="text-sm text-slate-500" x-text="order_label"></p>
+                </div>
+                <button type="button" @click="open = false" class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
+                    <i class="ri-close-line text-lg"></i>
+                </button>
+            </div>
+
+            <form method="POST" :action="action" enctype="multipart/form-data" class="space-y-6">
+                @csrf
+                <div>
+                    <label class="mb-2 block text-sm font-bold text-slate-700" x-text="is_external ? 'Imagen del estado final (Obligatorio)' : 'Imagen del estado final (Opcional)'"></label>
+
+                    <div class="relative">
+                        <input type="file" name="finished_photo" accept="image/*" capture="environment" :required="is_external"
+
+                               @change="
+                                   const file = $event.target.files[0];
+                                   if (file) {
+                                       image = file;
+                                       previewUrl = URL.createObjectURL(file);
+                                   }
+                               "
+                               class="hidden" id="finished_photo_input">
+                        
+                        <label for="finished_photo_input" 
+                               class="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 py-8 transition hover:border-emerald-500 hover:bg-emerald-50"
+                               x-show="!previewUrl">
+                            <i class="ri-camera-line text-4xl text-slate-400"></i>
+                            <span class="mt-2 text-sm font-semibold text-slate-600">Tomar o subir foto</span>
+                            <span class="mt-1 text-[11px] text-slate-400">JPG, PNG hasta 10MB</span>
+                        </label>
+
+                        <div class="relative overflow-hidden rounded-2xl border border-slate-200" x-show="previewUrl">
+                            <img :src="previewUrl" class="h-48 w-full object-cover">
+                            <button type="button" @click="image = null; previewUrl = null; $refs.fileInput.value = ''" 
+                                    class="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70">
+                                <i class="ri-close-line"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-3 pt-2">
+                    <button type="submit" :disabled="is_external && !image"
+                            class="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 transition-all hover:bg-emerald-700 hover:shadow-emerald-600/30 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none">
+
+                        <i class="ri-checkbox-circle-line text-lg"></i>
+                        <span>Confirmar y Finalizar</span>
+                    </button>
+                    <button type="button" @click="open = false"
+                            class="w-full rounded-xl border border-slate-200 py-3 text-sm font-bold text-slate-500 transition-all hover:bg-slate-50 hover:text-slate-700">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </x-ui.modal>
+    
     <x-ui.modal
         x-data="{
             open: false,

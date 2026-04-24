@@ -31,6 +31,7 @@ class WorkshopMovementDetail extends Model
         'sales_movement_id',
         'stock_consumed',
         'consumed_at',
+        'is_terciarizado',
     ];
 
     protected $casts = [
@@ -43,6 +44,7 @@ class WorkshopMovementDetail extends Model
         'total' => 'decimal:6',
         'stock_consumed' => 'boolean',
         'consumed_at' => 'datetime',
+        'is_terciarizado' => 'boolean',
     ];
 
     public function workshopMovement()

@@ -53,6 +53,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'awaiting_approval',
             'approved',
             'in_progress',
+            'in_progress_external',
             'paused',
             'finished',
             'delivered',
@@ -73,8 +74,9 @@ class WorkshopMaintenanceBoardController extends Controller
                     ->whereIn('line_type', ['SERVICE', 'PART'])
                     ->whereNull('deleted_at')
                     ->orderBy('id'),
-                'details.service:id,name,type,base_price',
+                'details.service:id,name,type,base_price,is_terciarizado',
                 'details.product:id,code,description',
+                'statusHistories.user:id,name',
             ])
             ->withCount([
                 'details as pending_billing_count' => fn ($query) => $query->whereNull('sales_movement_id'),
@@ -139,9 +141,12 @@ class WorkshopMaintenanceBoardController extends Controller
                 if ($selectedStatus === 'in_progress') {
                     return $query->whereIn('status', ['in_progress', 'paused']);
                 }
+                if ($selectedStatus === 'in_progress_external') {
+                    return $query->where('status', 'in_progress_external');
+                }
                 return $query->where('status', $selectedStatus);
             })
-            ->orderByRaw("CASE status WHEN 'in_progress' THEN 1 WHEN 'paused' THEN 2 WHEN 'approved' THEN 3 WHEN 'awaiting_approval' THEN 4 WHEN 'diagnosis' THEN 5 ELSE 6 END")
+            ->orderByRaw("CASE status WHEN 'in_progress' THEN 1 WHEN 'in_progress_external' THEN 2 WHEN 'paused' THEN 3 WHEN 'approved' THEN 4 WHEN 'awaiting_approval' THEN 5 WHEN 'diagnosis' THEN 6 ELSE 7 END")
             ->orderByDesc('id')
             ->paginate(18)
             ->withQueryString();
@@ -228,6 +233,7 @@ class WorkshopMaintenanceBoardController extends Controller
                 'qty' => (float) $d->qty,
                 'unit_price' => (float) $d->unit_price,
                 'validity_months' => $d->validity_months,
+                'is_terciarizado' => (bool) $d->is_terciarizado,
             ])
             ->all();
 
@@ -525,7 +531,29 @@ class WorkshopMaintenanceBoardController extends Controller
             'inventoryItemsByVehicleType',
             'showInventoryDefault',
             'showDamagesPreexistingDefault'
-        );
+        ) + ['externalServicesEnabled' => $this->isExternalServiceEnabled($branchId)];
+    }
+
+    private function isExternalServiceEnabled(int $branchId): bool
+    {
+        $parameter = DB::table('parameters')
+            ->where('description', 'Habilitar función de servicio externo (Taller)')
+            ->where('status', 1)
+            ->first();
+
+        if (!$parameter) {
+            return false;
+        }
+
+        $branchValue = DB::table('branch_parameters')
+            ->where('parameter_id', $parameter->id)
+            ->where('branch_id', $branchId)
+            ->whereNull('deleted_at')
+            ->value('value');
+
+        $val = strtolower(trim((string) ($branchValue ?? $parameter->value)));
+
+        return in_array($val, ['si', 'yes', 'true', '1'], true);
     }
             
 
@@ -556,6 +584,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'service_lines.*.qty' => ['nullable', 'numeric'],
             'service_lines.*.unit_price' => ['nullable', 'numeric'],
             'service_lines.*.validity_months' => ['nullable', 'in:6,12'],
+            'service_lines.*.is_terciarizado' => ['nullable', 'boolean'],
             'product_lines' => ['nullable', 'array'],
             'product_lines.*.detail_id' => ['nullable', 'integer'],
             'product_lines.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
@@ -646,6 +675,7 @@ class WorkshopMaintenanceBoardController extends Controller
                         'description' => $line['description'],
                         'qty' => $line['qty'],
                         'unit_price' => $line['unit_price'],
+                        'is_terciarizado' => (bool) ($line['is_terciarizado'] ?? false),
                     ]);
                     continue;
                 }
@@ -670,6 +700,7 @@ class WorkshopMaintenanceBoardController extends Controller
                     'qty' => $qty,
                     'unit_price' => $unitPrice,
                     'validity_months' => $line['validity_months'] ?? null,
+                    'is_terciarizado' => (bool) ($line['is_terciarizado'] ?? $service->is_terciarizado ?? false),
                 ]);
             }
 
@@ -754,6 +785,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'service_lines.*.qty' => ['nullable', 'numeric'],
             'service_lines.*.unit_price' => ['nullable', 'numeric'],
             'service_lines.*.validity_months' => ['nullable', 'in:6,12'],
+            'service_lines.*.is_terciarizado' => ['nullable', 'boolean'],
             'product_lines' => ['nullable', 'array'],
             'product_lines.*.detail_id' => ['nullable', 'integer'],
             'product_lines.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
@@ -884,6 +916,7 @@ class WorkshopMaintenanceBoardController extends Controller
                                     'unit_price' => $line['unit_price'],
                                     'description' => $line['description'],
                                     'validity_months' => $line['validity_months'] ?? null,
+                                    'is_terciarizado' => (bool) ($line['is_terciarizado'] ?? false),
                                 ],
                                 $branchId,
                                 (int) ($user?->id ?? 0),
@@ -897,6 +930,7 @@ class WorkshopMaintenanceBoardController extends Controller
                                 'qty' => $qty,
                                 'unit_price' => $line['unit_price'],
                                 'validity_months' => $line['validity_months'] ?? null,
+                                'is_terciarizado' => (bool) ($line['is_terciarizado'] ?? false),
                             ]);
                         }
                         continue;
@@ -921,6 +955,7 @@ class WorkshopMaintenanceBoardController extends Controller
                                 'qty' => $qty,
                                 'unit_price' => round((float) ($line['unit_price'] ?? $resolvedPrice), 6),
                                 'validity_months' => $line['validity_months'] ?? null,
+                                'is_terciarizado' => (bool) ($line['is_terciarizado'] ?? $service->is_terciarizado ?? false),
                             ],
                             $branchId,
                             (int) ($user?->id ?? 0),
@@ -938,6 +973,7 @@ class WorkshopMaintenanceBoardController extends Controller
                             'qty' => $qty,
                             'unit_price' => $unitPrice,
                             'validity_months' => $line['validity_months'] ?? null,
+                            'is_terciarizado' => (bool) ($line['is_terciarizado'] ?? $service->is_terciarizado ?? false),
                         ]);
                     }
                 }
@@ -1482,27 +1518,43 @@ class WorkshopMaintenanceBoardController extends Controller
     {
         $this->assertOrderScope($order);
         $validated = $request->validate([
-            'technician_person_id' => ['required', 'integer', 'exists:people,id'],
+            'service_type' => ['required', 'string', 'in:internal,external'],
+            'technician_person_id' => ['required_if:service_type,internal', 'nullable', 'integer', 'exists:people,id'],
+            'glosa' => ['required_if:service_type,external', 'nullable', 'string', 'max:1000'],
         ]);
 
         try {
             DB::transaction(function () use ($order, $validated) {
-                // Assign technician
-                WorkshopMovementTechnician::query()->updateOrCreate(
-                    [
-                        'workshop_movement_id' => $order->id,
-                        'technician_person_id' => $validated['technician_person_id'],
-                    ],
-                    [
-                        'commission_percentage' => 0,
-                        'commission_amount' => 0,
-                    ]
-                );
+                if ($validated['service_type'] === 'internal') {
+                    // Assign technician
+                    WorkshopMovementTechnician::query()->updateOrCreate(
+                        [
+                            'workshop_movement_id' => $order->id,
+                            'technician_person_id' => $validated['technician_person_id'],
+                        ],
+                        [
+                            'commission_percentage' => 0,
+                            'commission_amount' => 0,
+                        ]
+                    );
 
-                $this->flowService->updateOrder($order, [
-                    'status' => 'in_progress',
-                    'comment' => 'Inicio de mantenimiento desde tablero',
-                ]);
+                    $this->flowService->updateOrder($order, [
+                        'status' => 'in_progress',
+                        'comment' => 'Inicio de mantenimiento (Interno) desde tablero',
+                    ]);
+                } else {
+                    // External service
+                    $glosa = trim($validated['glosa'] ?? '');
+                    $newObservations = trim(($order->observations ?? '') . "\n" . "[SERVICIO EXTERNO - " . now()->format('Y-m-d H:i') . "] " . $glosa);
+
+                    $this->flowService->updateOrder($order, [
+                        'status' => 'in_progress_external',
+                        'last_status' => $order->status,
+                        'observations' => $newObservations,
+                        'comment' => $glosa ?: 'Inicio de servicio externo desde tablero',
+
+                    ]);
+                }
             });
         } catch (\Throwable $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
@@ -1511,13 +1563,59 @@ class WorkshopMaintenanceBoardController extends Controller
         return back()->with('status', 'Servicio iniciado.');
     }
 
-    public function finish(WorkshopMovement $order): RedirectResponse
+    public function finishExternal(Request $request, WorkshopMovement $order): RedirectResponse
     {
         $this->assertOrderScope($order);
 
+        $request->validate([
+            'finished_photo' => ['required', 'image', 'max:10240'],
+        ]);
+
         try {
+            if ($order->status !== 'in_progress_external') {
+                throw new \RuntimeException('Solo se pueden finalizar servicios externos que estÃ©n en progreso.');
+            }
+
+            $branchId = (int) session('branch_id');
+            $photoPath = $order->finished_photo_path;
+            if ($request->hasFile('finished_photo')) {
+                $photoPath = $request->file('finished_photo')->store("workshop/finished/{$branchId}", 'public');
+            }
+
+            $targetStatus = $order->last_status ?? 'approved';
+
+            $this->flowService->updateOrder($order, [
+                'status' => $targetStatus,
+                'last_status' => null,
+                'finished_photo_path' => $photoPath,
+                'comment' => "Finalizacion de servicio externo. Vuelve a estado {$targetStatus} para seguir el flujo.",
+            ]);
+        } catch (\Throwable $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+
+        return back()->with('status', 'Servicio externo finalizado.');
+    }
+
+    public function finish(Request $request, WorkshopMovement $order): RedirectResponse
+    {
+        $this->assertOrderScope($order);
+
+        $request->validate([
+            'finished_photo' => ['nullable', 'image', 'max:10240'],
+        ]);
+
+
+        try {
+            $branchId = (int) session('branch_id');
+            $photoPath = $order->finished_photo_path;
+            if ($request->hasFile('finished_photo')) {
+                $photoPath = $request->file('finished_photo')->store("workshop/finished/{$branchId}", 'public');
+            }
+
             $this->flowService->updateOrder($order, [
                 'status' => 'finished',
+                'finished_photo_path' => $photoPath,
                 'comment' => 'Finalizacion desde tablero',
             ]);
         } catch (\Throwable $e) {
@@ -2068,6 +2166,7 @@ class WorkshopMaintenanceBoardController extends Controller
                     'qty' => $qty,
                     'unit_price' => $unitPrice,
                     'validity_months' => $validityMonths,
+                    'is_terciarizado' => (bool) ($row['is_terciarizado'] ?? false),
                 ];
                 continue;
             }
@@ -2090,6 +2189,7 @@ class WorkshopMaintenanceBoardController extends Controller
                     'description' => $desc,
                     'qty' => $qty,
                     'unit_price' => $unitPrice,
+                    'is_terciarizado' => (bool) ($row['is_terciarizado'] ?? false),
                 ];
             }
         }
@@ -2307,5 +2407,19 @@ class WorkshopMaintenanceBoardController extends Controller
 
         return $path;
     }
+
+    public function tracking(\App\Models\WorkshopMovement $order): \Illuminate\View\View
+    {
+        $this->assertOrderScope($order);
+        $order->load([
+            'movement',
+            'vehicle',
+            'client',
+            'statusHistories.user:id,name',
+        ]);
+
+        return view('workshop.maintenance-board.tracking', compact('order'));
+    }
 }
+
 
