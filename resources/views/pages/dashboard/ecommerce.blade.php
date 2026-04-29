@@ -128,6 +128,8 @@
     </div>
 
     <div class="space-y-6 pb-10" id="workshop-dashboard">
+        @include('pages.dashboard._indicators_block')
+
         <!-- CABECERA FORMAL DE REPORTE (SOLO IMPRESIÓN) -->
         <header class="hidden print:flex flex-col gap-3 mb-6 pb-4 border-b-2 border-slate-900 w-full">
             <div class="flex flex-row justify-between items-start w-full">

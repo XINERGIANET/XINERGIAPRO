@@ -7,6 +7,7 @@ use App\Models\Branch;
 use App\Models\CashMovements;
 use App\Models\Person;
 use App\Models\SalesMovement;
+use App\Models\SalesMovementDetail;
 use App\Models\WorkshopMaintenanceReminder;
 use App\Models\WorkshopMovement;
 use App\Models\WorkshopMovementDetail;
@@ -14,6 +15,7 @@ use App\Models\WorkshopMovementTechnician;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class DashboardController extends Controller
 {
@@ -324,6 +326,8 @@ class DashboardController extends Controller
             ->select('workshop_movement_details.*')
             ->get();
 
+        $indicatorCharts = $this->collectIndicatorCharts($branchId, $dateFrom, $dateTo);
+
         $dashboardData = [
             'branchName' => (string) (Branch::query()->where('id', $branchId)->value('legal_name') ?? 'Sucursal actual'),
             'ordersActive' => $ordersActive,
@@ -360,10 +364,275 @@ class DashboardController extends Controller
             'newOrdersInRange' => (int) $newOrdersInRange,
             'dateFrom' => $dateFrom->toDateString(),
             'dateTo' => $dateTo->toDateString(),
+            'indicatorCharts' => $indicatorCharts,
         ];
 
         return view('pages.dashboard.ecommerce', compact('dashboardData'));
     }
+
+    /**
+     * Indicadores ejecutivos (facturación mensual, segmentos, gastos, cotizaciones).
+     */
+    protected function collectIndicatorCharts(int $branchId, Carbon $dateFrom, Carbon $dateTo): array
+    {
+        if ($branchId <= 0) {
+            return [
+                'empty' => true,
+            ];
+        }
+
+        $monthCursor = now()->copy()->subMonths(13)->startOfMonth();
+        $monthEnd = now()->copy()->endOfMonth();
+        $monthKeys = [];
+        $monthLabels = [];
+        while ($monthCursor->lte($monthEnd)) {
+            $k = $monthCursor->format('Y-m');
+            $monthKeys[] = $k;
+            $monthLabels[] = ucfirst(mb_strtolower($monthCursor->copy()->locale('es')->translatedFormat('M Y')));
+            $monthCursor->addMonth();
+        }
+
+        $bucket = [];
+        foreach ($monthKeys as $k) {
+            $bucket[$k] = ['fact' => 0.0, 'nofact' => 0.0];
+        }
+
+        $salesAgg = SalesMovement::query()
+            ->join('movements as m', 'm.id', '=', 'sales_movements.movement_id')
+            ->where('sales_movements.branch_id', $branchId)
+            ->whereBetween('m.moved_at', [now()->subMonths(13)->startOfMonth(), now()->endOfMonth()])
+            ->select(['sales_movements.total', 'sales_movements.billing_status', 'm.moved_at'])
+            ->get();
+
+        foreach ($salesAgg as $row) {
+            $k = Carbon::parse($row->moved_at)->format('Y-m');
+            if (!isset($bucket[$k])) {
+                continue;
+            }
+            $amt = (float) $row->total;
+            $st = strtoupper((string) ($row->billing_status ?? ''));
+            if ($st === 'INVOICED') {
+                $bucket[$k]['fact'] += $amt;
+            } else {
+                $bucket[$k]['nofact'] += $amt;
+            }
+        }
+
+        $monthlySeriesFact = [];
+        $monthlySeriesNofact = [];
+        $monthlySeriesTotal = [];
+        $monthlyRows = [];
+
+        foreach ($monthKeys as $i => $mk) {
+            $fact = round($bucket[$mk]['fact'], 2);
+            $nof = round($bucket[$mk]['nofact'], 2);
+            $tot = round($fact + $nof, 2);
+            $monthlySeriesFact[] = $fact;
+            $monthlySeriesNofact[] = $nof;
+            $monthlySeriesTotal[] = $tot;
+
+            [, $y] = array_pad(explode('-', $mk, 3), 2, '');
+            $parts = explode('-', $mk);
+            $yearPart = isset($parts[0]) ? (int) $parts[0] : (int) now()->year;
+            $monthPart = isset($parts[1]) ? (int) $parts[1] : (int) now()->month;
+            $monthlyRows[] = [
+                'year' => $yearPart,
+                'month_label' => $monthLabels[$i],
+                'fact' => $fact,
+                'nofact' => $nof,
+                'total' => $tot,
+            ];
+        }
+
+        $clientGroupExpr = "
+            COALESCE(
+                TRIM(CONCAT(COALESCE(p.first_name,''), ' ', COALESCE(p.last_name,''))),
+                NULLIF(TRIM(m.person_name), ''),
+                '(Sin nombre)'
+            )
+        ";
+
+        $topClients = DB::table('sales_movements as sm')
+            ->join('movements as m', 'm.id', '=', 'sm.movement_id')
+            ->leftJoin('people as p', 'p.id', '=', 'm.person_id')
+            ->where('sm.branch_id', $branchId)
+            ->whereBetween('m.moved_at', [$dateFrom, $dateTo])
+            ->selectRaw($clientGroupExpr . ' as client_label')
+            ->selectRaw('SUM(sm.total) as total_sale')
+            ->groupBy(DB::raw($clientGroupExpr))
+            ->orderByDesc(DB::raw('SUM(sm.total)'))
+            ->limit(14)
+            ->get();
+
+        $clientsLabels = [];
+        $clientsData = [];
+        foreach ($topClients as $tc) {
+            $clientsLabels[] = $this->shortClientLabel((string) $tc->client_label);
+            $clientsData[] = round((float) $tc->total_sale, 2);
+        }
+
+        $monthsInRangeSales = SalesMovement::query()
+            ->join('movements as m', 'm.id', '=', 'sales_movements.movement_id')
+            ->where('sales_movements.branch_id', $branchId)
+            ->whereBetween('m.moved_at', [$dateFrom, $dateTo])
+            ->select(['sales_movements.total', 'm.moved_at'])
+            ->get();
+
+        $timelineBucket = [];
+        foreach ($monthsInRangeSales as $r) {
+            $k = Carbon::parse($r->moved_at)->format('Y-m');
+            if (!isset($timelineBucket[$k])) {
+                $timelineBucket[$k] = 0.0;
+            }
+            $timelineBucket[$k] += (float) $r->total;
+        }
+        ksort($timelineBucket);
+        $trendLabels = [];
+        $trendTotals = [];
+        foreach ($timelineBucket as $k => $amt) {
+            $trendLabels[] = Carbon::parse($k . '-01')->locale('es')->translatedFormat('M Y');
+            $trendTotals[] = round($amt, 2);
+        }
+        $projectionTotal = [];
+        $nTrend = count($trendTotals);
+        if ($nTrend >= 2) {
+            $growth = (($trendTotals[$nTrend - 1] - $trendTotals[0]) / max($nTrend - 1, 1));
+            foreach ($trendTotals as $_i => $tv) {
+                $projectionTotal[] = round(max(0, $tv + $growth * ($_i + 1) * 0.15), 2);
+            }
+        } elseif ($nTrend === 1) {
+            $projectionTotal[] = round($trendTotals[0] * 1.05, 2);
+        }
+
+        $topProducts = SalesMovementDetail::query()
+            ->join('sales_movements as sm', 'sm.id', '=', 'sales_movement_details.sales_movement_id')
+            ->join('movements as m', 'm.id', '=', 'sm.movement_id')
+            ->leftJoin('products as pr', 'pr.id', '=', 'sales_movement_details.product_id')
+            ->where('sales_movement_details.branch_id', $branchId)
+            ->whereNotNull('sales_movement_details.product_id')
+            ->whereBetween('m.moved_at', [$dateFrom, $dateTo])
+            ->groupBy('sales_movement_details.product_id')
+            ->orderByDesc(DB::raw('SUM(sales_movement_details.amount)'))
+            ->limit(12)
+            ->get([
+                DB::raw('MAX(COALESCE(pr.description, sales_movement_details.description, \'Sin descripcion\')) as prod_name'),
+                DB::raw('SUM(sales_movement_details.quantity) as qty_sum'),
+                DB::raw('SUM(sales_movement_details.amount) as amount_sum'),
+            ]);
+
+        $productLabels = [];
+        $productAmounts = [];
+        foreach ($topProducts as $tp) {
+            $productLabels[] = $this->shortClientLabel((string) $tp->prod_name, 36);
+            $productAmounts[] = round((float) $tp->amount_sum, 2);
+        }
+
+        $monthsInFilter = max(1, (int) $dateFrom->copy()->startOfMonth()->diffInMonths($dateTo->copy()->endOfMonth()) + 1);
+        $expenseHistoricalFrom = now()->copy()->subMonths(6)->startOfMonth();
+
+        $expenseRowsAgg = DB::table('cash_movements as cm')
+            ->join('payment_concepts as pc', 'pc.id', '=', 'cm.payment_concept_id')
+            ->where('cm.branch_id', $branchId)
+            ->whereNull('cm.deleted_at')
+            ->whereRaw('UPPER(TRIM(pc.type)) = ?', ['E'])
+            ->whereBetween('cm.created_at', [$dateFrom, $dateTo])
+            ->groupBy(['pc.id', 'pc.description'])
+            ->selectRaw('pc.id as concept_id')
+            ->selectRaw('pc.description as concept_label')
+            ->selectRaw('SUM(cm.total) as total_real')
+            ->orderByDesc(DB::raw('SUM(cm.total)'))
+            ->limit(18)
+            ->get();
+
+        $expHistorical = DB::table('cash_movements as cm')
+            ->join('payment_concepts as pc', 'pc.id', '=', 'cm.payment_concept_id')
+            ->where('cm.branch_id', $branchId)
+            ->whereNull('cm.deleted_at')
+            ->whereRaw('UPPER(TRIM(pc.type)) = ?', ['E'])
+            ->whereBetween('cm.created_at', [$expenseHistoricalFrom, $dateTo])
+            ->groupBy('pc.id')
+            ->selectRaw('pc.id as concept_id')
+            ->selectRaw('SUM(cm.total) as total_h')
+            ->pluck('total_h', 'concept_id');
+
+        $expenseProj = [];
+        $expenseReal = [];
+        $expenseLabels = [];
+        $expenseTableRows = [];
+        foreach ($expenseRowsAgg as $row) {
+            $label = mb_strtoupper((string) ($row->concept_label ?? 'OTROS'));
+            $hid = isset($row->concept_id) ? (int) $row->concept_id : null;
+            $historicalPortion = $hid && isset($expHistorical[$hid])
+                ? (float) $expHistorical[$hid] / max(6, 6)
+                : (float) $row->total_real / max(1, $monthsInFilter);
+            $proj = round($historicalPortion * $monthsInFilter, 2);
+            $real = round((float) $row->total_real, 2);
+
+            $expenseLabels[] = $this->shortClientLabel($label, 24);
+            $expenseProj[] = $proj > 0 ? $proj : $real;
+            $expenseReal[] = $real;
+            $expenseTableRows[] = [
+                'label' => $label,
+                'projected' => $proj > 0 ? $proj : $real,
+                'real' => $real,
+            ];
+        }
+
+        $quotesStats = [];
+        $wmCols = Schema::hasColumn('workshop_movements', 'quotation_source');
+
+        $qQuot = WorkshopMovement::query()
+            ->where('workshop_movements.branch_id', $branchId)
+            ->whereBetween('workshop_movements.updated_at', [$dateFrom, $dateTo]);
+
+        $applyQuotFilter = static function ($q) use ($wmCols) {
+            return $wmCols ? $q->where('quotation_source', 'external') : $q;
+        };
+
+        $quotesStats['total'] = $applyQuotFilter(clone $qQuot)->count();
+        $quotesStats['approved'] = $applyQuotFilter(clone $qQuot)->where('status', 'approved')->count();
+        $quotesStats['awaiting'] = $applyQuotFilter(clone $qQuot)->where('status', 'awaiting_approval')->count();
+
+        $quotesStats['converted'] = 0;
+        if (Schema::hasColumn('workshop_movements', 'quotation_result')) {
+            $quotesStats['converted'] = $applyQuotFilter(clone $qQuot)->whereIn('quotation_result', ['converted', 'won'])->count();
+        }
+
+        return [
+            'empty' => false,
+            'month_labels' => array_values(array_map(fn ($lbl) => (string) $lbl, $monthLabels)),
+            'month_rows' => $monthlyRows,
+            'series_monthly_fact' => $monthlySeriesFact,
+            'series_monthly_nofact' => $monthlySeriesNofact,
+            'series_monthly_total' => $monthlySeriesTotal,
+            'clients_labels' => $clientsLabels,
+            'clients_data' => $clientsData,
+            'trend_labels' => array_values(array_map(fn ($l) => (string) $l, $trendLabels)),
+            'trend_totals' => $trendTotals,
+            'trend_projection' => $projectionTotal,
+            'product_labels' => $productLabels,
+            'product_amounts' => $productAmounts,
+            'product_qty_top' => $topProducts->map(fn ($tp) => [
+                'name' => (string) $tp->prod_name,
+                'qty' => round((float) $tp->qty_sum, 2),
+                'amount' => round((float) $tp->amount_sum, 2),
+            ])->values()->all(),
+            'expense_labels' => $expenseLabels,
+            'expense_projected' => $expenseProj,
+            'expense_real' => $expenseReal,
+            'expense_rows' => $expenseTableRows,
+            'quotes_stats' => $quotesStats,
+            'range_label' => $dateFrom->format('d/m/Y') . ' — ' . $dateTo->format('d/m/Y'),
+        ];
+    }
+
+    protected function shortClientLabel(string $name, int $max = 26): string
+    {
+        $t = preg_replace('/\s+/', ' ', trim($name));
+
+        return $t !== '' && mb_strlen($t) > $max ? mb_substr($t, 0, $max - 2) . '…' : (string) $t;
+    }
+
     public function techDetail(Request $request, int $technicianId)
     {
         $branchId = (int) $request->session()->get('branch_id');
