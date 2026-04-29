@@ -77,9 +77,59 @@
                 </div>
 
                 <!-- Tab: Tendencia -->
-                <div x-show="tab === 'trend'" x-cloak class="space-y-4">
-                    <p class="text-sm text-slate-600">Total de ventas agrupado por mes dentro del rango. La serie <strong>Proyeccion suavizada</strong> es solo referencia (tendencia).</p>
-                    <div class="h-[380px] w-full min-w-0" id="indicator-chart-trend"></div>
+                <div x-show="tab === 'trend'" x-cloak class="space-y-6">
+                    <div>
+                        <h3 class="text-base font-black uppercase tracking-wide text-slate-900">Tendencia crecimiento lineal</h3>
+                        <p class="mt-1 text-xs text-slate-500">Ventas reales (T. VENTAS) por mes; desde el mes 10 se suma el escenario de nuevos clientes (Motocorp + Lifan/Hero) y la proyeccion lineal total. Montos en Soles.</p>
+                    </div>
+                    <div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+                        <table class="min-w-[860px] w-full text-left text-xs">
+                            <thead class="bg-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                <tr>
+                                    <th class="px-3 py-3 text-center w-12">Mes</th>
+                                    <th class="px-3 py-3 min-w-[140px]">Mes (nombre)</th>
+                                    <th class="px-3 py-3 text-right">T. VENTAS</th>
+                                    <th class="px-3 py-3 text-right">Nuevo cliente Motocorp</th>
+                                    <th class="px-3 py-3 text-right">Nuevo cliente (Lifan, Hero Senda)</th>
+                                    <th class="px-3 py-3 text-right">Proy. lineal total</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                @foreach (($ic['linear_growth_rows'] ?? []) as $lg)
+                                    <tr class="hover:bg-slate-50/80">
+                                        <td class="px-3 py-2 text-center font-bold text-slate-800">{{ $lg['mes_no'] ?? '' }}</td>
+                                        <td class="px-3 py-2 text-slate-700 capitalize">{{ $lg['mes_title'] ?? '' }}</td>
+                                        <td class="px-3 py-2 text-right font-mono">S/ {{ number_format((float) ($lg['tv_ventas'] ?? 0), 2) }}</td>
+                                        <td class="px-3 py-2 text-right font-mono text-slate-700">
+                                            @if (($lg['nuevo_cliente_motocorp'] ?? null) === null)
+                                                —
+                                            @else
+                                                S/ {{ number_format((float) $lg['nuevo_cliente_motocorp'], 2) }}
+                                            @endif
+                                        </td>
+                                        <td class="px-3 py-2 text-right font-mono text-slate-700">
+                                            @if (($lg['nuevo_cliente_lifan'] ?? null) === null)
+                                                —
+                                            @else
+                                                S/ {{ number_format((float) $lg['nuevo_cliente_lifan'], 2) }}
+                                            @endif
+                                        </td>
+                                        <td class="px-3 py-2 text-right font-mono font-bold text-slate-900">
+                                            @if (($lg['proy_lineal_total'] ?? null) === null)
+                                                —
+                                            @else
+                                                S/ {{ number_format((float) $lg['proy_lineal_total'], 2) }}
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                        <p class="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">T. VENTAS</p>
+                        <div class="h-[400px] w-full min-w-0" id="indicator-chart-trend"></div>
+                    </div>
                 </div>
 
                 <!-- Tab: Gastos -->
@@ -268,27 +318,30 @@
             if (!ApexCharts) return;
             const el = document.querySelector('#indicator-chart-trend');
             if (!el || chartStore.trend) return;
-            const lbl = payload.trend_labels || [];
-            const tot = payload.trend_totals || [];
-            const proj = payload.trend_projection || [];
-            const series = [];
-            if (lbl.length && tot.length) {
-                series.push({ name: 'Ventas mensuales', type: 'column', data: tot });
-                if (proj.length === tot.length && proj.some(function (x) { return x > 0; })) {
-                    series.push({ name: 'Proyeccion visual (referencia)', type: 'line', data: proj });
-                }
-            }
-            if (!series.length) return;
+            const lbl = payload.linear_growth_chart_categories || [];
+            const tot = payload.linear_growth_tv_series || [];
+            if (!lbl.length || !tot.length) return;
             chartStore.trend = new ApexCharts(el, Object.assign({}, baseOpts(), {
-                chart: { type: 'line', height: 380 },
-                stroke: series.length > 1
-                    ? { width: [0, 4], curve: 'smooth' }
-                    : { width: [0], curve: 'straight' },
-                series,
-                plotOptions: { bar: { borderRadius: 4, columnWidth: '55%' } },
-                xaxis: { categories: lbl, labels: { rotate: -30 } },
-                colors: ['#2563eb', '#9333ea'],
-                markers: series.length > 1 ? { size: [0, 4], strokeWidth: 2 } : { size: 0 },
+                chart: Object.assign({}, baseOpts().chart || {}, { type: 'line', height: 400, zoom: { enabled: false } }),
+                stroke: { width: 3, curve: 'smooth' },
+                series: [{ name: 'T. VENTAS', data: tot }],
+                colors: ['#2563eb'],
+                markers: { size: 4, strokeWidth: 2, hover: { size: 6 } },
+                xaxis: {
+                    categories: lbl,
+                    labels: { rotate: -45, rotateAlways: lbl.length > 8, maxHeight: 120, trim: false },
+                },
+                yaxis: {
+                    labels: {
+                        formatter: function (val) {
+                            try {
+                                return 'S/' + Number(val).toLocaleString('es-PE', { maximumFractionDigits: 0 });
+                            } catch (_) {
+                                return val;
+                            }
+                        },
+                    },
+                },
             }));
             chartStore.trend.render();
         }

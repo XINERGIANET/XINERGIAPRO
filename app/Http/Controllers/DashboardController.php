@@ -486,23 +486,7 @@ class DashboardController extends Controller
             }
             $timelineBucket[$k] += (float) $r->total;
         }
-        ksort($timelineBucket);
-        $trendLabels = [];
-        $trendTotals = [];
-        foreach ($timelineBucket as $k => $amt) {
-            $trendLabels[] = Carbon::parse($k . '-01')->locale('es')->translatedFormat('M Y');
-            $trendTotals[] = round($amt, 2);
-        }
-        $projectionTotal = [];
-        $nTrend = count($trendTotals);
-        if ($nTrend >= 2) {
-            $growth = (($trendTotals[$nTrend - 1] - $trendTotals[0]) / max($nTrend - 1, 1));
-            foreach ($trendTotals as $_i => $tv) {
-                $projectionTotal[] = round(max(0, $tv + $growth * ($_i + 1) * 0.15), 2);
-            }
-        } elseif ($nTrend === 1) {
-            $projectionTotal[] = round($trendTotals[0] * 1.05, 2);
-        }
+        $linearGrowthTrend = $this->buildLinearGrowthTrendData($branchId);
 
         $topProducts = SalesMovementDetail::query()
             ->join('sales_movements as sm', 'sm.id', '=', 'sales_movement_details.sales_movement_id')
@@ -607,9 +591,9 @@ class DashboardController extends Controller
             'series_monthly_total' => $monthlySeriesTotal,
             'clients_labels' => $clientsLabels,
             'clients_data' => $clientsData,
-            'trend_labels' => array_values(array_map(fn ($l) => (string) $l, $trendLabels)),
-            'trend_totals' => $trendTotals,
-            'trend_projection' => $projectionTotal,
+            'linear_growth_rows' => $linearGrowthTrend['rows'],
+            'linear_growth_chart_categories' => $linearGrowthTrend['chart_categories'],
+            'linear_growth_tv_series' => $linearGrowthTrend['tv_series'],
             'product_labels' => $productLabels,
             'product_amounts' => $productAmounts,
             'product_qty_top' => $topProducts->map(fn ($tp) => [
@@ -631,6 +615,135 @@ class DashboardController extends Controller
         $t = preg_replace('/\s+/', ' ', trim($name));
 
         return $t !== '' && mb_strlen($t) > $max ? mb_substr($t, 0, $max - 2) . '…' : (string) $t;
+    }
+
+    /**
+     * Serie «TENDENCIA CRECIMIENTO LINEAL»: 17 meses, escenario nuevo cliente (excel) sobre regresión de los 9 primeros meses de ventas reales.
+     *
+     * @return array{rows: array<int, array<string, mixed>>, chart_categories: array<int, string>, tv_series: array<int, float>}
+     */
+    protected function buildLinearGrowthTrendData(int $branchId): array
+    {
+        $spanMonths = (int) max(12, env('INDICATOR_LINEAR_MONTHS_SPAN', 17));
+        $motocorpMonthly = (float) env('INDICATOR_PROJ_MOTOCORP', 2000);
+
+        $startMonth = now()->copy()->startOfMonth()->subMonths($spanMonths - 1);
+
+        $salesByYm = [];
+        $saleRows = SalesMovement::query()
+            ->join('movements as m', 'm.id', '=', 'sales_movements.movement_id')
+            ->where('sales_movements.branch_id', $branchId)
+            ->where('m.moved_at', '>=', $startMonth->copy()->startOfDay())
+            ->where('m.moved_at', '<=', now()->copy()->endOfDay())
+            ->get(['sales_movements.total', 'm.moved_at']);
+
+        foreach ($saleRows as $sr) {
+            $k = Carbon::parse($sr->moved_at)->format('Y-m');
+            $salesByYm[$k] = ($salesByYm[$k] ?? 0.0) + (float) $sr->total;
+        }
+
+        $histTotals = [];
+        $cursorHist = $startMonth->copy();
+        for ($i = 1; $i <= min(9, $spanMonths); $i++) {
+            $yk = $cursorHist->format('Y-m');
+            $histTotals[] = isset($salesByYm[$yk]) ? round((float) $salesByYm[$yk], 2) : 0.0;
+            $cursorHist->addMonth();
+        }
+
+        [$intercept, $slope] = $this->leastSquaresLine(range(1, count($histTotals)), array_values($histTotals));
+
+        $rows = [];
+        $categories = [];
+        $tvSeries = [];
+
+        $c = $startMonth->copy();
+        for ($mesNum = 1; $mesNum <= $spanMonths; $mesNum++) {
+            $yk = $c->format('Y-m');
+            $actualRounded = isset($salesByYm[$yk]) ? round((float) $salesByYm[$yk], 2) : 0.0;
+            $isFutureMonthStart = $c->copy()->startOfMonth()->gt(now()->copy()->startOfMonth());
+            $forecastBase = round(max(0.0, $intercept + $slope * (float) $mesNum), 2);
+
+            if ($mesNum <= 9) {
+                $tv = $actualRounded;
+            } elseif (!$isFutureMonthStart && $actualRounded > 0.01) {
+                $tv = $actualRounded;
+            } else {
+                $tv = $forecastBase;
+            }
+
+            $mot = null;
+            $lifRow = null;
+            $proy = null;
+
+            if ($mesNum >= 10) {
+                $mot = $motocorpMonthly;
+                $lifRow = match ($mesNum) {
+                    10 => 200.0,
+                    11 => 300.0,
+                    default => 400.0,
+                };
+                $proy = round($tv + $mot + $lifRow, 2);
+            }
+
+            $locale = $c->copy()->locale('es');
+
+            $rows[] = [
+                'mes_no' => $mesNum,
+                'mes_title' => (string) $locale->translatedFormat('F Y'),
+                'tv_ventas' => $tv,
+                'nuevo_cliente_motocorp' => $mot,
+                'nuevo_cliente_lifan' => $lifRow,
+                'proy_lineal_total' => $proy,
+            ];
+
+            $lblMonth = ucfirst(mb_strtolower((string) $c->copy()->locale('es')->translatedFormat('F Y')));
+            $categories[] = trim((string) $mesNum . ' — ' . $lblMonth);
+            $tvSeries[] = $tv;
+
+            $c->addMonth();
+        }
+
+        return [
+            'rows' => $rows,
+            'chart_categories' => array_values(array_map(static fn ($s) => (string) $s, $categories)),
+            'tv_series' => array_values(array_map(static fn ($f) => (float) round($f, 2), $tvSeries)),
+        ];
+    }
+
+    /**
+     * @param  array<int, float|int>  $xs
+     * @param  array<int, float|int>  $ys
+     * @return array{0: float, 1: float} [intercepto, pendiente]
+     */
+    protected function leastSquaresLine(array $xs, array $ys): array
+    {
+        $n = count($xs);
+        if ($n !== count($ys) || $n === 0) {
+            return [0.0, 0.0];
+        }
+
+        $sumX = array_sum(array_map('floatval', $xs));
+        $sumY = array_sum(array_map('floatval', $ys));
+
+        $sumXs = array_sum(array_map(static fn ($v) => (float) $v * (float) $v, $xs));
+
+        $sumXY = 0.0;
+        for ($i = 0; $i < $n; $i++) {
+            $sumXY += (float) $xs[$i] * (float) $ys[$i];
+        }
+
+        $denom = ($n * $sumXs - $sumX * $sumX);
+
+        if (abs($denom) < 1e-9) {
+            $meanY = $n > 0 ? $sumY / $n : 0.0;
+
+            return [$meanY, 0.0];
+        }
+
+        $slope = ($n * $sumXY - $sumX * $sumY) / $denom;
+        $intercept = ($sumY - $slope * $sumX) / $n;
+
+        return [(float) $intercept, (float) $slope];
     }
 
     public function techDetail(Request $request, int $technicianId)
