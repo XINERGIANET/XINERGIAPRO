@@ -50,21 +50,25 @@
             <div class="flex items-start gap-6" style="display:flex;align-items:flex-start;gap:1.5rem;">
                 <section class="min-w-0 space-y-5" style="flex:0 0 60%;max-width:60%;width:60%;">
                     <div class="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                        <div class="mb-5 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                            <div>
-                                <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Catálogo</p>
-                                <h3 class="mt-1 text-lg font-bold text-slate-900">Productos</h3>
+                        <div class="mb-5 space-y-4">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                                <div class="min-w-0">
+                                    <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Catálogo</p>
+                                    <h3 class="mt-1 text-lg font-bold text-slate-900">Productos</h3>
+                                </div>
+                                <div class="flex shrink-0 flex-wrap items-center gap-2 sm:gap-3">
+                                    <a href="{{ $warehouseIndexUrl }}" class="relative z-10 inline-flex h-12 items-center gap-2 rounded-[22px] border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                                        <i class="ri-arrow-left-line"></i>
+                                        <span>Volver</span>
+                                    </a>
+                                    <button type="button" id="clear-entry-button" class="relative z-10 inline-flex h-12 items-center gap-2 rounded-[22px] border border-rose-200 bg-rose-50 px-5 text-sm font-semibold text-rose-700 hover:bg-rose-100">
+                                        <i class="ri-delete-bin-6-line"></i>
+                                        <span>Limpiar</span>
+                                    </button>
+                                </div>
                             </div>
-                            <div class="flex flex-wrap items-center gap-3">
-                                <div id="category-filters" class="flex flex-wrap gap-3"></div>
-                                <a href="{{ $warehouseIndexUrl }}" class="inline-flex h-12 items-center gap-2 rounded-[22px] border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                                    <i class="ri-arrow-left-line"></i>
-                                    <span>Volver</span>
-                                </a>
-                                <button type="button" id="clear-entry-button" class="inline-flex h-12 items-center gap-2 rounded-[22px] border border-rose-200 bg-rose-50 px-5 text-sm font-semibold text-rose-700 hover:bg-rose-100">
-                                    <i class="ri-delete-bin-6-line"></i>
-                                    <span>Limpiar</span>
-                                </button>
+                            <div class="w-full min-w-0 rounded-2xl border border-slate-100 bg-slate-50/80 p-3 sm:p-4">
+                                <div id="category-filters" class="flex flex-wrap gap-2 sm:gap-3"></div>
                             </div>
                         </div>
                         <div class="relative">
@@ -259,7 +263,7 @@
                 categories().forEach((category) => {
                     const button = document.createElement('button');
                     button.type = 'button';
-                    button.className = 'inline-flex h-12 items-center justify-center rounded-[22px] border px-6 text-sm font-bold transition';
+                    button.className = 'inline-flex min-h-[44px] items-center justify-center rounded-[22px] border px-4 py-2 text-sm font-bold transition sm:px-5';
                     const active = state.selectedCategory === category;
                     if (active) {
                         button.classList.add('border-transparent', 'text-white', 'shadow-theme-xs');

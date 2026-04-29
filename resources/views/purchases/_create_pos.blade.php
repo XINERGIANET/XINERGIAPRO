@@ -63,32 +63,34 @@
         </div>
 
         <div class="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6" x-show="detailType === 'DETALLADO'" x-cloak>
-            <div class="mb-5 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
-                    <div>
+            <div class="mb-5 space-y-4">
+                <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                    <div class="min-w-0">
                         <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Catálogo</p>
                         <h3 class="mt-1 text-lg font-bold text-slate-900">Productos</h3>
                     </div>
                     <button
                         type="button"
                         @click="$dispatch('open-product-type-selector')"
-                        class="inline-flex h-12 shrink-0 items-center gap-2 rounded-[22px] border border-orange-200 bg-white px-5 text-sm font-bold text-orange-600 shadow-sm transition hover:bg-orange-50"
+                        class="relative z-10 inline-flex h-12 shrink-0 items-center gap-2 rounded-[22px] border border-orange-200 bg-white px-5 text-sm font-bold text-orange-600 shadow-sm transition hover:bg-orange-50"
                     >
                         <i class="ri-add-line text-lg"></i>
                         <span>Nuevo producto</span>
                     </button>
                 </div>
-                <div class="flex flex-wrap gap-3">
-                    <template x-for="category in catalogCategories" :key="`purchase-category-${category}`">
-                        <button
-                            type="button"
-                            @click="selectedCategory = category"
-                            class="inline-flex h-12 items-center justify-center rounded-[22px] border px-6 text-sm font-bold transition"
-                            :class="selectedCategory === category ? 'border-transparent text-white shadow-theme-xs' : 'border-slate-200 bg-white text-slate-900 hover:border-orange-200 hover:text-orange-600'"
-                            :style="selectedCategory === category ? 'background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff;box-shadow:0 12px 24px rgba(249,115,22,.22);' : ''"
-                            x-text="category"
-                        ></button>
-                    </template>
+                <div class="w-full min-w-0 rounded-2xl border border-slate-100 bg-slate-50/80 p-3 sm:p-4">
+                    <div class="flex flex-wrap gap-2 sm:gap-3">
+                        <template x-for="category in catalogCategories" :key="`purchase-category-${category}`">
+                            <button
+                                type="button"
+                                @click="selectedCategory = category"
+                                class="inline-flex min-h-[44px] items-center justify-center rounded-[22px] border px-4 py-2 text-sm font-bold transition sm:px-5"
+                                :class="selectedCategory === category ? 'border-transparent text-white shadow-theme-xs' : 'border-slate-200 bg-white text-slate-900 hover:border-orange-200 hover:text-orange-600'"
+                                :style="selectedCategory === category ? 'background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff;box-shadow:0 12px 24px rgba(249,115,22,.22);' : ''"
+                                x-text="category"
+                            ></button>
+                        </template>
+                    </div>
                 </div>
             </div>
 

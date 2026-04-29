@@ -98,12 +98,14 @@
                     </div>
 
                     <div class="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-                        <div class="mb-5 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                            <div>
-                                <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">CatÃ¡logo</p>
+                        <div class="mb-5 space-y-4">
+                            <div class="min-w-0">
+                                <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Catálogo</p>
                                 <h3 class="mt-1 text-lg font-bold text-slate-900">Productos</h3>
                             </div>
-                            <div id="category-filters" class="flex flex-wrap gap-3"></div>
+                            <div class="w-full min-w-0 rounded-2xl border border-slate-100 bg-slate-50/80 p-3 sm:p-4">
+                                <div id="category-filters" class="flex flex-wrap gap-2 sm:gap-3"></div>
+                            </div>
                         </div>
                         <div id="sale-products-panel" class="space-y-3">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-stretch">
@@ -1961,7 +1963,7 @@
                 getCategories().forEach((category) => {
                     const button = document.createElement('button');
                     button.type = 'button';
-                    button.className = 'inline-flex h-12 items-center justify-center rounded-[22px] border px-6 text-sm font-bold transition';
+                    button.className = 'inline-flex min-h-[44px] items-center justify-center rounded-[22px] border px-4 py-2 text-sm font-bold transition sm:px-5';
                     const isActive = category === selectedCategory;
                     button.className += isActive
                         ? ' border-transparent text-white shadow-theme-xs'
