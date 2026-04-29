@@ -237,6 +237,7 @@
                             :value="$selectedDocumentTypeId ?? 'all'"
                             :options="collect($saleDocumentTypes ?? [])->map(fn($d) => ['value' => $d->id, 'label' => $d->name])->prepend(['value' => 'all', 'label' => 'Todos los docs.'])->values()->all()"
                             placeholder="Todos los docs."
+                            :submit-on-change="true"
                             inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                         />
                     </div>
@@ -246,6 +247,7 @@
                             :value="$billingStatus ?? 'all'"
                             :options="[['value' => 'all', 'label' => 'Todas'], ['value' => 'pending', 'label' => 'Por facturar'], ['value' => 'invoiced', 'label' => 'Facturadas']]"
                             placeholder="Todas"
+                            :submit-on-change="true"
                             inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                         />
                     </div>

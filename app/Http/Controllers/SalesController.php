@@ -41,7 +41,10 @@ class SalesController extends Controller
     {
         $search = $request->input('search');
         $viewId = $request->input('view_id');
-        $billingStatus = (string) $request->input('billing_status', 'all');
+        $billingStatus = strtolower(trim((string) $request->input('billing_status', 'all')));
+        if (!in_array($billingStatus, ['all', 'pending', 'invoiced'], true)) {
+            $billingStatus = 'all';
+        }
         $documentTypeId = (string) $request->input('document_type_id', 'all');
         $branchId = $request->session()->get('branch_id');
         $profileId = $request->session()->get('profile_id') ?? $request->user()?->profile_id;
@@ -77,18 +80,30 @@ class SalesController extends Controller
         }
 
         $cashRegisters = collect();
-        $selectedBoxId = $request->input('cash_register_id');
+        $selectedBoxId = null;
+        $queryParams = $request->query();
+        $cashRegisterIdProvidedInQuery = array_key_exists('cash_register_id', $queryParams);
         if ($branchId) {
             $cashRegisters = CashRegister::query()
                 ->where('branch_id', $branchId)
                 ->where('status', '1')
                 ->orderBy('number')
                 ->get(['id', 'number']);
-            if ($selectedBoxId && !$cashRegisters->contains('id', (int) $selectedBoxId)) {
-                $selectedBoxId = null;
+            $rawCashRegisterId = $request->input('cash_register_id');
+            $hasChosenBox = $rawCashRegisterId !== null && $rawCashRegisterId !== '';
+            if ($hasChosenBox) {
+                $candidateBoxId = (int) $rawCashRegisterId;
+                if ($cashRegisters->contains('id', $candidateBoxId)) {
+                    $selectedBoxId = $candidateBoxId;
+                }
             }
-            if (!$selectedBoxId && $cashRegisters->isNotEmpty()) {
+            // Sin param "cash_register_id" en la URL (~primera entrada): sugiero caja de la sucursal.
+            // Con param explicito vacio (Todas las cajas): no fuerza caja.
+            if (!$hasChosenBox && !$cashRegisterIdProvidedInQuery && $cashRegisters->isNotEmpty()) {
                 $selectedBoxId = $this->getBranchConfiguredCashRegisterId((int) $branchId, $cashRegisters, 'caja ventas');
+                if (!$selectedBoxId || !$cashRegisters->contains('id', (int) $selectedBoxId)) {
+                    $selectedBoxId = null;
+                }
             }
         }
 
@@ -174,8 +189,12 @@ class SalesController extends Controller
                         });
                 });
             })
-            ->when($billingStatus === 'pending', fn ($query) => $query->whereHas('salesMovement', fn ($salesMovementQuery) => $salesMovementQuery->where('billing_status', 'PENDING')))
-            ->when($billingStatus === 'invoiced', fn ($query) => $query->whereHas('salesMovement', fn ($salesMovementQuery) => $salesMovementQuery->where('billing_status', 'INVOICED')));
+            ->when($billingStatus === 'pending', function ($query) {
+                $query->whereHas('salesMovement', fn ($salesMovementQuery) => $salesMovementQuery->whereRaw('trim(lower(cast(billing_status as text))) = ?', ['pending']));
+            })
+            ->when($billingStatus === 'invoiced', function ($query) {
+                $query->whereHas('salesMovement', fn ($salesMovementQuery) => $salesMovementQuery->whereRaw('trim(lower(cast(billing_status as text))) = ?', ['invoiced']));
+            });
 
         $salesTotalAmount = (float) $salesBaseQuery->clone()
             ->join('sales_movements', 'sales_movements.movement_id', '=', 'movements.id')
