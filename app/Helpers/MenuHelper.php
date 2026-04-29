@@ -164,6 +164,10 @@ class MenuHelper
                     continue;
                 }
 
+                if ($option->name === 'Correctivo' && !self::isCorrectiveEnabled()) {
+                    continue;
+                }
+
                 $path = $resolvePath($option->action);
                 $path = self::appendViewIdToPath($path, $option->view_id);
 
@@ -225,6 +229,37 @@ class MenuHelper
     public static function getOthersItems()
     {
         return [];
+    }
+
+    private static function isCorrectiveEnabled(): bool
+    {
+        try {
+            $branchId = session('branch_id');
+            if (!$branchId) {
+                // Si no hay sucursal en sesión, intentar con la del usuario
+                $user = auth()->user();
+                $branchId = $user?->person?->branch_id;
+            }
+            if (!$branchId) return false;
+
+            $baseParam = DB::table('parameters')
+                ->where('description', 'Agregar Funcionalidad servicio correctivo')
+                ->where('status', 1)
+                ->first();
+                
+            if (!$baseParam) return false;
+
+            $branchVal = DB::table('branch_parameters')
+                ->where('parameter_id', $baseParam->id)
+                ->where('branch_id', $branchId)
+                ->whereNull('deleted_at')
+                ->value('value');
+
+            $val = $branchVal ?? $baseParam->value;
+            return in_array(strtoupper(trim((string)$val)), ['1', 'SI', 'S', 'TRUE', 'YES']);
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     public static function getMenuGroups()

@@ -139,6 +139,9 @@ class WorkshopFlowService
                 'tax' => 0,
                 'total' => 0,
                 'paid_total' => 0,
+                'service_type' => $data['service_type'] ?? 'preventivo',
+                'corrective_phase' => $data['corrective_phase'] ?? null,
+                'corrective_reception_at' => $data['corrective_reception_at'] ?? null,
             ]);
 
             if (!empty($data['previous_workshop_movement_id'])) {
@@ -225,6 +228,7 @@ class WorkshopFlowService
                 'total_paused_minutes' => array_key_exists('total_paused_minutes', $data) ? $data['total_paused_minutes'] : $order->total_paused_minutes,
                 'last_status' => $data['last_status'] ?? $order->last_status,
                 'finished_photo_path' => $data['finished_photo_path'] ?? $order->finished_photo_path,
+                'service_type' => $data['service_type'] ?? $order->service_type,
             ];
 
 

@@ -53,6 +53,18 @@ class WorkshopMovement extends Model
         'quotation_commercial_terms',
         'last_status',
         'finished_photo_path',
+        'service_type',
+        'corrective_phase',
+        'corrective_reception_at',
+        'corrective_scheduled_at',
+        'corrective_eval_started_at',
+        'corrective_eval_finished_at',
+        'corrective_quote_delivered_at',
+        'corrective_quote_approved_at',
+        'corrective_parts_delivered_at',
+        'corrective_repair_started_at',
+        'corrective_repair_finished_at',
+        'corrective_observations',
     ];
 
     protected $casts = [
@@ -70,6 +82,16 @@ class WorkshopMovement extends Model
         'tax' => 'decimal:6',
         'total' => 'decimal:6',
         'paid_total' => 'decimal:6',
+        'corrective_reception_at' => 'datetime',
+        'corrective_scheduled_at' => 'datetime',
+        'corrective_eval_started_at' => 'datetime',
+        'corrective_eval_finished_at' => 'datetime',
+        'corrective_quote_delivered_at' => 'datetime',
+        'corrective_quote_approved_at' => 'datetime',
+        'corrective_parts_requested_at' => 'datetime',
+        'corrective_parts_delivered_at' => 'datetime',
+        'corrective_repair_started_at' => 'datetime',
+        'corrective_repair_finished_at' => 'datetime',
     ];
 
     public function movement()

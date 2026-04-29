@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Carbon\Carbon;
 use App\Models\Branch;
 use App\Models\Card;
 use App\Models\CashRegister;
@@ -47,6 +48,7 @@ class WorkshopMaintenanceBoardController extends Controller
     public function index(Request $request)
     {
         [$branchId, $companyId] = $this->branchScope();
+        $correctiveServicesEnabled = $this->isCorrectiveServiceEnabled($branchId);
         $allowedStatuses = [
             'draft',
             'diagnosis',
@@ -70,7 +72,7 @@ class WorkshopMaintenanceBoardController extends Controller
                 'movement',
                 'vehicle',
                 'client',
-                'details' => fn ($query) => $query
+                'details' => fn($query) => $query
                     ->whereIn('line_type', ['SERVICE', 'PART'])
                     ->whereNull('deleted_at')
                     ->orderBy('id'),
@@ -79,16 +81,23 @@ class WorkshopMaintenanceBoardController extends Controller
                 'statusHistories.user:id,name',
             ])
             ->withCount([
-                'details as pending_billing_count' => fn ($query) => $query->whereNull('sales_movement_id'),
+                'details as pending_billing_count' => fn($query) => $query->whereNull('sales_movement_id'),
             ])
             ->withSum([
-                'details as pending_billing_total' => fn ($query) => $query->whereNull('sales_movement_id'),
+                'details as pending_billing_total' => fn($query) => $query->whereNull('sales_movement_id'),
             ], 'total')
             ->where('company_id', $companyId)
             ->where('branch_id', $branchId)
+            ->when($correctiveServicesEnabled, function ($query) {
+                // Excluir correctivos en borrador (están en el tablero correctivo)
+                $query->where(function ($q) {
+                    $q->where('service_type', '!=', 'correctivo')
+                      ->orWhere('status', '!=', 'draft');
+                });
+            })
             ->when(
                 Schema::hasColumn('workshop_movements', 'quotation_source'),
-                fn ($query) => $query->where(function ($scope) {
+                fn($query) => $query->where(function ($scope) {
                     $scope->whereNull('quotation_source')
                         ->orWhere('quotation_source', '!=', 'external');
                 })
@@ -160,6 +169,67 @@ class WorkshopMaintenanceBoardController extends Controller
         ) + $formData);
     }
 
+    public function correctiveIndex(Request $request)
+    {
+        [$branchId, $companyId] = $this->branchScope();
+
+        if (!$this->isCorrectiveServiceEnabled($branchId)) {
+            return redirect()->route('workshop.maintenance-board.index')
+                ->withErrors(['error' => 'La funcionalidad de servicio correctivo no está habilitada.']);
+        }
+
+        $search = trim((string) $request->query('search', ''));
+
+        $cards = WorkshopMovement::query()
+            ->with([
+                'movement',
+                'vehicle',
+                'client',
+                'details' => fn($query) => $query
+                    ->whereIn('line_type', ['SERVICE', 'PART'])
+                    ->whereNull('deleted_at')
+                    ->orderBy('id'),
+                'details.service',
+                'details.product',
+                'technicians.technician',
+            ])
+            ->where('company_id', $companyId)
+            ->where('branch_id', $branchId)
+            ->where('service_type', 'correctivo')
+            ->where('status', 'draft')
+            ->when($search !== '', function ($query) use ($search) {
+                $needle = mb_strtolower($search, 'UTF-8');
+                $query->where(function ($inner) use ($needle) {
+                    $inner->whereHas('movement', function ($movementQuery) use ($needle) {
+                        $movementQuery
+                            ->whereRaw('LOWER(COALESCE(number, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(comment, \'\')) LIKE ?', ["%{$needle}%"]);
+                    })->orWhereHas('client', function ($clientQuery) use ($needle) {
+                        $clientQuery
+                            ->whereRaw('LOWER(COALESCE(first_name, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(last_name, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(TRIM(COALESCE(first_name, \'\') || \' \' || COALESCE(last_name, \'\'))) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(document_number, \'\')) LIKE ?', ["%{$needle}%"]);
+                    })->orWhereHas('vehicle', function ($vehicleQuery) use ($needle) {
+                        $vehicleQuery
+                            ->whereRaw('LOWER(COALESCE(brand, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(model, \'\')) LIKE ?', ["%{$needle}%"])
+                            ->orWhereRaw('LOWER(COALESCE(plate, \'\')) LIKE ?', ["%{$needle}%"]);
+                    });
+                });
+            })
+            ->orderBy('id', 'desc')
+            ->paginate(18)
+            ->withQueryString();
+
+        $formData = $this->maintenanceFormData($branchId, $companyId);
+
+        return view('workshop.maintenance-board.corrective', compact(
+            'cards',
+            'search'
+        ) + $formData);
+    }
+
     public function create(Request $request): \Illuminate\View\View
     {
         [$branchId, $companyId] = $this->branchScope();
@@ -169,6 +239,8 @@ class WorkshopMaintenanceBoardController extends Controller
         $preFilledClientId = (string) $request->query('client_person_id', '');
         $preFilledDiagnosis = (string) $request->query('diagnosis', '');
         $preFilledAppointmentId = (string) $request->query('appointment_id', '');
+
+        $serviceType = $request->query('service_type', 'preventivo');
 
         return view('workshop.maintenance-board.create', $formData + [
             'editingOrder' => null,
@@ -184,6 +256,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'preFilledClientId' => $preFilledClientId,
             'preFilledDiagnosis' => $preFilledDiagnosis,
             'preFilledAppointmentId' => $preFilledAppointmentId,
+            'serviceType' => $serviceType,
         ]);
     }
 
@@ -210,7 +283,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'client',
             'intakeInventory',
             'damages.photos',
-            'details' => fn ($query) => $query->whereNull('sales_movement_id')->whereNull('deleted_at')->orderBy('id'),
+            'details' => fn($query) => $query->whereNull('sales_movement_id')->whereNull('deleted_at')->orderBy('id'),
             'details.service',
             'details.product',
         ]);
@@ -226,7 +299,7 @@ class WorkshopMaintenanceBoardController extends Controller
         $initialServiceLines = $order->details
             ->where('line_type', 'SERVICE')
             ->values()
-            ->map(fn ($d) => [
+            ->map(fn($d) => [
                 'detail_id' => (int) $d->id,
                 'service_id' => $d->service_id !== null ? (string) $d->service_id : '',
                 'description' => (string) ($d->description ?? ''),
@@ -240,7 +313,7 @@ class WorkshopMaintenanceBoardController extends Controller
         $initialProductLines = $order->details
             ->where('line_type', 'PART')
             ->values()
-            ->map(fn ($d) => [
+            ->map(fn($d) => [
                 'detail_id' => (int) $d->id,
                 'product_id' => (string) ($d->product_id ?? ''),
                 'qty' => (float) $d->qty,
@@ -251,10 +324,10 @@ class WorkshopMaintenanceBoardController extends Controller
 
         $vehicleTypeId = $order->vehicle?->vehicle_type_id;
         $inventoryKeys = WorkshopVehicleIntakeInventoryItem::query()
-            ->when($vehicleTypeId, fn ($q) => $q->where('vehicle_type_id', (int) $vehicleTypeId))
+            ->when($vehicleTypeId, fn($q) => $q->where('vehicle_type_id', (int) $vehicleTypeId))
             ->orderBy('order_num')
             ->pluck('item_key')
-            ->map(fn ($k) => (string) $k)
+            ->map(fn($k) => (string) $k)
             ->all();
 
         $initialInventoryChecks = [];
@@ -269,7 +342,7 @@ class WorkshopMaintenanceBoardController extends Controller
         $editingDamageRows = [];
         $editingDamagePhotoPreviews = [0 => [], 1 => [], 2 => [], 3 => []];
         foreach ($sidesOrder as $idx => $side) {
-            $d = $order->damages->first(fn ($x) => strtoupper((string) $x->side) === $side);
+            $d = $order->damages->first(fn($x) => strtoupper((string) $x->side) === $side);
             $editingDamageRows[] = [
                 'description' => $d ? (string) ($d->description ?? '') : '',
                 'severity' => $d ? (string) ($d->severity ?? '') : '',
@@ -311,6 +384,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'editingDamageRows' => $editingDamageRows,
             'editingDamagePhotoPreviews' => $editingDamagePhotoPreviews,
             'editingSignatureUrl' => $editingSignatureUrl,
+            'serviceType' => $order->service_type ?? 'preventivo',
         ]);
     }
 
@@ -373,14 +447,14 @@ class WorkshopMaintenanceBoardController extends Controller
             ->value('id');
 
         $documentTypes = DocumentType::query()
-            ->when($saleMovementTypeId > 0, fn ($query) => $query->where('movement_type_id', $saleMovementTypeId))
+            ->when($saleMovementTypeId > 0, fn($query) => $query->where('movement_type_id', $saleMovementTypeId))
             ->orderBy('name')
             ->get(['id', 'name', 'stock']);
 
         $cashRegisters = CashRegister::query()
             ->when(
                 Schema::hasColumn('cash_registers', 'branch_id') && $branchId > 0,
-                fn ($query) => $query->where('branch_id', $branchId)
+                fn($query) => $query->where('branch_id', $branchId)
             )
             ->orderBy('number')
             ->get(['id', 'number', 'status']);
@@ -394,11 +468,11 @@ class WorkshopMaintenanceBoardController extends Controller
             ->whereHas('roles', function ($query) {
                 $query->where('roles.id', 2); // Role 2 = Empleado
             })
-            ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
+            ->when($branchId > 0, fn($query) => $query->where('branch_id', $branchId))
             ->orderBy('first_name')
             ->orderBy('last_name')
             ->get(['id', 'first_name', 'last_name'])
-            ->map(fn ($p) => [
+            ->map(fn($p) => [
                 'id' => (int) $p->id,
                 'name' => trim(($p->first_name ?? '') . ' ' . ($p->last_name ?? '')),
             ])
@@ -409,7 +483,7 @@ class WorkshopMaintenanceBoardController extends Controller
             ->orderBy('order_num')
             ->get(['vehicle_type_id', 'item_key', 'label'])
             ->groupBy('vehicle_type_id')
-            ->map(fn ($items) => $items->values()->map(fn ($i) => [
+            ->map(fn($items) => $items->values()->map(fn($i) => [
                 'item_key' => (string) $i->item_key,
                 'label' => (string) $i->label,
             ])->values()->all())
@@ -430,7 +504,7 @@ class WorkshopMaintenanceBoardController extends Controller
                 'products.marca',
                 'products.description',
             ])
-            ->map(fn ($row) => [
+            ->map(fn($row) => [
                 'id' => (int) $row->product_id,
                 'code' => (string) ($row->code ?? ''),
                 'marca' => (string) ($row->marca ?? ''),
@@ -531,7 +605,10 @@ class WorkshopMaintenanceBoardController extends Controller
             'inventoryItemsByVehicleType',
             'showInventoryDefault',
             'showDamagesPreexistingDefault'
-        ) + ['externalServicesEnabled' => $this->isExternalServiceEnabled($branchId)];
+        ) + [
+            'externalServicesEnabled' => $this->isExternalServiceEnabled($branchId),
+            'correctiveServicesEnabled' => $this->isCorrectiveServiceEnabled($branchId)
+        ];
     }
 
     private function isExternalServiceEnabled(int $branchId): bool
@@ -555,7 +632,29 @@ class WorkshopMaintenanceBoardController extends Controller
 
         return in_array($val, ['si', 'yes', 'true', '1'], true);
     }
-            
+
+    private function isCorrectiveServiceEnabled(int $branchId): bool
+    {
+        $parameter = DB::table('parameters')
+            ->where('description', 'Agregar Funcionalidad servicio correctivo')
+            ->where('status', 1)
+            ->first();
+
+        if (!$parameter) {
+            return false;
+        }
+
+        $branchValue = DB::table('branch_parameters')
+            ->where('parameter_id', $parameter->id)
+            ->where('branch_id', $branchId)
+            ->whereNull('deleted_at')
+            ->value('value');
+
+        $val = strtolower(trim((string) ($branchValue ?? $parameter->value)));
+
+        return in_array($val, ['si', 'yes', 'true', '1'], true);
+    }
+
 
     public function store(Request $request): \Illuminate\Http\Response|RedirectResponse
     {
@@ -585,6 +684,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'service_lines.*.unit_price' => ['nullable', 'numeric'],
             'service_lines.*.validity_months' => ['nullable', 'in:6,12'],
             'service_lines.*.is_terciarizado' => ['nullable', 'boolean'],
+            'service_type' => ['nullable', 'string', 'in:preventivo,correctivo'],
             'product_lines' => ['nullable', 'array'],
             'product_lines.*.detail_id' => ['nullable', 'integer'],
             'product_lines.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
@@ -626,7 +726,12 @@ class WorkshopMaintenanceBoardController extends Controller
             $damagesWithPhotos = $this->uploadDamagePhotos($request, (array) ($validated['damages'] ?? []), $branchId);
             $signaturePath = $this->storeSignatureFromDataUri((string) ($validated['client_signature_data'] ?? ''), $branchId);
 
-            $workshop = $this->flowService->createOrder([
+            $status = ($validated['service_type'] ?? 'preventivo') === 'correctivo' ? 'draft' : 'awaiting_approval';
+            $comment = ($validated['service_type'] ?? 'preventivo') === 'correctivo'
+                ? 'Inicio de flujo correctivo - Fase Recepción'
+                : 'OS creada desde tablero y enviada a espera de aprobación';
+
+            $data = array_merge($validated, [
                 'vehicle_id' => (int) $validated['vehicle_id'],
                 'client_person_id' => $clientPersonId,
                 'appointment_id' => !empty($validated['appointment_id']) ? (int) $validated['appointment_id'] : null,
@@ -635,9 +740,22 @@ class WorkshopMaintenanceBoardController extends Controller
                 'tow_in' => (bool) ($validated['tow_in'] ?? false),
                 'diagnosis_text' => $validated['diagnosis_text'] ?? null,
                 'observations' => $validated['observations'] ?? null,
-                'status' => 'awaiting_approval',
-                'comment' => 'OS creada desde tablero y enviada a espera de aprobación',
-            ], $branchId, (int) $user?->id, (string) ($user?->name ?? 'Sistema'));
+                'status' => $status,
+                'comment' => $comment,
+                'service_type' => $validated['service_type'] ?? 'preventivo',
+            ]);
+
+            if (($validated['service_type'] ?? 'preventivo') === 'correctivo') {
+                $data['corrective_phase'] = 'recepcion';
+                $data['corrective_reception_at'] = now();
+            }
+
+            $workshop = $this->flowService->createOrder(
+                $data,
+                $branchId,
+                (int) $user?->id,
+                (string) ($user?->name ?? 'Sistema')
+            );
 
             $this->flowService->syncIntakeAndDamages(
                 $workshop,
@@ -652,8 +770,8 @@ class WorkshopMaintenanceBoardController extends Controller
                 ->where('kind', 'catalog')
                 ->pluck('service_id')
                 ->unique()
-                ->map(fn ($id) => (int) $id)
-                ->filter(fn ($id) => $id > 0)
+                ->map(fn($id) => (int) $id)
+                ->filter(fn($id) => $id > 0)
                 ->values()
                 ->all();
 
@@ -705,7 +823,7 @@ class WorkshopMaintenanceBoardController extends Controller
             }
 
             $productLines = collect($validated['product_lines'] ?? [])
-                ->filter(fn ($line) => !empty($line['product_id']))
+                ->filter(fn($line) => !empty($line['product_id']))
                 ->values();
 
             foreach ($productLines as $line) {
@@ -738,13 +856,21 @@ class WorkshopMaintenanceBoardController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
 
-        session()->flash('status', 'Servicio registrado y enviado a espera de aprobacion.');
+        session()->flash('status', 'Servicio registrado correctamente.');
+
+        $redirectUrl = route('workshop.maintenance-board.index', array_filter([
+            'view_id' => $request->query('view_id'),
+        ]));
+
+        if (($workshop->service_type ?? '') === 'correctivo') {
+            $redirectUrl = route('workshop.maintenance-board.corrective', array_filter([
+                'view_id' => $request->query('view_id'),
+            ]));
+        }
 
         return response()->view('workshop.maintenance-board.store_redirect', [
             'reportUrl' => route('workshop.pdf.order', $workshop),
-            'redirectUrl' => route('workshop.maintenance-board.index', array_filter([
-                'view_id' => $request->query('view_id'),
-            ])),
+            'redirectUrl' => $redirectUrl,
         ]);
     }
 
@@ -786,6 +912,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'service_lines.*.unit_price' => ['nullable', 'numeric'],
             'service_lines.*.validity_months' => ['nullable', 'in:6,12'],
             'service_lines.*.is_terciarizado' => ['nullable', 'boolean'],
+            'service_type' => ['nullable', 'string', 'in:preventivo,correctivo'],
             'product_lines' => ['nullable', 'array'],
             'product_lines.*.detail_id' => ['nullable', 'integer'],
             'product_lines.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
@@ -838,6 +965,7 @@ class WorkshopMaintenanceBoardController extends Controller
                     'tow_in' => (bool) ($validated['tow_in'] ?? false),
                     'diagnosis_text' => $validated['diagnosis_text'] ?? null,
                     'observations' => $validated['observations'] ?? null,
+                    'service_type' => $validated['service_type'] ?? $order->service_type,
                 ]);
 
                 $damagesWithPhotos = $this->uploadDamagePhotos($request, (array) ($validated['damages'] ?? []), $branchId);
@@ -861,8 +989,8 @@ class WorkshopMaintenanceBoardController extends Controller
                     ->where('kind', 'catalog')
                     ->pluck('service_id')
                     ->unique()
-                    ->map(fn ($id) => (int) $id)
-                    ->filter(fn ($id) => $id > 0)
+                    ->map(fn($id) => (int) $id)
+                    ->filter(fn($id) => $id > 0)
                     ->values()
                     ->all();
 
@@ -884,8 +1012,8 @@ class WorkshopMaintenanceBoardController extends Controller
 
                 $submittedDetailIds = collect($parsedServiceLines)
                     ->pluck('detail_id')
-                    ->filter(fn ($id) => (int) $id > 0)
-                    ->map(fn ($id) => (int) $id)
+                    ->filter(fn($id) => (int) $id > 0)
+                    ->map(fn($id) => (int) $id)
                     ->all();
                 foreach ($detailsById as $id => $detail) {
                     if (!in_array((int) $id, $submittedDetailIds, true)) {
@@ -981,7 +1109,7 @@ class WorkshopMaintenanceBoardController extends Controller
                 $lockedOrder->refresh();
 
                 $productLines = collect($validated['product_lines'] ?? [])
-                    ->filter(fn ($line) => !empty($line['product_id']))
+                    ->filter(fn($line) => !empty($line['product_id']))
                     ->values();
 
                 $partDetails = $lockedOrder->details()
@@ -990,7 +1118,7 @@ class WorkshopMaintenanceBoardController extends Controller
                     ->get()
                     ->keyBy('id');
 
-                $submittedPartIds = $productLines->pluck('detail_id')->filter()->map(fn ($id) => (int) $id)->all();
+                $submittedPartIds = $productLines->pluck('detail_id')->filter()->map(fn($id) => (int) $id)->all();
                 foreach ($partDetails as $id => $detail) {
                     if (!in_array((int) $id, $submittedPartIds, true)) {
                         $this->flowService->removeDetail($detail);
@@ -1057,6 +1185,16 @@ class WorkshopMaintenanceBoardController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
 
+        if ($request->filled('advance_corrective_phase')) {
+            $order->corrective_phase = 'cotizacion_entrega';
+            $order->corrective_quote_delivered_at = now();
+            $order->corrective_observations = ($order->corrective_observations ? $order->corrective_observations . "\n" : "") . "[" . now()->format('Y-m-d H:i') . " - Entrega de Cotización]: Generada desde edición de detalles.";
+            $order->save();
+
+            return redirect()->route('workshop.maintenance-board.corrective')
+                ->with('status', 'Cotización generada y fase avanzada exitosamente.');
+        }
+
         return redirect()
             ->route('workshop.maintenance-board.index')
             ->with('status', 'Orden de servicio actualizada.');
@@ -1095,7 +1233,7 @@ class WorkshopMaintenanceBoardController extends Controller
                     ->get()
                     ->keyBy('id');
 
-                $submittedDetailIds = collect((array) $validated['quote_lines'])->pluck('detail_id')->map(fn ($id) => (int) $id)->all();
+                $submittedDetailIds = collect((array) $validated['quote_lines'])->pluck('detail_id')->map(fn($id) => (int) $id)->all();
                 foreach ($detailsById as $id => $detail) {
                     if (!in_array((int) $id, $submittedDetailIds, true)) {
                         $this->flowService->removeDetail($detail);
@@ -1175,7 +1313,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'client_person_id' => [
                 'required',
                 'integer',
-                Rule::exists('people', 'id')->where(fn ($query) => $query->where('branch_id', $branchId)),
+                Rule::exists('people', 'id')->where(fn($query) => $query->where('branch_id', $branchId)),
             ],
             'vehicle_type_id' => [
                 'required',
@@ -1202,13 +1340,13 @@ class WorkshopMaintenanceBoardController extends Controller
                 'nullable',
                 'string',
                 'max:255',
-                Rule::unique('vehicles', 'plate')->where(fn ($query) => $query->where('company_id', $companyId)),
+                Rule::unique('vehicles', 'plate')->where(fn($query) => $query->where('company_id', $companyId)),
             ],
             'vin' => [
                 'nullable',
                 'string',
                 'max:255',
-                Rule::unique('vehicles', 'vin')->where(fn ($query) => $query->where('company_id', $companyId)),
+                Rule::unique('vehicles', 'vin')->where(fn($query) => $query->where('company_id', $companyId)),
             ],
             'engine_number' => ['nullable', 'string', 'max:255'],
             'chassis_number' => ['nullable', 'string', 'max:255'],
@@ -1694,7 +1832,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'movement',
             'vehicle',
             'client',
-            'details' => fn ($query) => $query
+            'details' => fn($query) => $query
                 ->whereNull('sales_movement_id')
                 ->whereNull('deleted_at')
                 ->orderBy('id'),
@@ -1725,7 +1863,7 @@ class WorkshopMaintenanceBoardController extends Controller
             ->where('status', true)
             ->orderBy('order_num')
             ->get(['id', 'description', 'type', 'icon'])
-            ->map(fn ($card) => [
+            ->map(fn($card) => [
                 'id' => (int) $card->id,
                 'description' => (string) ($card->description ?? ''),
                 'type' => (string) ($card->type ?? ''),
@@ -1737,7 +1875,7 @@ class WorkshopMaintenanceBoardController extends Controller
             ->where('status', true)
             ->orderBy('order_num')
             ->get(['id', 'description'])
-            ->map(fn ($wallet) => [
+            ->map(fn($wallet) => [
                 'id' => (int) $wallet->id,
                 'description' => (string) ($wallet->description ?? ''),
             ])
@@ -1758,7 +1896,7 @@ class WorkshopMaintenanceBoardController extends Controller
                 ])
         )
             ->groupBy('payment_method_id')
-            ->map(fn ($rows) => collect($rows)->map(fn ($row) => [
+            ->map(fn($rows) => collect($rows)->map(fn($row) => [
                 'id' => (int) $row->id,
                 'description' => (string) ($row->description ?? ''),
             ])->values())
@@ -1824,7 +1962,7 @@ class WorkshopMaintenanceBoardController extends Controller
         $paymentType = strtoupper((string) ($validated['payment_type'] ?? 'CONTADO'));
         $isDebtCheckout = $paymentType === 'DEUDA';
         $validated['payment_methods'] = collect($validated['payment_methods'] ?? [])
-            ->filter(fn ($row) => !empty($row['payment_method_id']) && (float) ($row['amount'] ?? 0) > 0)
+            ->filter(fn($row) => !empty($row['payment_method_id']) && (float) ($row['amount'] ?? 0) > 0)
             ->values()
             ->all();
 
@@ -1840,7 +1978,7 @@ class WorkshopMaintenanceBoardController extends Controller
         $methodIds = collect($validated['payment_methods'] ?? [])
             ->pluck('payment_method_id')
             ->filter()
-            ->map(fn ($value) => (int) $value)
+            ->map(fn($value) => (int) $value)
             ->unique()
             ->values();
 
@@ -1856,50 +1994,50 @@ class WorkshopMaintenanceBoardController extends Controller
                 ->get(['payment_method_id', 'payment_gateway_id'])
         )
             ->groupBy('payment_method_id')
-            ->map(fn ($rows) => collect($rows)->pluck('payment_gateway_id')->map(fn ($value) => (int) $value)->all());
+            ->map(fn($rows) => collect($rows)->pluck('payment_gateway_id')->map(fn($value) => (int) $value)->all());
 
         if (!$isDebtCheckout) {
             foreach ($validated['payment_methods'] as $index => $payment) {
-            $method = $methodsIndex->get((int) ($payment['payment_method_id'] ?? 0));
-            $kind = $this->inferPaymentMethodKind((string) ($method?->description ?? ''));
+                $method = $methodsIndex->get((int) ($payment['payment_method_id'] ?? 0));
+                $kind = $this->inferPaymentMethodKind((string) ($method?->description ?? ''));
 
-            if ($kind === 'card') {
-                if (empty($payment['card_id'])) {
-                    throw ValidationException::withMessages([
-                        "payment_methods.{$index}.card_id" => 'Debe seleccionar la tarjeta.',
-                    ]);
-                }
-
-                if (!empty($payment['payment_gateway_id'])) {
-                    $allowedGateways = $gatewayMethodMap->get((int) $payment['payment_method_id'], []);
-                    if (!in_array((int) $payment['payment_gateway_id'], $allowedGateways, true)) {
+                if ($kind === 'card') {
+                    if (empty($payment['card_id'])) {
                         throw ValidationException::withMessages([
-                            "payment_methods.{$index}.payment_gateway_id" => 'La pasarela no corresponde al mÃ©todo de pago seleccionado.',
+                            "payment_methods.{$index}.card_id" => 'Debe seleccionar la tarjeta.',
                         ]);
                     }
+
+                    if (!empty($payment['payment_gateway_id'])) {
+                        $allowedGateways = $gatewayMethodMap->get((int) $payment['payment_method_id'], []);
+                        if (!in_array((int) $payment['payment_gateway_id'], $allowedGateways, true)) {
+                            throw ValidationException::withMessages([
+                                "payment_methods.{$index}.payment_gateway_id" => 'La pasarela no corresponde al mÃ©todo de pago seleccionado.',
+                            ]);
+                        }
+                    }
+
+                    $validated['payment_methods'][$index]['digital_wallet_id'] = null;
+                    $validated['payment_methods'][$index]['bank_id'] = null;
+                } elseif ($kind === 'wallet') {
+                    if (empty($payment['digital_wallet_id'])) {
+                        throw ValidationException::withMessages([
+                            "payment_methods.{$index}.digital_wallet_id" => 'Debe seleccionar la billetera digital.',
+                        ]);
+                    }
+
+                    $validated['payment_methods'][$index]['card_id'] = null;
+                    $validated['payment_methods'][$index]['payment_gateway_id'] = null;
+                    $validated['payment_methods'][$index]['bank_id'] = null;
+                } else {
+                    $validated['payment_methods'][$index]['card_id'] = null;
+                    $validated['payment_methods'][$index]['payment_gateway_id'] = null;
+                    $validated['payment_methods'][$index]['digital_wallet_id'] = null;
                 }
 
-                $validated['payment_methods'][$index]['digital_wallet_id'] = null;
-                $validated['payment_methods'][$index]['bank_id'] = null;
-            } elseif ($kind === 'wallet') {
-                if (empty($payment['digital_wallet_id'])) {
-                    throw ValidationException::withMessages([
-                        "payment_methods.{$index}.digital_wallet_id" => 'Debe seleccionar la billetera digital.',
-                    ]);
-                }
-
-                $validated['payment_methods'][$index]['card_id'] = null;
-                $validated['payment_methods'][$index]['payment_gateway_id'] = null;
-                $validated['payment_methods'][$index]['bank_id'] = null;
-            } else {
-                $validated['payment_methods'][$index]['card_id'] = null;
-                $validated['payment_methods'][$index]['payment_gateway_id'] = null;
-                $validated['payment_methods'][$index]['digital_wallet_id'] = null;
-            }
-
-            $validated['payment_methods'][$index]['reference'] = isset($payment['reference'])
-                ? trim((string) $payment['reference'])
-                : null;
+                $validated['payment_methods'][$index]['reference'] = isset($payment['reference'])
+                    ? trim((string) $payment['reference'])
+                    : null;
             }
         }
 
@@ -1918,13 +2056,13 @@ class WorkshopMaintenanceBoardController extends Controller
                 }
 
                 $productLines = collect($validated['product_lines'] ?? [])
-                    ->filter(fn ($line) => !empty($line['product_id']))
+                    ->filter(fn($line) => !empty($line['product_id']))
                     ->values();
 
                 if ($productLines->isNotEmpty()) {
                     $productBranchIndex = ProductBranch::query()
                         ->where('branch_id', $branchId)
-                        ->whereIn('product_id', $productLines->pluck('product_id')->map(fn ($v) => (int) $v)->all())
+                        ->whereIn('product_id', $productLines->pluck('product_id')->map(fn($v) => (int) $v)->all())
                         ->whereNull('deleted_at')
                         ->get(['product_id', 'tax_rate_id'])
                         ->keyBy('product_id');
@@ -2043,7 +2181,7 @@ class WorkshopMaintenanceBoardController extends Controller
             ->where('workshop_movement_id', $order->id)
             ->with('photos')
             ->get()
-            ->keyBy(fn ($d) => strtoupper((string) $d->side));
+            ->keyBy(fn($d) => strtoupper((string) $d->side));
 
         foreach ($damagesWithPhotos as $index => $damage) {
             $side = strtoupper((string) ($damage['side'] ?? ''));
@@ -2058,7 +2196,7 @@ class WorkshopMaintenanceBoardController extends Controller
             if (!$row) {
                 continue;
             }
-            $paths = $row->photos->pluck('photo_path')->filter()->map(fn ($p) => (string) $p)->values()->all();
+            $paths = $row->photos->pluck('photo_path')->filter()->map(fn($p) => (string) $p)->values()->all();
             if ($paths === [] && $row->photo_path) {
                 $paths = [(string) $row->photo_path];
             }
@@ -2083,8 +2221,8 @@ class WorkshopMaintenanceBoardController extends Controller
 
         if ((bool) ($service->frequency_enabled ?? false) && $mileageForFrequency > 0) {
             $validFrequencies = $service->frequencies
-                ->filter(fn ($f) => (int) ($f->km ?? 0) > 0 && ((int) $mileageForFrequency % (int) $f->km) === 0)
-                ->sortByDesc(fn ($f) => (int) $f->km)
+                ->filter(fn($f) => (int) ($f->km ?? 0) > 0 && ((int) $mileageForFrequency % (int) $f->km) === 0)
+                ->sortByDesc(fn($f) => (int) $f->km)
                 ->values();
 
             $multiplier = (float) ($validFrequencies->first()->multiplier ?? 1);
@@ -2104,7 +2242,7 @@ class WorkshopMaintenanceBoardController extends Controller
         }
         $parts = array_values(array_filter(
             [$code, $marca !== '' ? $marca : null, $description],
-            fn ($p) => $p !== null && $p !== ''
+            fn($p) => $p !== null && $p !== ''
         ));
 
         return $parts === [] ? '' : implode(' - ', $parts);
@@ -2202,9 +2340,9 @@ class WorkshopMaintenanceBoardController extends Controller
         $ids = collect($parsedServiceLines)
             ->where('kind', 'catalog')
             ->pluck('service_id')
-            ->map(fn ($id) => (int) $id)
+            ->map(fn($id) => (int) $id)
             ->unique()
-            ->filter(fn ($id) => $id > 0)
+            ->filter(fn($id) => $id > 0)
             ->values()
             ->all();
 
@@ -2222,7 +2360,7 @@ class WorkshopMaintenanceBoardController extends Controller
                 $query->whereNull('branch_id')->orWhere('branch_id', $branchId);
             })
             ->pluck('id')
-            ->map(fn ($value) => (int) $value)
+            ->map(fn($value) => (int) $value)
             ->all();
 
         foreach ($ids as $id) {
@@ -2268,7 +2406,7 @@ class WorkshopMaintenanceBoardController extends Controller
 
         if (is_numeric($configuredValue)) {
             $configuredId = (int) $configuredValue;
-            $existsInSaleDocs = $documentTypes->contains(fn ($d) => (int) $d->id === $configuredId);
+            $existsInSaleDocs = $documentTypes->contains(fn($d) => (int) $d->id === $configuredId);
             if ($existsInSaleDocs) {
                 return $configuredId;
             }
@@ -2295,7 +2433,7 @@ class WorkshopMaintenanceBoardController extends Controller
 
         if (is_numeric($configuredValue)) {
             $configuredId = (int) $configuredValue;
-            $exists = $cashRegisters->contains(fn ($cashRegister) => (int) ($cashRegister->id ?? 0) === $configuredId);
+            $exists = $cashRegisters->contains(fn($cashRegister) => (int) ($cashRegister->id ?? 0) === $configuredId);
             if ($exists) {
                 return $configuredId;
             }
@@ -2310,7 +2448,7 @@ class WorkshopMaintenanceBoardController extends Controller
             return false;
         }
 
-        $documentType = collect($documentTypes)->first(fn ($item) => (int) ($item->id ?? 0) === (int) $documentTypeId);
+        $documentType = collect($documentTypes)->first(fn($item) => (int) ($item->id ?? 0) === (int) $documentTypeId);
         $name = mb_strtolower(trim((string) ($documentType->name ?? '')), 'UTF-8');
 
         return str_contains($name, 'factura');
@@ -2419,6 +2557,220 @@ class WorkshopMaintenanceBoardController extends Controller
         ]);
 
         return view('workshop.maintenance-board.tracking', compact('order'));
+    }
+
+    public function advancePhase(Request $request, WorkshopMovement $order): RedirectResponse
+    {
+        $this->assertOrderScope($order);
+
+        $validated = $request->validate([
+            'next_phase' => ['required', 'string'],
+            'date' => ['required', 'date'],
+            'observations' => ['nullable', 'string'],
+            'approved' => ['nullable', 'string', 'in:yes,no'],
+            'technician_id' => ['nullable', 'integer'],
+        ]);
+
+        $nextPhase = $validated['next_phase'];
+        $date = Carbon::parse($validated['date']);
+        $obs = $validated['observations'];
+        $approved = $validated['approved'] ?? 'yes';
+
+        if ($nextPhase === 'cotizacion_aprobacion' && $approved === 'no') {
+            $oldStatus = $order->status;
+            
+            $patch = [
+                'status' => 'cancelled',
+                'corrective_phase' => 'cotizacion_rechazada',
+            ];
+            
+            if (\Illuminate\Support\Facades\Schema::hasColumn('workshop_movements', 'approval_status')) {
+                $patch['approval_status'] = 'rejected';
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('workshop_movements', 'quotation_result')) {
+                $patch['quotation_result'] = 'lost';
+                $patch['quotation_lost_reason'] = $obs;
+            }
+
+            $order->update($patch);
+            
+            $order->statusHistories()->create([
+                'from_status' => $oldStatus,
+                'to_status' => 'cancelled',
+                'user_id' => (int) $request->user()?->id,
+                'note' => "Cotización Rechazada por el cliente." . (!empty($obs) ? " Observaciones: " . $obs : ""),
+            ]);
+
+            return redirect()->route('workshop.maintenance-board.corrective')->with('status', 'Cotización rechazada. El servicio ha sido cancelado.');
+        }
+
+        // Map phase to column
+        $phaseToColumn = [
+            'programacion' => 'corrective_scheduled_at',
+            'eval_inicio' => 'corrective_eval_started_at',
+            'eval_fin' => 'corrective_eval_finished_at',
+            'cotizacion_entrega' => 'corrective_quote_delivered_at',
+            'cotizacion_aprobacion' => 'corrective_quote_approved_at',
+            'repuestos_solicitud' => 'corrective_parts_requested_at',
+            'repuestos_entrega' => 'corrective_parts_delivered_at',
+            'reparacion_inicio' => 'corrective_repair_started_at',
+            'reparacion_fin' => 'corrective_repair_finished_at',
+            'servicio_inicio' => null, // Mueve a tablero principal (Approved)
+        ];
+
+        $column = $phaseToColumn[$nextPhase] ?? null;
+
+        if ($column) {
+            $order->{$column} = $date;
+        }
+
+        $order->corrective_phase = $nextPhase;
+
+        if ($obs) {
+            $currentObs = $order->corrective_observations ? $order->corrective_observations . "\n" : "";
+            $phaseLabel = ucfirst(str_replace('_', ' ', $nextPhase));
+            $order->corrective_observations = $currentObs . "[" . now()->format('Y-m-d H:i') . " - {$phaseLabel}]: " . $obs;
+        }
+
+        if (!empty($validated['technician_id'])) {
+            $techId = (int) $validated['technician_id'];
+            if (!$order->technicians()->where('technician_person_id', $techId)->exists()) {
+                $order->technicians()->create([
+                    'technician_person_id' => $techId,
+                ]);
+            }
+        }
+
+        if ($nextPhase === 'reparacion_inicio') {
+            // Al iniciar reparación (fase final administrativa), movemos al tablero principal como Aprobado
+            $order->status = 'approved';
+        }
+
+        $order->save();
+
+        return back()->with('status', 'Fase de servicio correctivo actualizada exitosamente.');
+    }
+
+    public function partsRequest(WorkshopMovement $order)
+    {
+        $branchId = (int) session('branch_id');
+
+        $order->load(['details' => function($q) {
+            $q->where('line_type', 'PART')->orderBy('id');
+        }, 'details.product', 'details.supplier']);
+
+        $products = \App\Models\ProductBranch::query()
+            ->join('products', 'products.id', '=', 'product_branch.product_id')
+            ->where('product_branch.branch_id', $branchId)
+            ->whereNull('product_branch.deleted_at')
+            ->whereNull('products.deleted_at')
+            ->orderBy('products.description')
+            ->get([
+                'product_branch.product_id',
+                'product_branch.price',
+                'products.code',
+                'products.marca',
+                'products.description',
+            ])
+            ->map(fn($row) => (object) [
+                'id' => (int) $row->product_id,
+                'code' => (string) ($row->code ?? ''),
+                'marca' => (string) ($row->marca ?? ''),
+                'description' => (string) ($row->description ?? ''),
+                'price' => (float) ($row->price ?? 0),
+            ])
+            ->values();
+
+        $suppliers = \App\Models\Person::query()
+            ->where('branch_id', $branchId)
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name', 'document_number']);
+
+        return view('workshop.maintenance-board.parts-request', compact('order', 'products', 'suppliers'));
+    }
+
+    public function storePartsRequest(Request $request, WorkshopMovement $order)
+    {
+        $branchId = (int) session('branch_id');
+
+        $validated = $request->validate([
+            'parts' => ['nullable', 'array'],
+            'parts.*.detail_id' => ['nullable', 'integer'],
+            'parts.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
+            'parts.*.description' => ['nullable', 'string', 'max:255'],
+            'parts.*.qty' => ['required', 'numeric', 'min:0.01'],
+            'parts.*.unit_price' => ['nullable', 'numeric', 'min:0'],
+            'parts.*.supplier_person_id' => ['nullable', 'integer', 'exists:people,id'],
+        ]);
+
+        $parts = $validated['parts'] ?? [];
+
+        // First, handle existing PART lines. If they are not in the submitted parts, we might not delete them if they were quoted?
+        // Actually, the view will send ALL parts. If a detail_id is missing, it should be deleted.
+        $submittedDetailIds = collect($parts)->pluck('detail_id')->filter()->map(fn($id) => (int)$id)->all();
+        $order->details()->where('line_type', 'PART')->whereNotIn('id', $submittedDetailIds)->delete();
+
+        foreach ($parts as $partData) {
+            $qty = round((float) $partData['qty'], 6);
+            if ($qty <= 0) continue;
+
+            $unitPrice = round((float) ($partData['unit_price'] ?? 0), 6);
+            $supplierId = !empty($partData['supplier_person_id']) ? (int) $partData['supplier_person_id'] : null;
+
+            if (!empty($partData['detail_id'])) {
+                // Update existing
+                $detail = $order->details()->find($partData['detail_id']);
+                if ($detail && $detail->line_type === 'PART') {
+                    $detail->update([
+                        'qty' => $qty,
+                        'unit_price' => $unitPrice,
+                        'supplier_person_id' => $supplierId,
+                        'description' => $partData['description'] ?? $detail->description, // update glosa desc if needed
+                    ]);
+                }
+            } else {
+                // Create new
+                $description = $partData['description'] ?? '';
+                if (empty($description) && !empty($partData['product_id'])) {
+                    $product = \App\Models\Product::find($partData['product_id']);
+                    if ($product) {
+                        $description = $product->description . ($product->marca ? ' (' . $product->marca . ')' : '');
+                    }
+                }
+
+                $this->flowService->addDetail($order, [
+                    'line_type' => 'PART',
+                    'product_id' => $partData['product_id'] ?? null,
+                    'description' => $description,
+                    'qty' => $qty,
+                    'unit_price' => $unitPrice,
+                ]);
+
+                // The flowService->addDetail doesn't have supplier_person_id in its input params normally, 
+                // so we update the latest created detail (or we can just create it directly).
+                // Let's get the latest detail and update it.
+                $latest = $order->details()->where('line_type', 'PART')->latest('id')->first();
+                if ($latest && $supplierId) {
+                    $latest->update(['supplier_person_id' => $supplierId]);
+                }
+            }
+        }
+
+        // Advance phase to repuestos_solicitud
+        $order->corrective_phase = 'repuestos_solicitud';
+        $order->corrective_parts_requested_at = now();
+        
+        $obs = $request->input('observations');
+        if ($obs) {
+            $currentObs = $order->corrective_observations ? $order->corrective_observations . "\n" : "";
+            $order->corrective_observations = $currentObs . "[" . now()->format('Y-m-d H:i') . " - Solicitud de Repuestos]: " . $obs;
+        }
+
+        $order->save();
+
+        return redirect()->route('workshop.maintenance-board.corrective')
+            ->with('status', 'Solicitud de repuestos registrada correctamente y fase avanzada.');
     }
 }
 
