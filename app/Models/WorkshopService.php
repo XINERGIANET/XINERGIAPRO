@@ -22,6 +22,7 @@ class WorkshopService extends Model
         'has_validity',
         'validity_type',
         'active',
+        'is_terciarizado',
     ];
 
     protected $casts = [
@@ -30,6 +31,7 @@ class WorkshopService extends Model
         'frequency_enabled' => 'boolean',
         'has_validity' => 'boolean',
         'active' => 'boolean',
+        'is_terciarizado' => 'boolean',
     ];
 
     public function priceTiers()

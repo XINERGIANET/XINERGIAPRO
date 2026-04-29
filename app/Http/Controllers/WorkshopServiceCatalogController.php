@@ -135,6 +135,7 @@ class WorkshopServiceCatalogController extends Controller
                 'has_validity' => (bool) ($validated['has_validity'] ?? false),
                 'validity_type' => !empty($validated['has_validity']) ? ($validated['validity_type'] ?? null) : null,
                 'active' => (bool) ($validated['active'] ?? true),
+                'is_terciarizado' => (bool) ($validated['is_terciarizado'] ?? false),
             ]);
 
             $this->syncPriceTiers($service, $validated['normalized_price_tiers']);
@@ -163,6 +164,7 @@ class WorkshopServiceCatalogController extends Controller
                 'has_validity' => (bool) ($validated['has_validity'] ?? false),
                 'validity_type' => !empty($validated['has_validity']) ? ($validated['validity_type'] ?? null) : null,
                 'active' => (bool) ($validated['active'] ?? false),
+                'is_terciarizado' => (bool) ($validated['is_terciarizado'] ?? false),
             ]);
 
             $this->syncPriceTiers($service, $validated['normalized_price_tiers']);
@@ -410,10 +412,11 @@ class WorkshopServiceCatalogController extends Controller
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'type' => ['required', 'in:preventivo,correctivo'],
+            'type' => ['required', 'in:preventivo,correctivo,externo'],
             'base_price' => ['nullable', 'numeric', 'min:0'],
             'estimated_minutes' => ['required', 'integer', 'min:0'],
             'active' => ['nullable', 'boolean'],
+            'is_terciarizado' => ['nullable', 'boolean'],
             'has_validity' => ['nullable', 'boolean'],
             'validity_type' => ['nullable', 'string', 'in:soat_vencimiento,revision_tecnica_vencimiento'],
             'frequency_each_km' => ['nullable', 'integer', 'min:1'],

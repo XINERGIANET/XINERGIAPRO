@@ -832,7 +832,7 @@ class WorkshopQuotationController extends Controller
         return WorkshopMovement::query()
             ->when($companyId > 0, fn ($query) => $query->where('company_id', $companyId))
             ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
-            ->whereIn('status', ['awaiting_approval', 'approved', 'diagnosis'])
+            ->whereIn('status', ['awaiting_approval', 'approved', 'diagnosis', 'cancelled'])
             ->when($clientId, fn ($query) => $query->where('client_person_id', $clientId))
             ->when(
                 Schema::hasColumn('workshop_movements', 'quotation_source')

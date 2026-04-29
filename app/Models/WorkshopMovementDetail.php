@@ -31,6 +31,8 @@ class WorkshopMovementDetail extends Model
         'sales_movement_id',
         'stock_consumed',
         'consumed_at',
+        'is_terciarizado',
+        'supplier_person_id',
     ];
 
     protected $casts = [
@@ -43,6 +45,7 @@ class WorkshopMovementDetail extends Model
         'total' => 'decimal:6',
         'stock_consumed' => 'boolean',
         'consumed_at' => 'datetime',
+        'is_terciarizado' => 'boolean',
     ];
 
     public function workshopMovement()
@@ -68,6 +71,11 @@ class WorkshopMovementDetail extends Model
     public function technician()
     {
         return $this->belongsTo(Person::class, 'technician_person_id');
+    }
+
+    public function supplier()
+    {
+        return $this->belongsTo(Person::class, 'supplier_person_id');
     }
 
     public function warehouseMovement()

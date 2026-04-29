@@ -465,20 +465,28 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('/admin/taller')->name('workshop.')->group(function () {
         Route::get('/tablero-mantenimiento', [WorkshopMaintenanceBoardController::class, 'index'])->name('maintenance-board.index');
+        Route::get('/tablero-mantenimiento/correctivo', [WorkshopMaintenanceBoardController::class, 'correctiveIndex'])->name('maintenance-board.corrective');
         Route::get('/tablero-mantenimiento/nuevo', [WorkshopMaintenanceBoardController::class, 'create'])->name('maintenance-board.create');
         Route::post('/tablero-mantenimiento', [WorkshopMaintenanceBoardController::class, 'store'])->name('maintenance-board.store');
         Route::get('/tablero-mantenimiento/{order}/editar', [WorkshopMaintenanceBoardController::class, 'edit'])->name('maintenance-board.edit');
+        Route::get('/tablero-mantenimiento/{order}/edit', [WorkshopMaintenanceBoardController::class, 'edit']); // Alias para evitar errores 404 de caché
         Route::put('/tablero-mantenimiento/{order}', [WorkshopMaintenanceBoardController::class, 'update'])->name('maintenance-board.update');
+        Route::get('/tablero-mantenimiento/{order}/solicitud-repuestos', [WorkshopMaintenanceBoardController::class, 'partsRequest'])->name('maintenance-board.parts-request');
+        Route::post('/tablero-mantenimiento/{order}/solicitud-repuestos', [WorkshopMaintenanceBoardController::class, 'storePartsRequest'])->name('maintenance-board.parts-request.store');
         Route::post('/tablero-mantenimiento/vehiculos', [WorkshopMaintenanceBoardController::class, 'storeVehicleQuick'])->name('maintenance-board.vehicles.store');
         Route::get('/tablero-mantenimiento/vehiculos/consulta-placa', [WorkshopMaintenanceBoardController::class, 'lookupVehicleByPlate'])->name('maintenance-board.vehicles.lookup-plate');
         Route::post('/tablero-mantenimiento/clientes', [WorkshopMaintenanceBoardController::class, 'storeClientQuick'])->name('maintenance-board.clients.store');
         Route::post('/tablero-mantenimiento/{order}/iniciar', [WorkshopMaintenanceBoardController::class, 'start'])->name('maintenance-board.start');
         Route::post('/tablero-mantenimiento/{order}/pausar', [WorkshopMaintenanceBoardController::class, 'pause'])->name('maintenance-board.pause');
         Route::post('/tablero-mantenimiento/{order}/reanudar', [WorkshopMaintenanceBoardController::class, 'resume'])->name('maintenance-board.resume');
+        Route::post('/tablero-mantenimiento/{order}/finalizar-externo', [WorkshopMaintenanceBoardController::class, 'finishExternal'])->name('maintenance-board.finish.external');
         Route::post('/tablero-mantenimiento/{order}/finalizar', [WorkshopMaintenanceBoardController::class, 'finish'])->name('maintenance-board.finish');
         Route::post('/tablero-mantenimiento/{order}/cotizacion', [WorkshopMaintenanceBoardController::class, 'quotation'])->name('maintenance-board.quotation');
         Route::get('/tablero-mantenimiento/{order}/venta-cobro', [WorkshopMaintenanceBoardController::class, 'checkoutPage'])->name('maintenance-board.checkout.page');
         Route::post('/tablero-mantenimiento/{order}/venta-cobro', [WorkshopMaintenanceBoardController::class, 'checkout'])->name('maintenance-board.checkout');
+        Route::get('/tablero-mantenimiento/{order}/seguimiento', [WorkshopMaintenanceBoardController::class, 'tracking'])->name('maintenance-board.tracking');
+        Route::post('/tablero-mantenimiento/{order}/avanzar-fase', [WorkshopMaintenanceBoardController::class, 'advancePhase'])->name('maintenance-board.advance-phase');
+
         Route::get('/clientes', [WorkshopClientController::class, 'index'])->name('clients.index');
         Route::post('/clientes', [WorkshopClientController::class, 'store'])->name('clients.store');
         Route::put('/clientes/{person}', [WorkshopClientController::class, 'update'])->name('clients.update');
@@ -568,11 +576,13 @@ Route::middleware('auth')->group(function () {
         Route::get('/reportes/export/productividad', [WorkshopExportController::class, 'productivityCsv'])->name('reports.export.productivity');
         Route::get('/reportes/export/kardex', [WorkshopExportController::class, 'kardexProductCsv'])->name('reports.export.kardex');
         Route::get('/ordenes/{order}/pdf/os', [WorkshopReportController::class, 'serviceOrderPdf'])->name('pdf.order');
+        Route::get('/ordenes/{order}/pdf/cotizacion-correctiva', [WorkshopReportController::class, 'serviceQuotationPdf'])->name('pdf.corrective-quote');
         Route::get('/ordenes/{order}/pdf/activacion', [WorkshopReportController::class, 'activationPdf'])->name('pdf.activation');
         Route::get('/ordenes/{order}/pdf/pdi', [WorkshopReportController::class, 'pdiPdf'])->name('pdf.pdi');
         Route::get('/ordenes/{order}/pdf/mantenimiento', [WorkshopReportController::class, 'maintenancePdf'])->name('pdf.maintenance');
         Route::get('/ordenes/{order}/pdf/repuestos', [WorkshopReportController::class, 'partsSummaryPdf'])->name('pdf.parts');
         Route::get('/ordenes/{order}/pdf/venta-interna', [WorkshopReportController::class, 'internalSalePdf'])->name('pdf.internal-sale');
+        Route::get('/ordenes/{order}/pdf/orden-compra', [WorkshopReportController::class, 'purchaseOrderPdf'])->name('maintenance-board.purchase-order.pdf');
         Route::post('/ordenes/{order}/pdf/os/guardar', [WorkshopReportController::class, 'saveOrderPdfSnapshot'])->name('pdf.order.save');
     });
 });

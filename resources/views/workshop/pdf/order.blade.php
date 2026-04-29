@@ -176,8 +176,7 @@
 @endphp
 
 <div class="page-title">
-    <h1>ORDEN DE SERVICIO</h1>
- 
+    <h1>{{ ($order->service_type === 'correctivo' && $order->status === 'draft') ? 'COTIZACIÓN' : 'ORDEN DE SERVICIO' }}</h1>
 </div>
 
 <table class="row-2">

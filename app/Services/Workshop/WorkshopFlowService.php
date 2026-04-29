@@ -50,10 +50,11 @@ class WorkshopFlowService
         'draft' => ['diagnosis', 'cancelled'],
         'diagnosis' => ['awaiting_approval', 'cancelled'],
         'awaiting_approval' => ['approved', 'diagnosis', 'cancelled'],
-        'approved' => ['in_progress', 'cancelled'],
-        'in_progress' => ['paused', 'finished', 'cancelled'],
+        'approved' => ['in_progress', 'in_progress_external', 'cancelled'],
+        'in_progress' => ['paused', 'finished', 'cancelled', 'in_progress_external'],
+        'in_progress_external' => ['approved', 'in_progress', 'finished', 'cancelled'],
         'paused' => ['in_progress', 'cancelled'],
-        'finished' => ['delivered', 'cancelled'],
+        'finished' => ['delivered', 'cancelled', 'in_progress_external'],
         'delivered' => [],
         'cancelled' => [],
     ];
@@ -138,6 +139,9 @@ class WorkshopFlowService
                 'tax' => 0,
                 'total' => 0,
                 'paid_total' => 0,
+                'service_type' => $data['service_type'] ?? 'preventivo',
+                'corrective_phase' => $data['corrective_phase'] ?? null,
+                'corrective_reception_at' => $data['corrective_reception_at'] ?? null,
             ]);
 
             if (!empty($data['previous_workshop_movement_id'])) {
@@ -222,7 +226,11 @@ class WorkshopFlowService
                 'observations' => $data['observations'] ?? $order->observations,
                 'paused_at' => array_key_exists('paused_at', $data) ? $data['paused_at'] : $order->paused_at,
                 'total_paused_minutes' => array_key_exists('total_paused_minutes', $data) ? $data['total_paused_minutes'] : $order->total_paused_minutes,
+                'last_status' => $data['last_status'] ?? $order->last_status,
+                'finished_photo_path' => $data['finished_photo_path'] ?? $order->finished_photo_path,
+                'service_type' => $data['service_type'] ?? $order->service_type,
             ];
+
 
             $order->update($updateData);
             $this->audit((int) $order->id, $userId, 'OS_UPDATED', ['data' => $updateData]);
@@ -297,6 +305,7 @@ class WorkshopFlowService
                 'total' => round($net, 6),
                 'technician_person_id' => $data['technician_person_id'] ?? null,
                 'validity_months' => $data['validity_months'] ?? null,
+                'is_terciarizado' => (bool) ($data['is_terciarizado'] ?? false),
             ]);
 
             $this->recalculateOrderTotals($order);
@@ -398,6 +407,7 @@ class WorkshopFlowService
                 'total' => round($net, 6),
                 'technician_person_id' => $data['technician_person_id'] ?? $detail->technician_person_id,
                 'validity_months' => array_key_exists('validity_months', $data) ? $data['validity_months'] : $detail->validity_months,
+                'is_terciarizado' => (bool) ($data['is_terciarizado'] ?? $detail->is_terciarizado),
             ]);
 
             $this->recalculateOrderTotals($order);

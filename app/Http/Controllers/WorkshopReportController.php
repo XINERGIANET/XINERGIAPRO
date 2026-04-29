@@ -223,7 +223,130 @@ class WorkshopReportController extends Controller
         ]);
     }
 
-    public function activationPdf(WorkshopMovement $order)
+    public function serviceQuotationPdf(\App\Models\WorkshopMovement $order)
+    {
+        $this->assertOrderScope($order);
+        $order->loadMissing([
+            'movement',
+            'vehicle',
+            'client',
+            'branch.company',
+            'branch.location.parent',
+            'details.product',
+            'details.service',
+            'details.technician',
+            'technicians.technician',
+        ]);
+
+        $branch = $order->branch instanceof \App\Models\Branch ? $order->branch : \App\Models\Branch::query()->with('company', 'location.parent')->find($order->branch_id);
+        $terms = is_array($order->quotation_commercial_terms ?? null) ? $order->quotation_commercial_terms : [];
+
+        $serviceLines = $order->details->filter(function ($d) {
+            $t = strtoupper((string) $d->line_type);
+            return $t === 'SERVICE' || $t === 'LABOR';
+        })->values();
+        $partLines = $order->details->filter(fn ($d) => strtoupper((string) $d->line_type) === 'PART')->values();
+
+        $subtotalServices = (float) $serviceLines->sum(fn ($d) => (float) $d->total);
+        $subtotalParts = (float) $partLines->sum(fn ($d) => (float) $d->total);
+
+        $logoPath = \App\Support\WorkshopQuotationExcelExport::resolveBranchLogoPath($branch);
+        $logoFileUri = null;
+        if ($logoPath) {
+            $normalized = str_replace('\\', '/', $logoPath);
+            if (preg_match('/^[A-Za-z]:\//', $normalized)) {
+                $logoFileUri = 'file:///' . $normalized;
+            } else {
+                $logoFileUri = 'file://' . $normalized;
+            }
+        }
+
+        $cityName = trim((string) data_get($branch, 'location.parent.name', ''));
+        if ($cityName === '') {
+            $cityName = trim((string) ($branch?->location?->name ?? ''));
+        }
+        if ($cityName === '') {
+            $cityName = 'Lima';
+        }
+
+        $intake = $order->intake_date;
+        if ($intake) {
+            $dateLine = $cityName . ', ' . $intake->locale('es')->translatedFormat('d \d\e F \d\e\l Y');
+        } else {
+            $dateLine = $cityName . ', ' . now()->locale('es')->translatedFormat('d \d\e F \d\e\l Y');
+        }
+
+        $docNumber = 'N°' . (string) ($order->quotation_correlative ?: ($order->movement?->number ?? str_pad((string) $order->id, 5, '0', STR_PAD_LEFT)));
+
+        $branchDireccion = trim((string) data_get($branch, 'direccion', ''));
+        $branchAddress = trim((string) data_get($branch, 'address', ''));
+        $address = $branchDireccion !== '' ? $branchDireccion : $branchAddress;
+
+        $branchPhone = '';
+        foreach (['branch_phone', 'phone', 'telefono', 'tel'] as $key) {
+            if (array_key_exists($key, $terms) && trim((string) $terms[$key]) !== '') {
+                $branchPhone = trim((string) $terms[$key]);
+                break;
+            }
+        }
+        $branchEmail = '';
+        foreach (['branch_email', 'email', 'correo'] as $key) {
+            if (array_key_exists($key, $terms) && trim((string) $terms[$key]) !== '') {
+                $branchEmail = trim((string) $terms[$key]);
+                break;
+            }
+        }
+
+        $companyName = $branch?->company?->legal_name ?? $branch?->legal_name ?? 'Empresa';
+
+        $technicianNames = $order->technicians
+            ->map(fn ($row) => trim(($row->technician?->first_name ?? '') . ' ' . ($row->technician?->last_name ?? '')))
+            ->filter()
+            ->values();
+        $technicianLine = $technicianNames->isNotEmpty() ? $technicianNames->implode(', ') : '';
+        
+        $quotation = $order;
+
+        $viewData = compact(
+            'quotation',
+            'branch',
+            'terms',
+            'serviceLines',
+            'partLines',
+            'subtotalServices',
+            'subtotalParts',
+            'logoFileUri',
+            'dateLine',
+            'docNumber',
+            'address',
+            'branchPhone',
+            'branchEmail',
+            'companyName',
+            'technicianLine'
+        );
+
+        $html = view('workshop.pdf.corrective_quote', $viewData)->render();
+        $pdfBinary = $this->renderPdfWithWkhtmltopdf($html, 'A4', [
+            '--orientation', 'Portrait',
+            '--margin-top', '8',
+            '--margin-right', '8',
+            '--margin-bottom', '8',
+            '--margin-left', '8',
+        ]);
+
+        if ($pdfBinary === null) {
+            return view('workshop.pdf.corrective_quote', $viewData);
+        }
+
+        $safe = preg_replace('/[^A-Za-z0-9_-]+/', '_', (string) ($order->quotation_correlative ?: $order->id)) ?? 'cotizacion';
+
+        return response($pdfBinary, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="liquidacion-servicio-' . $safe . '.pdf"',
+        ]);
+    }
+
+    public function activationPdf(\App\Models\WorkshopMovement $order)
     {
         $this->assertOrderScope($order);
         $order->load(['movement', 'vehicle', 'client', 'checklists.items']);
@@ -250,9 +373,107 @@ class WorkshopReportController extends Controller
     public function partsSummaryPdf(WorkshopMovement $order)
     {
         $this->assertOrderScope($order);
-        $order->load(['movement', 'vehicle', 'client', 'details.product', 'details.warehouseMovement']);
+        $order->loadMissing([
+            'movement',
+            'vehicle',
+            'client',
+            'branch.company',
+            'branch.location.parent',
+            'details.product',
+            'details.warehouseMovement',
+            'technicians.technician',
+        ]);
 
-        return view('workshop.pdf.parts_summary', compact('order'));
+        $branch = $order->branch instanceof \App\Models\Branch ? $order->branch : \App\Models\Branch::query()->with('company', 'location.parent')->find($order->branch_id);
+        $terms = is_array($order->quotation_commercial_terms ?? null) ? $order->quotation_commercial_terms : [];
+
+        $partLines = $order->details->filter(fn ($d) => strtoupper((string) $d->line_type) === 'PART')->values();
+        $subtotalParts = (float) $partLines->sum(fn ($d) => (float) $d->total);
+
+        $logoPath = \App\Support\WorkshopQuotationExcelExport::resolveBranchLogoPath($branch);
+        $logoFileUri = null;
+        if ($logoPath) {
+            $normalized = str_replace('\\', '/', $logoPath);
+            if (preg_match('/^[A-Za-z]:\//', $normalized)) {
+                $logoFileUri = 'file:///' . $normalized;
+            } else {
+                $logoFileUri = 'file://' . $normalized;
+            }
+        }
+
+        $cityName = trim((string) data_get($branch, 'location.parent.name', ''));
+        if ($cityName === '') {
+            $cityName = trim((string) ($branch?->location?->name ?? ''));
+        }
+        if ($cityName === '') {
+            $cityName = 'Lima';
+        }
+
+        $dateLine = $cityName . ', ' . now()->locale('es')->translatedFormat('d \d\e F \d\e\l Y');
+
+        $docNumber = 'N°' . (string) ($order->movement?->number ?? str_pad((string) $order->id, 5, '0', STR_PAD_LEFT));
+
+        $branchDireccion = trim((string) data_get($branch, 'direccion', ''));
+        $branchAddress = trim((string) data_get($branch, 'address', ''));
+        $address = $branchDireccion !== '' ? $branchDireccion : $branchAddress;
+
+        $branchPhone = '';
+        foreach (['branch_phone', 'phone', 'telefono', 'tel'] as $key) {
+            if (array_key_exists($key, $terms) && trim((string) $terms[$key]) !== '') {
+                $branchPhone = trim((string) $terms[$key]);
+                break;
+            }
+        }
+        $branchEmail = '';
+        foreach (['branch_email', 'email', 'correo'] as $key) {
+            if (array_key_exists($key, $terms) && trim((string) $terms[$key]) !== '') {
+                $branchEmail = trim((string) $terms[$key]);
+                break;
+            }
+        }
+
+        $companyName = $branch?->company?->legal_name ?? $branch?->legal_name ?? 'Empresa';
+
+        $technicianNames = $order->technicians
+            ->map(fn ($row) => trim(($row->technician?->first_name ?? '') . ' ' . ($row->technician?->last_name ?? '')))
+            ->filter()
+            ->values();
+        $technicianLine = $technicianNames->isNotEmpty() ? $technicianNames->implode(', ') : '';
+
+        $viewData = compact(
+            'order',
+            'branch',
+            'partLines',
+            'subtotalParts',
+            'logoFileUri',
+            'dateLine',
+            'docNumber',
+            'address',
+            'branchPhone',
+            'branchEmail',
+            'companyName',
+            'technicianLine'
+        );
+
+        $html = view('workshop.pdf.parts_summary', $viewData)->render();
+        $pdfBinary = $this->renderPdfWithWkhtmltopdf($html, 'A4', [
+            '--orientation', 'Portrait',
+            '--margin-top', '8',
+            '--margin-right', '8',
+            '--margin-bottom', '8',
+            '--margin-left', '8',
+        ]);
+
+        if ($pdfBinary === null) {
+            return view('workshop.pdf.parts_summary', $viewData);
+        }
+
+        $safe = preg_replace('/[^A-Za-z0-9_-]+/', '_', (string) ($order->movement?->number ?: $order->id)) ?? 'repuestos';
+
+        return response($pdfBinary, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="resumen-repuestos-' . $safe . '.pdf"',
+        ]);
     }
 
     public function internalSalePdf(WorkshopMovement $order)
@@ -278,6 +499,32 @@ class WorkshopReportController extends Controller
         Storage::disk('local')->put($path, $html);
 
         return back()->with('status', 'Snapshot de PDF guardado en storage/app/' . $path);
+    }
+
+    public function purchaseOrderPdf(WorkshopMovement $order)
+    {
+        $this->assertOrderScope($order);
+        $order->load(['movement', 'vehicle', 'branch', 'details.product']);
+
+        $html = view('workshop.pdf.purchase_order', compact('order'))->render();
+        $pdfBinary = $this->renderPdfWithWkhtmltopdf($html, 'A4', [
+            '--orientation', 'Portrait',
+            '--margin-top', '8',
+            '--margin-right', '8',
+            '--margin-bottom', '8',
+            '--margin-left', '8',
+        ]);
+
+        if ($pdfBinary === null) {
+            return view('workshop.pdf.purchase_order', compact('order'));
+        }
+
+        $number = $order->movement?->number ?? ('os-' . $order->id);
+
+        return response($pdfBinary, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="orden-compra-repuestos-' . $number . '.pdf"',
+        ]);
     }
 
     private function assertOrderScope(WorkshopMovement $order): void

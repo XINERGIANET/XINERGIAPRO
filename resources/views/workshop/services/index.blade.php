@@ -102,7 +102,7 @@
                         <tr class="relative hover:z-[60] border-t border-gray-100 dark:border-gray-800 transition hover:bg-gray-50 dark:hover:bg-white/5">
                             <td class="px-3 py-3 text-sm text-center align-middle font-medium text-gray-800 dark:text-white/90">{{ $service->name }}</td>
                             <td class="px-3 py-3 text-sm text-center align-middle">
-                                <x-ui.badge variant="light" color="{{ $service->type === 'preventivo' ? 'success' : 'info' }}">
+                                <x-ui.badge variant="light" color="{{ $service->type === 'preventivo' ? 'success' : ($service->type === 'externo' ? 'warning' : 'info') }}">
                                     {{ ucfirst($service->type) }}
                                 </x-ui.badge>
                             </td>
@@ -322,7 +322,8 @@
         </div>
     </x-ui.modal>
 
-    <x-ui.modal x-data="{ open: false }" x-on:open-service-modal.window="open = true" :isOpen="false" :showCloseButton="false" class="max-w-4xl">
+    <x-ui.modal x-on:open-service-modal.window="open = true" 
+                :isOpen="false" :showCloseButton="false" class="max-w-4xl">
         <div class="p-6 sm:p-8">
             <div class="mb-6 flex items-center justify-between">
                 <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Registrar servicio</h3>
@@ -334,7 +335,8 @@
             <form method="POST"
                 action="{{ route('workshop.services.store') }}"
                 class="grid grid-cols-1 gap-5 md:grid-cols-3"
-                x-data="workshopServicePriceTierForm(@js(old('price_tiers', [['max_cc' => '', 'price' => '']])))">
+                x-data="workshopServicePriceTierForm(@js(old('price_tiers', [['max_cc' => '', 'price' => '']])))"
+                x-on:open-service-modal.window="serviceType = 'preventivo'">
                 @csrf
                 <div class="md:col-span-3">
                     <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Nombre del Servicio</label>
@@ -342,9 +344,10 @@
                 </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Tipo de Servicio</label>
-                    <select name="type" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" required>
+                    <select name="type" x-model="serviceType" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" required>
                         <option value="preventivo">Preventivo</option>
                         <option value="correctivo">Correctivo</option>
+                        <option value="externo">Externo</option>
                     </select>
                 </div>
                 <div>
@@ -366,6 +369,7 @@
                         <span>Usar multiplicador por km</span>
                     </label>
                 </div>
+
                 <div x-data="{ hasValidity: {{ old('has_validity') ? 'true' : 'false' }} }" class="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-5 rounded-2xl border border-gray-200 bg-emerald-50/30 p-4">
                     <div>
                         <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">¿Tiene vigencia?</label>
@@ -430,7 +434,8 @@
     </x-ui.modal>
 
     @foreach($services as $service)
-        <x-ui.modal x-data="{ open: false }" x-on:open-edit-service-modal.window="if ($event.detail === {{ $service->id }}) { open = true }" :isOpen="false" :showCloseButton="false" class="max-w-4xl">
+        <x-ui.modal x-on:open-edit-service-modal.window="if ($event.detail === {{ $service->id }}) { open = true }" 
+                    :isOpen="false" :showCloseButton="false" class="max-w-4xl">
             <div class="p-6 sm:p-8">
                 <div class="mb-6 flex items-center justify-between">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Editar servicio</h3>
@@ -442,7 +447,7 @@
                 <form method="POST"
                     action="{{ route('workshop.services.update', $service) }}"
                     class="grid grid-cols-1 gap-5 md:grid-cols-3"
-                    x-data="workshopServicePriceTierForm(@js($service->priceTiers->map(fn($tier) => ['max_cc' => (int) $tier->max_cc, 'price' => (float) $tier->price])->values()->all()))">
+                    x-data="workshopServicePriceTierForm(@js($service->priceTiers->map(fn($tier) => ['max_cc' => (int) $tier->max_cc, 'price' => (float) $tier->price])->values()->all()), @js($service->type))">
                     @csrf
                     @method('PUT')
                     <div class="md:col-span-3">
@@ -451,14 +456,11 @@
                     </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Tipo de Servicio</label>
-                        <x-form.select-autocomplete
-                            name="type"
-                            :value="$service->type"
-                            :options="[['value' => 'preventivo', 'label' => 'Preventivo'], ['value' => 'correctivo', 'label' => 'Correctivo']]"
-                            placeholder="Tipo"
-                            :required="true"
-                            inputClass="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none"
-                        />
+                        <select name="type" x-model="serviceType" class="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none" required>
+                            <option value="preventivo">Preventivo</option>
+                            <option value="correctivo">Correctivo</option>
+                            <option value="externo">Externo</option>
+                        </select>
                     </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">Precio Base / sin cilindrada (S/)</label>
@@ -509,6 +511,7 @@
                             inputClass="h-11 w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 text-sm transition-all focus:border-brand-500 focus:ring-brand-500/10 focus:outline-none"
                         />
                     </div>
+
                     <div class="md:col-span-3 rounded-2xl border border-gray-200 bg-gray-50/60 p-4">
                         <div class="mb-3 flex items-center justify-between gap-3">
                             <div>
@@ -557,9 +560,10 @@
 </div>
 
 <script>
-    function workshopServicePriceTierForm(initialRows = []) {
+    function workshopServicePriceTierForm(initialRows = [], initialServiceType = 'preventivo') {
         return {
             rows: [],
+            serviceType: initialServiceType,
             init() {
                 const seededRows = Array.isArray(initialRows) ? initialRows : [];
                 this.rows = seededRows.length
