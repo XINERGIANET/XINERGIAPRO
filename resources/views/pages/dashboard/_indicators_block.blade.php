@@ -168,13 +168,30 @@
     @push('scripts')
     <script>
     (function () {
-        const Apex = typeof window !== 'undefined' ? window.ApexCharts : null;
-        if (!Apex) return;
-
         const payload = @json($ic ?? []);
         const techProd = @json($techRows->values()->take(12)->values() ?? []);
 
         const chartStore = {};
+
+        function apexCtor() {
+            return typeof window !== 'undefined' ? window.ApexCharts : null;
+        }
+
+        function bootWhenApex(callback) {
+            var tries = 0;
+            function tick() {
+                var Ctor = apexCtor();
+                if (Ctor) {
+                    callback();
+                    return;
+                }
+                tries += 1;
+                if (tries < 120) {
+                    window.setTimeout(tick, 25);
+                }
+            }
+            tick();
+        }
 
         function baseOpts() {
             return {
@@ -210,6 +227,8 @@
         }
 
         function mountMonthlySales() {
+            var ApexCharts = apexCtor();
+            if (!ApexCharts) return;
             const el = document.querySelector('#indicator-chart-monthly-sales');
             if (!el || chartStore.monthly) return;
             const categories = payload.month_labels || [];
@@ -229,6 +248,8 @@
         }
 
         function mountClients() {
+            var ApexCharts = apexCtor();
+            if (!ApexCharts) return;
             const el = document.querySelector('#indicator-chart-clients');
             if (!el || chartStore.clients) return;
             const labels = payload.clients_labels || [];
@@ -243,6 +264,8 @@
         }
 
         function mountTrend() {
+            var ApexCharts = apexCtor();
+            if (!ApexCharts) return;
             const el = document.querySelector('#indicator-chart-trend');
             if (!el || chartStore.trend) return;
             const lbl = payload.trend_labels || [];
@@ -271,6 +294,8 @@
         }
 
         function mountExpense() {
+            var ApexCharts = apexCtor();
+            if (!ApexCharts) return;
             const el = document.querySelector('#indicator-chart-expense');
             if (!el || chartStore.expense) return;
             const labels = payload.expense_labels || [];
@@ -288,6 +313,8 @@
         }
 
         function mountTech() {
+            var ApexCharts = apexCtor();
+            if (!ApexCharts) return;
             const el = document.querySelector('#indicator-chart-tech');
             if (!el || chartStore.tech) return;
             if (!techProd || !techProd.length) return;
@@ -320,6 +347,8 @@
         }
 
         function mountProducts() {
+            var ApexCharts = apexCtor();
+            if (!ApexCharts) return;
             const el = document.querySelector('#indicator-chart-products');
             if (!el || chartStore.products) return;
             chartStore.products = new ApexCharts(el, Object.assign({}, baseOpts(), {
@@ -333,25 +362,47 @@
         }
 
         window.__drawIndicatorTab = function (slug) {
-            if (slug === 'clients') mountClients();
-            if (slug === 'trend') mountTrend();
-            if (slug === 'expense') mountExpense();
-            if (slug === 'ops') {
-                mountTech();
-                mountProducts();
-            }
-            setTimeout(function () {
-                ['monthly', 'clients', 'trend', 'expense', 'tech', 'products'].forEach(function (k) {
-                    if (chartStore[k]) {
-                        chartStore[k].updateOptions({});
-                    }
-                });
-            }, 120);
+            bootWhenApex(function () {
+                if (slug === 'clients') mountClients();
+                if (slug === 'trend') mountTrend();
+                if (slug === 'expense') mountExpense();
+                if (slug === 'ops') {
+                    mountTech();
+                    mountProducts();
+                }
+                window.setTimeout(function () {
+                    var keys = ['monthly', 'clients', 'trend', 'expense', 'tech', 'products'];
+                    keys.forEach(function (k) {
+                        var ch = chartStore[k];
+                        if (ch && typeof ch.resize === 'function') ch.resize();
+                    });
+                }, 120);
+            });
         };
 
-        document.addEventListener('DOMContentLoaded', function () {
-            mountMonthlySales();
-        });
+        function bootFirstSeries() {
+            bootWhenApex(function () {
+                mountMonthlySales();
+                window.requestAnimationFrame(function () {
+                    window.requestAnimationFrame(function () {
+                        if (chartStore.monthly && typeof chartStore.monthly.resize === 'function') {
+                            chartStore.monthly.resize();
+                        }
+                        window.setTimeout(function () {
+                            if (chartStore.monthly && typeof chartStore.monthly.resize === 'function') {
+                                chartStore.monthly.resize();
+                            }
+                        }, 160);
+                    });
+                });
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', bootFirstSeries);
+        document.addEventListener('turbo:load', bootFirstSeries);
+        if (document.readyState !== 'loading') {
+            bootFirstSeries();
+        }
     })();
     </script>
     @endpush
