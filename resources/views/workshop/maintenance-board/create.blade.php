@@ -804,15 +804,28 @@
             this.quickClient.location_id = '';
         },
         initQuickClientLocationDefaults() {
-            if (!String(this.quickClient.department_id || '').trim()) {
-                this.quickClient.department_id = @js((string) ($selectedDepartmentId ?? ''));
+            let departmentId = String(this.quickClient.department_id || @js((string) ($selectedDepartmentId ?? '')) || '').trim();
+            let provinceId = String(this.quickClient.province_id || @js((string) ($selectedProvinceId ?? '')) || '').trim();
+            let districtId = String(this.quickClient.location_id || @js((string) ($selectedDistrictId ?? '')) || '').trim();
+
+            if (!departmentId && this.branchDepartmentName) {
+                const department = this.findDepartmentByName(this.branchDepartmentName);
+                departmentId = department ? String(department.id) : '';
             }
-            if (!String(this.quickClient.province_id || '').trim()) {
-                this.quickClient.province_id = @js((string) ($selectedProvinceId ?? ''));
+
+            if (!provinceId && departmentId && this.branchProvinceName) {
+                const province = this.findProvinceByName(this.branchProvinceName, departmentId);
+                provinceId = province ? String(province.id) : '';
             }
-            if (!String(this.quickClient.location_id || '').trim()) {
-                this.quickClient.location_id = @js((string) ($selectedDistrictId ?? ''));
+
+            if (!districtId && provinceId && this.branchDistrictName) {
+                const district = this.findDistrictByName(this.branchDistrictName, provinceId);
+                districtId = district ? String(district.id) : '';
             }
+
+            this.quickClient.department_id = departmentId;
+            this.quickClient.province_id = provinceId;
+            this.quickClient.location_id = districtId;
         },
         isQuickClientRuc() {
             return String(this.quickClient.person_type || '').toUpperCase() === 'RUC';
@@ -1936,7 +1949,7 @@
 
                 <div x-show="quickClientError" class="mb-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700" x-text="quickClientError"></div>
 
-                <form @submit.prevent="saveQuickClient()" class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                <form @submit.prevent="saveQuickClient()" x-init="$nextTick(() => initQuickClientLocationDefaults())" class="grid grid-cols-1 gap-4 md:grid-cols-4">
                     <div>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700">Tipo de persona</label>
                         <select x-model="quickClient.person_type" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
@@ -2021,7 +2034,11 @@
                         <select x-model="quickClient.department_id" @change="onClientDepartmentChange()" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
                             <option value="">Seleccione departamento</option>
                             <template x-for="department in departments" :key="department.id">
-                                <option :value="String(department.id)" x-text="department.name"></option>
+                                <option
+                                    :value="String(department.id)"
+                                    :selected="String(department.id) === String(quickClient.department_id || '')"
+                                    x-text="department.name"
+                                ></option>
                             </template>
                         </select>
                     </div>
@@ -2030,7 +2047,11 @@
                         <select x-model="quickClient.province_id" @change="onClientProvinceChange()" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
                             <option value="">Seleccione provincia</option>
                             <template x-for="province in filteredProvinces" :key="province.id">
-                                <option :value="String(province.id)" x-text="province.name"></option>
+                                <option
+                                    :value="String(province.id)"
+                                    :selected="String(province.id) === String(quickClient.province_id || '')"
+                                    x-text="province.name"
+                                ></option>
                             </template>
                         </select>
                     </div>
@@ -2039,7 +2060,11 @@
                         <select x-model="quickClient.location_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
                             <option value="">Seleccione distrito</option>
                             <template x-for="district in filteredDistricts" :key="district.id">
-                                <option :value="String(district.id)" x-text="district.name"></option>
+                                <option
+                                    :value="String(district.id)"
+                                    :selected="String(district.id) === String(quickClient.location_id || '')"
+                                    x-text="district.name"
+                                ></option>
                             </template>
                         </select>
                     </div>
