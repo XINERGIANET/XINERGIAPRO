@@ -183,6 +183,7 @@
         inventoryItemsByVehicleType: @js($inventoryItemsByVehicleType ?? []),
         inventoryChecks: @js($inventoryForUi),
         selectedVehicleTypeId: '',
+        showInventory: @js($showInventoryDefault ?? true),
         showDamagesPreexisting: @js($showDamagesPreexistingDefault ?? true),
         diagnosisText: @js($diagnosisDefault),
         serviceType: @js($serviceType ?? 'preventivo'),
@@ -350,6 +351,7 @@
             this.vehicleDropdownOpen = true;
             if (!String(this.vehicleSearch || '').trim()) {
                 this.selectedVehicleId = '';
+                this.selectedVehicleTypeId = '';
                 this.selectedClientId = '';
                 this.refreshServiceLinePrices();
             }
@@ -906,6 +908,7 @@
                 this.vehicles[0].display_label = `${payload.label || `Vehiculo #${payload.id}`}${quickClientName ? ` (Cliente: ${quickClientName})` : ''}`;
                 this.selectedVehicleId = String(payload.id);
                 this.selectedClientId = payload.client_person_id ? String(payload.client_person_id) : this.selectedClientId;
+                this.selectedVehicleTypeId = payload.vehicle_type_id ? String(payload.vehicle_type_id) : String(this.quickVehicle.vehicle_type_id || '');
                 this.mileageIn = payload.km ? String(payload.km) : this.mileageIn;
                 this.vehicleSearch = this.vehicles[0].display_label || payload.label || '';
                 this.refreshVehicleFilter();

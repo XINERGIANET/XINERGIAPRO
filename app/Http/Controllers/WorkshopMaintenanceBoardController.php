@@ -552,39 +552,11 @@ class WorkshopMaintenanceBoardController extends Controller
             }
         }
 
-        $showInventoryDefault = true;
-        $showInventoryBaseParameter = DB::table('parameters')
-            ->where('description', 'Mostrar inventario')
-            ->first();
-
-        if ($showInventoryBaseParameter) {
-            $showInventoryBranchValue = DB::table('branch_parameters')
-                ->where('parameter_id', $showInventoryBaseParameter->id)
-                ->where('branch_id', $branchId)
-                ->whereNull('deleted_at')
-                ->value('value');
-
-            $rawValue = $showInventoryBranchValue ?? $showInventoryBaseParameter->value;
-            $normalized = strtoupper(trim((string) $rawValue));
-            $showInventoryDefault = in_array($normalized, ['1', 'TRUE', 'YES', 'SI', 'S'], true);
-        }
-
-        $showDamagesPreexistingDefault = true;
-        $showDamagesPreexistingBaseParameter = DB::table('parameters')
-            ->where('description', 'Mostrar daÃ±os preexistentes')
-            ->first();
-
-        if ($showDamagesPreexistingBaseParameter) {
-            $showDamagesPreexistingBranchValue = DB::table('branch_parameters')
-                ->where('parameter_id', $showDamagesPreexistingBaseParameter->id)
-                ->where('branch_id', $branchId)
-                ->whereNull('deleted_at')
-                ->value('value');
-
-            $rawValue = $showDamagesPreexistingBranchValue ?? $showDamagesPreexistingBaseParameter->value;
-            $normalized = strtoupper(trim((string) $rawValue));
-            $showDamagesPreexistingDefault = in_array($normalized, ['1', 'TRUE', 'YES', 'SI', 'S'], true);
-        }
+        $showInventoryDefault = $this->branchBooleanParameter($branchId, 'Mostrar inventario', true);
+        $showDamagesPreexistingDefault = $this->branchBooleanParameter($branchId, [
+            'Mostrar daños preexistentes',
+            'Mostrar daÃ±os preexistentes',
+        ], true);
 
         return compact(
             'vehicles',
@@ -631,6 +603,52 @@ class WorkshopMaintenanceBoardController extends Controller
         $val = strtolower(trim((string) ($branchValue ?? $parameter->value)));
 
         return in_array($val, ['si', 'yes', 'true', '1'], true);
+    }
+
+    private function branchBooleanParameter(int $branchId, string|array $descriptions, bool $default = true): bool
+    {
+        $descriptions = (array) $descriptions;
+
+        $parameter = DB::table('parameters')
+            ->whereNull('deleted_at')
+            ->where(function ($query) use ($descriptions) {
+                foreach ($descriptions as $description) {
+                    $query->orWhere('description', $description);
+                }
+            })
+            ->first();
+
+        if (!$parameter) {
+            return $default;
+        }
+
+        $branchValue = DB::table('branch_parameters')
+            ->where('parameter_id', $parameter->id)
+            ->where('branch_id', $branchId)
+            ->whereNull('deleted_at')
+            ->value('value');
+
+        return $this->booleanParameterValue($branchValue ?? $parameter->value, $default);
+    }
+
+    private function booleanParameterValue(mixed $value, bool $default): bool
+    {
+        if ($value === null) {
+            return $default;
+        }
+
+        $normalized = strtoupper(trim((string) $value));
+        $normalized = str_replace(['Í', 'í'], 'I', $normalized);
+
+        if (in_array($normalized, ['1', 'TRUE', 'YES', 'SI', 'S'], true)) {
+            return true;
+        }
+
+        if (in_array($normalized, ['0', 'FALSE', 'NO', 'N'], true)) {
+            return false;
+        }
+
+        return $default;
     }
 
     private function isCorrectiveServiceEnabled(int $branchId): bool
@@ -1398,6 +1416,7 @@ class WorkshopMaintenanceBoardController extends Controller
         return response()->json([
             'id' => $vehicle->id,
             'client_person_id' => (int) $vehicle->client_person_id,
+            'vehicle_type_id' => (int) $vehicle->vehicle_type_id,
             'label' => trim($vehicle->brand . ' ' . $vehicle->model . ' ' . ($vehicle->plate ? ('- ' . $vehicle->plate) : '')),
             'km' => (int) ($vehicle->current_mileage ?? 0),
             'engine_displacement_cc' => $vehicle->engine_displacement_cc ? (int) $vehicle->engine_displacement_cc : null,
@@ -2773,5 +2792,3 @@ class WorkshopMaintenanceBoardController extends Controller
             ->with('status', 'Solicitud de repuestos registrada correctamente y fase avanzada.');
     }
 }
-
-
