@@ -1482,7 +1482,16 @@
                     </div>
                     <textarea name="observations" rows="3" class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-3" placeholder="Observaciones">{{ old('observations', optional($editingOrder)->observations ?? '') }}</textarea>
 
-                    <div class="rounded-xl border border-gray-200 bg-white p-4 md:col-span-3" x-show="serviceType !== 'correctivo'" x-cloak @if(($serviceType ?? 'preventivo') === 'correctivo') style="display: none;" @endif>
+                    <div
+                        x-data="{
+                            showInventory: @js($showInventoryDefault ?? true),
+                            showDamagesPreexisting: @js($showDamagesPreexistingDefault ?? true)
+                        }"
+                        class="rounded-xl border border-gray-200 bg-white p-4 md:col-span-3"
+                        x-show="serviceType !== 'correctivo'"
+                        x-cloak
+                        @if(($serviceType ?? 'preventivo') === 'correctivo') style="display: none;" @endif
+                    >
                         <div class="mb-3">
                             <label class="inline-flex items-center gap-2 text-sm font-semibold text-gray-700">
                                 <input type="checkbox" x-model="showInventory" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
