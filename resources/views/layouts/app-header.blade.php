@@ -57,8 +57,14 @@
                     ->where('bp.branch_id', $branchId > 0 ? $branchId : 1)
                     ->where('p.description', 'Días para notificar próximo servicio')
                     ->value('bp.value');
+
+                $acceptRevisionNotif = \Illuminate\Support\Facades\DB::table('branch_parameters as bp')
+                    ->join('parameters as p', 'p.id', '=', 'bp.parameter_id')
+                    ->where('bp.branch_id', $branchId > 0 ? $branchId : 1)
+                    ->where('p.description', 'Aceptas notificacion de revision tecnica?')
+                    ->value('bp.value');
                     
-                if (is_null($notifMonths) || is_null($notifDays)) {
+                if (is_null($notifMonths) || is_null($notifDays) || is_null($acceptRevisionNotif)) {
                     try {
                         $categoryId = \Illuminate\Support\Facades\DB::table('parameter_categories')->whereRaw('UPPER(description) = ?', ['TALLER'])->value('id');
                         if (!$categoryId) {
@@ -93,6 +99,24 @@
                             \Illuminate\Support\Facades\DB::table('branch_parameters')->insert([
                                 'parameter_id' => $pId2, 'branch_id' => $bIdToUse, 'value' => '0', 'created_at' => now(), 'updated_at' => now()
                             ]);
+                        }
+                        
+                        // parameter Revision Tecnica
+                        $pId3 = \Illuminate\Support\Facades\DB::table('parameters')->where('description', 'Aceptas notificacion de revision tecnica?')->value('id');
+                        if (!$pId3) {
+                            $pId3 = \Illuminate\Support\Facades\DB::table('parameters')->insertGetId([
+                                'description' => 'Aceptas notificacion de revision tecnica?', 'value' => 'Si', 'status' => 1, 'parameter_category_id' => $categoryId, 'created_at' => now(), 'updated_at' => now()
+                            ]);
+                        }
+                        $existingBp3 = \Illuminate\Support\Facades\DB::table('branch_parameters')->where('parameter_id', $pId3)->where('branch_id', $bIdToUse)->first();
+                        if (!$existingBp3) {
+                            \Illuminate\Support\Facades\DB::table('branch_parameters')->insert([
+                                'parameter_id' => $pId3, 'branch_id' => $bIdToUse, 'value' => 'Si', 'created_at' => now(), 'updated_at' => now()
+                            ]);
+                        }
+                        
+                        if (is_null($acceptRevisionNotif)) {
+                            $acceptRevisionNotif = 'Si';
                         }
                     } catch (\Throwable $e) {}
                 }
@@ -147,7 +171,11 @@
                     
                 // Safe query handling in case table is not migrated yet
                 try {
-                    $expiringVehicles = collect($expiringVehiclesQuery->get());
+                    if (strtolower(trim((string)$acceptRevisionNotif)) === 'no') {
+                        $expiringVehicles = collect([]);
+                    } else {
+                        $expiringVehicles = collect($expiringVehiclesQuery->get());
+                    }
                     $recommendedVehicles = collect($recommendedVehiclesQuery->get());
                     $upcomingAppointments = collect($upcomingAppointmentsQuery->get());
                     
