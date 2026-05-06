@@ -151,9 +151,9 @@
             phone: '',
             email: '',
             address: '-',
-            location_id: @js($selectedDistrictId ?? ''),
-            department_id: @js($selectedDepartmentId ?? ''),
-            province_id: @js($selectedProvinceId ?? ''),
+            location_id: @js((string) ($selectedDistrictId ?? '')),
+            department_id: @js((string) ($selectedDepartmentId ?? '')),
+            province_id: @js((string) ($selectedProvinceId ?? '')),
             genero: '',
             fecha_nacimiento: ''
         },
@@ -803,6 +803,17 @@
         onClientProvinceChange() {
             this.quickClient.location_id = '';
         },
+        initQuickClientLocationDefaults() {
+            if (!String(this.quickClient.department_id || '').trim()) {
+                this.quickClient.department_id = @js((string) ($selectedDepartmentId ?? ''));
+            }
+            if (!String(this.quickClient.province_id || '').trim()) {
+                this.quickClient.province_id = @js((string) ($selectedProvinceId ?? ''));
+            }
+            if (!String(this.quickClient.location_id || '').trim()) {
+                this.quickClient.location_id = @js((string) ($selectedDistrictId ?? ''));
+            }
+        },
         isQuickClientRuc() {
             return String(this.quickClient.person_type || '').toUpperCase() === 'RUC';
         },
@@ -977,9 +988,9 @@
                     phone: '',
                     email: '',
                     address: '-',
-                    location_id: @js($selectedDistrictId ?? ''),
-                    department_id: @js($selectedDepartmentId ?? ''),
-                    province_id: @js($selectedProvinceId ?? ''),
+                    location_id: @js((string) ($selectedDistrictId ?? '')),
+                    department_id: @js((string) ($selectedDepartmentId ?? '')),
+                    province_id: @js((string) ($selectedProvinceId ?? '')),
                     genero: '',
                     fecha_nacimiento: ''
                 };
@@ -1914,7 +1925,7 @@
                 </div>
             </form>
         </x-common.component-card>
-        <x-ui.modal x-data="{ open: false }" x-on:open-client-modal.window="open = true" x-on:close-client-modal.window="open = false" :isOpen="false" :showCloseButton="false" class="max-w-6xl">
+        <x-ui.modal x-data="{ open: false }" x-on:open-client-modal.window="open = true; $nextTick(() => initQuickClientLocationDefaults())" x-on:close-client-modal.window="open = false" :isOpen="false" :showCloseButton="false" class="max-w-6xl">
             <div class="p-6 sm:p-8">
                 <div class="mb-6 flex items-center justify-between">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Registrar cliente</h3>
