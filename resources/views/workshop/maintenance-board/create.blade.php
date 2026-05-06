@@ -1113,14 +1113,14 @@
                     headers: { 'Accept': 'application/json' }
                 });
                 const payload = await response.json();
-                if (!response.ok || !payload?.status || !payload?.business_name) {
+                if (!response.ok || !payload?.status) {
                     throw new Error(payload?.message || 'No se encontro informacion para el RUC ingresado.');
                 }
                 this.quickClient.document_number = payload.ruc || ruc;
-                this.quickClient.first_name = payload.business_name || '';
+                this.quickClient.first_name = payload.legal_name || this.quickClient.first_name || '';
                 this.quickClient.last_name = '';
                 this.quickClient.genero = '';
-                this.quickClient.fecha_nacimiento = '';
+                this.quickClient.fecha_nacimiento = this.normalizeApiDate(payload?.raw?.fecha_inscripcion || '');
                 this.quickClient.address = payload.address || this.quickClient.address || '-';
                 this.applyQuickClientLocationFromLookup(payload);
             } catch (error) {
@@ -1914,7 +1914,7 @@
                 </div>
             </form>
         </x-common.component-card>
-        <x-ui.modal x-data="{ open: false }" x-on:open-client-modal.window="open = true" x-on:close-client-modal.window="open = false" :isOpen="false" :showCloseButton="false" class="max-w-4xl">
+        <x-ui.modal x-data="{ open: false }" x-on:open-client-modal.window="open = true" x-on:close-client-modal.window="open = false" :isOpen="false" :showCloseButton="false" class="max-w-6xl">
             <div class="p-6 sm:p-8">
                 <div class="mb-6 flex items-center justify-between">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Registrar cliente</h3>
