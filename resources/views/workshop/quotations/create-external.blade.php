@@ -50,14 +50,14 @@
         ])->values();
         $taxMap = $taxRates->mapWithKeys(fn ($tr) => [(string) $tr->id => (float) $tr->tax_rate])->all();
         $commercialDefaults = [
-            'quotation_delivery_time' => (string) ($quotation->quotation_commercial_terms['delivery_time'] ?? ''),
-            'quotation_offer_validity' => (string) ($quotation->quotation_commercial_terms['offer_validity'] ?? '5 dias habiles'),
-            'quotation_service_warranty' => (string) ($quotation->quotation_commercial_terms['service_warranty'] ?? ''),
-            'quotation_delivery_place' => (string) ($quotation->quotation_commercial_terms['delivery_place'] ?? 'Centro de servicio MOTOLAB GROUP SAC.'),
-            'quotation_prices_note' => (string) ($quotation->quotation_commercial_terms['prices_note'] ?? 'IGV Incluido'),
-            'quotation_payment_condition' => (string) ($quotation->quotation_commercial_terms['payment_condition'] ?? 'Deposito en cuenta'),
-            'quotation_bank_account_bcp' => (string) ($quotation->quotation_commercial_terms['bank_account_bcp'] ?? '30509057178051'),
-            'quotation_bank_cci' => (string) ($quotation->quotation_commercial_terms['bank_cci'] ?? '00230510905717805119'),
+            'quotation_delivery_time' => (string) ($quotation->quotation_commercial_terms['delivery_time'] ?? \App\Helpers\ParameterHelper::getBranchValue('Cotización: Tiempo de entrega', '')),
+            'quotation_offer_validity' => (string) ($quotation->quotation_commercial_terms['offer_validity'] ?? \App\Helpers\ParameterHelper::getBranchValue('Cotización: Validez de oferta', '5 dias habiles')),
+            'quotation_service_warranty' => (string) ($quotation->quotation_commercial_terms['service_warranty'] ?? \App\Helpers\ParameterHelper::getBranchValue('Cotización: Garantía de servicio', '')),
+            'quotation_delivery_place' => (string) ($quotation->quotation_commercial_terms['delivery_place'] ?? \App\Helpers\ParameterHelper::getBranchValue('Cotización: Lugar de entrega', 'Centro de servicio')),
+            'quotation_prices_note' => (string) ($quotation->quotation_commercial_terms['prices_note'] ?? \App\Helpers\ParameterHelper::getBranchValue('Cotización: Nota de precios', 'IGV Incluido')),
+            'quotation_payment_condition' => (string) ($quotation->quotation_commercial_terms['payment_condition'] ?? \App\Helpers\ParameterHelper::getBranchValue('Cotización: Condición de pago', 'Deposito en cuenta')),
+            'quotation_bank_account_bcp' => (string) ($quotation->quotation_commercial_terms['bank_account_bcp'] ?? \App\Helpers\ParameterHelper::getBranchValue('Cotización: Cuenta BCP', '')),
+            'quotation_bank_cci' => (string) ($quotation->quotation_commercial_terms['bank_cci'] ?? \App\Helpers\ParameterHelper::getBranchValue('Cotización: CCI', '')),
         ];
         $formAction = $isEdit
             ? route('admin.sales.quotations.update-external', $quotation)
