@@ -89,6 +89,16 @@
                 'amount' => (float) ($row['amount'] ?? 0),
             ];
         }
+
+        if ($points === []) {
+            $points[] = ['x' => 0, 'y' => 100];
+            $chartPoints[] = [
+                'x' => 0,
+                'y' => 100,
+                'label' => $rangeStart->format('d/m'),
+                'amount' => 0,
+            ];
+        }
         
         $path = "M " . $points[0]['x'] . " " . $points[0]['y'];
         for ($i = 0; $i < count($points) - 1; $i++) {
@@ -332,22 +342,20 @@
                                     </defs>
                                     <path d="{{ $areaPath }}" fill="url(#colorValueMain)" />
                                     <path d="{{ $path }}" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                                    <template x-if="activePoint">
-                                        <line :x1="activePoint.x" :x2="activePoint.x" y1="0" y2="100" stroke="#93c5fd" stroke-width="1" stroke-dasharray="3 3"></line>
-                                    </template>
-                                    <template x-for="(point, index) in points" :key="index">
+                                    <line x-show="activePoint" :x1="activePoint.x" :x2="activePoint.x" y1="0" y2="100" stroke="#93c5fd" stroke-width="1" stroke-dasharray="3 3"></line>
+                                    @foreach($chartPoints as $pointIndex => $point)
                                         <circle
-                                            :cx="point.x"
-                                            :cy="point.y"
-                                            :r="activeIndex === index ? 4.5 : 3"
-                                            :fill="activeIndex === index ? '#1d4ed8' : '#2563eb'"
+                                            cx="{{ $point['x'] }}"
+                                            cy="{{ $point['y'] }}"
+                                            :r="activeIndex === {{ $pointIndex }} ? 4.5 : 3"
+                                            :fill="activeIndex === {{ $pointIndex }} ? '#1d4ed8' : '#2563eb'"
                                             stroke="white"
                                             stroke-width="2"
                                             class="cursor-pointer transition-all duration-150"
-                                            @mouseenter="selectPoint(index)"
-                                            @click="selectPoint(index)">
+                                            @mouseenter="selectPoint({{ $pointIndex }})"
+                                            @click="selectPoint({{ $pointIndex }})">
                                         </circle>
-                                    </template>
+                                    @endforeach
                                 </svg>
                             </div>
                         </div>
@@ -356,16 +364,16 @@
                     <!-- Eje X (Dates) -->
                     <div class="border-t border-slate-50 pt-3 sm:pt-4">
                         <div class="flex gap-2 overflow-x-auto custom-scrollbar pb-1 sm:justify-between">
-                            <template x-for="(point, index) in points" :key="'label-' + index">
+                            @foreach($chartPoints as $pointIndex => $point)
                                 <button type="button"
                                     class="px-2.5 py-1 rounded-lg text-[10px] font-black tracking-tight whitespace-nowrap border transition-all"
-                                    :class="activeIndex === index
+                                    :class="activeIndex === {{ $pointIndex }}
                                         ? 'bg-blue-50 text-blue-700 border-blue-200'
                                         : 'bg-white text-slate-400 border-transparent hover:border-slate-200 hover:text-slate-600'"
-                                    @click="selectPoint(index)"
-                                    x-text="point.label">
+                                    @click="selectPoint({{ $pointIndex }})">
+                                    {{ $point['label'] }}
                                 </button>
-                            </template>
+                            @endforeach
                         </div>
                     </div>
                 </div>
