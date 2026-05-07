@@ -151,9 +151,9 @@
             phone: '',
             email: '',
             address: '-',
-            location_id: @js($selectedDistrictId ?? ''),
-            department_id: @js($selectedDepartmentId ?? ''),
-            province_id: @js($selectedProvinceId ?? ''),
+            location_id: @js((string) ($selectedDistrictId ?? '')),
+            department_id: @js((string) ($selectedDepartmentId ?? '')),
+            province_id: @js((string) ($selectedProvinceId ?? '')),
             genero: '',
             fecha_nacimiento: ''
         },
@@ -204,6 +204,13 @@
                     this.syncVehicle();
                 });
             }
+            this.$watch('quickClient.person_type', (value) => {
+                this.quickClientError = '';
+                if (String(value || '').toUpperCase() === 'RUC') {
+                    this.quickClient.last_name = '';
+                    this.quickClient.genero = '';
+                }
+            });
         },
         syncVehicle() {
             const selected = this.vehicles.find(v => String(v.id) === String(this.selectedVehicleId));
@@ -817,6 +824,33 @@
         onClientProvinceChange() {
             this.quickClient.location_id = '';
         },
+        initQuickClientLocationDefaults() {
+            let departmentId = String(this.quickClient.department_id || @js((string) ($selectedDepartmentId ?? '')) || '').trim();
+            let provinceId = String(this.quickClient.province_id || @js((string) ($selectedProvinceId ?? '')) || '').trim();
+            let districtId = String(this.quickClient.location_id || @js((string) ($selectedDistrictId ?? '')) || '').trim();
+
+            if (!departmentId && this.branchDepartmentName) {
+                const department = this.findDepartmentByName(this.branchDepartmentName);
+                departmentId = department ? String(department.id) : '';
+            }
+
+            if (!provinceId && departmentId && this.branchProvinceName) {
+                const province = this.findProvinceByName(this.branchProvinceName, departmentId);
+                provinceId = province ? String(province.id) : '';
+            }
+
+            if (!districtId && provinceId && this.branchDistrictName) {
+                const district = this.findDistrictByName(this.branchDistrictName, provinceId);
+                districtId = district ? String(district.id) : '';
+            }
+
+            this.quickClient.department_id = departmentId;
+            this.quickClient.province_id = provinceId;
+            this.quickClient.location_id = districtId;
+        },
+        isQuickClientRuc() {
+            return String(this.quickClient.person_type || '').toUpperCase() === 'RUC';
+        },
         resetQuickVehicle() {
             const fallbackClientId = this.resolveDefaultClientId();
             this.quickVehicle = {
@@ -988,9 +1022,9 @@
                     phone: '',
                     email: '',
                     address: '-',
-                    location_id: @js($selectedDistrictId ?? ''),
-                    department_id: @js($selectedDepartmentId ?? ''),
-                    province_id: @js($selectedProvinceId ?? ''),
+                    location_id: @js((string) ($selectedDistrictId ?? '')),
+                    department_id: @js((string) ($selectedDepartmentId ?? '')),
+                    province_id: @js((string) ($selectedProvinceId ?? '')),
                     genero: '',
                     fecha_nacimiento: ''
                 };
@@ -1018,6 +1052,68 @@
             }
             return this.splitName(String(payload?.name ?? payload?.nombre_completo ?? ''));
         },
+        normalizeApiDate(value) {
+            const raw = String(value || '').trim();
+            if (!raw) return '';
+            const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+            return match ? match[1] : '';
+        },
+        normalizeLocationText(value) {
+            return String(value || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .trim();
+        },
+        findDepartmentByName(name) {
+            const target = this.normalizeLocationText(name);
+            return this.departments.find(item => this.normalizeLocationText(item.name) === target) || null;
+        },
+        findProvinceByName(name, departmentId) {
+            const target = this.normalizeLocationText(name);
+            return this.provinces.find(item =>
+                String(item.parent_location_id || '') === String(departmentId || '') &&
+                this.normalizeLocationText(item.name) === target
+            ) || null;
+        },
+        findDistrictByName(name, provinceId) {
+            const target = this.normalizeLocationText(name);
+            return this.districts.find(item =>
+                String(item.parent_location_id || '') === String(provinceId || '') &&
+                this.normalizeLocationText(item.name) === target
+            ) || null;
+        },
+        applyQuickClientLocationFromLookup(payload) {
+            const department = this.findDepartmentByName(payload?.department || '');
+            if (!department) return;
+
+            this.quickClient.department_id = String(department.id);
+
+            const province = this.findProvinceByName(payload?.province || '', department.id);
+            if (!province) {
+                this.quickClient.province_id = '';
+                this.quickClient.location_id = '';
+                return;
+            }
+
+            this.quickClient.province_id = String(province.id);
+
+            const district = this.findDistrictByName(payload?.district || '', province.id);
+            this.quickClient.location_id = district ? String(district.id) : '';
+        },
+        async fetchQuickClientDocumentData() {
+            const type = String(this.quickClient.person_type || '').toUpperCase();
+
+            if (type === 'DNI') {
+                return this.fetchReniecQuickClient();
+            }
+
+            if (type === 'RUC') {
+                return this.fetchRucQuickClient();
+            }
+
+            this.quickClientError = 'La busqueda automatica solo aplica para DNI o RUC.';
+        },
         async fetchReniecQuickClient() {
             this.quickClientError = '';
             if (String(this.quickClient.person_type).toUpperCase() !== 'DNI') {
@@ -1041,10 +1137,39 @@
                 const parsed = this.namesFromReniecPayload(payload);
                 this.quickClient.first_name = parsed.first_name;
                 this.quickClient.last_name = parsed.last_name;
-                this.quickClient.fecha_nacimiento = payload?.fecha_nacimiento || '';
+                this.quickClient.fecha_nacimiento = this.normalizeApiDate(payload?.fecha_nacimiento || '') || '';
                 this.quickClient.genero = payload?.genero || '';
             } catch (error) {
                 this.quickClientError = error?.message || 'Error consultando RENIEC.';
+            } finally {
+                this.creatingClientLoading = false;
+            }
+        },
+        async fetchRucQuickClient() {
+            this.quickClientError = '';
+            const ruc = String(this.quickClient.document_number || '').trim();
+            if (!/^\d{11}$/.test(ruc)) {
+                this.quickClientError = 'Ingrese un RUC valido de 11 digitos.';
+                return;
+            }
+            this.creatingClientLoading = true;
+            try {
+                const response = await fetch(`/api/ruc?ruc=${encodeURIComponent(ruc)}`, {
+                    headers: { 'Accept': 'application/json' }
+                });
+                const payload = await response.json();
+                if (!response.ok || !payload?.status) {
+                    throw new Error(payload?.message || 'No se encontro informacion para el RUC ingresado.');
+                }
+                this.quickClient.document_number = payload.ruc || ruc;
+                this.quickClient.first_name = payload.legal_name || this.quickClient.first_name || '';
+                this.quickClient.last_name = '';
+                this.quickClient.genero = '';
+                this.quickClient.fecha_nacimiento = this.normalizeApiDate(payload?.raw?.fecha_inscripcion || '');
+                this.quickClient.address = payload.address || this.quickClient.address || '-';
+                this.applyQuickClientLocationFromLookup(payload);
+            } catch (error) {
+                this.quickClientError = error?.message || 'Error consultando RUC.';
             } finally {
                 this.creatingClientLoading = false;
             }
@@ -1512,7 +1637,16 @@
 
                     <textarea name="observations" rows="3" class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-3" placeholder="Observaciones">{{ old('observations', optional($editingOrder)->observations ?? '') }}</textarea>
 
-                    <div class="rounded-xl border border-gray-200 bg-white p-4 md:col-span-3" x-show="serviceType !== 'correctivo'" x-cloak @if(($serviceType ?? 'preventivo') === 'correctivo') style="display: none;" @endif>
+                    <div
+                        x-data="{
+                            showInventory: @js($showInventoryDefault ?? true),
+                            showDamagesPreexisting: @js($showDamagesPreexistingDefault ?? true)
+                        }"
+                        class="rounded-xl border border-gray-200 bg-white p-4 md:col-span-3"
+                        x-show="serviceType !== 'correctivo'"
+                        x-cloak
+                        @if(($serviceType ?? 'preventivo') === 'correctivo') style="display: none;" @endif
+                    >
                         <div class="mb-3">
                             <label class="inline-flex items-center gap-2 text-sm font-semibold text-gray-700">
                                 <input type="checkbox" x-model="showInventory" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
@@ -1834,7 +1968,7 @@
                 </div>
             </form>
         </x-common.component-card>
-        <x-ui.modal x-data="{ open: false }" x-on:open-client-modal.window="open = true" x-on:close-client-modal.window="open = false" :isOpen="false" :showCloseButton="false" class="max-w-4xl">
+        <x-ui.modal x-data="{ open: false }" x-on:open-client-modal.window="open = true; $nextTick(() => initQuickClientLocationDefaults())" x-on:close-client-modal.window="open = false" :isOpen="false" :showCloseButton="false" class="max-w-6xl">
             <div class="p-6 sm:p-8">
                 <div class="mb-6 flex items-center justify-between">
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Registrar cliente</h3>
@@ -1845,7 +1979,7 @@
 
                 <div x-show="quickClientError" class="mb-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700" x-text="quickClientError"></div>
 
-                <form @submit.prevent="saveQuickClient()" class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                <form @submit.prevent="saveQuickClient()" x-init="$nextTick(() => initQuickClientLocationDefaults())" class="grid grid-cols-1 gap-4 md:grid-cols-4">
                     <div>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700">Tipo de persona</label>
                         <select x-model="quickClient.person_type" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
@@ -1858,10 +1992,15 @@
                     <div>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700">Documento</label>
                         <div class="flex items-center gap-2">
-                            <input x-model="quickClient.document_number" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Documento" required>
+                            <input
+                                x-model="quickClient.document_number"
+                                class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                                :placeholder="isQuickClientRuc() ? 'Ingrese el RUC (11 digitos)' : 'Documento'"
+                                required
+                            >
                             <button
                                 type="button"
-                                @click="fetchReniecQuickClient()"
+                                @click="fetchQuickClientDocumentData()"
                                 :disabled="creatingClientLoading"
                                 class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-[#334155] px-4 text-sm font-medium text-white hover:bg-[#1f3f98] disabled:opacity-60"
                             >
@@ -1871,16 +2010,26 @@
                         </div>
                     </div>
                     <div>
-                        <label class="mb-1.5 block text-sm font-medium text-gray-700">Nombres</label>
-                        <input x-model="quickClient.first_name" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nombres / Razon social" required>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700" x-text="isQuickClientRuc() ? 'Razon social' : 'Nombres'"></label>
+                        <input
+                            x-model="quickClient.first_name"
+                            class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                            :placeholder="isQuickClientRuc() ? 'Razon social' : 'Nombres'"
+                            required
+                        >
                     </div>
-                    <div>
+                    <div x-show="!isQuickClientRuc()" x-cloak>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700">Apellidos</label>
-                        <input x-model="quickClient.last_name" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Apellidos" required>
+                        <input
+                            x-model="quickClient.last_name"
+                            class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                            placeholder="Apellidos"
+                            :required="!isQuickClientRuc()"
+                        >
                     </div>
 
                     <div>
-                        <label class="mb-1.5 block text-sm font-medium text-gray-700">Fecha de nacimiento</label>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700" x-text="isQuickClientRuc() ? 'Fecha de inscripcion' : 'Fecha de nacimiento'"></label>
                         <div class="flex items-center gap-2">
                             <input type="date" x-ref="quickClientFechaInput" x-model="quickClient.fecha_nacimiento" class="h-11 min-w-0 flex-1 rounded-lg border border-gray-300 px-3 text-sm">
                             <button type="button" @click="$refs.quickClientFechaInput?.showPicker?.()" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-gray-50 text-gray-600 hover:bg-gray-100" aria-label="Abrir calendario" title="Abrir calendario">
@@ -1888,7 +2037,7 @@
                             </button>
                         </div>
                     </div>
-                    <div>
+                    <div x-show="!isQuickClientRuc()" x-cloak>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700">Genero</label>
                         <select x-model="quickClient.genero" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
                             <option value="">Seleccione genero</option>
@@ -1912,15 +2061,42 @@
                     </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700">Departamento</label>
-                        <input type="text" :value="branchDepartmentName || '-'" readonly class="h-11 w-full rounded-lg border border-gray-300 bg-gray-100 px-3 text-sm text-gray-700">
+                        <select x-model="quickClient.department_id" @change="onClientDepartmentChange()" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                            <option value="">Seleccione departamento</option>
+                            <template x-for="department in departments" :key="department.id">
+                                <option
+                                    :value="String(department.id)"
+                                    :selected="String(department.id) === String(quickClient.department_id || '')"
+                                    x-text="department.name"
+                                ></option>
+                            </template>
+                        </select>
                     </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700">Provincia</label>
-                        <input type="text" :value="branchProvinceName || '-'" readonly class="h-11 w-full rounded-lg border border-gray-300 bg-gray-100 px-3 text-sm text-gray-700">
+                        <select x-model="quickClient.province_id" @change="onClientProvinceChange()" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                            <option value="">Seleccione provincia</option>
+                            <template x-for="province in filteredProvinces" :key="province.id">
+                                <option
+                                    :value="String(province.id)"
+                                    :selected="String(province.id) === String(quickClient.province_id || '')"
+                                    x-text="province.name"
+                                ></option>
+                            </template>
+                        </select>
                     </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700">Distrito</label>
-                        <input type="text" :value="branchDistrictName || '-'" readonly class="h-11 w-full rounded-lg border border-gray-300 bg-gray-100 px-3 text-sm text-gray-700">
+                        <select x-model="quickClient.location_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                            <option value="">Seleccione distrito</option>
+                            <template x-for="district in filteredDistricts" :key="district.id">
+                                <option
+                                    :value="String(district.id)"
+                                    :selected="String(district.id) === String(quickClient.location_id || '')"
+                                    x-text="district.name"
+                                ></option>
+                            </template>
+                        </select>
                     </div>
 
                     <div class="md:col-span-4">

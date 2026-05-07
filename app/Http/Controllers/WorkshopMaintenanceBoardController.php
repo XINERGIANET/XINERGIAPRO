@@ -572,6 +572,9 @@ class WorkshopMaintenanceBoardController extends Controller
             'departments',
             'provinces',
             'districts',
+            'selectedDepartmentId',
+            'selectedProvinceId',
+            'selectedDistrictId',
             'selectedDepartmentName',
             'selectedProvinceName',
             'selectedDistrictName',
@@ -1656,7 +1659,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'person_type' => ['required', 'in:DNI,RUC,CARNET DE EXTRANGERIA,PASAPORTE'],
             'document_number' => ['required', 'string', 'max:50'],
             'first_name' => ['required', 'string', 'max:255'],
-            'last_name' => ['required', 'string', 'max:255'],
+            'last_name' => ['required_unless:person_type,RUC', 'nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:255'],
             'address' => ['nullable', 'string', 'max:255'],
@@ -1698,8 +1701,13 @@ class WorkshopMaintenanceBoardController extends Controller
 
         $validated['phone'] = (string) ($validated['phone'] ?? '');
         $validated['email'] = (string) ($validated['email'] ?? '');
+        $validated['last_name'] = strtoupper((string) $validated['person_type']) === 'RUC'
+            ? ''
+            : (string) ($validated['last_name'] ?? '');
         $validated['address'] = trim((string) ($validated['address'] ?? '')) ?: '-';
-        $validated['location_id'] = $branchDistrictId;
+        $validated['location_id'] = (int) ($validated['location_id'] ?? 0) > 0
+            ? (int) $validated['location_id']
+            : $branchDistrictId;
 
         $person = DB::transaction(function () use ($validated, $branchId) {
             $person = Person::query()->create(array_merge(
