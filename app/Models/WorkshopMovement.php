@@ -38,6 +38,8 @@ class WorkshopMovement extends Model
         'total',
         'paid_total',
         'payment_status',
+        'driver_name',
+        'driver_phone',
         'started_at',
         'finished_at',
         'paused_at',

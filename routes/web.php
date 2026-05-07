@@ -486,6 +486,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/tablero-mantenimiento/{order}/venta-cobro', [WorkshopMaintenanceBoardController::class, 'checkout'])->name('maintenance-board.checkout');
         Route::get('/tablero-mantenimiento/{order}/seguimiento', [WorkshopMaintenanceBoardController::class, 'tracking'])->name('maintenance-board.tracking');
         Route::post('/tablero-mantenimiento/{order}/avanzar-fase', [WorkshopMaintenanceBoardController::class, 'advancePhase'])->name('maintenance-board.advance-phase');
+        Route::get('/tablero-mantenimiento/ultimo-chofer', [WorkshopMaintenanceBoardController::class, 'getLastDriverInfo'])->name('maintenance-board.last-driver');
 
         Route::get('/clientes', [WorkshopClientController::class, 'index'])->name('clients.index');
         Route::post('/clientes', [WorkshopClientController::class, 'store'])->name('clients.store');

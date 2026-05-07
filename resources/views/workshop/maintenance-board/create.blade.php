@@ -187,6 +187,11 @@
         showDamagesPreexisting: @js($showDamagesPreexistingDefault ?? true),
         diagnosisText: @js($diagnosisDefault),
         serviceType: @js($serviceType ?? 'preventivo'),
+        driverName: @js($editingDriverName ?? ''),
+        driverPhone: @js($editingDriverPhone ?? ''),
+        driverInfoEnabled: @js($driverInfoEnabled ?? false),
+        vehicleDocumentAlertsEnabled: @js($vehicleDocumentAlertsEnabled ?? true),
+        lastDriverUrl: @js(route('workshop.maintenance-board.last-driver')),
         externalServiceModal: {
             open: false,
             description: '',
@@ -210,6 +215,22 @@
             this.refreshVehicleFilter();
             this.syncHistoryUrl();
             this.refreshServiceLinePrices();
+            if (this.driverInfoEnabled && !this.editingMode) {
+                this.fetchLastDriverInfo();
+            }
+        },
+        async fetchLastDriverInfo() {
+            if (!this.selectedVehicleId) return;
+            try {
+                const response = await fetch(`${this.lastDriverUrl}?vehicle_id=${this.selectedVehicleId}`);
+                const data = await response.json();
+                if (data.success) {
+                    this.driverName = data.driver_name || '';
+                    this.driverPhone = data.driver_phone || '';
+                }
+            } catch (e) {
+                console.error('Error fetching last driver info', e);
+            }
         },
         inventoryItemsForSelectedVehicle() {
             const typeId = String(this.selectedVehicleTypeId || this.quickVehicle.vehicle_type_id || '');
@@ -1190,9 +1211,9 @@
         <x-common.page-breadcrumb
             :pageTitle="$editingOrder ? 'Editar ingreso a mantenimiento' : 'Nuevo Ingreso a Mantenimiento'"
             :crumbs="[
-            ['label' => 'Tablero de Mantenimiento', 'url' => route('workshop.maintenance-board.index')],
-            ['label' => $editingOrder ? 'Editar ingreso a mantenimiento' : 'Nuevo Ingreso a Mantenimiento'],
-        ]"
+        ['label' => 'Tablero de Mantenimiento', 'url' => route('workshop.maintenance-board.index')],
+        ['label' => $editingOrder ? 'Editar ingreso a mantenimiento' : 'Nuevo Ingreso a Mantenimiento'],
+    ]"
         />
 
         <x-common.component-card>
@@ -1218,19 +1239,6 @@
 
             <form method="POST" action="{{ $editingOrder ? route('workshop.maintenance-board.update', $editingOrder) : route('workshop.maintenance-board.store') }}" enctype="multipart/form-data" data-turbo="false" @submit="syncSignature()" class="grid grid-cols-1 gap-3 md:grid-cols-3">
                 @csrf
-                <div class="mb-4 md:col-span-3">
-                    @if(($serviceType ?? 'preventivo') === 'correctivo')
-                        <div class="inline-flex items-center gap-2 rounded-lg bg-rose-100 px-4 py-2 text-sm font-bold text-rose-700 shadow-sm border border-rose-200">
-                            <i class="ri-error-warning-fill text-lg"></i>
-                            <span>MODO: MANTENIMIENTO CORRECTIVO </span>
-                        </div>
-                    @else
-                        <div class="inline-flex items-center gap-2 rounded-lg bg-indigo-100 px-4 py-2 text-sm font-bold text-indigo-700 shadow-sm border border-indigo-200">
-                            <i class="ri-tools-fill text-lg"></i>
-                            <span>MODO: MANTENIMIENTO PREVENTIVO ESTÁNDAR</span>
-                        </div>
-                    @endif
-                </div>
                 @if($editingOrder)
                     @method('PUT')
                 @endif
@@ -1401,7 +1409,7 @@
                                         autocomplete="off"
                                         required
                                     >
-                                    <div class="mt-2 flex flex-wrap gap-2" x-show="selectedVehicleId" x-cloak>
+                                    <div class="mt-2 flex flex-wrap gap-2" x-show="selectedVehicleId && vehicleDocumentAlertsEnabled" x-cloak>
                                         <template x-if="vehicles.find(v => String(v.id) === String(selectedVehicleId))">
                                             <div class="flex flex-wrap gap-2">
                                                 <div class="flex items-center gap-1 overflow-hidden rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider shadow-sm"
@@ -1478,8 +1486,30 @@
                                 Ingreso en grua
                             </label>
                         </div>
-
                     </div>
+
+                    <div x-show="driverInfoEnabled" x-cloak class="md:col-span-3 grid grid-cols-1 gap-3 md:grid-cols-3 bg-gray-50/50 p-3 rounded-xl border border-gray-100">
+                        <div class="md:col-span-1">
+                            <label class="mb-1 block text-sm font-medium text-gray-700">Nombre Chofer</label>
+                            <div class="relative">
+                                <i class="ri-user-received-2-line absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                <input name="driver_name" x-model="driverName" class="h-11 w-full rounded-lg border border-gray-300 pl-10 pr-3 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition" placeholder="Nombre completo del chofer">
+                            </div>
+                        </div>
+                        <div class="md:col-span-1">
+                            <label class="mb-1 block text-sm font-medium text-gray-700">Celular Chofer</label>
+                            <div class="relative">
+                                <i class="ri-phone-line absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                <input name="driver_phone" x-model="driverPhone" class="h-11 w-full rounded-lg border border-gray-300 pl-10 pr-3 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition" placeholder="Número de contacto">
+                            </div>
+                        </div>
+                        <div class="md:col-span-1 flex items-end">
+                            <p class="text-[11px] text-gray-500 leading-tight italic">
+                                <i class="ri-information-line"></i> Datos del conductor que trae el vehículo al taller.
+                            </p>
+                        </div>
+                    </div>
+
                     <textarea name="observations" rows="3" class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-3" placeholder="Observaciones">{{ old('observations', optional($editingOrder)->observations ?? '') }}</textarea>
 
                     <div class="rounded-xl border border-gray-200 bg-white p-4 md:col-span-3" x-show="serviceType !== 'correctivo'" x-cloak @if(($serviceType ?? 'preventivo') === 'correctivo') style="display: none;" @endif>
@@ -1526,40 +1556,40 @@
                                         2 => ['value' => 'FRONT', 'label' => 'Frente'],
                                         3 => ['value' => 'BACK', 'label' => 'Atras'],
                                     ] as $idx => $side)
-                                        <div class="rounded-lg border border-gray-200 bg-white p-3">
-                                            <input type="hidden" name="damages[{{ $idx }}][side]" value="{{ $side['value'] }}">
-                                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">{{ $side['label'] }}</label>
-                                            <textarea name="damages[{{ $idx }}][description]" rows="2" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Describe daño preexistente (opcional)">{{ old('damages.' . $idx . '.description', data_get($editingDamageRows, $idx . '.description', '')) }}</textarea>
-                                            <select name="damages[{{ $idx }}][severity]" class="mt-2 h-10 w-full rounded-lg border border-gray-300 px-3 text-sm">
-                                                <option value="">Severidad</option>
-                                                <option value="LOW" @selected(old('damages.' . $idx . '.severity', data_get($editingDamageRows, $idx . '.severity', '')) === 'LOW')>Baja</option>
-                                                <option value="MED" @selected(old('damages.' . $idx . '.severity', data_get($editingDamageRows, $idx . '.severity', '')) === 'MED')>Media</option>
-                                                <option value="HIGH" @selected(old('damages.' . $idx . '.severity', data_get($editingDamageRows, $idx . '.severity', '')) === 'HIGH')>Alta</option>
-                                            </select>
-                                            <label class="mt-2 block text-xs font-medium text-gray-700">Evidencia fotografica (camara)</label>
-                                            <input type="file"
-                                                   x-ref="damageCameraInput{{ $idx }}"
-                                                   name="damages[{{ $idx }}][photos][]"
-                                                   accept="image/*"
-                                                   capture="environment"
-                                                   multiple
-                                                   @change="updateDamagePreviews({{ $idx }}, $event)"
-                                                   class="hidden">
-                                            <button type="button"
-                                                    @click="$refs.damageCameraInput{{ $idx }}.click()"
-                                                    class="mt-2 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700">
-                                                <i class="ri-camera-line"></i>
-                                                <span>Abrir camara</span>
-                                            </button>
-                                            <p class="mt-1 text-[11px] text-gray-500">Toma una o varias fotos por cada lado.</p>
-                                            <div class="mt-2 flex flex-wrap gap-2" x-show="(damagePreviews[{{ $idx }}] || []).length > 0">
-                                                <template x-for="(preview, pIndex) in (damagePreviews[{{ $idx }}] || [])" :key="`damage-preview-{{ $idx }}-${pIndex}`">
-                                                    <a :href="preview.url" target="_blank" class="block h-16 w-16 overflow-hidden rounded border border-gray-200">
-                                                        <img :src="preview.url" :alt="preview.name" class="h-full w-full object-cover">
-                                                    </a>
-                                                </template>
+                                            <div class="rounded-lg border border-gray-200 bg-white p-3">
+                                                <input type="hidden" name="damages[{{ $idx }}][side]" value="{{ $side['value'] }}">
+                                                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">{{ $side['label'] }}</label>
+                                                <textarea name="damages[{{ $idx }}][description]" rows="2" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Describe daño preexistente (opcional)">{{ old('damages.' . $idx . '.description', data_get($editingDamageRows, $idx . '.description', '')) }}</textarea>
+                                                <select name="damages[{{ $idx }}][severity]" class="mt-2 h-10 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                                                    <option value="">Severidad</option>
+                                                    <option value="LOW" @selected(old('damages.' . $idx . '.severity', data_get($editingDamageRows, $idx . '.severity', '')) === 'LOW')>Baja</option>
+                                                    <option value="MED" @selected(old('damages.' . $idx . '.severity', data_get($editingDamageRows, $idx . '.severity', '')) === 'MED')>Media</option>
+                                                    <option value="HIGH" @selected(old('damages.' . $idx . '.severity', data_get($editingDamageRows, $idx . '.severity', '')) === 'HIGH')>Alta</option>
+                                                </select>
+                                                <label class="mt-2 block text-xs font-medium text-gray-700">Evidencia fotografica (camara)</label>
+                                                <input type="file"
+                                                       x-ref="damageCameraInput{{ $idx }}"
+                                                       name="damages[{{ $idx }}][photos][]"
+                                                       accept="image/*"
+                                                       capture="environment"
+                                                       multiple
+                                                       @change="updateDamagePreviews({{ $idx }}, $event)"
+                                                       class="hidden">
+                                                <button type="button"
+                                                        @click="$refs.damageCameraInput{{ $idx }}.click()"
+                                                        class="mt-2 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700">
+                                                    <i class="ri-camera-line"></i>
+                                                    <span>Abrir camara</span>
+                                                </button>
+                                                <p class="mt-1 text-[11px] text-gray-500">Toma una o varias fotos por cada lado.</p>
+                                                <div class="mt-2 flex flex-wrap gap-2" x-show="(damagePreviews[{{ $idx }}] || []).length > 0">
+                                                    <template x-for="(preview, pIndex) in (damagePreviews[{{ $idx }}] || [])" :key="`damage-preview-{{ $idx }}-${pIndex}`">
+                                                        <a :href="preview.url" target="_blank" class="block h-16 w-16 overflow-hidden rounded border border-gray-200">
+                                                            <img :src="preview.url" :alt="preview.name" class="h-full w-full object-cover">
+                                                        </a>
+                                                    </template>
+                                                </div>
                                             </div>
-                                        </div>
                                 @endforeach
                             </div>
                         </div>

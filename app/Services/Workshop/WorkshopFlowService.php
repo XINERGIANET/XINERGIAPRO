@@ -139,6 +139,8 @@ class WorkshopFlowService
                 'tax' => 0,
                 'total' => 0,
                 'paid_total' => 0,
+                'driver_name' => $data['driver_name'] ?? null,
+                'driver_phone' => $data['driver_phone'] ?? null,
                 'service_type' => $data['service_type'] ?? 'preventivo',
                 'corrective_phase' => $data['corrective_phase'] ?? null,
                 'corrective_reception_at' => $data['corrective_reception_at'] ?? null,
@@ -229,6 +231,8 @@ class WorkshopFlowService
                 'last_status' => $data['last_status'] ?? $order->last_status,
                 'finished_photo_path' => $data['finished_photo_path'] ?? $order->finished_photo_path,
                 'service_type' => $data['service_type'] ?? $order->service_type,
+                'driver_name' => $data['driver_name'] ?? $order->driver_name,
+                'driver_phone' => $data['driver_phone'] ?? $order->driver_phone,
             ];
 
 

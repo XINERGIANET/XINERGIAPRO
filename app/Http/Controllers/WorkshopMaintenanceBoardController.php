@@ -385,6 +385,8 @@ class WorkshopMaintenanceBoardController extends Controller
             'editingDamagePhotoPreviews' => $editingDamagePhotoPreviews,
             'editingSignatureUrl' => $editingSignatureUrl,
             'serviceType' => $order->service_type ?? 'preventivo',
+            'editingDriverName' => (string) ($order->driver_name ?? ''),
+            'editingDriverPhone' => (string) ($order->driver_phone ?? ''),
         ]);
     }
 
@@ -579,7 +581,9 @@ class WorkshopMaintenanceBoardController extends Controller
             'showDamagesPreexistingDefault'
         ) + [
             'externalServicesEnabled' => $this->isExternalServiceEnabled($branchId),
-            'correctiveServicesEnabled' => $this->isCorrectiveServiceEnabled($branchId)
+            'correctiveServicesEnabled' => $this->isCorrectiveServiceEnabled($branchId),
+            'driverInfoEnabled' => $this->isDriverInfoEnabled($branchId),
+            'vehicleDocumentAlertsEnabled' => $this->isVehicleDocumentAlertsEnabled($branchId)
         ];
     }
 
@@ -673,6 +677,50 @@ class WorkshopMaintenanceBoardController extends Controller
         return in_array($val, ['si', 'yes', 'true', '1'], true);
     }
 
+    private function isDriverInfoEnabled(int $branchId): bool
+    {
+        $parameter = DB::table('parameters')
+            ->where('description', 'Habilitar registro de chofer en OS')
+            ->where('status', 1)
+            ->first();
+
+        if (!$parameter) {
+            return false;
+        }
+
+        $branchValue = DB::table('branch_parameters')
+            ->where('parameter_id', $parameter->id)
+            ->where('branch_id', $branchId)
+            ->whereNull('deleted_at')
+            ->value('value');
+
+        $val = strtolower(trim((string) ($branchValue ?? $parameter->value)));
+
+        return in_array($val, ['si', 'yes', 'true', '1'], true);
+    }
+
+    private function isVehicleDocumentAlertsEnabled(int $branchId): bool
+    {
+        $parameter = DB::table('parameters')
+            ->where('description', 'Habilitar alertas de documentos de vehiculo (SOAT/RT)')
+            ->where('status', 1)
+            ->first();
+
+        if (!$parameter) {
+            return true;
+        }
+
+        $branchValue = DB::table('branch_parameters')
+            ->where('parameter_id', $parameter->id)
+            ->where('branch_id', $branchId)
+            ->whereNull('deleted_at')
+            ->value('value');
+
+        $val = strtolower(trim((string) ($branchValue ?? $parameter->value)));
+
+        return in_array($val, ['si', 'yes', 'true', '1'], true);
+    }
+
 
     public function store(Request $request): \Illuminate\Http\Response|RedirectResponse
     {
@@ -682,6 +730,8 @@ class WorkshopMaintenanceBoardController extends Controller
             'client_person_id' => ['nullable', 'integer', 'exists:people,id'],
             'mileage_in' => ['nullable', 'integer', 'min:0'],
             'appointment_id' => ['nullable', 'integer', 'exists:appointments,id'],
+            'driver_name' => ['nullable', 'string', 'max:255'],
+            'driver_phone' => ['nullable', 'string', 'max:50'],
             'tow_in' => ['nullable', 'boolean'],
             'diagnosis_text' => ['nullable', 'string'],
             'observations' => ['nullable', 'string'],
@@ -936,6 +986,8 @@ class WorkshopMaintenanceBoardController extends Controller
             'product_lines.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
             'product_lines.*.qty' => ['nullable', 'numeric', 'gte:0'],
             'product_lines.*.unit_price' => ['nullable', 'numeric', 'gte:0'],
+            'driver_name' => ['nullable', 'string', 'max:255'],
+            'driver_phone' => ['nullable', 'string', 'max:50'],
         ]);
 
         $vehicle = Vehicle::query()
@@ -984,6 +1036,8 @@ class WorkshopMaintenanceBoardController extends Controller
                     'diagnosis_text' => $validated['diagnosis_text'] ?? null,
                     'observations' => $validated['observations'] ?? null,
                     'service_type' => $validated['service_type'] ?? $order->service_type,
+                    'driver_name' => $validated['driver_name'] ?? null,
+                    'driver_phone' => $validated['driver_phone'] ?? null,
                 ]);
 
                 $damagesWithPhotos = $this->uploadDamagePhotos($request, (array) ($validated['damages'] ?? []), $branchId);
@@ -2790,5 +2844,25 @@ class WorkshopMaintenanceBoardController extends Controller
 
         return redirect()->route('workshop.maintenance-board.corrective')
             ->with('status', 'Solicitud de repuestos registrada correctamente y fase avanzada.');
+    }
+
+    public function getLastDriverInfo(Request $request): JsonResponse
+    {
+        $vehicleId = (int) $request->query('vehicle_id');
+        if (!$vehicleId) {
+            return response()->json(['success' => false, 'message' => 'Vehicle ID is required.'], 400);
+        }
+
+        $lastMovement = WorkshopMovement::query()
+            ->where('vehicle_id', $vehicleId)
+            ->whereNotNull('driver_name')
+            ->orderByDesc('id')
+            ->first(['driver_name', 'driver_phone']);
+
+        return response()->json([
+            'success' => true,
+            'driver_name' => $lastMovement?->driver_name ?? '',
+            'driver_phone' => $lastMovement?->driver_phone ?? '',
+        ]);
     }
 }
