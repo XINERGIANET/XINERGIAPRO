@@ -411,6 +411,8 @@ class WorkshopFlowService
                 'total' => round($net, 6),
                 'technician_person_id' => $data['technician_person_id'] ?? $detail->technician_person_id,
                 'validity_months' => array_key_exists('validity_months', $data) ? $data['validity_months'] : $detail->validity_months,
+                                'service_id' => array_key_exists('service_id', $data) ? $data['service_id'] : $detail->service_id,
+                'product_id' => array_key_exists('product_id', $data) ? $data['product_id'] : $detail->product_id,
                 'is_terciarizado' => (bool) ($data['is_terciarizado'] ?? $detail->is_terciarizado),
             ]);
 

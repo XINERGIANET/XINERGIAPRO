@@ -724,6 +724,43 @@ class WorkshopMaintenanceBoardController extends Controller
         return in_array($val, ['si', 'yes', 'true', '1'], true);
     }
 
+    private function isSaveGlosaAsServiceEnabled(int $branchId): bool
+    {
+        return $this->branchBooleanParameter($branchId, 'Guardar glosa como servicio de taller', false);
+    }
+
+    private function createServiceFromGlosa(int $companyId, int $branchId, string $description, float $price, bool $isTerciarizado): ?int
+    {
+        if (!$this->isSaveGlosaAsServiceEnabled($branchId)) {
+            return null;
+        }
+
+        $existing = WorkshopService::query()
+            ->where('company_id', $companyId)
+            ->where('branch_id', $branchId)
+            ->where('name', $description)
+            ->whereNull('deleted_at')
+            ->first();
+
+        if ($existing) {
+            return $existing->id;
+        }
+
+        $service = WorkshopService::create([
+            'company_id' => $companyId,
+            'branch_id' => $branchId,
+            'name' => $description,
+            'type' => 'preventivo', // Default to preventivo
+            'base_price' => $price,
+            'estimated_minutes' => 0,
+            'active' => true,
+            'is_terciarizado' => $isTerciarizado,
+        ]);
+
+        return $service->id;
+    }
+
+
 
     public function store(Request $request): \Illuminate\Http\Response|RedirectResponse
     {
@@ -858,9 +895,11 @@ class WorkshopMaintenanceBoardController extends Controller
 
             foreach ($parsedServiceLines as $line) {
                 if ($line['kind'] === 'glosa') {
+                    $serviceId = $this->createServiceFromGlosa($companyId, $branchId, $line['description'], (float) $line['unit_price'], (bool) ($line['is_terciarizado'] ?? false));
+
                     $this->flowService->addDetail($workshop, [
                         'line_type' => 'SERVICE',
-                        'service_id' => null,
+                        'service_id' => $serviceId,
                         'description' => $line['description'],
                         'qty' => $line['qty'],
                         'unit_price' => $line['unit_price'],
@@ -1111,6 +1150,9 @@ class WorkshopMaintenanceBoardController extends Controller
                         if ($detailId > 0 && !$detailsById->has($detailId)) {
                             throw new \RuntimeException('Linea de servicio no valida para esta OS.');
                         }
+
+                        $serviceId = $this->createServiceFromGlosa($companyId, $branchId, $line['description'], (float) $line['unit_price'], (bool) ($line['is_terciarizado'] ?? false));
+
                         if ($detailId > 0 && $detailsById->has($detailId)) {
                             $this->flowService->updateDetail(
                                 $detailsById->get($detailId),
@@ -1118,6 +1160,7 @@ class WorkshopMaintenanceBoardController extends Controller
                                     'qty' => $qty,
                                     'unit_price' => $line['unit_price'],
                                     'description' => $line['description'],
+                                    'service_id' => $serviceId,
                                     'validity_months' => $line['validity_months'] ?? null,
                                     'is_terciarizado' => (bool) ($line['is_terciarizado'] ?? false),
                                 ],
@@ -1128,7 +1171,7 @@ class WorkshopMaintenanceBoardController extends Controller
                         } else {
                             $this->flowService->addDetail($lockedOrder, [
                                 'line_type' => 'SERVICE',
-                                'service_id' => null,
+                                'service_id' => $serviceId,
                                 'description' => $line['description'],
                                 'qty' => $qty,
                                 'unit_price' => $line['unit_price'],
