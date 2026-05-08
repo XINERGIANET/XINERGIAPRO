@@ -137,7 +137,7 @@
                 // Caso: APERTURA -> Solo mostramos conceptos que digan 'apertura'
                 currentConcepts = listIngresos.filter(c => c.description.toLowerCase().includes('apertura'));
                 // Auto-seleccionar el primero si existe
-                if (currentConcepts.length > 0) formConceptId = currentConcepts[0].id;
+                if (currentConcepts.length > 0) formConceptId = String(currentConcepts[0].id);
             } else {
                 // Caso: INGRESO NORMAL -> Ocultamos lo que diga 'apertura'
                 currentConcepts = listIngresos.filter(c => !c.description.toLowerCase().includes('apertura'));
@@ -150,7 +150,7 @@
                 // Caso: CIERRE -> Solo mostramos conceptos que digan 'cierre'
                 currentConcepts = listEgresos.filter(c => c.description.toLowerCase().includes('cierre'));
                 // Auto-seleccionar el primero si existe
-                if (currentConcepts.length > 0) formConceptId = currentConcepts[0].id;
+                if (currentConcepts.length > 0) formConceptId = String(currentConcepts[0].id);
             } else {
                 // Caso: EGRESO NORMAL -> Ocultamos lo que diga 'cierre'
                 currentConcepts = listEgresos.filter(c => !c.description.toLowerCase().includes('cierre'));
@@ -158,7 +158,17 @@
         }
 
         // Abrir el modal
-        open = true; 
+        open = true;
+
+        $nextTick(() => {
+            setTimeout(() => {
+                const conceptSelect = $refs.movementConceptSelect;
+                if (!conceptSelect || !formConceptId) return;
+
+                conceptSelect.value = String(formConceptId);
+                conceptSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            }, 0);
+        });
     ">
 
         <x-common.page-breadcrumb pageTitle="Movimientos de Caja" />

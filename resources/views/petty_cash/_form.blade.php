@@ -59,10 +59,16 @@
                     <label class="mb-1.5 block text-sm font-medium text-gray-600 dark:text-gray-400">Concepto</label>
                     <div class="relative">
                         <i class="ri-price-tag-3-line absolute top-1/2 left-3 -translate-y-1/2 text-gray-400"></i>
-                        <select name="payment_concept_id" required x-model="formConceptId"
+                        <select name="payment_concept_id" required x-model="formConceptId" x-ref="movementConceptSelect"
+                            x-effect="$nextTick(() => {
+                                if (!formConceptId) return;
+                                $el.value = String(formConceptId);
+                                $el.dispatchEvent(new Event('change', { bubbles: true }));
+                            })"
                             class="h-11 w-full rounded-lg border-gray-200 bg-white pl-10 pr-4 text-sm text-gray-800 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-dark-900 dark:text-white/90 appearance-none transition-all">
                             <template x-for="item in currentConcepts" :key="item.id">
-                                <option :value="item.id" x-text="item.description"></option>
+                                <option :value="item.id" x-text="item.description"
+                                    :selected="String(item.id) === String(formConceptId)"></option>
                             </template>
                         </select>
                     </div>
@@ -256,7 +262,7 @@
                                         </div>
                                         <div>
                                             <label class="block text-xs text-gray-500 mb-1">N° Celular / Ref.</label>
-                                            <input type="text" :name="`payments[${index}][number]`" required
+                                            <input type="text" :name="`payments[${index}][number]`"
                                                 placeholder="Ej: 999..."
                                                 class="w-full rounded-md border-gray-200 py-2 px-3 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-dark-900">
                                         </div>
@@ -278,7 +284,7 @@
                                         </select>
                                     </div>
                                     <div>
-                                        <input type="text" :name="`payments[${index}][number]`" required
+                                        <input type="text" :name="`payments[${index}][number]`"
                                             placeholder="N° de Operación / Constancia"
                                             class="w-full rounded-md border-gray-200 py-2 px-3 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-dark-900">
                                     </div>
