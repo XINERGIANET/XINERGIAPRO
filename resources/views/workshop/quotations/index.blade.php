@@ -296,15 +296,11 @@
                                             </a>
                                             @if ($isExternalQuotation && $quotation->status === 'approved' && !$generatedOrder)
                                                 @if ($hasVehicle)
-                                                    <form method="POST" action="{{ route('admin.sales.quotations.generate-order', $quotation) }}">
-                                                        @csrf
-                                                        <input type="hidden" name="view_id" value="{{ request('view_id') }}">
-                                                        <button type="submit"
-                                                            class="w-10 h-10 rounded-xl bg-violet-600 text-white flex items-center justify-center shadow-lg shadow-violet-500/20 hover:scale-105 transition-all cursor-pointer"
-                                                            title="Generar orden de servicio">
-                                                            <i class="ri-tools-line text-lg"></i>
-                                                        </button>
-                                                    </form>
+                                                    <a href="{{ route('workshop.maintenance-board.create', ['quotation_id' => $quotation->id]) }}"
+                                                        class="w-10 h-10 rounded-xl bg-violet-600 text-white flex items-center justify-center shadow-lg shadow-violet-500/20 hover:scale-105 transition-all cursor-pointer"
+                                                        title="Generar orden de servicio">
+                                                        <i class="ri-tools-line text-lg"></i>
+                                                    </a>
                                                 @else
                                                     @if ($showPartsRegisterPurchase)
                                                         <a href="{{ route('admin.purchases.create', array_filter(['workshop_quotation_id' => $quotation->id, 'view_id' => request('view_id')])) }}"

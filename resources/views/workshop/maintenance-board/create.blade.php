@@ -1248,12 +1248,15 @@
         },
         signaturePoint(evt) {
             const rect = this.signatureCanvas.getBoundingClientRect();
-            const source = evt.touches?.[0] ?? evt;
-            const scaleX = this.signatureCanvas.width / rect.width;
-            const scaleY = this.signatureCanvas.height / rect.height;
+            let source = evt;
+            if (evt.touches && evt.touches.length > 0) {
+                source = evt.touches[0];
+            } else if (evt.changedTouches && evt.changedTouches.length > 0) {
+                source = evt.changedTouches[0];
+            }
             return {
-                x: (source.clientX - rect.left) * scaleX / (window.devicePixelRatio || 1),
-                y: (source.clientY - rect.top) * scaleY / (window.devicePixelRatio || 1),
+                x: source.clientX - rect.left,
+                y: source.clientY - rect.top,
             };
         },
         startSignature(evt) {
@@ -1386,10 +1389,7 @@
                 </h1>
                 <p class="text-sm text-gray-500">Agregue los repuestos y servicios requeridos para esta reparación.</p>
             @else
-                <h1 class="text-2xl font-bold tracking-tight text-gray-900">
-                    {{ $editingOrder ? 'Editar ingreso a mantenimiento' : 'Nuevo ingreso a mantenimiento' }}
-                </h1>
-                <p class="text-sm text-gray-500">Complete los datos de la orden de servicio.</p>
+              
             @endif
             @if (session('status'))
                 <div class="mb-4 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-700">{{ session('status') }}</div>
@@ -1405,6 +1405,7 @@
                 @if($editingOrder)
                     @method('PUT')
                 @endif
+                <input type="hidden" name="quotation_id" value="{{ $preFilledQuotationId ?? '' }}">
                 <input type="hidden" name="client_person_id" x-model="selectedClientId">
                 <input type="hidden" name="service_type" x-model="serviceType">
                 <input type="hidden" name="client_signature_data" x-model="clientSignatureData">

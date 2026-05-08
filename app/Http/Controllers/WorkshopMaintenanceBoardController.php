@@ -239,16 +239,69 @@ class WorkshopMaintenanceBoardController extends Controller
         $preFilledClientId = (string) $request->query('client_person_id', '');
         $preFilledDiagnosis = (string) $request->query('diagnosis', '');
         $preFilledAppointmentId = (string) $request->query('appointment_id', '');
+        $preFilledQuotationId = (string) $request->query('quotation_id', '');
 
         $serviceType = $request->query('service_type', 'preventivo');
 
+        $initialServiceLines = [];
+        $initialProductLines = [];
+        $editingVehicleLabel = '';
+        $editingClientLabel = '';
+
+        if ($preFilledQuotationId) {
+            $quotation = \App\Models\WorkshopMovement::with([
+                'vehicle',
+                'client',
+                'details' => fn($query) => $query->whereNull('sales_movement_id')->whereNull('deleted_at')->orderBy('id'),
+                'details.service',
+                'details.product',
+            ])->find($preFilledQuotationId);
+
+            if ($quotation) {
+                if ($quotation->vehicle_id) {
+                    $preFilledVehicleId = (string) $quotation->vehicle_id;
+                    $editingVehicleLabel = trim(($quotation->vehicle->plate ?? '') . ' - ' . ($quotation->vehicle->brand ?? '') . ' ' . ($quotation->vehicle->model ?? ''));
+                }
+                if ($quotation->client_person_id) {
+                    $preFilledClientId = (string) $quotation->client_person_id;
+                    $editingClientLabel = trim(($quotation->client->document_number ?? '') . ' - ' . ($quotation->client->name ?? ''));
+                }
+
+                $initialServiceLines = $quotation->details
+                    ->where('line_type', 'SERVICE')
+                    ->values()
+                    ->map(fn($d) => [
+                        'detail_id' => 0, // 0 because it's new for the order
+                        'service_id' => $d->service_id !== null ? (string) $d->service_id : '',
+                        'description' => (string) ($d->description ?? ''),
+                        'qty' => (float) $d->qty,
+                        'unit_price' => (float) $d->unit_price,
+                        'validity_months' => $d->validity_months,
+                        'is_terciarizado' => (bool) $d->is_terciarizado,
+                    ])
+                    ->all();
+
+                $initialProductLines = $quotation->details
+                    ->where('line_type', 'PART')
+                    ->values()
+                    ->map(fn($d) => [
+                        'detail_id' => 0, // 0 because it's new for the order
+                        'product_id' => (string) ($d->product_id ?? ''),
+                        'qty' => (float) $d->qty,
+                        'unit_price' => (float) $d->unit_price,
+                        'label' => (string) ($d->description ?? ''),
+                    ])
+                    ->all();
+            }
+        }
+
         return view('workshop.maintenance-board.create', $formData + [
             'editingOrder' => null,
-            'initialServiceLines' => [],
-            'initialProductLines' => [],
+            'initialServiceLines' => $initialServiceLines,
+            'initialProductLines' => $initialProductLines,
             'initialInventoryChecks' => [],
-            'editingVehicleLabel' => '',
-            'editingClientLabel' => '',
+            'editingVehicleLabel' => $editingVehicleLabel,
+            'editingClientLabel' => $editingClientLabel,
             'editingDamageRows' => [],
             'editingDamagePhotoPreviews' => [0 => [], 1 => [], 2 => [], 3 => []],
             'editingSignatureUrl' => null,
@@ -256,6 +309,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'preFilledClientId' => $preFilledClientId,
             'preFilledDiagnosis' => $preFilledDiagnosis,
             'preFilledAppointmentId' => $preFilledAppointmentId,
+            'preFilledQuotationId' => $preFilledQuotationId,
             'serviceType' => $serviceType,
         ]);
     }
@@ -778,6 +832,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'client_person_id' => ['nullable', 'integer', 'exists:people,id'],
             'mileage_in' => ['nullable', 'integer', 'min:0'],
             'appointment_id' => ['nullable', 'integer', 'exists:appointments,id'],
+            'quotation_id' => ['nullable', 'integer', 'exists:workshop_movements,id'],
             'driver_name' => ['nullable', 'string', 'max:255'],
             'driver_phone' => ['nullable', 'string', 'max:50'],
             'tow_in' => ['nullable', 'boolean'],
@@ -848,10 +903,16 @@ class WorkshopMaintenanceBoardController extends Controller
                 ? 'Inicio de flujo correctivo - Fase Recepción'
                 : 'OS creada desde tablero y enviada a espera de aprobación';
 
+            if (!empty($validated['quotation_id'])) {
+                $status = 'in_progress';
+                $comment = 'OS generada desde cotización y pasada a reparación';
+            }
+
             $data = array_merge($validated, [
                 'vehicle_id' => (int) $validated['vehicle_id'],
                 'client_person_id' => $clientPersonId,
                 'appointment_id' => !empty($validated['appointment_id']) ? (int) $validated['appointment_id'] : null,
+                'previous_workshop_movement_id' => !empty($validated['quotation_id']) ? (int) $validated['quotation_id'] : null,
                 'intake_date' => now()->format('Y-m-d H:i:s'),
                 'mileage_in' => $validated['mileage_in'] ?? null,
                 'tow_in' => (bool) ($validated['tow_in'] ?? false),
