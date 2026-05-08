@@ -622,10 +622,23 @@
             }
             const vehicleCc = this.selectedVehicleCc();
             if (vehicleCc > 0) {
-                const matchedTier = tiers.find((tier) => vehicleCc <= Number(tier.max_cc || 0)) || tiers[tiers.length - 1];
+                const matchedTier = tiers.find((tier) => vehicleCc <= Number(tier.max_cc || 0));
+                if (matchedTier) {
+                    return {
+                        price: Number(matchedTier?.price || 0),
+                        label: `Hasta ${Number(matchedTier?.max_cc || 0)}cc`,
+                    };
+                }
+                // Si la cilindrada es mayor que todos los tiers, devolver el precio base
+                if (basePrice > 0) {
+                    return {
+                        price: basePrice,
+                        label: 'Precio base',
+                    };
+                }
                 return {
-                    price: Number(matchedTier?.price || 0),
-                    label: `Hasta ${Number(matchedTier?.max_cc || 0)}cc`,
+                    price: Number(tiers[0]?.price || 0),
+                    label: `Desde tabla (${Number(tiers[0]?.max_cc || 0)}cc)`,
                 };
             }
             if (basePrice > 0) {

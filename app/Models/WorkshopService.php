@@ -58,7 +58,12 @@ class WorkshopService extends Model
                 return (float) $matched->price;
             }
 
-            return (float) $tiers->last()->price;
+            // Si la cilindrada es mayor que todos los tiers, devolver el precio base
+            if ((float) $this->base_price > 0) {
+                return (float) $this->base_price;
+            }
+
+            return (float) $tiers->first()->price;
         }
 
         if ((float) $this->base_price > 0) {
