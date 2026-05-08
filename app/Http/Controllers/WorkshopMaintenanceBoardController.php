@@ -92,7 +92,7 @@ class WorkshopMaintenanceBoardController extends Controller
                 // Excluir correctivos en borrador (están en el tablero correctivo)
                 $query->where(function ($q) {
                     $q->where('service_type', '!=', 'correctivo')
-                      ->orWhere('status', '!=', 'draft');
+                        ->orWhere('status', '!=', 'draft');
                 });
             })
             ->when(
@@ -1076,7 +1076,7 @@ class WorkshopMaintenanceBoardController extends Controller
         $user = auth()->user();
 
         try {
-            DB::transaction(function () use ($order, $request, $validated, $branchId, $vehicle, $clientPersonId, $parsedServiceLines, $user, $editableCatalogServicePrices) {
+            DB::transaction(function () use ($order, $request, $validated, $branchId, $companyId, $vehicle, $clientPersonId, $parsedServiceLines, $user, $editableCatalogServicePrices) {
                 $lockedOrder = WorkshopMovement::query()
                     ->where('id', $order->id)
                     ->lockForUpdate()
@@ -2718,12 +2718,12 @@ class WorkshopMaintenanceBoardController extends Controller
 
         if ($nextPhase === 'cotizacion_aprobacion' && $approved === 'no') {
             $oldStatus = $order->status;
-            
+
             $patch = [
                 'status' => 'cancelled',
                 'corrective_phase' => 'cotizacion_rechazada',
             ];
-            
+
             if (\Illuminate\Support\Facades\Schema::hasColumn('workshop_movements', 'approval_status')) {
                 $patch['approval_status'] = 'rejected';
             }
@@ -2733,7 +2733,7 @@ class WorkshopMaintenanceBoardController extends Controller
             }
 
             $order->update($patch);
-            
+
             $order->statusHistories()->create([
                 'from_status' => $oldStatus,
                 'to_status' => 'cancelled',
@@ -2795,9 +2795,13 @@ class WorkshopMaintenanceBoardController extends Controller
     {
         $branchId = (int) session('branch_id');
 
-        $order->load(['details' => function($q) {
-            $q->where('line_type', 'PART')->orderBy('id');
-        }, 'details.product', 'details.supplier']);
+        $order->load([
+            'details' => function ($q) {
+                $q->where('line_type', 'PART')->orderBy('id');
+            },
+            'details.product',
+            'details.supplier'
+        ]);
 
         $products = \App\Models\ProductBranch::query()
             ->join('products', 'products.id', '=', 'product_branch.product_id')
@@ -2848,12 +2852,13 @@ class WorkshopMaintenanceBoardController extends Controller
 
         // First, handle existing PART lines. If they are not in the submitted parts, we might not delete them if they were quoted?
         // Actually, the view will send ALL parts. If a detail_id is missing, it should be deleted.
-        $submittedDetailIds = collect($parts)->pluck('detail_id')->filter()->map(fn($id) => (int)$id)->all();
+        $submittedDetailIds = collect($parts)->pluck('detail_id')->filter()->map(fn($id) => (int) $id)->all();
         $order->details()->where('line_type', 'PART')->whereNotIn('id', $submittedDetailIds)->delete();
 
         foreach ($parts as $partData) {
             $qty = round((float) $partData['qty'], 6);
-            if ($qty <= 0) continue;
+            if ($qty <= 0)
+                continue;
 
             $unitPrice = round((float) ($partData['unit_price'] ?? 0), 6);
             $supplierId = !empty($partData['supplier_person_id']) ? (int) $partData['supplier_person_id'] : null;
@@ -2900,7 +2905,7 @@ class WorkshopMaintenanceBoardController extends Controller
         // Advance phase to repuestos_solicitud
         $order->corrective_phase = 'repuestos_solicitud';
         $order->corrective_parts_requested_at = now();
-        
+
         $obs = $request->input('observations');
         if ($obs) {
             $currentObs = $order->corrective_observations ? $order->corrective_observations . "\n" : "";
