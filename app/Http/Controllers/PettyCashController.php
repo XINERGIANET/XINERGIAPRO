@@ -255,7 +255,7 @@ class PettyCashController extends Controller
 
         $cards = Card::where('status', true)->orderBy('order_num', 'asc')->get();
 
-        $cashEfectivoTotal = (float) DB::table('cash_movement_details as cmd')
+        $paymentBalanceRows = DB::table('cash_movement_details as cmd')
             ->join('cash_movements as cm', 'cm.id', '=', 'cmd.cash_movement_id')
             ->join('movements as m', 'm.id', '=', 'cm.movement_id')
             ->leftJoin('document_types as dt', 'dt.id', '=', 'm.document_type_id')
@@ -263,11 +263,14 @@ class PettyCashController extends Controller
             ->where('cm.cash_register_id', $selectedBoxId)
             ->where('m.branch_id', $branchId)
             ->whereNull('m.deleted_at')
-            ->where(function ($query) {
-                $query->whereRaw("LOWER(COALESCE(pm.description, cmd.payment_method, '')) LIKE '%efectivo%'")
-                    ->orWhereRaw("LOWER(COALESCE(pm.description, cmd.payment_method, '')) LIKE '%cash%'");
-            })
+            ->where('cmd.status', 'A')
+            ->whereRaw("UPPER(COALESCE(cmd.type, 'PAGADO')) <> 'DEUDA'")
             ->selectRaw("
+                COALESCE(pm.description, cmd.payment_method, '') as method_label,
+                COALESCE(cmd.bank, '') as bank_label,
+                COALESCE(cmd.digital_wallet, '') as wallet_label,
+                COALESCE(cmd.card, '') as card_label,
+                COALESCE(cmd.payment_gateway, '') as gateway_label,
                 COALESCE(
                     SUM(
                         CASE
@@ -278,7 +281,43 @@ class PettyCashController extends Controller
                     0
                 ) as total
             ")
-            ->value('total');
+            ->groupBy('method_label', 'bank_label', 'wallet_label', 'card_label', 'gateway_label')
+            ->get();
+
+        $paymentBalances = $paymentBalanceRows
+            ->map(function ($row) {
+                $method = trim((string) ($row->method_label ?? ''));
+                $methodLower = mb_strtolower($method, 'UTF-8');
+                $bank = trim((string) ($row->bank_label ?? ''));
+                $wallet = trim((string) ($row->wallet_label ?? ''));
+                $card = trim((string) ($row->card_label ?? ''));
+                $gateway = trim((string) ($row->gateway_label ?? ''));
+
+                $label = match (true) {
+                    str_contains($methodLower, 'efectivo') || str_contains($methodLower, 'cash') => 'Efectivo en caja',
+                    $bank !== '' => $bank,
+                    $wallet !== '' => $wallet,
+                    $card !== '' => $card,
+                    $gateway !== '' => $gateway,
+                    $method !== '' => $method,
+                    default => 'Método',
+                };
+
+                return [
+                    'label' => $label,
+                    'total' => (float) ($row->total ?? 0),
+                ];
+            })
+            ->groupBy('label')
+            ->map(fn ($items, $label) => [
+                'label' => $label,
+                'total' => (float) $items->sum('total'),
+            ])
+            ->filter(fn ($item) => $item['total'] > 0)
+            ->sortBy(fn ($item) => $item['label'] === 'Efectivo en caja' ? '0000' : $item['label'])
+            ->values();
+
+        $cashEfectivoTotal = (float) ($paymentBalances->firstWhere('label', 'Efectivo en caja')['total'] ?? 0);
 
         return view('petty_cash.index', [
             'title'           => 'Caja Chica',
@@ -309,6 +348,7 @@ class PettyCashController extends Controller
             'operaciones'     => $operaciones,
             'perPage'         => $perPage,
             'cashEfectivoTotal' => $cashEfectivoTotal,
+            'paymentBalances' => $paymentBalances,
         ]);
     }
 

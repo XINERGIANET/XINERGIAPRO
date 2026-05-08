@@ -427,11 +427,20 @@
                 </div>
             </div>
 
-            <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-                <div class="flex items-center gap-2 text-sm text-gray-500">
-                    <span>Efectivo en caja</span>
-                    <x-ui.badge size="sm" variant="light" color="success">S/ {{ number_format((float) ($cashEfectivoTotal ?? 0), 2) }}</x-ui.badge>
-                </div>
+            <div class="mt-4 flex flex-wrap items-center justify-end gap-2 text-sm text-gray-500">
+                @forelse (($paymentBalances ?? collect()) as $balance)
+                    <div class="flex items-center gap-2">
+                        <span>{{ $balance['label'] }}</span>
+                        <x-ui.badge size="sm" variant="light" color="success">
+                            S/ {{ number_format((float) ($balance['total'] ?? 0), 2) }}
+                        </x-ui.badge>
+                    </div>
+                @empty
+                    <div class="flex items-center gap-2">
+                        <span>Efectivo en caja</span>
+                        <x-ui.badge size="sm" variant="light" color="success">S/ 0.00</x-ui.badge>
+                    </div>
+                @endforelse
             </div>
 
             {{-- TABLA --}}
