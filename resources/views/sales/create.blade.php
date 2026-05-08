@@ -1535,8 +1535,7 @@ return [
                 paymentRows[index].card_id = variant.card_id ? Number(variant.card_id) : null;
                 paymentRows[index].digital_wallet_id = variant.digital_wallet_id ? Number(variant
                     .digital_wallet_id) : null;
-                paymentRows[index].bank_id = isBankTransferMethod(variant.payment_method_id) ? (paymentRows[index]
-                    .bank_id || defaultBankId()) : null;
+                paymentRows[index].bank_id = variant.bank_id ? Number(variant.bank_id) : null;
                 if (variant.kind !== 'card') {
                     paymentRows[index].payment_gateway_id = null;
                 }
@@ -1603,6 +1602,7 @@ return [
                 const normalized = String(description || '').toLowerCase();
                 if (normalized.includes('tarjeta') || normalized.includes('card')) return 'card';
                 if (normalized.includes('billetera') || normalized.includes('wallet')) return 'wallet';
+                if (normalized.includes('transfer') || normalized.includes('banco')) return 'bank';
                 return 'plain';
             };
             const cardTypeLabel = (type) => {
@@ -1622,6 +1622,7 @@ return [
                         payment_method_id: methodId,
                         digital_wallet_id: Number(wallet.id),
                         card_id: null,
+                        bank_id: null,
                         label: `${description} - ${wallet.description}`,
                         kind,
                     }));
@@ -1637,10 +1638,23 @@ return [
                             payment_method_id: methodId,
                             digital_wallet_id: null,
                             card_id: Number(card.id),
+                            bank_id: null,
                             label,
                             kind,
                         };
                     });
+                }
+
+                if (kind === 'bank' && banks.length) {
+                    return banks.map((bank) => ({
+                        key: `bank:${methodId}:${Number(bank.id)}`,
+                        payment_method_id: methodId,
+                        digital_wallet_id: null,
+                        card_id: null,
+                        bank_id: Number(bank.id),
+                        label: `${description} - ${bank.description}`,
+                        kind,
+                    }));
                 }
 
                 return [{
@@ -1648,6 +1662,7 @@ return [
                     payment_method_id: methodId,
                     digital_wallet_id: null,
                     card_id: null,
+                    bank_id: null,
                     label: description,
                     kind,
                 }];
@@ -1662,12 +1677,6 @@ return [
                 const description = String(method?.description || '').toLowerCase();
                 return description.includes('tarjeta') || description.includes('card');
             };
-            const isBankTransferMethod = (methodId) => {
-                const method = paymentMethods.find((pm) => Number(pm.id) === Number(methodId));
-                const description = String(method?.description || '').toLowerCase();
-                return description.includes('transfer') || description.includes('banco');
-            };
-            const defaultBankId = () => Number(banks[0]?.id || 0) || null;
             const getMethodName = (methodId) => {
                 const method = paymentMethods.find((pm) => Number(pm.id) === Number(methodId));
                 return method?.description || 'Método';
@@ -1960,7 +1969,7 @@ return [
                         remaining),
                     payment_gateway_id: null,
                     card_id: fallbackVariant.card_id ? Number(fallbackVariant.card_id) : null,
-                    bank_id: isBankTransferMethod(fallbackVariant.payment_method_id) ? defaultBankId() : null,
+                    bank_id: fallbackVariant.bank_id ? Number(fallbackVariant.bank_id) : null,
                     digital_wallet_id: fallbackVariant.digital_wallet_id ? Number(fallbackVariant
                         .digital_wallet_id) : null,
                     method_variant_key: fallbackVariant.key,
@@ -1992,30 +2001,22 @@ return [
                             `card:${Number(row.payment_method_id)}:${Number(row.card_id)}` :
                             row.digital_wallet_id ?
                             `wallet:${Number(row.payment_method_id)}:${Number(row.digital_wallet_id)}` :
+                            row.bank_id ?
+                            `bank:${Number(row.payment_method_id)}:${Number(row.bank_id)}` :
                             `plain:${Number(row.payment_method_id)}`);
                     const selectedVariant = getPaymentVariantByKey(selectedVariantKey);
                     const showCardFields = selectedVariant?.kind === 'card' || isCardMethod(row
                         .payment_method_id);
-                    const showBankFields = isBankTransferMethod(row.payment_method_id);
-                    if (showBankFields && !row.bank_id) {
-                        row.bank_id = defaultBankId();
-                    } else if (!showBankFields && row.bank_id) {
-                        row.bank_id = null;
-                    }
-                    const layoutStyle = (showCardFields || showBankFields) ?
+                    const layoutStyle = showCardFields ?
                         'display:grid; gap:0.75rem; grid-template-columns:minmax(0,1.7fr) minmax(0,0.9fr) minmax(0,1fr) auto;' :
                         'display:grid; gap:0.75rem; grid-template-columns:minmax(0,1.8fr) minmax(0,1fr) auto;';
                     const gatewayOptions = paymentGateways.map((gateway) => `
                             <option value="${gateway.id}" ${Number(row.payment_gateway_id) === Number(gateway.id) ? 'selected' : ''}>${escapeHtml(gateway.description)}</option>
                         `).join('');
-                    const bankOptions = banks.map((bank) => `
-                            <option value="${bank.id}" ${Number(row.bank_id) === Number(bank.id) ? 'selected' : ''}>${escapeHtml(bank.description)}</option>
-                        `).join('');
                     const methodLabel = escapeHtml(selectedVariant?.label || 'Seleccionar');
 
                     return `
-                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                                <div style="${layoutStyle}">
+                            <div style="${layoutStyle}">
                                     <div class="space-y-1 js-payment-method-ac relative" data-index="${index}">
                                         <label class="block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Método</label>
                                         <button type="button" class="payment-method-ac-trigger flex h-11 w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 text-left text-sm font-semibold text-slate-700 outline-none transition hover:border-orange-200 focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
@@ -2042,20 +2043,11 @@ return [
                                                                 </select>
                                                             </div>
                                                         ` : ''}
-                                    ${showBankFields ? `
-                                                            <div class="space-y-1">
-                                                                <label class="block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Banco</label>
-                                                                <select data-role="bank" data-index="${index}" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
-                                                                    ${bankOptions || '<option value="">Sin bancos</option>'}
-                                                                </select>
-                                                            </div>
-                                                        ` : ''}
                                     <div class="flex items-end">
                                         <button type="button" data-role="remove-payment" data-index="${index}" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-rose-200 bg-white text-rose-600 hover:bg-rose-50" title="Eliminar">
                                             <i class="ri-delete-bin-line"></i>
                                         </button>
                                     </div>
-                                </div>
                             </div>
                         `;
                 }).join('');
@@ -2077,15 +2069,6 @@ return [
                         paymentRows[index].payment_gateway_id = event.currentTarget.value ?
                             Number(event
                                 .currentTarget.value) : null;
-                        syncPaymentRows();
-                    });
-                });
-
-                container.querySelectorAll('[data-role="bank"]').forEach((element) => {
-                    element.addEventListener('change', (event) => {
-                        const index = Number(event.currentTarget.dataset.index);
-                        paymentRows[index].bank_id = event.currentTarget.value ?
-                            Number(event.currentTarget.value) : null;
                         syncPaymentRows();
                     });
                 });
