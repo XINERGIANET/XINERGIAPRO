@@ -133,14 +133,16 @@ class WorkshopQuotationController extends Controller
             ->orderBy('first_name')
             ->get();
 
+        // Get all vehicles for autocomplete
+        $allVehicles = Vehicle::query()
+            ->where('branch_id', $branchId)
+            ->orderBy('plate')
+            ->get();
+
+        $selectedClientId = (int) old('client_person_id', 0);
         $vehicles = collect();
-        $clientId = (int) old('client_person_id', 0);
-        if ($clientId > 0) {
-            $vehicles = Vehicle::query()
-                ->where('client_person_id', $clientId)
-                ->when($branchId > 0, fn ($q) => $q->where('branch_id', $branchId))
-                ->orderBy('plate')
-                ->get();
+        if ($selectedClientId > 0) {
+            $vehicles = $allVehicles->where('client_person_id', $selectedClientId)->values();
         }
 
         $taxRates = TaxRate::query()->orderBy('description')->get(['id', 'description', 'tax_rate']);
@@ -193,8 +195,8 @@ class WorkshopQuotationController extends Controller
 
         return view('workshop.quotations.create-external', [
             'clients' => $clients,
-            'vehicles' => $vehicles,
-            'clientId' => $clientId,
+            'vehicles' => $allVehicles,
+            'clientId' => $selectedClientId,
             'taxRates' => $taxRates,
             'productOptions' => $productOptions,
             'services' => $services,

@@ -102,35 +102,88 @@
                         <div>
                             <label class="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-400">Cliente <span class="text-red-500">*</span></label>
                             <div class="flex gap-2">
-                                <select name="client_person_id" id="quotation-external-client-select" class="h-11 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 focus:border-[#465fff] focus:outline-none">
-                                    <option value="">Seleccione…</option>
-                                    @foreach ($clients as $c)
-                                        <option value="{{ $c->id }}" @selected($selectedClientId === (int) $c->id)>
-                                            {{ $c->first_name }} {{ $c->last_name }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <button type="button" id="open-quotation-quick-client-modal" title="Nuevo cliente" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-lg font-black text-slate-700 hover:border-[#465fff] hover:text-[#465fff]">
-                                    +
+                                <div class="relative min-w-0 flex-1" @click.outside="externalQuotationClientDropdownOpen = false">
+                                    <input
+                                        x-model="externalQuotationClientSearch"
+                                        @focus="externalQuotationClientDropdownOpen = true"
+                                        @click="externalQuotationClientDropdownOpen = true"
+                                        @input="externalQuotationClientDropdownOpen = true"
+                                        class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 focus:border-[#465fff] focus:outline-none"
+                                        placeholder="Buscar cliente..."
+                                        autocomplete="off"
+                                    >
+                                    <input type="hidden" name="client_person_id" x-model="externalQuotationSelectedClientId">
+                                    <div
+                                        x-show="externalQuotationClientDropdownOpen"
+                                        x-cloak
+                                        class="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg"
+                                    >
+                                        <template x-if="externalQuotationFilteredClients().length === 0">
+                                            <p class="px-3 py-2 text-xs text-slate-500">Sin resultados.</p>
+                                        </template>
+                                        <template x-for="client in externalQuotationFilteredClients()" :key="`ext-client-${client.id}`">
+                                            <button
+                                                type="button"
+                                                @click="externalQuotationSelectClient(client)"
+                                                class="flex w-full items-center justify-between border-b border-slate-100 px-3 py-2 text-left hover:bg-slate-50 last:border-b-0"
+                                            >
+                                                <span class="text-xs font-medium text-slate-800" x-text="`${client.document_number || ''} - ${((client.first_name || '') + ' ' + (client.last_name || '')).trim()}`"></span>
+                                            </button>
+                                        </template>
+                                    </div>
+                                </div>
+                                <button type="button" @click="$dispatch('open-quotation-external-client-modal')" title="Nuevo cliente" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white hover:shadow-lg" style="background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff;">
+                                    <i class="ri-add-line text-lg"></i>
                                 </button>
                             </div>
                         </div>
                         <div>
                             <label class="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-400">Vehículo (opcional)</label>
                             <div class="flex gap-2">
-                                <select name="vehicle_id" id="quotation-external-vehicle-select" class="h-11 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 focus:border-[#465fff] focus:outline-none">
-                                    <option value="">Sin vehículo</option>
-                                    @foreach ($vehicles as $v)
-                                        <option value="{{ $v->id }}" @selected($selectedVehicleId === (int) $v->id)>
-                                            {{ $v->plate }} - {{ $v->brand }} {{ $v->model }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                <button type="button" id="open-quotation-quick-vehicle-modal" title="Nuevo vehículo" @if ($selectedClientId <= 0 || $vehicleTypes->isEmpty()) disabled @endif class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-lg font-black text-slate-700 hover:border-[#465fff] hover:text-[#465fff] disabled:cursor-not-allowed disabled:opacity-40">
-                                    +
+                                <div class="relative min-w-0 flex-1" @click.outside="externalQuotationVehicleDropdownOpen = false">
+                                    <input
+                                        x-model="externalQuotationVehicleSearch"
+                                        @focus="externalQuotationVehicleDropdownOpen = true"
+                                        @click="externalQuotationVehicleDropdownOpen = true"
+                                        @input="externalQuotationOnVehicleSearchInput()"
+                                        class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 focus:border-[#465fff] focus:outline-none"
+                                        placeholder="Buscar vehículo..."
+                                        autocomplete="off"
+                                    >
+                                    <input type="hidden" name="vehicle_id" x-model="externalQuotationSelectedVehicleId">
+                                    <div
+                                        x-show="externalQuotationVehicleDropdownOpen"
+                                        x-cloak
+                                        class="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg"
+                                    >
+                                        <div class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-3 py-2">
+                                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-600">Vehículos</p>
+                                            <button type="button" @click="externalQuotationVehicleDropdownOpen = false" class="text-xs font-semibold text-slate-500 hover:text-slate-700">
+                                                Cerrar
+                                            </button>
+                                        </div>
+                                        <template x-if="externalQuotationFilteredVehicles().length === 0">
+                                            <p class="px-3 py-2 text-xs text-slate-500">Sin resultados.</p>
+                                        </template>
+                                        <template x-for="vehicle in externalQuotationFilteredVehicles()" :key="`ext-vehicle-${vehicle.id}`">
+                                            <button
+                                                type="button"
+                                                @click="externalQuotationSelectVehicle(vehicle)"
+                                                class="flex w-full items-start justify-between border-b border-slate-100 px-3 py-2 text-left hover:bg-slate-50"
+                                            >
+                                                <span class="font-medium text-slate-800" x-text="vehicle.label || `Vehículo #${vehicle.id}`"></span>
+                                                <span class="ml-3 text-xs text-slate-500" x-text="vehicle.client_name ? `(${vehicle.client_name})` : ''"></span>
+                                            </button>
+                                        </template>
+                                    </div>
+                                </div>
+                                <button type="button"
+                                        @click="externalQuotationToggleCreatingVehicle()"
+                                        :disabled="externalQuotationSelectedClientId <= 0 || vehicleTypes.length === 0"
+                                        class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-white hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40" style="background:linear-gradient(90deg,#465fff,#3b47d9);color:#fff;">
+                                    <i class="ri-add-line text-lg"></i>
                                 </button>
                             </div>
-
                         </div>
                     </div>
                 </div>
