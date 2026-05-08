@@ -96,7 +96,7 @@
 
                     <div class="grid gap-4 md:grid-cols-3 md:items-end">
                         <div>
-                            <label class="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-400">Fecha <span class="text-red-500">*</span></label>
+                            <label class="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-400">Fecha</label>
                             <input type="date" name="quotation_date" value="{{ $quotationDateDefault }}" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 focus:border-[#465fff] focus:outline-none" required>
                         </div>
                         <div>
