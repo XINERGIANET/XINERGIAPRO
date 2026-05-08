@@ -57,20 +57,31 @@
                 {{-- CONCEPTO --}}
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-600 dark:text-gray-400">Concepto</label>
-                    <div class="relative">
+                    <div class="relative" data-gsa-skip="true">
                         <i class="ri-price-tag-3-line absolute top-1/2 left-3 -translate-y-1/2 text-gray-400"></i>
                         <select name="payment_concept_id" required x-model="formConceptId" x-ref="movementConceptSelect"
+                            :disabled="formConcept === 'Apertura de caja' || formConcept === 'Cierre de caja'"
                             x-effect="$nextTick(() => {
+                                currentConcepts.length;
                                 if (!formConceptId) return;
                                 $el.value = String(formConceptId);
                                 $el.dispatchEvent(new Event('change', { bubbles: true }));
                             })"
-                            class="h-11 w-full rounded-lg border-gray-200 bg-white pl-10 pr-4 text-sm text-gray-800 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-dark-900 dark:text-white/90 appearance-none transition-all">
+                            :class="formConcept === 'Apertura de caja' || formConcept === 'Cierre de caja'
+                                ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                                : 'bg-white dark:bg-dark-900 text-gray-800 dark:text-white/90'"
+                            class="h-11 w-full rounded-lg border-gray-200 pl-10 pr-4 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-gray-700 appearance-none transition-all">
+                            <option value="" disabled>Seleccionar...</option>
                             <template x-for="item in currentConcepts" :key="item.id">
                                 <option :value="item.id" x-text="item.description"
                                     :selected="String(item.id) === String(formConceptId)"></option>
                             </template>
                         </select>
+                        <template x-if="formConcept === 'Apertura de caja' || formConcept === 'Cierre de caja'">
+                            <input type="hidden" name="payment_concept_id" :value="formConceptId">
+                        </template>
+                        <i
+                            class="ri-arrow-down-s-line absolute top-1/2 right-3 -translate-y-1/2 text-gray-400 pointer-events-none"></i>
                     </div>
                 </div>
             </div>
