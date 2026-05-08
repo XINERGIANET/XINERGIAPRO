@@ -403,12 +403,23 @@
             const products = {{ \Illuminate\Support\Js::from($productRows) }};
             const services = {{ \Illuminate\Support\Js::from($serviceRows) }};
             const taxMap = {{ \Illuminate\Support\Js::from($taxMap) }};
+            const allClients = {{ \Illuminate\Support\Js::from($clients->map(fn($c) => ['id' => $c->id, 'first_name' => $c->first_name, 'last_name' => $c->last_name, 'person_type' => $c->person_type, 'document_number' => $c->document_number])) }};
+            const allVehicles = {{ \Illuminate\Support\Js::from($vehicles->map(fn($v) => ['id' => $v->id, 'client_person_id' => $v->client_person_id, 'plate' => $v->plate, 'brand' => $v->brand, 'model' => $v->model, 'engine_displacement_cc' => $v->engine_displacement_cc, 'label' => trim($v->brand . ' ' . $v->model . ' ' . ($v->plate ? ('- ' . $v->plate) : '')), 'client_name' => trim(($clients->firstWhere('id', $v->client_person_id)?->first_name ?? '') . ' ' . ($clients->firstWhere('id', $v->client_person_id)?->last_name ?? ''))])) }};
 
             return Object.assign(typeof formAutocompleteHelpers === 'function' ? formAutocompleteHelpers() : {}, {
                 rows: initialRows,
                 products,
                 services,
                 taxMap,
+                allClients,
+                allVehicles,
+                externalQuotationSelectedClientId: @json((string) $selectedClientId),
+                externalQuotationSelectedVehicleId: @json((string) $selectedVehicleId),
+                externalQuotationClientSearch: '',
+                externalQuotationVehicleSearch: '',
+                externalQuotationClientDropdownOpen: false,
+                externalQuotationVehicleDropdownOpen: false,
+                vehicleTypes: {{ \Illuminate\Support\Js::from($vehicleTypes) }},
                 defaultRow: {
                     line_type: 'LABOR',
                     description: 'Mano de obra',
@@ -418,6 +429,52 @@
                     service_id: '',
                     tax_rate_id: '{{ $resolvedDefaultTaxRateId ? (string) $resolvedDefaultTaxRateId : '' }}',
                     discount_amount: 0,
+                },
+                externalQuotationFilteredClients() {
+                    const q = String(this.externalQuotationClientSearch || '').trim().toLowerCase();
+                    if (!q) return this.allClients.slice(0, 30);
+                    return this.allClients
+                        .filter(c => {
+                            const doc = String(c.document_number ?? '').toLowerCase();
+                            const name = `${String(c.first_name ?? '')} ${String(c.last_name ?? '')}`.toLowerCase().trim();
+                            const label = `${doc} - ${name}`.toLowerCase();
+                            if (label.includes(q) || doc.includes(q) || name.includes(q)) return true;
+                            return false;
+                        })
+                        .slice(0, 30);
+                },
+                externalQuotationSelectClient(client) {
+                    this.externalQuotationSelectedClientId = String(client.id);
+                    this.externalQuotationClientSearch = `${client.document_number || ''} - ${((client.first_name || '') + ' ' + (client.last_name || '')).trim()}`;
+                    this.externalQuotationClientDropdownOpen = false;
+                },
+                externalQuotationFilteredVehicles() {
+                    const q = String(this.externalQuotationVehicleSearch || '').trim().toLowerCase();
+                    const clientId = String(this.externalQuotationSelectedClientId || '');
+                    const filtered = this.allVehicles.filter(v => String(v.client_person_id || '') === clientId);
+                    if (!q) return filtered.slice(0, 30);
+                    return filtered
+                        .filter(v => {
+                            const label = (v.label || '').toLowerCase();
+                            const client = (v.client_name || '').toLowerCase();
+                            return label.includes(q) || client.includes(q);
+                        })
+                        .slice(0, 30);
+                },
+                externalQuotationSelectVehicle(vehicle) {
+                    this.externalQuotationSelectedVehicleId = String(vehicle.id);
+                    this.externalQuotationVehicleSearch = vehicle.label || '';
+                    this.externalQuotationVehicleDropdownOpen = false;
+                },
+                externalQuotationOnVehicleSearchInput() {
+                    this.externalQuotationVehicleDropdownOpen = true;
+                    if (!String(this.externalQuotationVehicleSearch || '').trim()) {
+                        this.externalQuotationSelectedVehicleId = '';
+                    }
+                },
+                externalQuotationToggleCreatingVehicle() {
+                    // Placeholder for creating vehicle modal
+                    console.log('Toggle creating vehicle');
                 },
                 get summary() {
                     let subtotal = 0;
