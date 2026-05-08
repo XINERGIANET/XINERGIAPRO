@@ -1959,10 +1959,10 @@ class WorkshopMaintenanceBoardController extends Controller
     {
         $this->assertOrderScope($order);
 
-        if ((string) $order->status !== 'finished') {
+        if (!in_array((string) $order->status, ['in_progress', 'paused', 'finished'], true)) {
             return redirect()
                 ->route('workshop.maintenance-board.index')
-                ->withErrors(['error' => 'La venta y cobro solo esta disponible para OS terminadas.']);
+                ->withErrors(['error' => 'La venta y cobro solo esta disponible para OS en reparacion, pausadas o terminadas.']);
         }
 
         [$branchId, $companyId] = $this->branchScope();
@@ -2068,6 +2068,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'defaultCashRegisterId' => $defaultCashRegisterId,
             'standardCashRegisterId' => $standardCashRegisterId,
             'invoiceCashRegisterId' => $invoiceCashRegisterId,
+            'deliversOnConfirm' => (string) $order->status === 'finished',
         ]));
     }
 
@@ -2191,8 +2192,9 @@ class WorkshopMaintenanceBoardController extends Controller
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                if ((string) $lockedOrder->status !== 'finished') {
-                    throw new \RuntimeException('Solo se puede registrar venta y cobro cuando la OS esta terminada.');
+                $deliversOnConfirm = (string) $lockedOrder->status === 'finished';
+                if (!in_array((string) $lockedOrder->status, ['in_progress', 'paused', 'finished'], true)) {
+                    throw new \RuntimeException('Solo se puede registrar venta y cobro cuando la OS esta en reparacion, pausada o terminada.');
                 }
 
                 $productLines = collect($validated['product_lines'] ?? [])
@@ -2295,12 +2297,14 @@ class WorkshopMaintenanceBoardController extends Controller
                     $paymentType
                 );
 
-                $afterPayment = WorkshopMovement::query()->findOrFail($lockedOrder->id);
-                $this->flowService->updateOrder($afterPayment, [
-                    'status' => 'delivered',
-                    'delivery_date' => now()->format('Y-m-d H:i:s'),
-                    'comment' => 'Entrega automatica al registrar venta y cobro desde tablero',
-                ]);
+                if ($deliversOnConfirm) {
+                    $afterPayment = WorkshopMovement::query()->findOrFail($lockedOrder->id);
+                    $this->flowService->updateOrder($afterPayment, [
+                        'status' => 'delivered',
+                        'delivery_date' => now()->format('Y-m-d H:i:s'),
+                        'comment' => 'Entrega automatica al registrar venta y cobro desde tablero',
+                    ]);
+                }
             });
         } catch (ValidationException $e) {
             return back()
@@ -2312,7 +2316,7 @@ class WorkshopMaintenanceBoardController extends Controller
 
         return redirect()
             ->route('workshop.maintenance-board.index')
-            ->with('status', 'Venta y cobro registrados. La OS fue entregada automaticamente.');
+            ->with('status', 'Venta y cobro registrados correctamente.');
     }
 
     private function mergeExistingWorkshopDamagePhotos(WorkshopMovement $order, array $damagesWithPhotos): array

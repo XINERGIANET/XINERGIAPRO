@@ -87,8 +87,8 @@
                     $pendingDebtCard = max(0, (float) $card->total - (float) $card->paid_total);
                     $pendingBillingCountCard = (int) ($card->pending_billing_count ?? 0);
                     $canQuoteCard = ((string) $card->status === 'awaiting_approval');
-                    $canCheckoutCard = ((string) $card->status === 'finished'
-                        && ($pendingDebtCard > 0.00001 || (float) $card->total <= 0.00001));
+                    $canCheckoutCard = in_array((string) $card->status, ['in_progress', 'paused', 'finished'], true)
+                        && ($pendingBillingCountCard > 0 || $pendingDebtCard > 0.00001 || (float) $card->total <= 0.00001);
                     $canEditBoardCard = !in_array((string) $card->status, ['cancelled', 'delivered'], true) && !$card->sales_movement_id;
                     $quotationPayload = [
                         'action' => route('workshop.maintenance-board.quotation', $card),
@@ -305,7 +305,7 @@
                             @if($canCheckoutCard)
                                 <a href="{{ route('workshop.maintenance-board.checkout.page', $card) }}"
                                    class="inline-flex items-center rounded-xl bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-800">
-                                    Venta y cobro
+                                    <i class="ri-file-list-3-line mr-1"></i> Venta
                                 </a>
                             @endif
                             @if($canEditBoardCard)

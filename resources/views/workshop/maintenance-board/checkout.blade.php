@@ -254,7 +254,10 @@
         ]"
     />
 
-    <x-common.component-card title="OS Finalizada - Venta y cobro" desc="Factura servicios pendientes, agrega productos y registra el pago para entregar la unidad.">
+    <x-common.component-card
+        :title="($deliversOnConfirm ?? false) ? 'OS Finalizada - Venta y cobro' : 'Venta y cobro de OS'"
+        :desc="($deliversOnConfirm ?? false) ? 'Factura servicios pendientes, agrega productos y registra el pago para entregar la unidad.' : 'Genera la venta, emite el comprobante y registra cobro o crédito sin finalizar el servicio.'"
+    >
         @if (session('status'))
             <div class="mb-4 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-700">{{ session('status') }}</div>
         @endif
@@ -451,14 +454,18 @@
 
             <div x-show="!isDebtPaymentSelected() && nothingToCollect()" x-cloak class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
                 <p class="font-semibold">Total a cobrar: S/ 0.00</p>
-                <p class="mt-1 text-xs text-sky-800">No se registran medios de pago. Elige el documento de venta y confirma para facturar (si aplica) y marcar la OS como entregada.</p>
+                <p class="mt-1 text-xs text-sky-800">
+                    {{ ($deliversOnConfirm ?? false)
+                        ? 'No se registran medios de pago. Elige el documento de venta y confirma para facturar (si aplica) y marcar la OS como entregada.'
+                        : 'No se registran medios de pago. Elige el documento de venta y confirma para facturar (si aplica); la OS seguirá en su estado actual.' }}
+                </p>
             </div>
 
             <div x-show="!isDebtPaymentSelected() && !nothingToCollect()" x-cloak data-gsa-skip="true" class="overflow-visible rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div class="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 md:flex-row md:items-center md:justify-between">
                     <div>
                         <p class="text-sm font-semibold text-slate-800">Desglose de cobro</p>
-                        <p class="text-xs text-slate-500">Puedes combinar uno o varios métodos de pago en la misma entrega.</p>
+                        <p class="text-xs text-slate-500">Puedes combinar uno o varios métodos de pago en la misma operación.</p>
                     </div>
                     <button
                         type="button"
@@ -633,7 +640,8 @@
 
             <div class="flex flex-wrap gap-2 pt-1">
                 <x-ui.button type="submit" size="md" variant="primary" style="background:linear-gradient(90deg,#16a34a,#059669);color:#fff">
-                    <i class="ri-money-dollar-circle-line"></i><span>Confirmar venta, cobro y entrega</span>
+                    <i class="ri-money-dollar-circle-line"></i>
+                    <span>{{ ($deliversOnConfirm ?? false) ? 'Confirmar venta, cobro y entrega' : 'Confirmar venta y cobro' }}</span>
                 </x-ui.button>
                 <x-ui.link-button size="md" variant="outline" href="{{ route('workshop.maintenance-board.index') }}">
                     <i class="ri-close-line"></i><span>Cancelar</span>
@@ -643,4 +651,3 @@
     </x-common.component-card>
 </div>
 @endsection
-
