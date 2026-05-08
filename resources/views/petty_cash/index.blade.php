@@ -486,8 +486,15 @@
                                     $movementStatus = (string) ($movement->status ?? '1');
                                     $isActive = in_array($movementStatus, ['1', 'A'], true);
                                     $paymentSummary = collect($movement->cashMovement?->details ?? [])
-                                        ->groupBy('payment_method')
-                                        ->map(fn($items, $method) => trim(($method ?: 'Metodo') . ': ' . number_format($items->sum('amount'), 2)))
+                                        ->groupBy(function ($detail) {
+                                            $bank = trim((string) ($detail->bank ?? ''));
+                                            if ($bank !== '') {
+                                                return $bank;
+                                            }
+
+                                            return trim((string) ($detail->payment_method ?: 'Metodo'));
+                                        })
+                                        ->map(fn($items, $label) => trim(($label ?: 'Metodo') . ': ' . number_format($items->sum('amount'), 2)))
                                         ->values()
                                         ->implode(' | ');
                                 @endphp
