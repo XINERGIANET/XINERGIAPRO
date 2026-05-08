@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Branch;
+use App\Models\Bank;
 use App\Models\Card;
 use App\Models\CashMovements;
 use App\Models\CashRegister;
@@ -416,6 +417,11 @@ class SalesController extends Controller
             ->where('status', true)
             ->orderBy('order_num')
             ->get(['id', 'description', 'order_num']);
+
+        $banks = Bank::query()
+            ->where('status', true)
+            ->orderBy('order_num')
+            ->get(['id', 'description', 'order_num']);
         $units = Unit::query()
             ->orderBy('description')
             ->get(['id', 'description']);
@@ -466,6 +472,7 @@ class SalesController extends Controller
             'paymentGateways' => $paymentGateways,
             'cards' => $cards,
             'digitalWallets' => $digitalWallets,
+            'banks' => $banks,
             'units' => $units,
             'cashRegisters' => $cashRegisters,
             'defaultCashRegisterId' => $defaultCashRegisterId,
@@ -606,6 +613,7 @@ class SalesController extends Controller
                     'amount',
                     'payment_gateway_id',
                     'card_id',
+                    'bank_id',
                     'digital_wallet_id',
                 ])
                 ->map(fn ($row) => [
@@ -613,6 +621,7 @@ class SalesController extends Controller
                     'amount' => (float) ($row->amount ?? 0),
                     'payment_gateway_id' => $row->payment_gateway_id ? (int) $row->payment_gateway_id : null,
                     'card_id' => $row->card_id ? (int) $row->card_id : null,
+                    'bank_id' => $row->bank_id ? (int) $row->bank_id : null,
                     'digital_wallet_id' => $row->digital_wallet_id ? (int) $row->digital_wallet_id : null,
                 ])
                 ->values()
@@ -920,6 +929,7 @@ class SalesController extends Controller
                 'payment_methods.*.amount' => 'nullable|numeric|min:0',
                 'payment_methods.*.payment_gateway_id' => 'nullable|integer|exists:payment_gateways,id',
                 'payment_methods.*.card_id' => 'nullable|integer|exists:cards,id',
+                'payment_methods.*.bank_id' => 'nullable|integer|exists:banks,id',
                 'payment_methods.*.digital_wallet_id' => 'nullable|integer|exists:digital_wallets,id',
                 'billing_status' => 'nullable|string|in:PENDING,INVOICED,NOT_APPLICABLE',
                 'invoice_series' => 'nullable|string|max:20',
@@ -1489,14 +1499,19 @@ class SalesController extends Controller
                 $paymentMethodDescription = mb_strtolower((string) ($paymentMethod->description ?? ''));
                 $paymentGateway = null;
                 $card = null;
+                $bank = null;
                 $digitalWallet = null;
 
                 if ((str_contains($paymentMethodDescription, 'billetera') || str_contains($paymentMethodDescription, 'wallet')) && empty($paymentMethodData['digital_wallet_id'])) {
-                    throw new \Exception('Debe seleccionar la billetera digital del metodo de pago.');
+                    throw new \Exception('Debe seleccionar la billetera digital del método de pago.');
                 }
 
                 if ((str_contains($paymentMethodDescription, 'tarjeta') || str_contains($paymentMethodDescription, 'card')) && empty($paymentMethodData['card_id'])) {
-                    throw new \Exception('Debe seleccionar el detalle de tarjeta del metodo de pago.');
+                    throw new \Exception('Debe seleccionar el detalle de tarjeta del método de pago.');
+                }
+
+                if ((str_contains($paymentMethodDescription, 'transfer') || str_contains($paymentMethodDescription, 'banco')) && empty($paymentMethodData['bank_id'])) {
+                    throw new \Exception('Debe seleccionar el banco del método de pago.');
                 }
                 
                 if ($paymentMethodData['payment_gateway_id']) {
@@ -1505,6 +1520,10 @@ class SalesController extends Controller
                 
                 if ($paymentMethodData['card_id']) {
                     $card = Card::find($paymentMethodData['card_id']);
+                }
+
+                if (!empty($paymentMethodData['bank_id'])) {
+                    $bank = Bank::find($paymentMethodData['bank_id']);
                 }
 
                 if (!empty($paymentMethodData['digital_wallet_id'])) {
@@ -1520,8 +1539,8 @@ class SalesController extends Controller
                     'number' => $cashReferenceNumber,
                     'card_id' => $card?->id,
                     'card' => $card?->description ?? '',
-                    'bank_id' => null,
-                    'bank' => '',
+                    'bank_id' => $bank?->id,
+                    'bank' => $bank?->description ?? '',
                     'digital_wallet_id' => $digitalWallet?->id,
                     'digital_wallet' => $digitalWallet?->description ?? '',
                     'payment_gateway_id' => $paymentGateway?->id,

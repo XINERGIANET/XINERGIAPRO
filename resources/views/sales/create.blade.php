@@ -10,7 +10,7 @@ $isEditMode = $posMode === 'edit';
 $pageTitle = $invoiceMode && $isEditMode ? 'Facturar venta' : ($isEditMode ? 'Editar venta' : 'Nueva venta');
 $cardDescription = $isEditMode
 ? 'Actualiza la venta con la misma interfaz del punto de venta.'
-: 'Interfaz de venta r?pida. Puedes seguir agregando productos aunque el stock mostrado sea 0.';
+: 'Interfaz de venta rápida. Puedes seguir agregando productos aunque el stock mostrado sea 0.';
 $secondaryActionLabel = $isEditMode ? 'Cancelar' : 'Guardar';
 $secondaryActionIcon = $isEditMode ? 'ri-close-line' : 'ri-save-line';
 $primaryActionLabel =
@@ -22,7 +22,7 @@ $primaryActionIcon = $isEditMode ? 'ri-save-line' : 'ri-cash-line';
     <x-common.page-breadcrumb :pageTitle="$pageTitle" />
 
     <x-common.component-card title="Punto de Venta"
-        desc="Interfaz de venta rÃ¡pida. Puedes seguir agregando productos aunque el stock mostrado sea 0.">
+        desc="Interfaz de venta rápida. Puedes seguir agregando productos aunque el stock mostrado sea 0.">
         <div class="flex items-start gap-6" style="display:flex; align-items:flex-start; gap:1.5rem;">
             <section class="min-w-0 space-y-5" style="flex: 0 0 60%; max-width: 60%; width: 60%;">
 
@@ -81,7 +81,7 @@ $primaryActionIcon = $isEditMode ? 'ri-save-line' : 'ri-cash-line';
                             <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
                                 <i class="ri-search-line text-lg"></i>
                             </span>
-                            <input id="product-search-legacy" type="text" placeholder="Buscar por nombre o categorÃ­a"
+                            <input id="product-search-legacy" type="text" placeholder="Buscar por nombre o categoría"
                                 class="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-12 pr-4 text-sm font-medium text-slate-700 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100">
                         </div>
                         <div class="flex flex-wrap gap-2">
@@ -133,7 +133,7 @@ $primaryActionIcon = $isEditMode ? 'ri-save-line' : 'ri-cash-line';
                                 <p class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Catalogo</p>
                                 <h4 class="text-base font-bold text-slate-900">Venta por glosa</h4>
                                 <p class="mt-1 text-sm text-slate-500">Registra conceptos manuales sin obligar un
-                                    producto del catÃƒÂ¡logo.</p>
+                                    producto del catálogo.</p>
                             </div>
                             <button type="button" id="add-glosa-button"
                                 class="inline-flex h-11 items-center gap-2 rounded-2xl px-4 text-sm font-bold text-white shadow-theme-xs"
@@ -560,6 +560,7 @@ return [
             const cards = Array.isArray(@json($cards ?? [])) ? @json($cards ?? []) : [];
             const digitalWallets = Array.isArray(@json($digitalWallets ?? [])) ?
                 @json($digitalWallets ?? []) : [];
+            const banks = Array.isArray(@json($banks ?? [])) ? @json($banks ?? []) : [];
             const units = Array.isArray(@json($units ?? [])) ? @json($units ?? []) : [];
 
             const priceByProductId = new Map();
@@ -704,6 +705,7 @@ return [
                     amount: Number(row.amount || 0),
                     payment_gateway_id: row.payment_gateway_id ? Number(row.payment_gateway_id) : null,
                     card_id: row.card_id ? Number(row.card_id) : null,
+                    bank_id: row.bank_id ? Number(row.bank_id) : null,
                     digital_wallet_id: row.digital_wallet_id ? Number(row.digital_wallet_id) : null,
                     method_variant_key: row.method_variant_key || null,
                 })) : [];
@@ -1533,6 +1535,8 @@ return [
                 paymentRows[index].card_id = variant.card_id ? Number(variant.card_id) : null;
                 paymentRows[index].digital_wallet_id = variant.digital_wallet_id ? Number(variant
                     .digital_wallet_id) : null;
+                paymentRows[index].bank_id = isBankTransferMethod(variant.payment_method_id) ? (paymentRows[index]
+                    .bank_id || defaultBankId()) : null;
                 if (variant.kind !== 'card') {
                     paymentRows[index].payment_gateway_id = null;
                 }
@@ -1603,8 +1607,8 @@ return [
             };
             const cardTypeLabel = (type) => {
                 const c = String(type || '').trim().toUpperCase();
-                if (c === 'C') return 'CrÃ©dito';
-                if (c === 'D') return 'DÃ©bito';
+                if (c === 'C') return 'Crédito';
+                if (c === 'D') return 'Débito';
                 return '';
             };
             const buildPaymentMethodVariants = () => paymentMethods.flatMap((method) => {
@@ -1658,9 +1662,15 @@ return [
                 const description = String(method?.description || '').toLowerCase();
                 return description.includes('tarjeta') || description.includes('card');
             };
+            const isBankTransferMethod = (methodId) => {
+                const method = paymentMethods.find((pm) => Number(pm.id) === Number(methodId));
+                const description = String(method?.description || '').toLowerCase();
+                return description.includes('transfer') || description.includes('banco');
+            };
+            const defaultBankId = () => Number(banks[0]?.id || 0) || null;
             const getMethodName = (methodId) => {
                 const method = paymentMethods.find((pm) => Number(pm.id) === Number(methodId));
-                return method?.description || 'MÃ©todo';
+                return method?.description || 'Método';
             };
 
             function getCategories() {
@@ -1852,6 +1862,7 @@ return [
                     amount: Number(row.amount) || 0,
                     payment_gateway_id: row.payment_gateway_id ? Number(row.payment_gateway_id) : null,
                     card_id: row.card_id ? Number(row.card_id) : null,
+                    bank_id: row.bank_id ? Number(row.bank_id) : null,
                     digital_wallet_id: row.digital_wallet_id ? Number(row.digital_wallet_id) : null,
                     method_variant_key: row.method_variant_key || null,
                 }));
@@ -1934,7 +1945,7 @@ return [
             function addPaymentRow(prefillAmount = null) {
                 const fallbackVariant = getDefaultPaymentVariant();
                 if (!fallbackVariant) {
-                    showNotice('No hay mÃ©todos de pago disponibles.');
+                    showNotice('No hay métodos de pago disponibles.');
                     return;
                 }
 
@@ -1949,6 +1960,7 @@ return [
                         remaining),
                     payment_gateway_id: null,
                     card_id: fallbackVariant.card_id ? Number(fallbackVariant.card_id) : null,
+                    bank_id: isBankTransferMethod(fallbackVariant.payment_method_id) ? defaultBankId() : null,
                     digital_wallet_id: fallbackVariant.digital_wallet_id ? Number(fallbackVariant
                         .digital_wallet_id) : null,
                     method_variant_key: fallbackVariant.key,
@@ -1969,7 +1981,7 @@ return [
 
                 if (!paymentRows.length) {
                     container.innerHTML =
-                        '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-center text-xs font-medium text-slate-500">Agrega al menos un m?todo de pago.</div>';
+                        '<div class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-center text-xs font-medium text-slate-500">Agrega al menos un método de pago.</div>';
                     updatePaymentSummary();
                     return;
                 }
@@ -1984,11 +1996,20 @@ return [
                     const selectedVariant = getPaymentVariantByKey(selectedVariantKey);
                     const showCardFields = selectedVariant?.kind === 'card' || isCardMethod(row
                         .payment_method_id);
-                    const layoutStyle = showCardFields ?
+                    const showBankFields = isBankTransferMethod(row.payment_method_id);
+                    if (showBankFields && !row.bank_id) {
+                        row.bank_id = defaultBankId();
+                    } else if (!showBankFields && row.bank_id) {
+                        row.bank_id = null;
+                    }
+                    const layoutStyle = (showCardFields || showBankFields) ?
                         'display:grid; gap:0.75rem; grid-template-columns:minmax(0,1.7fr) minmax(0,0.9fr) minmax(0,1fr) auto;' :
                         'display:grid; gap:0.75rem; grid-template-columns:minmax(0,1.8fr) minmax(0,1fr) auto;';
                     const gatewayOptions = paymentGateways.map((gateway) => `
-                            <option value="${gateway.id}" ${Number(row.payment_gateway_id) === Number(gateway.id) ? 'selected' : ''}>${gateway.description}</option>
+                            <option value="${gateway.id}" ${Number(row.payment_gateway_id) === Number(gateway.id) ? 'selected' : ''}>${escapeHtml(gateway.description)}</option>
+                        `).join('');
+                    const bankOptions = banks.map((bank) => `
+                            <option value="${bank.id}" ${Number(row.bank_id) === Number(bank.id) ? 'selected' : ''}>${escapeHtml(bank.description)}</option>
                         `).join('');
                     const methodLabel = escapeHtml(selectedVariant?.label || 'Seleccionar');
 
@@ -1996,7 +2017,7 @@ return [
                             <div class="rounded-2xl border border-slate-200 bg-slate-50 p-3">
                                 <div style="${layoutStyle}">
                                     <div class="space-y-1 js-payment-method-ac relative" data-index="${index}">
-                                        <label class="block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">MÃ©todo</label>
+                                        <label class="block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Método</label>
                                         <button type="button" class="payment-method-ac-trigger flex h-11 w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 text-left text-sm font-semibold text-slate-700 outline-none transition hover:border-orange-200 focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                                             <span class="payment-method-ac-label min-w-0 flex-1 truncate">${methodLabel}</span>
                                             <span class="shrink-0 text-slate-400"><i class="ri-arrow-down-s-line text-lg"></i></span>
@@ -2018,6 +2039,14 @@ return [
                                                                 <select data-role="gateway" data-index="${index}" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
                                                                     <option value="">Seleccionar</option>
                                                                     ${gatewayOptions}
+                                                                </select>
+                                                            </div>
+                                                        ` : ''}
+                                    ${showBankFields ? `
+                                                            <div class="space-y-1">
+                                                                <label class="block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Banco</label>
+                                                                <select data-role="bank" data-index="${index}" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-100">
+                                                                    ${bankOptions || '<option value="">Sin bancos</option>'}
                                                                 </select>
                                                             </div>
                                                         ` : ''}
@@ -2048,6 +2077,15 @@ return [
                         paymentRows[index].payment_gateway_id = event.currentTarget.value ?
                             Number(event
                                 .currentTarget.value) : null;
+                        syncPaymentRows();
+                    });
+                });
+
+                container.querySelectorAll('[data-role="bank"]').forEach((element) => {
+                    element.addEventListener('change', (event) => {
+                        const index = Number(event.currentTarget.dataset.index);
+                        paymentRows[index].bank_id = event.currentTarget.value ?
+                            Number(event.currentTarget.value) : null;
                         syncPaymentRows();
                     });
                 });
@@ -2414,7 +2452,7 @@ return [
 
                 if (!currentSale.items.length) {
                     container.innerHTML =
-                        '<div class="flex min-h-[240px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-center"><div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-sm"><i class="ri-shopping-bag-3-line text-3xl"></i></div><p class="mt-4 text-base font-bold text-slate-800">Sin productos en la orden</p><p class="mt-1 text-sm text-slate-500">Agrega productos desde el catÃ¡logo.</p></div>';
+                        '<div class="flex min-h-[240px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-8 text-center"><div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-sm"><i class="ri-shopping-bag-3-line text-3xl"></i></div><p class="mt-4 text-base font-bold text-slate-800">Sin productos en la orden</p><p class="mt-1 text-sm text-slate-500">Agrega productos desde el catálogo.</p></div>';
                 } else {
                     currentSale.items.forEach((item, index) => {
                         const isManualLine = Number(item.pId || 0) <= 0 || String(item.kind || '') ===
@@ -2568,7 +2606,7 @@ return [
                 }
 
                 if (!isDebtSaleSelected() && !paymentRows.length) {
-                    showNotice('Agrega al menos un mÃ©todo de pago.');
+                    showNotice('Agrega al menos un método de pago.');
                     return;
                 }
 
@@ -2636,6 +2674,7 @@ return [
                         payment_gateway_id: row.payment_gateway_id ? Number(row
                             .payment_gateway_id) : null,
                         card_id: row.card_id ? Number(row.card_id) : null,
+                        bank_id: row.bank_id ? Number(row.bank_id) : null,
                         digital_wallet_id: row.digital_wallet_id ? Number(row
                             .digital_wallet_id) : null,
                     })),
@@ -2989,7 +3028,7 @@ return [
 
                 renderTicket();
                 updatePaymentSummary
-                    (); // ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â´ IMPORTANTE
+                    (); // IMPORTANTE
 
                 document.getElementById('sale-discount-modal')?.classList.add('hidden');
 

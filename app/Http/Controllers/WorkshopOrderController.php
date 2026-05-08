@@ -151,7 +151,7 @@ class WorkshopOrderController extends Controller
         ]);
 
         if ($validator->fails()) {
-            $msg = (string) ($validator->errors()->first('file') ?: 'Archivo no vÃ¡lido. Usa .xlsx, .xls o .csv (mÃ¡x. 10 MB).');
+            $msg = (string) ($validator->errors()->first('file') ?: 'Archivo no válido. Usa .xlsx, .xls o .csv (máx. 10 MB).');
 
             return redirect()
                 ->route('workshop.orders.index', array_filter(['view_id' => $viewId]))
@@ -166,15 +166,15 @@ class WorkshopOrderController extends Controller
         if ($branchId <= 0 || $companyId <= 0) {
             return redirect()
                 ->route('workshop.orders.index', array_filter(['view_id' => $viewId]))
-                ->with('error', 'Selecciona una sucursal para importar Ã³rdenes.');
+                ->with('error', 'Selecciona una sucursal para importar órdenes.');
         }
 
         $uploaded = $request->file('file');
         if (!$uploaded) {
             return redirect()
                 ->route('workshop.orders.index', array_filter(['view_id' => $viewId]))
-                ->withErrors(['file' => 'No se recibiÃ³ ningÃºn archivo.'])
-                ->with('error', 'No se recibiÃ³ ningÃºn archivo.');
+                ->withErrors(['file' => 'No se recibió ningún archivo.'])
+                ->with('error', 'No se recibió ningún archivo.');
         }
 
         $ext = strtolower((string) $uploaded->getClientOriginalExtension());
@@ -263,7 +263,7 @@ class WorkshopOrderController extends Controller
 
                     $glosas = $row['service_descriptions'];
                     if ($glosas === []) {
-                        throw new \RuntimeException('OBSERVACIONES sin Ã­tems vÃ¡lidos despuÃ©s de separar por +.');
+                        throw new \RuntimeException('OBSERVACIONES sin ítems válidos después de separar por +.');
                     }
 
                     $intakeDate = $row['intake_date'] ?? now()->toDateString();
@@ -305,7 +305,7 @@ class WorkshopOrderController extends Controller
         if ($rowErrors !== []) {
             $msg .= ' Errores: ' . implode(' | ', array_slice($rowErrors, 0, 8));
             if (count($rowErrors) > 8) {
-                $msg .= ' (+' . (count($rowErrors) - 8) . ' mÃ¡s)';
+                $msg .= ' (+' . (count($rowErrors) - 8) . ' más)';
             }
         }
 
@@ -363,7 +363,7 @@ class WorkshopOrderController extends Controller
             return true;
         }
 
-        $markers = ['-', '--', '.', '..', 'N/A', 'NA', 'S/N', 'SN', 'XXX', 'SINPLACA', '0', '00', 'â€”', 'â€“'];
+        $markers = ['-', '--', '.', '..', 'N/A', 'NA', 'S/N', 'SN', 'XXX', 'SINPLACA', '0', '00', '—', '–'];
         foreach ($markers as $m) {
             if ($normalized === strtoupper($m)) {
                 return true;
@@ -486,7 +486,7 @@ class WorkshopOrderController extends Controller
     {
         $t = strtoupper(trim($value));
 
-        return $t === '-' || $t === 'â€”' || $t === 'â€“' || $t === 'N/A' || $t === 'S/N';
+        return $t === '-' || $t === '—' || $t === '–' || $t === 'N/A' || $t === 'S/N';
     }
 
     private function isImportAnonymousDocument(string $doc): bool
@@ -496,7 +496,7 @@ class WorkshopOrderController extends Controller
             return true;
         }
         $u = strtoupper($t);
-        if (in_array($u, ['-', 'N/A', 'S/N', 'SN', 'â€”', 'â€“'], true)) {
+        if (in_array($u, ['-', 'N/A', 'S/N', 'SN', '—', '–'], true)) {
             return true;
         }
         if (preg_match('/^\d+$/', $t)) {
@@ -570,7 +570,7 @@ class WorkshopOrderController extends Controller
         $branch = Branch::query()->findOrFail($branchId);
         $districtId = (int) ($branch->location_id ?? 0);
         if ($districtId <= 0) {
-            throw new \RuntimeException('La sucursal no tiene distrito configurado; no se puede crear el cliente de la fila Â«' . $fullName . 'Â».');
+            throw new \RuntimeException('La sucursal no tiene distrito configurado; no se puede crear el cliente de la fila «' . $fullName . '».');
         }
 
         [$firstName, $lastName] = $this->splitImportPersonFullName($fullName);
@@ -990,7 +990,7 @@ class WorkshopOrderController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
 
-        return back()->with('status', 'Cotizacion generada y enviada a aprobacion.');
+        return back()->with('status', 'Cotización generada y enviada a aprobacion.');
     }
 
     public function consumePart(ConsumeWorkshopPartRequest $request, WorkshopMovement $order): RedirectResponse
@@ -1388,4 +1388,3 @@ class WorkshopOrderController extends Controller
         return $path;
     }
 }
-

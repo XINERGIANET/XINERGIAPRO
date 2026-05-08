@@ -557,7 +557,7 @@ class WorkshopMaintenanceBoardController extends Controller
         $showInventoryDefault = $this->branchBooleanParameter($branchId, 'Mostrar inventario', true);
         $showDamagesPreexistingDefault = $this->branchBooleanParameter($branchId, [
             'Mostrar daños preexistentes',
-            'Mostrar daÃ±os preexistentes',
+            'Mostrar daños preexistentes',
         ], true);
 
         $editableServicePricesEnabled = $this->isCatalogServicePriceEditingEnabled($branchId);
@@ -1402,15 +1402,15 @@ class WorkshopMaintenanceBoardController extends Controller
 
                 if ((string) $lockedOrder->status === 'awaiting_approval' && !empty($validated['quote_note'])) {
                     $this->flowService->updateOrder($lockedOrder, [
-                        'observations' => trim(((string) $lockedOrder->observations . "\n" . '[Cotizacion] ' . (string) $validated['quote_note'])),
+                        'observations' => trim(((string) $lockedOrder->observations . "\n" . '[Cotización] ' . (string) $validated['quote_note'])),
                     ]);
                 }
 
-                // Al aprobar cotizaciÃ³n desde tablero, la OS pasa a estado aprobado.
+                // Al aprobar cotización desde tablero, la OS pasa a estado aprobado.
                 if ((string) $lockedOrder->status === 'awaiting_approval') {
                     $this->flowService->updateOrder($lockedOrder, [
                         'status' => 'approved',
-                        'comment' => 'Cotizacion aprobada desde tablero',
+                        'comment' => 'Cotización aprobada desde tablero',
                     ]);
                 }
             });
@@ -1418,7 +1418,7 @@ class WorkshopMaintenanceBoardController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
 
-        return back()->with('status', 'CotizaciÃ³n aprobada correctamente.');
+        return back()->with('status', 'Cotización aprobada correctamente.');
     }
 
     public function storeVehicleQuick(Request $request): JsonResponse
@@ -1851,7 +1851,7 @@ class WorkshopMaintenanceBoardController extends Controller
 
         try {
             if ($order->status !== 'in_progress_external') {
-                throw new \RuntimeException('Solo se pueden finalizar servicios externos que estÃ©n en progreso.');
+                throw new \RuntimeException('Solo se pueden finalizar servicios externos que estén en progreso.');
             }
 
             $branchId = (int) session('branch_id');
@@ -1866,7 +1866,7 @@ class WorkshopMaintenanceBoardController extends Controller
                 'status' => $targetStatus,
                 'last_status' => null,
                 'finished_photo_path' => $photoPath,
-                'comment' => "Finalizacion de servicio externo. Vuelve a estado {$targetStatus} para seguir el flujo.",
+                'comment' => "Finalización de servicio externo. Vuelve a estado {$targetStatus} para seguir el flujo.",
             ]);
         } catch (\Throwable $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
@@ -1894,7 +1894,7 @@ class WorkshopMaintenanceBoardController extends Controller
             $this->flowService->updateOrder($order, [
                 'status' => 'finished',
                 'finished_photo_path' => $photoPath,
-                'comment' => 'Finalizacion desde tablero',
+                'comment' => 'Finalización desde tablero',
             ]);
         } catch (\Throwable $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
@@ -1912,7 +1912,7 @@ class WorkshopMaintenanceBoardController extends Controller
 
         try {
             if ((string) $order->status !== 'in_progress') {
-                throw new \RuntimeException('Solo se pueden pausar servicios en reparaciÃ³n.');
+                throw new \RuntimeException('Solo se pueden pausar servicios en reparación.');
             }
 
             $this->flowService->updateOrder($order, [
@@ -1946,7 +1946,7 @@ class WorkshopMaintenanceBoardController extends Controller
                 'status' => 'in_progress',
                 'paused_at' => null,
                 'total_paused_minutes' => (int) ($order->total_paused_minutes ?? 0) + $minutes,
-                'comment' => 'ReanudaciÃ³n de servicio desde tablero',
+                'comment' => 'Reanudación de servicio desde tablero',
             ]);
         } catch (\Throwable $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
@@ -2152,7 +2152,7 @@ class WorkshopMaintenanceBoardController extends Controller
                         $allowedGateways = $gatewayMethodMap->get((int) $payment['payment_method_id'], []);
                         if (!in_array((int) $payment['payment_gateway_id'], $allowedGateways, true)) {
                             throw ValidationException::withMessages([
-                                "payment_methods.{$index}.payment_gateway_id" => 'La pasarela no corresponde al mÃ©todo de pago seleccionado.',
+                                "payment_methods.{$index}.payment_gateway_id" => 'La pasarela no corresponde al método de pago seleccionado.',
                             ]);
                         }
                     }
@@ -2253,8 +2253,8 @@ class WorkshopMaintenanceBoardController extends Controller
                     ->whereNull('sales_movement_id')
                     ->count();
 
-                // Mantener la misma lÃ³gica operativa del mÃ³dulo de ventas:
-                // si aÃºn no existe venta asociada o hay lÃ­neas pendientes, primero se factura.
+                // Mantener la misma lógica operativa del módulo de ventas:
+                // si aún no existe venta asociada o hay líneas pendientes, primero se factura.
                 $mustGenerateSale = (bool) ($validated['generate_sale'] ?? false);
                 if ((int) ($lockedOrder->sales_movement_id ?? 0) <= 0 || $pendingLines > 0) {
                     $mustGenerateSale = true;
@@ -2615,7 +2615,7 @@ class WorkshopMaintenanceBoardController extends Controller
             str_contains($normalized, 'tarjeta')
             || str_contains($normalized, 'card')
             || str_contains($normalized, 'credito')
-            || str_contains($normalized, 'dÃ©bito')
+            || str_contains($normalized, 'débito')
             || str_contains($normalized, 'debito')
         ) {
             return 'card';

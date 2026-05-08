@@ -61,7 +61,7 @@ class MenuOptionSeeder extends Seeder
                 ['name' => 'Cuentas por cobrar', 'action' => '/admin/caja/cuentas-por-cobrar',  'icon' => 'ri-money-dollar-circle-line'],
                 ['name' => 'Cuentas por pagar',  'action' => '/admin/caja/cuentas-por-pagar',   'icon' => 'ri-file-list-3-line'],
             ],
-            'Configuraci�n' => [
+            'Configuración' => [
                 ['name' => 'Parametros',         'action' => '/admin/configuracion/parametros', 'icon' => 'mdi-cog'],
                 ['name' => 'Menu y recetas',     'action' => '/admin/configuracion/menu',       'icon' => 'mdi-food-fork-drink'],
                 ['name' => 'Impuestos',          'action' => '/admin/configuracion/impuestos',  'icon' => 'mdi-percent'],

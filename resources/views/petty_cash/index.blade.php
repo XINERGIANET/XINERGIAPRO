@@ -119,7 +119,7 @@
         listIngresos: {{ Js::from($conceptsIngreso) }},
         listEgresos: {{ Js::from($conceptsEgreso) }},
         currentConcepts: []
-    }" {{-- LÃ“GICA DEL EVENTO --}}
+    }" {{-- LÓGICA DEL EVENTO --}}
         @open-movement-modal.window="
         let conceptText = $event.detail.concept || ''; 
         let receivedId = String($event.detail.docId);
@@ -130,7 +130,7 @@
         formConceptId = ''; 
         formDocId = receivedId;
 
-        // Filtrar listas segÃºn si es Ingreso o Egreso
+        // Filtrar listas según si es Ingreso o Egreso
         if (receivedId === refIngresoId) {
             
             if (conceptText === 'Apertura de caja') {
@@ -173,7 +173,7 @@
 
         <x-common.page-breadcrumb pageTitle="Movimientos de Caja" />
 
-        <x-common.component-card title="GestiÃ³n de Movimientos" desc="Control de ingresos, egresos y traslados de fondos.">
+        <x-common.component-card title="Gestión de Movimientos" desc="Control de ingresos, egresos y traslados de fondos.">
 
             <div class="flex flex-col gap-5">
                 {{-- FILTROS (misma estructura que kardex: grid en 2 filas) --}}
@@ -675,7 +675,7 @@
                 <div class="mb-4 flex items-center justify-between">
                     <div>
                         <p class="text-[10px] uppercase tracking-[0.2em] text-gray-400">
-                            <span x-text="formDocId == ingresoId ? 'OperaciÃ³n de Ingreso' : 'OperaciÃ³n de Egreso'"></span>
+                            <span x-text="formDocId == ingresoId ? 'Operación de Ingreso' : 'Operación de Egreso'"></span>
                         </p>
                         <h3 class="mt-1 text-base font-semibold text-gray-800 dark:text-white/90"
                             x-text="formDocId == ingresoId ? 'Registrar Ingreso' : 'Registrar Egreso'">

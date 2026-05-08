@@ -9,7 +9,7 @@ class ModuleSeeder extends Seeder
 {
     public function run(): void
     {
-        $this->command->info('Creando m�dulos...');
+        $this->command->info('Creando módulos...');
 
         $modules = [
             [
@@ -62,7 +62,7 @@ class ModuleSeeder extends Seeder
                 'updated_at' => now(),
             ],
             [
-                'name' => 'Configuraci�n',
+                'name' => 'Configuración',
                 'icon' => 'ri-settings-3-line',
                 'order_num' => 8,
                 'created_at' => now(),
@@ -85,14 +85,14 @@ class ModuleSeeder extends Seeder
                         'updated_at' => now(),
                     ]);
                 $updated++;
-                $this->command->info("  ? M�dulo '{$module['name']}' actualizado (ID: {$existing->id})");
+                $this->command->info("  ? Módulo '{$module['name']}' actualizado (ID: {$existing->id})");
             } else {
                 DB::table('modules')->insert($module);
                 $inserted++;
-                $this->command->info("  ? M�dulo '{$module['name']}' creado exitosamente");
+                $this->command->info("  ? Módulo '{$module['name']}' creado exitosamente");
             }
         }
 
-        $this->command->info("? Proceso finalizado. {$inserted} m�dulos nuevos, {$updated} actualizados.");
+        $this->command->info("? Proceso finalizado. {$inserted} módulos nuevos, {$updated} actualizados.");
     }
 }

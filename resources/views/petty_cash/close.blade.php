@@ -444,10 +444,10 @@
                                 <span x-text="descuadre > 0 ? '(Faltante)' : (descuadre < 0 ? '(Sobrante)' : '(Cuadrado)')"></span>
                             </div>
                         </div>
-                        <div class="pc-tile green">
+                        {{-- <div class="pc-tile green">
                             <span class="pc-tile-label">Total Contado (billetes/monedas)</span>
                             <span class="pc-tile-value" x-text="'S/ ' + formatMoney(realCashTotal)"></span>
-                        </div>
+                        </div> --}}
                     </div>
 
                     <div class="pc-currency-box">
