@@ -707,9 +707,13 @@ class WorkshopFlowService
                 ? $this->allocateQuotationCorrelative($branchId)
                 : null;
 
+            $quotationDate = !empty($data['quotation_date'])
+                ? \Carbon\Carbon::parse((string) $data['quotation_date'])->startOfDay()
+                : now();
+
             $movement = Movement::query()->create([
                 'number' => $this->generateMovementNumber($branchId, $documentTypeId),
-                'moved_at' => now(),
+                'moved_at' => $quotationDate,
                 'user_id' => $userId,
                 'user_name' => $userName,
                 'person_id' => $client->id,
@@ -732,7 +736,7 @@ class WorkshopFlowService
                 'vehicle_id' => $vehicleId,
                 'client_person_id' => $client->id,
                 'appointment_id' => null,
-                'intake_date' => now(),
+                'intake_date' => $quotationDate,
                 'delivery_date' => null,
                 'mileage_in' => null,
                 'mileage_out' => null,
@@ -768,6 +772,8 @@ class WorkshopFlowService
                     'offer_validity' => isset($data['quotation_offer_validity']) ? trim((string) $data['quotation_offer_validity']) : '',
                     'service_warranty' => isset($data['quotation_service_warranty']) ? trim((string) $data['quotation_service_warranty']) : '',
                     'delivery_place' => isset($data['quotation_delivery_place']) ? trim((string) $data['quotation_delivery_place']) : '',
+                    'currency_note' => isset($data['quotation_currency_note']) ? trim((string) $data['quotation_currency_note']) : '',
+                    'credit_days' => isset($data['quotation_credit_days']) && $data['quotation_credit_days'] !== '' ? (int) $data['quotation_credit_days'] : null,
                     'prices_note' => isset($data['quotation_prices_note']) ? trim((string) $data['quotation_prices_note']) : '',
                     'payment_condition' => isset($data['quotation_payment_condition']) ? trim((string) $data['quotation_payment_condition']) : '',
                     'bank_account_bcp' => isset($data['quotation_bank_account_bcp']) ? trim((string) $data['quotation_bank_account_bcp']) : '',
@@ -907,15 +913,22 @@ class WorkshopFlowService
                 'offer_validity' => isset($data['quotation_offer_validity']) ? trim((string) $data['quotation_offer_validity']) : '',
                 'service_warranty' => isset($data['quotation_service_warranty']) ? trim((string) $data['quotation_service_warranty']) : '',
                 'delivery_place' => isset($data['quotation_delivery_place']) ? trim((string) $data['quotation_delivery_place']) : '',
+                'currency_note' => isset($data['quotation_currency_note']) ? trim((string) $data['quotation_currency_note']) : '',
+                'credit_days' => isset($data['quotation_credit_days']) && $data['quotation_credit_days'] !== '' ? (int) $data['quotation_credit_days'] : null,
                 'prices_note' => isset($data['quotation_prices_note']) ? trim((string) $data['quotation_prices_note']) : '',
                 'payment_condition' => isset($data['quotation_payment_condition']) ? trim((string) $data['quotation_payment_condition']) : '',
                 'bank_account_bcp' => isset($data['quotation_bank_account_bcp']) ? trim((string) $data['quotation_bank_account_bcp']) : '',
                 'bank_cci' => isset($data['quotation_bank_cci']) ? trim((string) $data['quotation_bank_cci']) : '',
             ];
 
+            $quotationDate = !empty($data['quotation_date'])
+                ? \Carbon\Carbon::parse((string) $data['quotation_date'])->startOfDay()
+                : ($quotation->intake_date ?? now());
+
             $patch = [
                 'vehicle_id' => $vehicleId,
                 'client_person_id' => $client->id,
+                'intake_date' => $quotationDate,
                 'diagnosis_text' => $data['diagnosis_text'] ?? null,
                 'observations' => $data['observations'] ?? null,
             ];
@@ -938,6 +951,7 @@ class WorkshopFlowService
                 'user_name' => $userName,
                 'responsible_id' => $userId,
                 'responsible_name' => $userName,
+                'moved_at' => $quotationDate,
             ]);
 
             WorkshopMovementDetail::query()

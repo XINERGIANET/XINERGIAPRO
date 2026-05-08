@@ -37,6 +37,7 @@ class WorkshopParameterSeeder extends Seeder
             ['description' => 'WS_NO_LABOR_CHARGE_WARRANTY', 'value' => '1'],
             ['description' => 'WS_REQUIRED_CHECKLIST_TYPES', 'value' => 'PDI,OS_INTAKE'],
             ['description' => 'Mostrar inventario', 'value' => 'Si'],
+            ['description' => 'Permitir editar precios en cotizacion de taller', 'value' => 'No'],
             ['description' => 'Mostrar daños preexistentes', 'value' => 'Si'],
             ['description' => 'Meses para notificar próximo servicio', 'value' => '2'],
             ['description' => 'Días para notificar próximo servicio', 'value' => '0'],

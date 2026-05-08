@@ -195,7 +195,7 @@
                             <div class="relative">
                                 <span
                                     class="absolute top-1/2 left-3 -translate-y-1/2 text-gray-500 font-medium">S/.</span>
-                                <input type="number" step="0.00" min="0.00" x-model="row.amount"
+                                <input type="number" step="0.01" min="0.00" inputmode="decimal" x-model="row.amount"
                                     :name="`payments[${index}][amount]`" required
                                     class="h-11 w-full rounded-lg border-gray-200 bg-white pl-10 pr-4 text-base font-bold text-gray-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-dark-900 dark:text-white placeholder:text-gray-300 transition-all"
                                     placeholder="0.00">

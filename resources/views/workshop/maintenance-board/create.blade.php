@@ -175,6 +175,8 @@
         editingVehicleLabel: @js($editingVehicleLabel ?? ''),
         editingClientLabel: @js($editingClientLabel ?? ''),
         selectedServiceIds: @js($selectedIdsFromLines),
+        editableServicePrices: @js($editableServicePricesEnabled ?? false),
+        customServicePrices: {},
         serviceCcOverrideById: {},
         servicePricesSeeded: false,
         preserveCustomCatalogPriceIds: {},
@@ -467,6 +469,11 @@
                 delete rest[id];
                 this.preserveCustomCatalogPriceIds = rest;
             }
+            if (this.customServicePrices && Object.prototype.hasOwnProperty.call(this.customServicePrices, id)) {
+                const custom = { ...this.customServicePrices };
+                delete custom[id];
+                this.customServicePrices = custom;
+            }
             const next = { ...this.serviceCcOverrideById };
             if (value === 'auto' || value === '' || value == null) {
                 delete next[id];
@@ -475,6 +482,30 @@
             }
             this.serviceCcOverrideById = next;
             this.refreshServiceLinePrices();
+        },
+        serviceEditablePrice(service) {
+            const id = String(service?.id ?? '');
+            if (this.editableServicePrices && this.customServicePrices && Object.prototype.hasOwnProperty.call(this.customServicePrices, id)) {
+                const custom = Number(this.customServicePrices[id]);
+                return Number.isFinite(custom) ? custom : 0;
+            }
+            return this.resolveServicePrice(service);
+        },
+        setServiceEditablePrice(serviceId, value) {
+            if (!this.editableServicePrices) {
+                return;
+            }
+            const id = String(serviceId);
+            const parsed = Number(value);
+            const price = Number.isFinite(parsed) && parsed >= 0 ? Number(parsed.toFixed(2)) : 0;
+            this.customServicePrices = { ...(this.customServicePrices || {}), [id]: price };
+            this.serviceLines = this.serviceLines.map((line) => {
+                if (!this.isGlosaLine(line) && String(line.service_id) === id) {
+                    return { ...line, unit_price: price };
+                }
+                return line;
+            });
+            this.totalsTick = (this.totalsTick || 0) + 1;
         },
         servicePriceOptions(service) {
             const options = [{ value: 'auto', label: 'Según cil. vehículo' }];
@@ -634,6 +665,7 @@
         seedServiceCcOverridesFromLines() {
             const next = {};
             const preserve = {};
+            const customPrices = {};
             const lines = Array.isArray(this.serviceLines) ? this.serviceLines : [];
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i];
@@ -646,6 +678,9 @@
                     continue;
                 }
                 const p = Number(line.unit_price || 0);
+                if (this.editableServicePrices && Number.isFinite(p)) {
+                    customPrices[sid] = Number(p.toFixed(2));
+                }
                 const autoP = Number(this.autoResolvedPricing(service).price || 0);
                 const eps = 0.02;
                 const inferred = this.inferCcOverrideForSavedPrice(service, p);
@@ -659,6 +694,9 @@
             }
             this.serviceCcOverrideById = next;
             this.preserveCustomCatalogPriceIds = preserve;
+            if (this.editableServicePrices) {
+                this.customServicePrices = customPrices;
+            }
         },
         refreshServiceLinePrices() {
             const next = this.serviceLines.map((line) => {
@@ -676,7 +714,7 @@
                 if (!this.servicePricesSeeded && this.editingMode && line.detail_id) {
                     return { ...line };
                 }
-                const price = this.resolveServicePrice(service);
+                const price = this.serviceEditablePrice(service);
                 return {
                     ...line,
                     unit_price: price,
@@ -769,7 +807,7 @@
                         service_id: String(service.id),
                         description: '',
                         qty: 1,
-                        unit_price: this.resolveServicePrice(service),
+                        unit_price: this.serviceEditablePrice(service),
                         validity_months: service.has_validity ? (prev?.validity_months || '') : null,
                     };
                 })
@@ -1847,7 +1885,23 @@
                                         <span class="block text-xs text-gray-500" x-text="servicePricingLabel(service)"></span>
                                     </div>
                                     <div class="flex items-center gap-3">
-                                        <span class="whitespace-nowrap text-xs font-bold text-emerald-600" x-text="`S/ ${resolveServicePrice(service).toFixed(2)}`"></span>
+                                        <template x-if="!editableServicePrices">
+                                            <span class="whitespace-nowrap text-xs font-bold text-emerald-600" x-text="`S/ ${resolveServicePrice(service).toFixed(2)}`"></span>
+                                        </template>
+                                        <template x-if="editableServicePrices">
+                                            <div class="flex items-center gap-1" @click.stop>
+                                                <span class="text-[11px] font-bold text-emerald-700">S/</span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    inputmode="decimal"
+                                                    :value="serviceEditablePrice(service).toFixed(2)"
+                                                    @input="setServiceEditablePrice(service.id, $event.target.value)"
+                                                    class="h-8 w-20 rounded-md border border-emerald-200 bg-emerald-50 px-2 text-right text-xs font-bold text-emerald-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                                                >
+                                            </div>
+                                        </template>
                                         <input
                                             type="checkbox"
                                             :checked="isServiceSelected(service.id)"

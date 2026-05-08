@@ -560,6 +560,8 @@ class WorkshopMaintenanceBoardController extends Controller
             'Mostrar daÃ±os preexistentes',
         ], true);
 
+        $editableServicePricesEnabled = $this->isCatalogServicePriceEditingEnabled($branchId);
+
         return compact(
             'vehicles',
             'clients',
@@ -581,7 +583,8 @@ class WorkshopMaintenanceBoardController extends Controller
             'technicians',
             'inventoryItemsByVehicleType',
             'showInventoryDefault',
-            'showDamagesPreexistingDefault'
+            'showDamagesPreexistingDefault',
+            'editableServicePricesEnabled'
         ) + [
             'externalServicesEnabled' => $this->isExternalServiceEnabled($branchId),
             'correctiveServicesEnabled' => $this->isCorrectiveServiceEnabled($branchId),
@@ -729,6 +732,11 @@ class WorkshopMaintenanceBoardController extends Controller
         return $this->branchBooleanParameter($branchId, 'Guardar glosa como servicio de taller', false);
     }
 
+    private function isCatalogServicePriceEditingEnabled(int $branchId): bool
+    {
+        return $this->branchBooleanParameter($branchId, 'Permitir editar precios en cotizacion de taller', false);
+    }
+
     private function createServiceFromGlosa(int $companyId, int $branchId, string $description, float $price, bool $isTerciarizado): ?int
     {
         if (!$this->isSaveGlosaAsServiceEnabled($branchId)) {
@@ -789,7 +797,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'service_lines.*.service_id' => ['nullable', 'string', 'max:32'],
             'service_lines.*.description' => ['nullable', 'string', 'max:255'],
             'service_lines.*.qty' => ['nullable', 'numeric'],
-            'service_lines.*.unit_price' => ['nullable', 'numeric'],
+            'service_lines.*.unit_price' => ['nullable', 'numeric', 'gte:0'],
             'service_lines.*.validity_months' => ['nullable', 'in:6,12'],
             'service_lines.*.is_terciarizado' => ['nullable', 'boolean'],
             'service_type' => ['nullable', 'string', 'in:preventivo,correctivo'],
@@ -828,6 +836,7 @@ class WorkshopMaintenanceBoardController extends Controller
         } catch (ValidationException $e) {
             return back()->withErrors($e->errors());
         }
+        $editableCatalogServicePrices = $this->isCatalogServicePriceEditingEnabled($branchId);
 
         $user = auth()->user();
         try {
@@ -916,7 +925,9 @@ class WorkshopMaintenanceBoardController extends Controller
                 }
 
                 $resolvedPrice = $this->resolveMaintenanceBoardServiceUnitPrice($service, $vehicle, $mileageForFrequency);
-                $unitPrice = round((float) ($line['unit_price'] ?? $resolvedPrice), 6);
+                $unitPrice = $editableCatalogServicePrices
+                    ? round((float) ($line['unit_price'] ?? $resolvedPrice), 6)
+                    : round((float) $resolvedPrice, 6);
                 if ($unitPrice < 0) {
                     $unitPrice = 0;
                 }
@@ -1019,7 +1030,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'service_lines.*.service_id' => ['nullable', 'string', 'max:32'],
             'service_lines.*.description' => ['nullable', 'string', 'max:255'],
             'service_lines.*.qty' => ['nullable', 'numeric'],
-            'service_lines.*.unit_price' => ['nullable', 'numeric'],
+            'service_lines.*.unit_price' => ['nullable', 'numeric', 'gte:0'],
             'service_lines.*.validity_months' => ['nullable', 'in:6,12'],
             'service_lines.*.is_terciarizado' => ['nullable', 'boolean'],
             'service_type' => ['nullable', 'string', 'in:preventivo,correctivo'],
@@ -1060,11 +1071,12 @@ class WorkshopMaintenanceBoardController extends Controller
         } catch (ValidationException $e) {
             return back()->withErrors($e->errors());
         }
+        $editableCatalogServicePrices = $this->isCatalogServicePriceEditingEnabled($branchId);
 
         $user = auth()->user();
 
         try {
-            DB::transaction(function () use ($order, $request, $validated, $branchId, $vehicle, $clientPersonId, $parsedServiceLines, $user) {
+            DB::transaction(function () use ($order, $request, $validated, $branchId, $vehicle, $clientPersonId, $parsedServiceLines, $user, $editableCatalogServicePrices) {
                 $lockedOrder = WorkshopMovement::query()
                     ->where('id', $order->id)
                     ->lockForUpdate()
@@ -1199,7 +1211,9 @@ class WorkshopMaintenanceBoardController extends Controller
                             $detailsById->get($detailId),
                             [
                                 'qty' => $qty,
-                                'unit_price' => round((float) ($line['unit_price'] ?? $resolvedPrice), 6),
+                                'unit_price' => $editableCatalogServicePrices
+                                    ? round((float) ($line['unit_price'] ?? $resolvedPrice), 6)
+                                    : round((float) $resolvedPrice, 6),
                                 'validity_months' => $line['validity_months'] ?? null,
                                 'is_terciarizado' => (bool) ($line['is_terciarizado'] ?? $service->is_terciarizado ?? false),
                             ],
@@ -1208,7 +1222,9 @@ class WorkshopMaintenanceBoardController extends Controller
                             (string) ($user?->name ?? 'Sistema')
                         );
                     } else {
-                        $unitPrice = round((float) ($line['unit_price'] ?? $resolvedPrice), 6);
+                        $unitPrice = $editableCatalogServicePrices
+                            ? round((float) ($line['unit_price'] ?? $resolvedPrice), 6)
+                            : round((float) $resolvedPrice, 6);
                         if ($unitPrice < 0) {
                             $unitPrice = 0;
                         }

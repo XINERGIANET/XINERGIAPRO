@@ -28,6 +28,8 @@
     }
     $intro = (string) ($terms['quotation_intro'] ?? 'Estimado agradecemos de ante mano su peticion y estamos enviando formalmente nuestra proforma según lo solicitado, con referencia a la siguiente unidad.');
     $pricesLine = (string) ($terms['prices_note'] ?? 'Precios expresados en Soles');
+    $currencyLine = (string) ($terms['currency_note'] ?? 'Cotizacion expresado en soles');
+    $creditDays = $terms['credit_days'] ?? null;
     $validityLine = (string) ($terms['offer_validity'] ?? '7 dias habiles');
     $bcpCuenta = (string) ($terms['bank_account_bcp'] ?? '');
     $bcpCci = (string) ($terms['bank_cci'] ?? '');
@@ -201,7 +203,13 @@
 
         <p style="margin:0 0 4px;"><strong>Condiciones:</strong></p>
         <ol class="cond-list">
+            @if (trim($currencyLine) !== '')
+                <li>{{ $currencyLine }}</li>
+            @endif
             <li>{{ $pricesLine }}</li>
+            @if ($creditDays !== null && $creditDays !== '')
+                <li>Credito en {{ (int) $creditDays }} dias.</li>
+            @endif
             <li>Válido por {{ $validityLine }}.</li>
             <li>
                 Cuentas bancarias:

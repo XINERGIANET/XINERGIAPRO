@@ -34,6 +34,7 @@
         $initialRows = old('items', !empty($existingRows) ? $existingRows : [$defaultRow]);
         $selectedClientId = (int) old('client_person_id', $isEdit ? (int) $quotation->client_person_id : $clientId);
         $selectedVehicleId = (int) old('vehicle_id', $isEdit ? (int) ($quotation->vehicle_id ?? 0) : 0);
+        $quotationDateDefault = old('quotation_date', $isEdit ? optional($quotation->intake_date)->format('Y-m-d') : now()->format('Y-m-d'));
         $productRows = $productOptions->map(fn ($p) => [
             'product_id' => (int) $p->product_id,
             'price' => (float) ($p->price ?? 0),
@@ -54,6 +55,8 @@
             'quotation_offer_validity' => (string) ($quotation->quotation_commercial_terms['offer_validity'] ?? \App\Helpers\ParameterHelper::getBranchValue('Cotización: Validez de oferta', '5 dias habiles')),
             'quotation_service_warranty' => (string) ($quotation->quotation_commercial_terms['service_warranty'] ?? \App\Helpers\ParameterHelper::getBranchValue('Cotización: Garantía de servicio', '')),
             'quotation_delivery_place' => (string) ($quotation->quotation_commercial_terms['delivery_place'] ?? \App\Helpers\ParameterHelper::getBranchValue('Cotización: Lugar de entrega', 'Centro de servicio')),
+            'quotation_currency_note' => (string) ($quotation->quotation_commercial_terms['currency_note'] ?? 'Cotizacion expresado en soles'),
+            'quotation_credit_days' => (string) ($quotation->quotation_commercial_terms['credit_days'] ?? ''),
             'quotation_prices_note' => (string) ($quotation->quotation_commercial_terms['prices_note'] ?? \App\Helpers\ParameterHelper::getBranchValue('Cotización: Nota de precios', 'IGV Incluido')),
             'quotation_payment_condition' => (string) ($quotation->quotation_commercial_terms['payment_condition'] ?? \App\Helpers\ParameterHelper::getBranchValue('Cotización: Condición de pago', 'Deposito en cuenta')),
             'quotation_bank_account_bcp' => (string) ($quotation->quotation_commercial_terms['bank_account_bcp'] ?? \App\Helpers\ParameterHelper::getBranchValue('Cotización: Cuenta BCP', '')),
@@ -91,7 +94,11 @@
                         <h3 class="text-sm font-black uppercase tracking-widest text-slate-500">Datos de cabecera</h3>
                     </div>
 
-                    <div class="grid gap-4 md:grid-cols-2 md:items-end">
+                    <div class="grid gap-4 md:grid-cols-3 md:items-end">
+                        <div>
+                            <label class="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-400">Fecha <span class="text-red-500">*</span></label>
+                            <input type="date" name="quotation_date" value="{{ $quotationDateDefault }}" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 focus:border-[#465fff] focus:outline-none" required>
+                        </div>
                         <div>
                             <label class="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-400">Cliente <span class="text-red-500">*</span></label>
                             <div class="flex gap-2">
@@ -150,6 +157,14 @@
                             <input type="text" name="quotation_delivery_place" value="{{ old('quotation_delivery_place', $commercialDefaults['quotation_delivery_place']) }}" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 focus:border-[#465fff] focus:outline-none">
                         </div>
                         <div>
+                            <label class="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-400">Moneda</label>
+                            <input type="text" name="quotation_currency_note" value="{{ old('quotation_currency_note', $commercialDefaults['quotation_currency_note']) }}" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 focus:border-[#465fff] focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-400">Credito en dias</label>
+                            <input type="number" min="0" step="1" name="quotation_credit_days" value="{{ old('quotation_credit_days', $commercialDefaults['quotation_credit_days']) }}" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 focus:border-[#465fff] focus:outline-none" placeholder="Ej. 30">
+                        </div>
+                        <div>
                             <label class="mb-1 block text-[10px] font-black uppercase tracking-widest text-slate-400">Precios</label>
                             <input type="text" name="quotation_prices_note" value="{{ old('quotation_prices_note', $commercialDefaults['quotation_prices_note']) }}" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 focus:border-[#465fff] focus:outline-none">
                         </div>
@@ -166,6 +181,13 @@
                             <input type="text" name="quotation_bank_cci" value="{{ old('quotation_bank_cci', $commercialDefaults['quotation_bank_cci']) }}" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 font-mono text-xs font-bold text-slate-800 focus:border-[#465fff] focus:outline-none" autocomplete="off">
                         </div>
                     </div>
+                </div>
+
+                <div class="mb-6 rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
+                    <div class="mb-4 border-b border-slate-100 pb-3">
+                        <h3 class="text-sm font-black uppercase tracking-widest text-slate-500">Observaciones</h3>
+                    </div>
+                    <textarea name="observations" rows="4" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-xs font-medium text-slate-700 focus:border-[#465fff] focus:outline-none" placeholder="Observaciones que aparecerán en la parte inferior de la cotización">{{ old('observations', $isEdit ? (string) ($quotation->observations ?? '') : '') }}</textarea>
                 </div>
 
                 <div class="space-y-5">
@@ -203,21 +225,37 @@
                                                 </select>
                                             </td>
                                             <td class="px-3 py-2 align-top relative-dropdown-host">
+                                                <input type="hidden" :name="`items[${index}][product_id]`" :value="row.product_id || ''">
+                                                <input type="hidden" :name="`items[${index}][service_id]`" :value="row.service_id || ''">
                                                 <template x-if="row.line_type === 'PART'">
-                                                <select class="h-10 w-full rounded-lg border border-slate-200 px-2 text-xs font-semibold text-slate-700 quotation-front-select focus:outline-none focus:ring-2 focus:ring-[#465fff]/20" x-model="row.product_id" :name="`items[${index}][product_id]`" @change="onProductChange(index)">
-                                                        <option value="">Sin catalogo (solo descripcion)</option>
-                                                        @foreach ($productOptions as $p)
-                                                            <option value="{{ $p->product_id }}">{{ $p->code }} - {{ $p->description }}</option>
-                                                        @endforeach
-                                                    </select>
+                                                    <div>
+                                                        <x-form.select-autocomplete-inline
+                                                            fieldKeyExpr="'quotation-product-' + index"
+                                                            valueVar="row.product_id"
+                                                            optionsListExpr="products"
+                                                            optionLabel="label"
+                                                            optionValue="product_id"
+                                                            emptyText="Sin catalogo (solo descripcion)"
+                                                            placeholderSearch="Buscar producto..."
+                                                            pickExpr="row.product_id = String(opt.product_id); onProductChange(index)"
+                                                            inputClass="h-10 w-full rounded-lg border-slate-200 px-2 text-xs font-semibold text-slate-700 quotation-front-select"
+                                                        />
+                                                    </div>
                                                 </template>
                                                 <template x-if="row.line_type === 'SERVICE'">
-                                                    <select class="h-10 w-full rounded-lg border border-slate-200 px-2 text-xs font-semibold text-slate-700 quotation-front-select focus:outline-none focus:ring-2 focus:ring-[#465fff]/20" x-model="row.service_id" :name="`items[${index}][service_id]`" @change="onServiceChange(index)">
-                                                        <option value="">Seleccione servicio</option>
-                                                        @foreach ($services as $s)
-                                                            <option value="{{ $s->id }}">{{ $s->name }}</option>
-                                                        @endforeach
-                                                    </select>
+                                                    <div>
+                                                        <x-form.select-autocomplete-inline
+                                                            fieldKeyExpr="'quotation-service-' + index"
+                                                            valueVar="row.service_id"
+                                                            optionsListExpr="services"
+                                                            optionLabel="name"
+                                                            optionValue="id"
+                                                            emptyText="Seleccione servicio"
+                                                            placeholderSearch="Buscar servicio..."
+                                                            pickExpr="row.service_id = String(opt.id); onServiceChange(index)"
+                                                            inputClass="h-10 w-full rounded-lg border-slate-200 px-2 text-xs font-semibold text-slate-700 quotation-front-select"
+                                                        />
+                                                    </div>
                                                 </template>
                                                 <template x-if="row.line_type === 'LABOR'">
                                                     <div class="h-10 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-2 text-xs font-bold text-slate-400 flex items-center">
@@ -313,7 +351,7 @@
             const services = {{ \Illuminate\Support\Js::from($serviceRows) }};
             const taxMap = {{ \Illuminate\Support\Js::from($taxMap) }};
 
-            return {
+            return Object.assign(typeof formAutocompleteHelpers === 'function' ? formAutocompleteHelpers() : {}, {
                 rows: initialRows,
                 products,
                 services,
@@ -421,7 +459,7 @@
                         maximumFractionDigits: 2,
                     });
                 },
-            };
+            });
         }
     </script>
 
