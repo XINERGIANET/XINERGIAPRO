@@ -561,6 +561,8 @@ return [
             const digitalWallets = Array.isArray(@json($digitalWallets ?? [])) ?
                 @json($digitalWallets ?? []) : [];
             const banks = Array.isArray(@json($banks ?? [])) ? @json($banks ?? []) : [];
+            const selectedPaymentMethodKeys = Array.isArray(@json($selectedPaymentMethodKeys ?? null)) ?
+                @json($selectedPaymentMethodKeys ?? null) : null;
             const units = Array.isArray(@json($units ?? [])) ? @json($units ?? []) : [];
 
             const priceByProductId = new Map();
@@ -1667,7 +1669,10 @@ return [
                     kind,
                 }];
             });
-            const paymentMethodVariants = buildPaymentMethodVariants();
+            const allPaymentMethodVariants = buildPaymentMethodVariants();
+            const paymentMethodVariants = selectedPaymentMethodKeys === null
+                ? allPaymentMethodVariants
+                : allPaymentMethodVariants.filter((variant) => selectedPaymentMethodKeys.includes(String(variant.key)));
             const getPaymentVariantByKey = (key) => paymentMethodVariants.find((variant) => variant.key ===
                     key) ||
                 null;

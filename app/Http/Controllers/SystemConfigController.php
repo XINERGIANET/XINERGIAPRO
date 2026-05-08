@@ -5,6 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Operation;
 use App\Models\ParameterCategories;
 use App\Models\TaxRate;
+use App\Models\PaymentMethod;
+use App\Models\DigitalWallet;
+use App\Models\Card;
+use App\Models\Bank;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -77,6 +81,8 @@ class SystemConfigController extends Controller
             ->orderBy('description')
             ->get(['id', 'description', 'tax_rate']);
 
+        $paymentMethodOptions = $this->salePaymentMethodOptions();
+
         return view('system_config.index', [
             'title' => 'Configuracion de sistema',
             'categories' => $categories,
@@ -85,6 +91,7 @@ class SystemConfigController extends Controller
             'saleDocumentTypes' => $saleDocumentTypes,
             'cashRegisters' => $cashRegisters,
             'taxRates' => $taxRates,
+            'paymentMethodOptions' => $paymentMethodOptions,
         ]);
     }
 
@@ -110,7 +117,10 @@ class SystemConfigController extends Controller
 
         DB::transaction(function () use ($validIds, $values, $branchId) {
             foreach ($validIds as $parameterId) {
-                $value = is_scalar($values[$parameterId] ?? null) ? (string) $values[$parameterId] : '';
+                $rawValue = $values[$parameterId] ?? null;
+                $value = is_array($rawValue)
+                    ? json_encode(array_values($rawValue), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+                    : (is_scalar($rawValue) ? (string) $rawValue : '');
 
                 $existing = DB::table('branch_parameters')
                     ->where('parameter_id', $parameterId)
@@ -140,5 +150,63 @@ class SystemConfigController extends Controller
         return redirect()
             ->route('admin.system-config.index', $viewId ? ['view_id' => $viewId] : [])
             ->with('status', 'Configuracion actualizada correctamente.');
+    }
+
+    private function salePaymentMethodOptions(): array
+    {
+        $paymentMethods = PaymentMethod::query()
+            ->where('status', true)
+            ->orderBy('order_num')
+            ->get(['id', 'description']);
+        $digitalWallets = DigitalWallet::query()
+            ->where('status', true)
+            ->orderBy('order_num')
+            ->get(['id', 'description']);
+        $cards = Card::query()
+            ->where('status', true)
+            ->orderBy('order_num')
+            ->get(['id', 'description', 'type']);
+        $banks = Bank::query()
+            ->where('status', true)
+            ->orderBy('order_num')
+            ->get(['id', 'description']);
+
+        return $paymentMethods->flatMap(function ($method) use ($digitalWallets, $cards, $banks) {
+            $methodId = (int) $method->id;
+            $description = (string) $method->description;
+            $normalized = mb_strtolower($description, 'UTF-8');
+
+            if ((str_contains($normalized, 'billetera') || str_contains($normalized, 'wallet')) && $digitalWallets->isNotEmpty()) {
+                return $digitalWallets->map(fn ($wallet) => [
+                    'key' => "wallet:{$methodId}:" . (int) $wallet->id,
+                    'label' => "{$description} - {$wallet->description}",
+                ]);
+            }
+
+            if ((str_contains($normalized, 'tarjeta') || str_contains($normalized, 'card')) && $cards->isNotEmpty()) {
+                return $cards->map(function ($card) use ($methodId, $description) {
+                    $type = strtoupper(trim((string) $card->type));
+                    $typeLabel = $type === 'C' ? 'Crédito' : ($type === 'D' ? 'Débito' : '');
+                    $label = "{$description} - {$card->description}";
+
+                    return [
+                        'key' => "card:{$methodId}:" . (int) $card->id,
+                        'label' => $typeLabel !== '' ? "{$label} ({$typeLabel})" : $label,
+                    ];
+                });
+            }
+
+            if ((str_contains($normalized, 'transfer') || str_contains($normalized, 'banco')) && $banks->isNotEmpty()) {
+                return $banks->map(fn ($bank) => [
+                    'key' => "bank:{$methodId}:" . (int) $bank->id,
+                    'label' => "{$description} - {$bank->description}",
+                ]);
+            }
+
+            return [[
+                'key' => "plain:{$methodId}",
+                'label' => $description,
+            ]];
+        })->values()->all();
     }
 }

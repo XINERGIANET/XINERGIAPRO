@@ -1,6 +1,8 @@
 @extends('layouts.app')
 
 @php
+    use Illuminate\Support\Js;
+
     $activeTab = old('active_tab', optional($categories->first())->id);
 @endphp
 
@@ -45,11 +47,25 @@
                                 $isDefaultIgvParameter = str_contains($parameterDescription, 'igv defecto')
                                     || str_contains($parameterDescription, 'igv por defecto');
                                 $isCashRegisterParameter = str_contains($parameterDescription, 'caja ventas del') || str_contains($parameterDescription, 'caja factur');
+                                $isSalePaymentMethodsParameter = str_contains($parameterDescription, 'medios de pago elegidos');
                                 $isMaintenanceDaysParameter = str_contains($parameterDescription, 'periodo de mantenimiento')
                                     || str_contains($parameterDescription, 'dias previos de recordatorio')
                                     || str_contains($parameterDescription, 'días previos de recordatorio')
                                     || str_contains($parameterDescription, 'notificar próximo servicio')
                                     || str_contains($parameterDescription, 'notificar citas');
+
+                                $selectedPaymentKeys = [];
+                                if ($isSalePaymentMethodsParameter) {
+                                    $decodedPaymentKeys = json_decode((string) $currentValue, true);
+                                    $hasPaymentKeySelection = is_array($decodedPaymentKeys);
+                                    $selectedPaymentKeys = is_array($decodedPaymentKeys)
+                                        ? array_values(array_filter(array_map('strval', $decodedPaymentKeys)))
+                                        : [];
+
+                                    if ((string) $currentValue === '__all__' || !$hasPaymentKeySelection) {
+                                        $selectedPaymentKeys = collect($paymentMethodOptions ?? [])->pluck('key')->map(fn ($key) => (string) $key)->values()->all();
+                                    }
+                                }
                                     
                                 if ($isMaintenanceDaysParameter) {
                                     $isBoolean = false;
@@ -59,7 +75,80 @@
                             <div class="rounded-xl border border-gray-200 bg-white p-4">
                                 <label class="mb-2 block text-sm font-semibold text-gray-700">{{ $parameter->description }}</label>
 
-                                @if ($isDefaultSaleDocType)
+                                @if ($isSalePaymentMethodsParameter)
+                                    <div
+                                        x-data="{
+                                            open: false,
+                                            query: '',
+                                            options: {{ Js::from($paymentMethodOptions ?? []) }},
+                                            selected: {{ Js::from($selectedPaymentKeys) }},
+                                            get filtered() {
+                                                const q = this.query.trim().toLowerCase();
+                                                if (!q) return this.options;
+                                                return this.options.filter(option => String(option.label || '').toLowerCase().includes(q));
+                                            },
+                                            isSelected(key) {
+                                                return this.selected.includes(String(key));
+                                            },
+                                            toggle(key) {
+                                                key = String(key);
+                                                this.selected = this.isSelected(key)
+                                                    ? this.selected.filter(item => item !== key)
+                                                    : [...this.selected, key];
+                                            },
+                                            get label() {
+                                                if (this.selected.length === 0) return 'Sin medios seleccionados';
+                                                if (this.selected.length === this.options.length) return 'Todos los medios de pago';
+                                                return `${this.selected.length} medio(s) seleccionado(s)`;
+                                            }
+                                        }"
+                                        class="relative"
+                                        @click.outside="open = false"
+                                    >
+                                        <input type="hidden" name="values[{{ $parameter->id }}]" :value="selected.length === options.length ? '__all__' : JSON.stringify(selected)">
+                                        <button
+                                            type="button"
+                                            @click="open = !open; if (open) $nextTick(() => $refs.paymentSearch?.focus())"
+                                            class="flex h-11 w-full items-center justify-between gap-2 rounded-lg border border-gray-300 bg-white px-3 text-left text-sm font-semibold text-gray-700 focus:border-orange-400 focus:outline-none"
+                                        >
+                                            <span class="min-w-0 flex-1 truncate" x-text="label"></span>
+                                            <i class="ri-arrow-down-s-line text-lg text-gray-400" :class="open && 'rotate-180'"></i>
+                                        </button>
+                                        <div
+                                            x-show="open"
+                                            x-cloak
+                                            x-transition
+                                            class="absolute z-50 mt-1 w-full overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl"
+                                        >
+                                            <div class="border-b border-gray-100 p-2">
+                                                <input
+                                                    x-ref="paymentSearch"
+                                                    type="text"
+                                                    x-model="query"
+                                                    @click.stop
+                                                    placeholder="Buscar..."
+                                                    class="h-9 w-full rounded border border-gray-200 bg-gray-50 px-3 text-sm text-gray-800 focus:border-orange-400 focus:outline-none"
+                                                >
+                                            </div>
+                                            <div class="max-h-64 overflow-auto py-1">
+                                                <template x-for="option in filtered" :key="option.key">
+                                                    <label class="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-orange-50">
+                                                        <input
+                                                            type="checkbox"
+                                                            :checked="isSelected(option.key)"
+                                                            @change="toggle(option.key)"
+                                                            class="rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                                                        >
+                                                        <span x-text="option.label"></span>
+                                                    </label>
+                                                </template>
+                                                <template x-if="filtered.length === 0">
+                                                    <p class="px-3 py-3 text-sm text-gray-500">Sin coincidencias.</p>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @elseif ($isDefaultSaleDocType)
                                     <select
                                         name="values[{{ $parameter->id }}]"
                                         class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-700 focus:border-orange-400 focus:outline-none"

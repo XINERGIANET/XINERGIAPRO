@@ -422,6 +422,7 @@ class SalesController extends Controller
             ->where('status', true)
             ->orderBy('order_num')
             ->get(['id', 'description', 'order_num']);
+        $selectedPaymentMethodKeys = $this->branchSalePaymentMethodKeys($branchId);
         $units = Unit::query()
             ->orderBy('description')
             ->get(['id', 'description']);
@@ -473,6 +474,7 @@ class SalesController extends Controller
             'cards' => $cards,
             'digitalWallets' => $digitalWallets,
             'banks' => $banks,
+            'selectedPaymentMethodKeys' => $selectedPaymentMethodKeys,
             'units' => $units,
             'cashRegisters' => $cashRegisters,
             'defaultCashRegisterId' => $defaultCashRegisterId,
@@ -2140,6 +2142,32 @@ class SalesController extends Controller
         }
 
         return $cashRegisters->firstWhere('status', 'A')->id ?? $cashRegisters->first()->id ?? null;
+    }
+
+    private function branchSalePaymentMethodKeys(int $branchId): ?array
+    {
+        if ($branchId <= 0) {
+            return null;
+        }
+
+        $configuredValue = DB::table('branch_parameters as bp')
+            ->join('parameters as p', 'p.id', '=', 'bp.parameter_id')
+            ->where('bp.branch_id', $branchId)
+            ->whereNull('bp.deleted_at')
+            ->whereNull('p.deleted_at')
+            ->whereRaw('LOWER(p.description) = ?', ['medios de pago elegidos'])
+            ->value('bp.value');
+
+        if ($configuredValue === null || $configuredValue === '' || $configuredValue === '__all__') {
+            return null;
+        }
+
+        $decoded = json_decode((string) $configuredValue, true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+
+        return array_values(array_filter(array_map('strval', $decoded)));
     }
 
     private function isInvoiceDocumentTypeId(?int $documentTypeId, $documentTypes): bool
