@@ -263,8 +263,29 @@ class PettyCashController extends Controller
             ->where('cm.cash_register_id', $selectedBoxId)
             ->where('m.branch_id', $branchId)
             ->whereNull('m.deleted_at')
+            ->whereIn('m.status', ['1', 'A'])
             ->where('cmd.status', 'A')
             ->whereRaw("UPPER(COALESCE(cmd.type, 'PAGADO')) <> 'DEUDA'")
+            ->when($selectedShiftRelation, function ($query) use ($selectedShiftRelation) {
+                $query->where('m.moved_at', '>=', $selectedShiftRelation->started_at);
+                if ($selectedShiftRelation->ended_at !== null) {
+                    $query->where('m.moved_at', '<=', $selectedShiftRelation->ended_at);
+                }
+            })
+            ->when($search, function ($query, $search) {
+                $needle = mb_strtolower((string) $search, 'UTF-8');
+                $query->where(function ($q) use ($needle) {
+                    $q->whereRaw('LOWER(COALESCE(m.person_name, \'\')) LIKE ?', ["%{$needle}%"])
+                        ->orWhereRaw('LOWER(COALESCE(m.user_name, \'\')) LIKE ?', ["%{$needle}%"])
+                        ->orWhereRaw('LOWER(COALESCE(m.responsible_name, \'\')) LIKE ?', ["%{$needle}%"])
+                        ->orWhereRaw('LOWER(COALESCE(m.number, \'\')) LIKE ?', ["%{$needle}%"]);
+                });
+            })
+            ->when($selectedTipoMovimiento === 'ingreso' && $ingresoDocId !== '', fn ($query) => $query->where('m.document_type_id', $ingresoDocId))
+            ->when($selectedTipoMovimiento === 'egreso' && $egresoDocId !== '', fn ($query) => $query->where('m.document_type_id', $egresoDocId))
+            ->when($selectedPaymentConceptId !== null, fn ($query) => $query->where('cm.payment_concept_id', $selectedPaymentConceptId))
+            ->when($dateFromCarbon !== null, fn ($query) => $query->where('m.moved_at', '>=', $dateFromCarbon))
+            ->when($dateToCarbon !== null, fn ($query) => $query->where('m.moved_at', '<=', $dateToCarbon))
             ->selectRaw("
                 COALESCE(pm.description, cmd.payment_method, '') as method_label,
                 COALESCE(cmd.bank, '') as bank_label,
