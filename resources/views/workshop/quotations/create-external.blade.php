@@ -388,6 +388,260 @@
         </x-common.component-card>
     </div>
 
+    <!-- Modal Cliente -->
+    <x-ui.modal x-data="{ open: false }" x-on:open-quotation-external-client-modal.window="open = true" x-on:close-quotation-external-client-modal.window="open = false" :isOpen="false" :showCloseButton="false" class="max-w-6xl">
+        <div class="p-6 sm:p-8">
+            <div class="mb-6 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Registrar cliente</h3>
+                <button type="button" @click="open = false" class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
+                    <i class="ri-close-line text-xl"></i>
+                </button>
+            </div>
+
+            <div x-show="quickClientError" class="mb-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700" x-text="quickClientError"></div>
+
+            <form @submit.prevent="saveQuickClient()" class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700">Tipo de persona</label>
+                    <select x-model="quickClient.person_type" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" required>
+                        <option value="DNI">DNI</option>
+                        <option value="RUC">RUC</option>
+                        <option value="CARNET DE EXTRANGERIA">CARNET DE EXTRANGERIA</option>
+                        <option value="PASAPORTE">PASAPORTE</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700">Documento</label>
+                    <div class="flex items-center gap-2">
+                        <input
+                            x-model="quickClient.document_number"
+                            class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                            :placeholder="isQuickClientRuc() ? 'Ingrese el RUC (11 digitos)' : 'Documento'"
+                            required
+                        >
+                        <button
+                            type="button"
+                            @click="fetchQuickClientDocumentData()"
+                            :disabled="creatingClientLoading"
+                            class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-[#334155] px-4 text-sm font-medium text-white hover:bg-[#1f3f98] disabled:opacity-60"
+                        >
+                            <i class="ri-search-line"></i>
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700" x-text="isQuickClientRuc() ? 'Razon social' : 'Nombres'"></label>
+                    <input
+                        x-model="quickClient.first_name"
+                        class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                        :placeholder="isQuickClientRuc() ? 'Razon social' : 'Nombres'"
+                        required
+                    >
+                </div>
+                <div x-show="!isQuickClientRuc()" x-cloak>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700">Apellidos</label>
+                    <input
+                        x-model="quickClient.last_name"
+                        class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                        placeholder="Apellidos"
+                        :required="!isQuickClientRuc()"
+                    >
+                </div>
+
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700" x-text="isQuickClientRuc() ? 'Fecha de inscripcion' : 'Fecha de nacimiento'"></label>
+                    <div class="flex items-center gap-2">
+                        <input type="date" x-ref="quickClientFechaInput" x-model="quickClient.fecha_nacimiento" class="h-11 min-w-0 flex-1 rounded-lg border border-gray-300 px-3 text-sm">
+                        <button type="button" @click="$refs.quickClientFechaInput?.showPicker?.()" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-gray-50 text-gray-600 hover:bg-gray-100" aria-label="Abrir calendario" title="Abrir calendario">
+                            <i class="ri-calendar-line text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+                <div x-show="!isQuickClientRuc()" x-cloak>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700">Genero</label>
+                    <select x-model="quickClient.genero" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                        <option value="">Seleccione genero</option>
+                        <option value="MASCULINO">MASCULINO</option>
+                        <option value="FEMENINO">FEMENINO</option>
+                        <option value="OTRO">OTRO</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700">Telefono</label>
+                    <input x-model="quickClient.phone" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Ingrese el telefono">
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" x-model="quickClient.email" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Ingrese el email">
+                </div>
+
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700">Direccion</label>
+                    <input x-model="quickClient.address" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Direccion (opcional)">
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700">Departamento</label>
+                    <select x-model="quickClient.department_id" @change="onClientDepartmentChange()" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                        <option value="">Seleccione departamento</option>
+                        <template x-for="department in departments" :key="department.id">
+                            <option
+                                :value="String(department.id)"
+                                :selected="String(department.id) === String(quickClient.department_id || '')"
+                                x-text="department.name"
+                            ></option>
+                        </template>
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700">Provincia</label>
+                    <select x-model="quickClient.province_id" @change="onClientProvinceChange()" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                        <option value="">Seleccione provincia</option>
+                        <template x-for="province in filteredProvinces" :key="province.id">
+                            <option
+                                :value="String(province.id)"
+                                :selected="String(province.id) === String(quickClient.province_id || '')"
+                                x-text="province.name"
+                            ></option>
+                        </template>
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700">Distrito</label>
+                    <select x-model="quickClient.location_id" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                        <option value="">Seleccione distrito</option>
+                        <template x-for="district in filteredDistricts" :key="district.id">
+                            <option
+                                :value="String(district.id)"
+                                :selected="String(district.id) === String(quickClient.location_id || '')"
+                                x-text="district.name"
+                            ></option>
+                        </template>
+                    </select>
+                </div>
+
+                <div class="md:col-span-4">
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700">Roles</label>
+                    <div class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                        <input type="checkbox" checked disabled class="h-4 w-4 rounded border-gray-300 text-brand-500">
+                        <span>Cliente</span>
+                    </div>
+                </div>
+
+                <div class="md:col-span-4 mt-2 flex gap-2">
+                    <x-ui.button type="submit" size="md" variant="primary" style="background-color:#00A389;color:#fff;">
+                        <i class="ri-save-line"></i><span x-text="creatingClientLoading ? 'Guardando...' : 'Guardar cliente'"></span>
+                    </x-ui.button>
+                    <x-ui.button type="button" size="md" variant="outline" @click="open = false"><i class="ri-close-line"></i><span>Cancelar</span></x-ui.button>
+                </div>
+            </form>
+        </div>
+    </x-ui.modal>
+
+    <!-- Modal Vehículo -->
+    <div x-show="creatingVehicle" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+        <div class="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-2xl bg-white shadow-2xl">
+            <div class="border-b border-slate-200 p-6">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-slate-800">Registrar vehiculo rapido</h3>
+                    <button type="button" @click="creatingVehicle = false" class="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
+                        <i class="ri-close-line text-xl"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div x-show="quickVehicleError" class="mx-6 mt-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700" x-text="quickVehicleError"></div>
+
+            <div class="p-6">
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Tipo de vehículo</label>
+                        <select x-model="quickVehicle.vehicle_type_id" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                            <template x-for="type in vehicleTypes" :key="`type-${type.id}`">
+                                <option :value="type.id" x-text="String(type.name || '').toUpperCase()"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Marca</label>
+                        <input x-model="quickVehicle.brand" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Marca">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Modelo</label>
+                        <input x-model="quickVehicle.model" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Modelo">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Año</label>
+                        <input x-model="quickVehicle.year" type="number" min="1900" max="2100" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Año">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Color</label>
+                        <input x-model="quickVehicle.color" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Color">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Placa <span class="text-red-600">*</span></label>
+                        <div class="flex items-center gap-2">
+                            <input x-model="quickVehicle.plate"
+                                @blur="lookupQuickVehicleByPlate()"
+                                @input="quickVehicle.plate = normalizePlateForLookup(quickVehicle.plate)"
+                                class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                                placeholder="Placa">
+                            <button type="button"
+                                @click="lookupQuickVehicleByPlate()"
+                                :disabled="lookingUpPlate"
+                                class="inline-flex h-10 shrink-0 items-center rounded-lg border border-blue-300 bg-blue-50 px-3 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60">
+                                <i class="ri-search-line mr-1"></i>
+                                <span x-text="lookingUpPlate ? 'Buscando...' : 'Buscar placa'"></span>
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">VIN <span class="text-red-600">*</span></label>
+                        <input x-model="quickVehicle.vin" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="VIN">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Nro. motor <span class="text-red-600">*</span></label>
+                        <input x-model="quickVehicle.engine_number" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nro. motor">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Nro. chasis</label>
+                        <input x-model="quickVehicle.chassis_number" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Nro. chasis">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Serial</label>
+                        <input x-model="quickVehicle.serial_number" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Serial">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">KM actual <span class="text-red-600">*</span></label>
+                        <input x-model="quickVehicle.current_mileage" type="number" min="0" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="KM actual">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Cilindrada (cc)</label>
+                        <input x-model="quickVehicle.engine_displacement_cc" type="number" min="1" max="5000" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Cilindrada (cc)">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">SOAT Vencimiento</label>
+                        <input x-model="quickVehicle.soat_vencimiento" type="date" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Rev. Técnica Vencimiento</label>
+                        <input x-model="quickVehicle.revision_tecnica_vencimiento" type="date" class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                    </div>
+                </div>
+
+                <div class="mt-3 flex items-center gap-2">
+                    <button type="button"
+                            @click="saveQuickVehicle()"
+                            :disabled="creatingVehicleLoading"
+                            class="inline-flex h-10 items-center rounded-lg bg-indigo-700 px-4 text-xs font-semibold text-white hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60">
+                        <i class="ri-save-line"></i>
+                        <span class="ml-1" x-text="creatingVehicleLoading ? 'Guardando...' : 'Guardar vehiculo'"></span>
+                    </button>
+                    <span class="text-xs text-gray-600">Se agregara y seleccionara automaticamente.</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     @include('sales.partials.quick-client-modal')
     @include('workshop.quotations.partials.quick-vehicle-modal')
     <script>
@@ -420,6 +674,48 @@
                 externalQuotationClientDropdownOpen: false,
                 externalQuotationVehicleDropdownOpen: false,
                 vehicleTypes: {{ \Illuminate\Support\Js::from($vehicleTypes) }},
+                // Modal states
+                creatingClient: false,
+                creatingVehicle: false,
+                creatingClientLoading: false,
+                creatingVehicleLoading: false,
+                quickClientError: '',
+                quickVehicleError: '',
+                // Quick client data
+                quickClient: {
+                    person_type: 'DNI',
+                    document_number: '',
+                    first_name: '',
+                    last_name: '',
+                    phone: '',
+                    email: '',
+                    address: '-',
+                    location_id: '',
+                    department_id: '',
+                    province_id: '',
+                    genero: '',
+                    fecha_nacimiento: ''
+                },
+                // Quick vehicle data
+                quickVehicle: {
+                    client_person_id: '',
+                    vehicle_type_id: '',
+                    brand: '',
+                    model: '',
+                    year: '',
+                    color: '',
+                    plate: '',
+                    vin: '',
+                    engine_number: '',
+                    chassis_number: '',
+                    serial_number: '',
+                    current_mileage: '',
+                    engine_displacement_cc: '',
+                    soat_vencimiento: '',
+                    revision_tecnica_vencimiento: ''
+                },
+                // Additional modal variables
+                lookingUpPlate: false,
                 defaultRow: {
                     line_type: 'LABOR',
                     description: 'Mano de obra',
@@ -473,8 +769,189 @@
                     }
                 },
                 externalQuotationToggleCreatingVehicle() {
-                    // Placeholder for creating vehicle modal
-                    console.log('Toggle creating vehicle');
+                    this.creatingVehicle = !this.creatingVehicle;
+                    if (this.creatingVehicle) {
+                        this.quickVehicle.client_person_id = this.externalQuotationSelectedClientId;
+                        this.quickVehicle.vehicle_type_id = this.vehicleTypes.length > 0 ? this.vehicleTypes[0].id : '';
+                    }
+                },
+                // Modal functions
+                async saveQuickClient() {
+                    this.quickClientError = '';
+                    this.creatingClientLoading = true;
+                    try {
+                        const response = await fetch(@js(route('admin.sales.clients.store')), {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': @js(csrf_token()),
+                            },
+                            body: JSON.stringify(this.quickClient),
+                        });
+                        const payload = await response.json();
+                        if (!response.ok) {
+                            const message = payload?.message || 'No se pudo registrar el cliente.';
+                            const firstError = payload?.errors ? Object.values(payload.errors)[0]?.[0] : null;
+                            throw new Error(firstError || message);
+                        }
+
+                        this.allClients.unshift(payload);
+                        this.externalQuotationSelectedClientId = String(payload.id);
+                        this.externalQuotationClientSearch = `${payload.document_number || ''} - ${((payload.first_name || '') + ' ' + (payload.last_name || '')).trim()}`;
+                        this.creatingClient = false;
+                        this.resetQuickClient();
+                    } catch (error) {
+                        this.quickClientError = error?.message || 'Error registrando cliente.';
+                    } finally {
+                        this.creatingClientLoading = false;
+                    }
+                },
+                async saveQuickVehicle() {
+                    this.quickVehicleError = '';
+                    const kmStr = String(this.quickVehicle.current_mileage ?? '').trim();
+                    if (kmStr === '') {
+                        this.quickVehicleError = 'Debes registrar KM actual.';
+                        return;
+                    }
+
+                    const kmNum = Number(kmStr);
+                    if (!Number.isFinite(kmNum) || kmNum < 0) {
+                        this.quickVehicleError = 'KM actual debe ser un numero valido.';
+                        return;
+                    }
+
+                    const plate = String(this.quickVehicle.plate ?? '').trim();
+                    const vin = String(this.quickVehicle.vin ?? '').trim();
+                    const engineNumber = String(this.quickVehicle.engine_number ?? '').trim();
+                    if (plate === '' && vin === '' && engineNumber === '') {
+                        this.quickVehicleError = 'Debe registrar placa o VIN o numero de motor.';
+                        return;
+                    }
+
+                    this.creatingVehicleLoading = true;
+                    try {
+                        const response = await fetch(@js(route('admin.sales.vehicles.store')), {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': @js(csrf_token()),
+                            },
+                            body: JSON.stringify(this.quickVehicle),
+                        });
+                        const payload = await response.json();
+                        if (!response.ok) {
+                            const message = payload?.message || 'No se pudo registrar el vehiculo.';
+                            const firstError = payload?.errors ? Object.values(payload.errors)[0]?.[0] : null;
+                            throw new Error(firstError || message);
+                        }
+                        this.allVehicles.unshift(payload);
+                        this.externalQuotationSelectedVehicleId = String(payload.id);
+                        this.externalQuotationVehicleSearch = payload.label || '';
+                        this.creatingVehicle = false;
+                        this.resetQuickVehicle();
+                    } catch (error) {
+                        this.quickVehicleError = error?.message || 'Error registrando vehiculo.';
+                    } finally {
+                        this.creatingVehicleLoading = false;
+                    }
+                },
+                resetQuickClient() {
+                    this.quickClient = {
+                        person_type: 'DNI',
+                        document_number: '',
+                        first_name: '',
+                        last_name: '',
+                        phone: '',
+                        email: '',
+                        address: '-',
+                        location_id: '',
+                        department_id: '',
+                        province_id: '',
+                        genero: '',
+                        fecha_nacimiento: ''
+                    };
+                },
+                resetQuickVehicle() {
+                    this.quickVehicle = {
+                        client_person_id: this.externalQuotationSelectedClientId,
+                        vehicle_type_id: this.vehicleTypes.length > 0 ? this.vehicleTypes[0].id : '',
+                        brand: '',
+                        model: '',
+                        year: '',
+                        color: '',
+                        plate: '',
+                        vin: '',
+                        engine_number: '',
+                        chassis_number: '',
+                        serial_number: '',
+                        current_mileage: '',
+                        engine_displacement_cc: '',
+                        soat_vencimiento: '',
+                        revision_tecnica_vencimiento: ''
+                    };
+                },
+                isQuickClientRuc() {
+                    return String(this.quickClient.person_type || '').toUpperCase() === 'RUC';
+                },
+                onClientDepartmentChange() {
+                    this.quickClient.province_id = '';
+                    this.quickClient.location_id = '';
+                    this.filteredProvinces = this.provinces.filter(p => String(p.parent_location_id) === String(this.quickClient.department_id));
+                },
+                onClientProvinceChange() {
+                    this.quickClient.location_id = '';
+                    this.filteredDistricts = this.districts.filter(d => String(d.parent_location_id) === String(this.quickClient.province_id));
+                },
+                async fetchQuickClientDocumentData() {
+                    const doc = String(this.quickClient.document_number || '').trim();
+                    if (!doc) return;
+
+                    try {
+                        const response = await fetch(`/api/apireniec/${doc}`);
+                        if (!response.ok) return;
+
+                        const data = await response.json();
+                        if (data && data.success) {
+                            const payload = data.data;
+                            this.quickClient.first_name = payload.nombres || payload.first_name || '';
+                            this.quickClient.last_name = payload.apellido_paterno && payload.apellido_materno ?
+                                `${payload.apellido_paterno} ${payload.apellido_materno}` :
+                                (payload.last_name || '');
+                            this.quickClient.address = payload.direccion || '-';
+                        }
+                    } catch (error) {
+                        console.error('Error fetching document data:', error);
+                    }
+                },
+                normalizePlateForLookup(value) {
+                    return String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+                },
+                async lookupQuickVehicleByPlate() {
+                    const plate = String(this.quickVehicle.plate || '').trim().toUpperCase();
+                    if (!plate) return;
+
+                    this.lookingUpPlate = true;
+                    try {
+                        const response = await fetch(`/api/vehicle_lookup/${plate}`);
+                        if (!response.ok) return;
+
+                        const data = await response.json();
+                        if (data && data.success && data.data) {
+                            const vehicle = data.data;
+                            this.quickVehicle.brand = vehicle.marca || '';
+                            this.quickVehicle.model = vehicle.modelo || '';
+                            this.quickVehicle.year = vehicle.anio || '';
+                            this.quickVehicle.color = vehicle.color || '';
+                            this.quickVehicle.vin = vehicle.vin || '';
+                            this.quickVehicle.engine_number = vehicle.motor || '';
+                        }
+                    } catch (error) {
+                        console.error('Error looking up plate:', error);
+                    } finally {
+                        this.lookingUpPlate = false;
+                    }
                 },
                 get summary() {
                     let subtotal = 0;

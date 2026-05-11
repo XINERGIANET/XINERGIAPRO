@@ -19,7 +19,7 @@
             <div class="lg:col-span-2 flex flex-col gap-3 overflow-hidden">
                                 {{-- Cliente y Caja --}}
                 <div class="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800 shrink-0">
-                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
                         <div>
                             <label for="client-id" class="mb-2 block text-xs font-semibold text-gray-900 dark:text-white">Cliente</label>
                             <select id="client-id"
@@ -39,6 +39,15 @@
                                     </option>
                                 @endforeach
                             </select>
+                        </div>
+                        <div>
+                            <label for="sale-moved-at" class="mb-2 block text-xs font-semibold text-gray-900 dark:text-white">Fecha de Venta</label>
+                            <x-form.date-picker id="sale-moved-at" name="moved_at" :label="false"
+                                placeholder="Selecciona fecha"
+                                :defaultDate="now()->format('Y-m-d H:i')"
+                                dateFormat="Y-m-d H:i" :enableTime="true" :time24hr="true" :altInput="true"
+                                altFormat="d/m/Y H:i" locale="es" :compact="true"
+                                inputClass="w-full rounded-lg border border-gray-300 bg-gray-50 px-2.5 py-2 text-xs text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-blue-400" />
                         </div>
                     </div>
                 </div>
@@ -1122,6 +1131,10 @@
                     clientInput.value = sale.clientId ? String(sale.clientId) : String(defaultClientId);
                 }
 
+                if (sale.moved_at && document.getElementById('sale-moved-at')?._flatpickr) {
+                    document.getElementById('sale-moved-at')._flatpickr.setDate(sale.moved_at);
+                }
+
                 const totalItems = sale.items.reduce((sum, it) => sum + (Number(it.qty) || 0), 0);
                 document.getElementById('items-count').textContent = `${totalItems} items`;
 
@@ -1320,6 +1333,7 @@
                         card_id: pm.cardId ? parseInt(pm.cardId) : null,
                     })),
                     notes: document.getElementById('sale-notes')?.value || '',
+                    moved_at: document.getElementById('sale-moved-at')?.value || '',
                 };
                 
                 // Si es un borrador, agregar el movement_id para actualizar en lugar de crear

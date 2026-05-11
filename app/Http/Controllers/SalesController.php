@@ -25,6 +25,8 @@ use App\Models\Shift;
 use App\Models\TaxRate;
 use App\Models\Unit;
 use App\Models\Operation;
+use App\Models\Vehicle;
+use App\Models\VehicleType;
 use App\Services\AccountReceivablePayableService;
 use App\Services\KardexSyncService;
 use Illuminate\Http\Request;
@@ -318,6 +320,128 @@ class SalesController extends Controller
             'name' => trim(((string) $person->first_name) . ' ' . ((string) $person->last_name)),
             'label' => trim(((string) $person->first_name) . ' ' . ((string) $person->last_name)),
             'document' => (string) ($person->document_number ?? ''),
+        ]);
+    }
+
+    public function storeVehicleQuick(Request $request)
+    {
+        $branchId = (int) session('branch_id');
+        $branch = Branch::query()->with('location.parent.parent')->findOrFail($branchId);
+        $companyId = (int) ($branch->company_id ?? 0);
+
+        $normalizeVehicleIdentifier = static function ($value): ?string {
+            $normalized = trim((string) $value);
+
+            if ($normalized === '' || $normalized === '-' || $normalized === '--') {
+                return null;
+            }
+
+            return $normalized;
+        };
+
+        $request->merge([
+            'plate' => $normalizeVehicleIdentifier($request->input('plate')),
+            'vin' => $normalizeVehicleIdentifier($request->input('vin')),
+            'engine_number' => $normalizeVehicleIdentifier($request->input('engine_number')),
+            'chassis_number' => $normalizeVehicleIdentifier($request->input('chassis_number')),
+            'serial_number' => $normalizeVehicleIdentifier($request->input('serial_number')),
+        ]);
+
+        $validated = $request->validate([
+            'client_person_id' => [
+                'required',
+                'integer',
+                Rule::exists('people', 'id')->where(fn($query) => $query->where('branch_id', $branchId)),
+            ],
+            'vehicle_type_id' => [
+                'required',
+                'integer',
+                Rule::exists('vehicle_types', 'id')->where(function ($query) use ($companyId, $branchId) {
+                    $query->whereNull('deleted_at')
+                        ->where(function ($inner) use ($companyId, $branchId) {
+                            $inner->whereNull('company_id')
+                                ->orWhere(function ($scope) use ($companyId, $branchId) {
+                                    $scope->where('company_id', $companyId)
+                                        ->where(function ($branchScope) use ($branchId) {
+                                            $branchScope->whereNull('branch_id')
+                                                ->orWhere('branch_id', $branchId);
+                                        });
+                                });
+                        });
+                }),
+            ],
+            'brand' => ['required', 'string', 'max:255'],
+            'model' => ['required', 'string', 'max:255'],
+            'year' => ['nullable', 'integer', 'digits:4'],
+            'color' => ['nullable', 'string', 'max:100'],
+            'plate' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::unique('vehicles', 'plate')->where(fn($query) => $query->where('company_id', $companyId)),
+            ],
+            'vin' => [
+                'nullable',
+                'string',
+                'max:255',
+                Rule::unique('vehicles', 'vin')->where(fn($query) => $query->where('company_id', $companyId)),
+            ],
+            'engine_number' => ['nullable', 'string', 'max:255'],
+            'chassis_number' => ['nullable', 'string', 'max:255'],
+            'serial_number' => ['nullable', 'string', 'max:255'],
+            'current_mileage' => ['nullable', 'integer', 'min:0'],
+            'engine_displacement_cc' => ['nullable', 'integer', 'min:1', 'max:5000'],
+            'soat_vencimiento' => ['nullable', 'date'],
+            'revision_tecnica_vencimiento' => ['nullable', 'date'],
+        ]);
+
+        $hasClientRole = Person::query()
+            ->where('id', (int) $validated['client_person_id'])
+            ->where('branch_id', $branchId)
+            ->whereHas('roles', function ($query) use ($branchId) {
+                $query->where('roles.id', 3)
+                    ->where('role_person.branch_id', $branchId);
+            })
+            ->exists();
+
+        if (!$hasClientRole) {
+            return response()->json([
+                'message' => 'La persona seleccionada no tiene rol de cliente.',
+            ], 422);
+        }
+
+        if (
+            trim((string) ($validated['plate'] ?? '')) === ''
+            && trim((string) ($validated['vin'] ?? '')) === ''
+            && trim((string) ($validated['engine_number'] ?? '')) === ''
+        ) {
+            return response()->json([
+                'message' => 'Debe registrar placa o VIN o numero de motor.',
+            ], 422);
+        }
+
+        $vehicleType = VehicleType::query()->findOrFail((int) $validated['vehicle_type_id']);
+        $validated['type'] = $vehicleType->name;
+
+        $vehicle = Vehicle::query()->create(array_merge($validated, [
+            'company_id' => $companyId,
+            'branch_id' => $branchId,
+            'status' => 'active',
+            'current_mileage' => (int) ($validated['current_mileage'] ?? 0),
+            'engine_displacement_cc' => isset($validated['engine_displacement_cc']) && $validated['engine_displacement_cc'] !== ''
+                ? (int) $validated['engine_displacement_cc']
+                : null,
+        ]));
+
+        return response()->json([
+            'id' => $vehicle->id,
+            'client_person_id' => (int) $vehicle->client_person_id,
+            'vehicle_type_id' => (int) $vehicle->vehicle_type_id,
+            'label' => trim($vehicle->brand . ' ' . $vehicle->model . ' ' . ($vehicle->plate ? ('- ' . $vehicle->plate) : '')),
+            'km' => (int) ($vehicle->current_mileage ?? 0),
+            'engine_displacement_cc' => $vehicle->engine_displacement_cc ? (int) $vehicle->engine_displacement_cc : null,
+            'soat_vencimiento' => $vehicle->soat_vencimiento ? $vehicle->soat_vencimiento->format('Y-m-d') : null,
+            'revision_tecnica_vencimiento' => $vehicle->revision_tecnica_vencimiento ? $vehicle->revision_tecnica_vencimiento->format('Y-m-d') : null,
         ]);
     }
 
@@ -1252,7 +1376,7 @@ class SalesController extends Controller
                         : ($headerSeries !== '' ? $headerSeries : ($cashRegister->series ?: '001')),
                     'billing_status' => $billingStatus,
                     'billing_number' => $invoiceNumber,
-                    'year' => Carbon::now()->year,
+                    'year' => $movedAt->year,
                     'detail_type' => 'DETALLADO',
                     'consumption' => 'N',
                     'payment_type' => $isDebtSale ? 'CREDITO' : 'CONTADO',
@@ -1385,7 +1509,7 @@ class SalesController extends Controller
                         (int) $cashRegister->id,
                         (int) $paymentConcept->id
                     ),
-                    'moved_at' => now(),
+                    'moved_at' => $movedAt,
                     'user_id' => $user?->id,
                     'user_name' => $user?->name ?? 'Sistema',
                     'person_id' => $selectedPerson?->id,
@@ -1403,7 +1527,7 @@ class SalesController extends Controller
                 ]);
             } elseif ($cashEntryMovement) {
                 $cashEntryMovement->update([
-                    'moved_at' => now(),
+                    'moved_at' => $movedAt,
                     'person_id' => $selectedPerson?->id,
                     'person_name' => $selectedPerson
                         ? trim(($selectedPerson->first_name ?? '') . ' ' . ($selectedPerson->last_name ?? ''))
@@ -1535,7 +1659,7 @@ class SalesController extends Controller
                 DB::table('cash_movement_details')->insert([
                     'cash_movement_id' => $cashMovement->id,
                     'type' => 'PAGADO',
-                    'paid_at' => now(),
+                    'paid_at' => $movedAt,
                     'payment_method_id' => $paymentMethod->id,
                     'payment_method' => $paymentMethod->description ?? '',
                     'number' => $cashReferenceNumber,
@@ -1947,6 +2071,24 @@ class SalesController extends Controller
             'branch_id' => $data['branch_id'],
             'parent_movement_id' => $data['parent_movement_id'] ?? null,
         ]);
+
+        // Sincronizar fecha con el movimiento de caja asociado
+        $cashEntryMovement = $this->resolveCashEntryMovementBySaleMovement($sale->id);
+        if ($cashEntryMovement) {
+            $cashEntryMovement->update([
+                'moved_at' => $sale->moved_at,
+            ]);
+
+            // Actualizar paid_at en los detalles del movimiento de caja
+            DB::table('cash_movement_details')
+                ->where('cash_movement_id', function ($query) use ($cashEntryMovement) {
+                    $query->select('id')
+                        ->from('cash_movements')
+                        ->where('movement_id', $cashEntryMovement->id);
+                })
+                ->where('type', 'PAGADO')
+                ->update(['paid_at' => $sale->moved_at]);
+        }
 
         return redirect()
             ->route('admin.sales.index', $request->filled('view_id') ? ['view_id' => $request->input('view_id')] : [])
