@@ -853,6 +853,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'service_lines.*.description' => ['nullable', 'string', 'max:255'],
             'service_lines.*.qty' => ['nullable', 'numeric'],
             'service_lines.*.unit_price' => ['nullable', 'numeric', 'gte:0'],
+            'service_lines.*.price_cc_override' => ['nullable', 'string', 'max:32'],
             'service_lines.*.validity_months' => ['nullable', 'in:6,12'],
             'service_lines.*.is_terciarizado' => ['nullable', 'boolean'],
             'service_type' => ['nullable', 'string', 'in:preventivo,correctivo'],
@@ -985,7 +986,12 @@ class WorkshopMaintenanceBoardController extends Controller
                     continue;
                 }
 
-                $resolvedPrice = $this->resolveMaintenanceBoardServiceUnitPrice($service, $vehicle, $mileageForFrequency);
+                $resolvedPrice = $this->resolveMaintenanceBoardServiceUnitPrice(
+                    $service,
+                    $vehicle,
+                    $mileageForFrequency,
+                    (string) ($line['price_cc_override'] ?? 'auto')
+                );
                 $unitPrice = $editableCatalogServicePrices
                     ? round((float) ($line['unit_price'] ?? $resolvedPrice), 6)
                     : round((float) $resolvedPrice, 6);
@@ -1092,6 +1098,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'service_lines.*.description' => ['nullable', 'string', 'max:255'],
             'service_lines.*.qty' => ['nullable', 'numeric'],
             'service_lines.*.unit_price' => ['nullable', 'numeric', 'gte:0'],
+            'service_lines.*.price_cc_override' => ['nullable', 'string', 'max:32'],
             'service_lines.*.validity_months' => ['nullable', 'in:6,12'],
             'service_lines.*.is_terciarizado' => ['nullable', 'boolean'],
             'service_type' => ['nullable', 'string', 'in:preventivo,correctivo'],
@@ -1261,7 +1268,12 @@ class WorkshopMaintenanceBoardController extends Controller
                         continue;
                     }
 
-                    $resolvedPrice = $this->resolveMaintenanceBoardServiceUnitPrice($service, $vehicle, $mileageForFrequency);
+                    $resolvedPrice = $this->resolveMaintenanceBoardServiceUnitPrice(
+                        $service,
+                        $vehicle,
+                        $mileageForFrequency,
+                        (string) ($line['price_cc_override'] ?? 'auto')
+                    );
 
                     if ($detailId > 0 && !$detailsById->has($detailId)) {
                         throw new \RuntimeException('Linea de servicio no valida para esta OS.');
@@ -2414,12 +2426,37 @@ class WorkshopMaintenanceBoardController extends Controller
         return $damagesWithPhotos;
     }
 
-    private function resolveMaintenanceBoardServiceUnitPrice(WorkshopService $service, Vehicle $vehicle, int $mileageForFrequency): float
+    private function resolveMaintenanceBoardServiceUnitPrice(
+        WorkshopService $service,
+        Vehicle $vehicle,
+        int $mileageForFrequency,
+        string $priceCcOverride = 'auto'
+    ): float
     {
-        $unitPrice = round(
-            (float) $service->resolvePriceForDisplacement((int) ($vehicle->engine_displacement_cc ?? 0)),
-            6
-        );
+        $override = trim($priceCcOverride);
+        $unitPrice = null;
+
+        if ($override === 'base' && (float) $service->base_price > 0) {
+            $unitPrice = (float) $service->base_price;
+        } elseif (str_starts_with($override, 'tier:')) {
+            $rawMaxCc = trim(substr($override, 5));
+            if (ctype_digit($rawMaxCc)) {
+                $maxCc = (int) $rawMaxCc;
+                $tiers = $service->relationLoaded('priceTiers')
+                    ? $service->priceTiers
+                    : $service->priceTiers()->get();
+                $matchedTier = $tiers->first(fn($tier) => (int) ($tier->max_cc ?? 0) === $maxCc);
+                if ($matchedTier) {
+                    $unitPrice = (float) $matchedTier->price;
+                }
+            }
+        }
+
+        if ($unitPrice === null) {
+            $unitPrice = (float) $service->resolvePriceForDisplacement((int) ($vehicle->engine_displacement_cc ?? 0));
+        }
+
+        $unitPrice = round($unitPrice, 6);
         if ($unitPrice < 0) {
             $unitPrice = 0;
         }
@@ -2472,7 +2509,7 @@ class WorkshopMaintenanceBoardController extends Controller
     }
 
     /**
-     * @return array<int, array{kind: string, detail_id: int, service_id: ?int, description: string, qty: float, unit_price: float}>
+     * @return array<int, array{kind: string, detail_id: int, service_id: ?int, description: string, qty: float, unit_price: float, price_cc_override?: string}>
      */
     private function parseMaintenanceBoardServiceLines(array $rows): array
     {
@@ -2485,6 +2522,7 @@ class WorkshopMaintenanceBoardController extends Controller
             $desc = trim((string) ($row['description'] ?? ''));
             $qty = round((float) ($row['qty'] ?? 0), 6);
             $unitPrice = round((float) ($row['unit_price'] ?? 0), 6);
+            $priceCcOverride = trim((string) ($row['price_cc_override'] ?? ''));
             $detailId = isset($row['detail_id']) && $row['detail_id'] !== '' && $row['detail_id'] !== null
                 ? (int) $row['detail_id']
                 : 0;
@@ -2508,6 +2546,7 @@ class WorkshopMaintenanceBoardController extends Controller
                     'description' => $desc,
                     'qty' => $qty,
                     'unit_price' => $unitPrice,
+                    'price_cc_override' => $priceCcOverride,
                     'validity_months' => $validityMonths,
                     'is_terciarizado' => (bool) ($row['is_terciarizado'] ?? false),
                 ];

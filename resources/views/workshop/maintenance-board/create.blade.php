@@ -2008,6 +2008,7 @@
                                 <input type="hidden" :name="`service_lines[${index}][service_id]`" :value="line.service_id">
                                 <input type="hidden" :name="`service_lines[${index}][qty]`" x-model="line.qty">
                                 <input type="hidden" :name="`service_lines[${index}][unit_price]`" x-model="line.unit_price">
+                                <input type="hidden" :name="`service_lines[${index}][price_cc_override]`" :value="getServiceCcOverride(line.service_id)">
                                 <input type="hidden" :name="`service_lines[${index}][description]`" :value="line.description || ''">
                                 <input type="hidden" :name="`service_lines[${index}][is_terciarizado]`" :value="line.is_terciarizado ? 1 : 0">
                                 <template x-if="line.validity_months">
