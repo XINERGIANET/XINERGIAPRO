@@ -323,4 +323,116 @@
             <p class="mt-1 text-xs text-error-500">{{ $message }}</p>
         @enderror
     </div>
+
+    @php
+        $electronicBillingConfig = $branch?->electronicBillingConfig;
+        $electronicBillingEnabled = old('electronic_billing_enabled', ($electronicBillingConfig->enabled ?? false) ? '1' : '0');
+        $electronicBillingApiUrl = old('electronic_billing_api_url', $electronicBillingConfig->api_url ?? config('apisunat.url', 'https://back.apisunat.com'));
+        $electronicBillingPersonaId = old('electronic_billing_persona_id', $electronicBillingConfig->persona_id ?? '');
+        $electronicBillingPersonaToken = old('electronic_billing_persona_token', $electronicBillingConfig->persona_token ?? '');
+        $electronicBillingSeriesBoleta = old('electronic_billing_series_boleta', $electronicBillingConfig->series_boleta ?? config('apisunat.series.boleta', 'B001'));
+        $electronicBillingSeriesFactura = old('electronic_billing_series_factura', $electronicBillingConfig->series_factura ?? config('apisunat.series.factura', 'F001'));
+    @endphp
+
+    <div class="sm:col-span-1 lg:col-span-3 mt-2 rounded-2xl border border-gray-200 bg-gray-50/70 p-4 dark:border-gray-800 dark:bg-gray-900/40">
+        <div class="mb-4">
+            <h3 class="text-sm font-semibold text-gray-800 dark:text-white">Facturación electrónica SaaS</h3>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Configura aquí las credenciales de Apisunat para esta sucursal. Solo las boletas y facturas se enviarán al proveedor.
+            </p>
+        </div>
+
+        <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="sm:col-span-1 lg:col-span-3">
+                <label class="flex items-start gap-2 cursor-pointer">
+                    <input
+                        type="checkbox"
+                        name="electronic_billing_enabled"
+                        value="1"
+                        class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        {{ (string) $electronicBillingEnabled === '1' ? 'checked' : '' }}
+                    />
+                    <span>
+                        <span class="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                            Activar Apisunat para esta sucursal
+                        </span>
+                        <span class="block text-xs text-gray-500 dark:text-gray-400">
+                            Si está activo, las ventas con boleta y factura se enviarán a SUNAT mediante Apisunat con estas credenciales.
+                        </span>
+                    </span>
+                </label>
+            </div>
+
+            <div class="sm:col-span-2 lg:col-span-3">
+                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">URL API</label>
+                <input
+                    type="url"
+                    name="electronic_billing_api_url"
+                    value="{{ $electronicBillingApiUrl }}"
+                    placeholder="https://back.apisunat.com"
+                    class="dark:bg-dark-900 shadow-theme-xs focus:border-[#FF4622] focus:ring-[#FF4622]/10 dark:focus:border-[#FF4622] h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                />
+                @error('electronic_billing_api_url')
+                    <p class="mt-1 text-xs text-error-500">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div class="sm:col-span-1">
+                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Persona ID</label>
+                <input
+                    type="text"
+                    name="electronic_billing_persona_id"
+                    value="{{ $electronicBillingPersonaId }}"
+                    placeholder="ID de Apisunat"
+                    class="dark:bg-dark-900 shadow-theme-xs focus:border-[#FF4622] focus:ring-[#FF4622]/10 dark:focus:border-[#FF4622] h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                />
+                @error('electronic_billing_persona_id')
+                    <p class="mt-1 text-xs text-error-500">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div class="sm:col-span-1 lg:col-span-2">
+                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Token producción</label>
+                <input
+                    type="text"
+                    name="electronic_billing_persona_token"
+                    value="{{ $electronicBillingPersonaToken }}"
+                    placeholder="Token de Apisunat"
+                    class="dark:bg-dark-900 shadow-theme-xs focus:border-[#FF4622] focus:ring-[#FF4622]/10 dark:focus:border-[#FF4622] h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                />
+                @error('electronic_billing_persona_token')
+                    <p class="mt-1 text-xs text-error-500">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div class="sm:col-span-1">
+                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Serie boleta</label>
+                <input
+                    type="text"
+                    name="electronic_billing_series_boleta"
+                    value="{{ $electronicBillingSeriesBoleta }}"
+                    placeholder="B001"
+                    class="dark:bg-dark-900 shadow-theme-xs focus:border-[#FF4622] focus:ring-[#FF4622]/10 dark:focus:border-[#FF4622] h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm uppercase text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                />
+                @error('electronic_billing_series_boleta')
+                    <p class="mt-1 text-xs text-error-500">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div class="sm:col-span-1">
+                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Serie factura</label>
+                <input
+                    type="text"
+                    name="electronic_billing_series_factura"
+                    value="{{ $electronicBillingSeriesFactura }}"
+                    placeholder="F001"
+                    class="dark:bg-dark-900 shadow-theme-xs focus:border-[#FF4622] focus:ring-[#FF4622]/10 dark:focus:border-[#FF4622] h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm uppercase text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
+                />
+                @error('electronic_billing_series_factura')
+                    <p class="mt-1 text-xs text-error-500">{{ $message }}</p>
+                @enderror
+            </div>
+        </div>
+    </div>
 </div>
+

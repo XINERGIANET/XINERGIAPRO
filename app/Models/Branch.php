@@ -41,4 +41,9 @@ class Branch extends Model
             ->withTimestamps()
             ->withPivot('deleted_at');
     }
+
+    public function electronicBillingConfig()
+    {
+        return $this->hasOne(BranchElectronicBillingConfig::class);
+    }
 }

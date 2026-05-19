@@ -152,6 +152,9 @@ Route::middleware('auth')->group(function () {
         ->name('admin.purchases.providers.store');
     Route::get('/admin/ventas/{sale}/imprimir/pdf', [SalesController::class, 'printPdf'])->name('admin.sales.print.pdf');
     Route::get('/admin/ventas/{sale}/imprimir/ticket', [SalesController::class, 'printTicket'])->name('admin.sales.print.ticket');
+    Route::get('/admin/ventas/{sale}/electronico/pdf-a4', [SalesController::class, 'redirectElectronicPdfA4'])->name('admin.sales.electronic.pdf-a4');
+    Route::get('/admin/ventas/{sale}/electronico/xml', [SalesController::class, 'redirectElectronicXml'])->name('admin.sales.electronic.xml');
+    Route::get('/admin/ventas/{sale}/electronico/cdr', [SalesController::class, 'redirectElectronicCdr'])->name('admin.sales.electronic.cdr');
 
     // Gestión de Cotizaciones (Taller)
     Route::get('/admin/ventas/cotizaciones', [WorkshopQuotationController::class, 'index'])->name('admin.sales.quotations.index');

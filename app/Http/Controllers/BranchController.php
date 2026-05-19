@@ -98,8 +98,9 @@ class BranchController extends Controller
             $data['logo'] = Storage::url($path);
         }
 
-        DB::transaction(function () use ($company, $data) {
+        DB::transaction(function () use ($company, $data, $request) {
             $branch = $company->branches()->create($data);
+            $this->syncElectronicBillingConfig($branch, $request);
             $this->replicateBranchConfiguration($branch->id);
             $this->createDefaultBranchPersonAndUser($branch);
         });
@@ -942,6 +943,7 @@ class BranchController extends Controller
         }
 
         $branch->update($data);
+        $this->syncElectronicBillingConfig($branch, $request);
 
         $params = [];
         if ($request->filled('view_id')) {
@@ -1292,5 +1294,29 @@ class BranchController extends Controller
                     'created_at' => now(),
                 ]
             );
+    }
+
+    private function syncElectronicBillingConfig(Branch $branch, Request $request): void
+    {
+        $billingData = $request->validate([
+            'electronic_billing_enabled' => ['nullable', 'boolean'],
+            'electronic_billing_api_url' => ['nullable', 'url', 'max:255'],
+            'electronic_billing_persona_id' => ['nullable', 'string', 'max:255'],
+            'electronic_billing_persona_token' => ['nullable', 'string', 'max:255'],
+            'electronic_billing_series_boleta' => ['nullable', 'string', 'max:8'],
+            'electronic_billing_series_factura' => ['nullable', 'string', 'max:8'],
+        ]);
+
+        $branch->electronicBillingConfig()->updateOrCreate(
+            ['branch_id' => $branch->id],
+            [
+                'enabled' => (bool) ($billingData['electronic_billing_enabled'] ?? false),
+                'api_url' => $billingData['electronic_billing_api_url'] ?? null,
+                'persona_id' => $billingData['electronic_billing_persona_id'] ?? null,
+                'persona_token' => $billingData['electronic_billing_persona_token'] ?? null,
+                'series_boleta' => $billingData['electronic_billing_series_boleta'] ?? 'B001',
+                'series_factura' => $billingData['electronic_billing_series_factura'] ?? 'F001',
+            ]
+        );
     }
 }

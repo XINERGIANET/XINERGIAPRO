@@ -1683,6 +1683,15 @@ class SalesController extends Controller
 
             DB::commit();
 
+            // Facturación electrónica Apisunat
+            $apisunatService = app(\App\Services\ApisunatService::class);
+            $apisunatResult = $this->syncElectronicInvoiceForSale($movement, $apisunatService);
+
+            // Si se emitió un comprobante con éxito, actualizamos los valores de respuesta para el frontend
+            if (($apisunatResult['status'] ?? '') === 'SENT') {
+                $number = $apisunatResult['data']['full_number'] ?? $number;
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Venta procesada correctamente',
@@ -1691,6 +1700,7 @@ class SalesController extends Controller
                     'cash_movement_id' => $cashEntryMovement?->id ?? $cashMovement?->id,
                     'number' => $number,
                     'total' => $total,
+                    'apisunat' => $apisunatResult,
                 ]
             ]);
             
@@ -2547,6 +2557,72 @@ class SalesController extends Controller
         ]);
     }
 
+    public function redirectElectronicPdfA4(Movement $sale)
+    {
+        if (!$sale->electronic_invoice_external_id) {
+            abort(404, 'No hay comprobante electrónico registrado para esta venta.');
+        }
+        $apisunatService = app(\App\Services\ApisunatService::class);
+        try {
+            $data = $apisunatService->getDocumentById($sale->electronic_invoice_external_id, $sale->branch);
+            $urls = $apisunatService->extractDocumentUrls($data);
+            $url = $urls['pdf_a4_url'] ?? $sale->electronic_invoice_pdf_a4_url;
+            if (!$url) {
+                abort(404, 'La URL del PDF A4 no está disponible.');
+            }
+            return redirect()->away($url);
+        } catch (\Exception $e) {
+            if (!$sale->electronic_invoice_pdf_a4_url) {
+                abort(404, 'La URL del PDF A4 no está disponible: ' . $e->getMessage());
+            }
+            return redirect()->away($sale->electronic_invoice_pdf_a4_url);
+        }
+    }
+
+    public function redirectElectronicXml(Movement $sale)
+    {
+        if (!$sale->electronic_invoice_external_id) {
+            abort(404, 'No hay comprobante electrónico registrado para esta venta.');
+        }
+        $apisunatService = app(\App\Services\ApisunatService::class);
+        try {
+            $data = $apisunatService->getDocumentById($sale->electronic_invoice_external_id, $sale->branch);
+            $urls = $apisunatService->extractDocumentUrls($data);
+            $url = $urls['xml_url'] ?? $sale->electronic_invoice_xml_url;
+            if (!$url) {
+                abort(404, 'La URL del XML no está disponible.');
+            }
+            return redirect()->away($url);
+        } catch (\Exception $e) {
+            if (!$sale->electronic_invoice_xml_url) {
+                abort(404, 'La URL del XML no está disponible: ' . $e->getMessage());
+            }
+            return redirect()->away($sale->electronic_invoice_xml_url);
+        }
+    }
+
+    public function redirectElectronicCdr(Movement $sale)
+    {
+        if (!$sale->electronic_invoice_external_id) {
+            abort(404, 'No hay comprobante electrónico registrado para esta venta.');
+        }
+        $apisunatService = app(\App\Services\ApisunatService::class);
+        try {
+            $data = $apisunatService->getDocumentById($sale->electronic_invoice_external_id, $sale->branch);
+            $urls = $apisunatService->extractDocumentUrls($data);
+            $url = $urls['cdr_url'] ?? $sale->electronic_invoice_cdr_url;
+            if (!$url) {
+                abort(404, 'La URL del CDR no está disponible.');
+            }
+            return redirect()->away($url);
+        } catch (\Exception $e) {
+            if (!$sale->electronic_invoice_cdr_url) {
+                abort(404, 'La URL del CDR no está disponible: ' . $e->getMessage());
+            }
+            return redirect()->away($sale->electronic_invoice_cdr_url);
+        }
+    }
+
     /**
      * Genera numero de venta en formato correlativo simple: 00000127.
      * Por sucursal, tipo de documento, año y caja (via cash_movements del cobro).
@@ -3045,5 +3121,51 @@ class SalesController extends Controller
         }
 
         return null;
+    }
+
+    private function syncElectronicInvoiceForSale(Movement $movement, \App\Services\ApisunatService $apisunatService): array
+    {
+        if (!$apisunatService->isEligibleDocument($movement)) {
+            return ['status' => 'SKIPPED'];
+        }
+        if (!$apisunatService->isConfiguredForBranch($movement->branch)) {
+            return ['status' => 'NOT_CONFIGURED', 'message' => 'La sucursal no tiene Apisunat configurado.'];
+        }
+        try {
+            $result = $apisunatService->emitSale($movement);
+            if ($result['status'] === 'SENT') {
+                $data = $result['data'];
+                $movement->update([
+                    'electronic_invoice_provider' => $data['provider'] ?? 'apisunat',
+                    'electronic_invoice_status' => 'SENT',
+                    'electronic_invoice_external_id' => $data['external_id'] ?? null,
+                    'electronic_invoice_series' => $data['series'] ?? null,
+                    'electronic_invoice_number' => $data['correlative'] ?? null,
+                    'electronic_invoice_file_name' => $data['file_name'] ?? null,
+                    'electronic_invoice_pdf_ticket_url' => $data['pdf_ticket_80mm'] ?? null,
+                    'electronic_invoice_pdf_a4_url' => $data['pdf_a4'] ?? null,
+                    'electronic_invoice_xml_url' => $data['xml_url'] ?? null,
+                    'electronic_invoice_cdr_url' => $data['cdr_url'] ?? null,
+                    'electronic_invoice_response' => $data['response'] ?? null,
+                ]);
+
+                if ($movement->salesMovement) {
+                    $movement->salesMovement->update([
+                        'billing_status' => 'INVOICED',
+                        'billing_number' => $data['correlative'] ?? null,
+                        'series' => $data['series'] ?? $movement->salesMovement->series,
+                    ]);
+                }
+            }
+            return $result;
+        } catch (\Exception $e) {
+            $movement->update([
+                'electronic_invoice_provider' => 'apisunat',
+                'electronic_invoice_status' => 'ERROR',
+                'electronic_invoice_response' => ['error' => $e->getMessage()],
+            ]);
+            Log::error('Error emitiendo comprobante electrónico en POS: ' . $e->getMessage());
+            return ['status' => 'ERROR', 'message' => $e->getMessage()];
+        }
     }
 }

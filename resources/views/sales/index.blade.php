@@ -737,6 +737,49 @@
                                             <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Origen</p>
                                             <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $sale->movementType?->description ?? 'Venta' }} - {{ $sale->salesDocumentCode() }}</p>
                                         </div>
+                                        @if ($sale->electronic_invoice_status)
+                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50 sm:col-span-2">
+                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Comprobante Electrónico (Apisunat)</p>
+                                                <div class="mt-1 flex flex-wrap items-center gap-3">
+                                                    @if ($sale->electronic_invoice_status === 'SENT')
+                                                        <span class="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
+                                                            <i class="ri-checkbox-circle-fill"></i> Enviado
+                                                        </span>
+                                                        @if ($sale->electronic_invoice_pdf_a4_url)
+                                                            <a href="{{ route('admin.sales.electronic.pdf-a4', $sale->id) }}" target="_blank" class="inline-flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700 hover:underline">
+                                                                <i class="ri-file-pdf-2-line"></i> PDF A4
+                                                            </a>
+                                                        @endif
+                                                        @if ($sale->electronic_invoice_pdf_ticket_url)
+                                                            <a href="{{ $sale->electronic_invoice_pdf_ticket_url }}" target="_blank" class="inline-flex items-center gap-1 text-xs font-bold text-purple-600 hover:text-purple-700 hover:underline">
+                                                                <i class="ri-printer-line"></i> PDF Ticket
+                                                            </a>
+                                                        @endif
+                                                        @if ($sale->electronic_invoice_xml_url)
+                                                            <a href="{{ route('admin.sales.electronic.xml', $sale->id) }}" target="_blank" class="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline">
+                                                                <i class="ri-file-code-line"></i> XML
+                                                            </a>
+                                                        @endif
+                                                        @if ($sale->electronic_invoice_cdr_url)
+                                                            <a href="{{ route('admin.sales.electronic.cdr', $sale->id) }}" target="_blank" class="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
+                                                                <i class="ri-checkbox-circle-line"></i> CDR
+                                                            </a>
+                                                        @endif
+                                                    @elseif ($sale->electronic_invoice_status === 'ERROR')
+                                                        <span class="inline-flex items-center gap-1 rounded bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 dark:bg-rose-950/30 dark:text-rose-400" title="{{ is_array($sale->electronic_invoice_response) ? json_encode($sale->electronic_invoice_response) : (is_string($sale->electronic_invoice_response) ? $sale->electronic_invoice_response : 'Error desconocido') }}">
+                                                            <i class="ri-close-circle-fill"></i> Error
+                                                        </span>
+                                                        <span class="text-xs text-rose-600 font-medium max-w-xs truncate" title="{{ is_array($sale->electronic_invoice_response) ? json_encode($sale->electronic_invoice_response) : (is_string($sale->electronic_invoice_response) ? $sale->electronic_invoice_response : 'Error') }}">
+                                                            {{ is_array($sale->electronic_invoice_response) ? ($sale->electronic_invoice_response['error'] ?? 'Error') : (is_string($sale->electronic_invoice_response) ? $sale->electronic_invoice_response : 'Error') }}
+                                                        </span>
+                                                    @else
+                                                        <span class="inline-flex items-center gap-1 rounded bg-gray-50 px-2 py-1 text-xs font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                                                            <i class="ri-time-line"></i> {{ $sale->electronic_invoice_status }}
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        @endif
                                     </div>
                                     @if ($sale->salesMovement?->details?->isNotEmpty())
                                         <div class="mt-4">
