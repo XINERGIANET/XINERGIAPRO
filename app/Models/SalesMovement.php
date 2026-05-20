@@ -28,6 +28,7 @@ class SalesMovement extends Model
         'total',
         'movement_id',
         'branch_id',
+        'is_advance',
     ];
 
     protected $casts = [
@@ -36,6 +37,7 @@ class SalesMovement extends Model
         'subtotal' => 'decimal:2',
         'tax' => 'decimal:2',
         'total' => 'decimal:2',
+        'is_advance' => 'boolean',
     ];
 
     public function movement()

@@ -2635,7 +2635,7 @@ class WorkshopFlowService
         return (int) $id;
     }
 
-    private function generateMovementNumber(int $branchId, int $documentTypeId): string
+    public function generateMovementNumber(int $branchId, int $documentTypeId): string
     {
         $year = (int) now()->year;
 

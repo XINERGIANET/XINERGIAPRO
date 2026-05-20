@@ -616,6 +616,10 @@ class WorkshopMaintenanceBoardController extends Controller
 
         $editableServicePricesEnabled = $this->isCatalogServicePriceEditingEnabled($branchId);
 
+        $branchModel = Branch::query()->with('electronicBillingConfig')->find($branchId);
+        $isSunatActive = $branchModel?->electronicBillingConfig?->enabled ?? false;
+        $isAnticipoEnabled = $this->branchBooleanParameter($branchId, ['Facturación con pago anticipado', 'Facturacion con pago anticipado'], false);
+
         return compact(
             'vehicles',
             'clients',
@@ -638,7 +642,9 @@ class WorkshopMaintenanceBoardController extends Controller
             'inventoryItemsByVehicleType',
             'showInventoryDefault',
             'showDamagesPreexistingDefault',
-            'editableServicePricesEnabled'
+            'editableServicePricesEnabled',
+            'isSunatActive',
+            'isAnticipoEnabled'
         ) + [
             'externalServicesEnabled' => $this->isExternalServiceEnabled($branchId),
             'correctiveServicesEnabled' => $this->isCorrectiveServiceEnabled($branchId),
@@ -1485,10 +1491,15 @@ class WorkshopMaintenanceBoardController extends Controller
                         'status' => 'approved',
                         'comment' => 'Cotización aprobada desde tablero',
                     ]);
+                    $showAnticipo = true;
                 }
             });
         } catch (\Throwable $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
+        }
+
+        if ($showAnticipo ?? false) {
+            return back()->with('status', 'Cotización aprobada correctamente.')->with('show_anticipo_modal_for_order', $order->id);
         }
 
         return back()->with('status', 'Cotización aprobada correctamente.');
@@ -2038,6 +2049,8 @@ class WorkshopMaintenanceBoardController extends Controller
                 ->withErrors(['error' => 'La venta y cobro solo esta disponible para OS en reparacion, pausadas o terminadas.']);
         }
 
+        $isAnticipo = request()->has('anticipo') && request()->query('anticipo') == '1';
+
         [$branchId, $companyId] = $this->branchScope();
         $formData = $this->maintenanceFormData($branchId, $companyId);
 
@@ -2061,6 +2074,28 @@ class WorkshopMaintenanceBoardController extends Controller
                 'subtotal' => (float) $detail->total,
             ];
         })->values();
+
+        if ($isAnticipo) {
+            $pendingLines->prepend([
+                'detail_id' => 'anticipo',
+                'line_type' => 'ANTICIPO',
+                'description' => 'PAGO ANTICIPADO DE OS ' . ($order->movement?->number ?? ('#' . $order->id)),
+                'qty' => 1,
+                'unit_price' => 0,
+                'subtotal' => 0,
+            ]);
+        } else {
+            if ((float) $order->paid_total > 0) {
+                $pendingLines->push([
+                    'detail_id' => 'anticipo',
+                    'line_type' => 'ANTICIPO',
+                    'description' => 'ANTICIPOS PREVIAMENTE PAGADOS',
+                    'qty' => 1,
+                    'unit_price' => -1 * (float) $order->paid_total,
+                    'subtotal' => -1 * (float) $order->paid_total,
+                ]);
+            }
+        }
 
         $paymentMethodOptions = collect($formData['paymentMethods'] ?? collect())
             ->map(function ($method) {
@@ -2130,9 +2165,10 @@ class WorkshopMaintenanceBoardController extends Controller
         return view('workshop.maintenance-board.checkout', array_merge($formData, [
             'order' => $order,
             'pendingLines' => $pendingLines,
+            'isAnticipo' => $isAnticipo ?? false,
             'totalOs' => (float) $order->total,
             'paidOs' => (float) $order->paid_total,
-            'pendingOs' => max(0, (float) $order->total - (float) $order->paid_total),
+            'pendingOs' => $isAnticipo ? 0.00 : max(0, (float) $order->total - (float) $order->paid_total),
             'paymentMethodOptions' => $paymentMethodOptions,
             'cardOptions' => $cardOptions,
             'digitalWalletOptions' => $digitalWalletOptions,
@@ -2257,9 +2293,11 @@ class WorkshopMaintenanceBoardController extends Controller
 
         $user = auth()->user();
         $branchId = (int) session('branch_id');
+        $movementForApisunat = null;
+        $isAnticipo = $request->has('anticipo') && $request->query('anticipo') == '1';
 
         try {
-            DB::transaction(function () use ($order, $validated, $branchId, $user, $paymentType, $isDebtCheckout) {
+            DB::transaction(function () use ($order, $validated, $branchId, $user, $paymentType, $isDebtCheckout, $isAnticipo, &$movementForApisunat) {
                 $lockedOrder = WorkshopMovement::query()
                     ->where('id', $order->id)
                     ->lockForUpdate()
@@ -2270,94 +2308,221 @@ class WorkshopMaintenanceBoardController extends Controller
                     throw new \RuntimeException('Solo se puede registrar venta y cobro cuando la OS esta en reparacion, pausada o terminada.');
                 }
 
-                $productLines = collect($validated['product_lines'] ?? [])
-                    ->filter(fn($line) => !empty($line['product_id']))
-                    ->values();
+                if (!$isAnticipo) {
+                    $productLines = collect($validated['product_lines'] ?? [])
+                        ->filter(fn($line) => !empty($line['product_id']))
+                        ->values();
 
-                if ($productLines->isNotEmpty()) {
-                    $productBranchIndex = ProductBranch::query()
-                        ->where('branch_id', $branchId)
-                        ->whereIn('product_id', $productLines->pluck('product_id')->map(fn($v) => (int) $v)->all())
-                        ->whereNull('deleted_at')
-                        ->get(['product_id', 'tax_rate_id'])
-                        ->keyBy('product_id');
+                    if ($productLines->isNotEmpty()) {
+                        $productBranchIndex = ProductBranch::query()
+                            ->where('branch_id', $branchId)
+                            ->whereIn('product_id', $productLines->pluck('product_id')->map(fn($v) => (int) $v)->all())
+                            ->whereNull('deleted_at')
+                            ->get(['product_id', 'tax_rate_id'])
+                            ->keyBy('product_id');
 
-                    foreach ($productLines as $line) {
-                        $productId = (int) $line['product_id'];
-                        $productBranch = $productBranchIndex->get($productId);
-                        if (!$productBranch) {
-                            throw new \RuntimeException('Uno de los productos no pertenece a la sucursal actual.');
+                        foreach ($productLines as $line) {
+                            $productId = (int) $line['product_id'];
+                            $productBranch = $productBranchIndex->get($productId);
+                            if (!$productBranch) {
+                                throw new \RuntimeException('Uno de los productos no pertenece a la sucursal actual.');
+                            }
+
+                            $product = \App\Models\Product::query()->find($productId);
+                            if (!$product) {
+                                throw new \RuntimeException('No se encontro uno de los productos seleccionados.');
+                            }
+
+                            $this->flowService->addDetail($lockedOrder, [
+                                'line_type' => 'PART',
+                                'product_id' => $productId,
+                                'description' => $this->formatWorkshopProductPartDescription($product),
+                                'qty' => (float) $line['qty'],
+                                'unit_price' => (float) $line['unit_price'],
+                                'tax_rate_id' => $productBranch->tax_rate_id ? (int) $productBranch->tax_rate_id : null,
+                            ]);
                         }
-
-                        $product = \App\Models\Product::query()->find($productId);
-                        if (!$product) {
-                            throw new \RuntimeException('No se encontro uno de los productos seleccionados.');
-                        }
-
-                        $this->flowService->addDetail($lockedOrder, [
-                            'line_type' => 'PART',
-                            'product_id' => $productId,
-                            'description' => $this->formatWorkshopProductPartDescription($product),
-                            'qty' => (float) $line['qty'],
-                            'unit_price' => (float) $line['unit_price'],
-                            'tax_rate_id' => $productBranch->tax_rate_id ? (int) $productBranch->tax_rate_id : null,
-                        ]);
                     }
-                }
 
-                $pendingPartDetails = \App\Models\WorkshopMovementDetail::query()
-                    ->where('workshop_movement_id', $lockedOrder->id)
-                    ->where('line_type', 'PART')
-                    ->whereNull('sales_movement_id')
-                    ->where('stock_consumed', false)
-                    ->whereNull('deleted_at')
-                    ->orderBy('id')
-                    ->get();
+                    $pendingPartDetails = \App\Models\WorkshopMovementDetail::query()
+                        ->where('workshop_movement_id', $lockedOrder->id)
+                        ->where('line_type', 'PART')
+                        ->whereNull('sales_movement_id')
+                        ->where('stock_consumed', false)
+                        ->whereNull('deleted_at')
+                        ->orderBy('id')
+                        ->get();
 
-                foreach ($pendingPartDetails as $partDetail) {
-                    $this->flowService->consumePart(
-                        $partDetail,
-                        $branchId,
-                        (int) $user?->id,
-                        (string) ($user?->name ?? 'Sistema'),
-                        'Salida por venta/cobro OS #' . ($lockedOrder->movement?->number ?? $lockedOrder->id)
-                    );
+                    foreach ($pendingPartDetails as $partDetail) {
+                        $this->flowService->consumePart(
+                            $partDetail,
+                            $branchId,
+                            (int) $user?->id,
+                            (string) ($user?->name ?? 'Sistema'),
+                            'Salida por venta/cobro OS #' . ($lockedOrder->movement?->number ?? $lockedOrder->id)
+                        );
+                    }
                 }
 
                 $pendingLines = (int) $lockedOrder->details()
                     ->whereNull('sales_movement_id')
                     ->count();
 
-                // Mantener la misma lógica operativa del módulo de ventas:
-                // si aún no existe venta asociada o hay líneas pendientes, primero se factura.
-                $mustGenerateSale = (bool) ($validated['generate_sale'] ?? false);
-                if ((int) ($lockedOrder->sales_movement_id ?? 0) <= 0 || $pendingLines > 0) {
-                    $mustGenerateSale = true;
-                }
-
-                if ($mustGenerateSale) {
+                $sale = null;
+                if ($isAnticipo) {
+                    $totalAnticipo = collect($validated['payment_methods'])->sum('amount');
+                    if ($totalAnticipo <= 0.001) {
+                        throw new \RuntimeException('Debe ingresar un monto válido para el anticipo (en los métodos de pago).');
+                    }
                     if (empty($validated['document_type_id'])) {
-                        throw new \RuntimeException('Debe seleccionar tipo de documento para generar la venta.');
+                        throw new \RuntimeException('Debe seleccionar tipo de documento para emitir el anticipo.');
                     }
 
-                    $this->flowService->generateSale(
-                        $lockedOrder,
-                        (int) $validated['document_type_id'],
-                        $branchId,
-                        (int) $user?->id,
-                        (string) ($user?->name ?? 'Sistema'),
-                        $validated['sale_comment'] ?? null,
-                        null,
-                        $validated['billing_status'] ?? null,
-                        $validated['invoice_series'] ?? null,
-                        $validated['invoice_number'] ?? null
-                    );
+                    // Creamos el movimiento y venta del anticipo directamente.
+                    // Para esto, usamos DB directo como lo hace FlowService, pero marcando is_advance.
+                    $documentType = \App\Models\DocumentType::query()
+                        ->where('id', $validated['document_type_id'])
+                        ->first();
+                    if (!$documentType) {
+                        throw new \RuntimeException('El tipo de documento no corresponde a ventas.');
+                    }
+
+                    $isInvoiceDocument = mb_strpos(mb_strtolower((string) ($documentType->name ?? ''), 'UTF-8'), 'factura') !== false;
+                    $resolvedBillingStatus = $isInvoiceDocument ? 'INVOICED' : 'NOT_APPLICABLE';
+                    
+                    $movement = \App\Models\Movement::query()->create([
+                        'number' => $this->flowService->generateMovementNumber($branchId, $validated['document_type_id']),
+                        'moved_at' => now(),
+                        'user_id' => $user?->id,
+                        'user_name' => $user?->name ?? 'Sistema',
+                        'person_id' => $lockedOrder->client_person_id,
+                        'person_name' => trim(($lockedOrder->client?->first_name ?? '') . ' ' . ($lockedOrder->client?->last_name ?? '')),
+                        'responsible_id' => $user?->id,
+                        'responsible_name' => $user?->name ?? 'Sistema',
+                        'comment' => $validated['sale_comment'] ?? 'Pago anticipado OS #' . ($lockedOrder->movement?->number ?? $lockedOrder->id),
+                        'status' => 'A',
+                        'movement_type_id' => $documentType->movement_type_id,
+                        'document_type_id' => $validated['document_type_id'],
+                        'branch_id' => $branchId,
+                        'parent_movement_id' => $lockedOrder->movement_id ? (int) $lockedOrder->movement_id : null,
+                    ]);
+
+                    $resolvedInvoiceSeries = $isInvoiceDocument ? trim((string) ($validated['invoice_series'] ?? '001')) : '001';
+                    $resolvedInvoiceSeries = $resolvedInvoiceSeries ?: '001';
+
+                    $sale = \App\Models\SalesMovement::query()->create([
+                        'branch_snapshot' => [
+                            'id' => $branchId,
+                            'company_id' => $lockedOrder->company_id,
+                        ],
+                        'series' => $resolvedInvoiceSeries,
+                        'billing_status' => $resolvedBillingStatus,
+                        'billing_number' => null, // Omitimos correlativo manual por ahora para simplificar.
+                        'year' => (string) now()->year,
+                        'detail_type' => 'DETALLADO',
+                        'consumption' => 'N',
+                        'payment_type' => 'CONTADO',
+                        'status' => 'N',
+                        'sale_type' => 'RETAIL',
+                        'currency' => 'PEN',
+                        'exchange_rate' => 1,
+                        'subtotal' => round($totalAnticipo / 1.18, 2),
+                        'tax' => round($totalAnticipo - ($totalAnticipo / 1.18), 2),
+                        'total' => $totalAnticipo,
+                        'movement_id' => $movement->id,
+                        'branch_id' => $branchId,
+                        'is_advance' => true,
+                    ]);
+
+                    \App\Models\SalesMovementDetail::query()->create([
+                        'detail_type' => 'DETALLADO',
+                        'sales_movement_id' => $sale->id,
+                        'code' => 'ANTICIPO',
+                        'description' => 'PAGO ANTICIPADO DE OS #' . ($lockedOrder->movement?->number ?? $lockedOrder->id),
+                        'product_id' => null,
+                        'product_snapshot' => null,
+                        'unit_id' => 27, // NIU as default fallback
+                        'tax_rate_id' => 1, // Default IGV 18%
+                        'tax_rate_snapshot' => null,
+                        'quantity' => 1,
+                        'amount' => $totalAnticipo,
+                        'discount_percentage' => 0,
+                        'original_amount' => round($totalAnticipo / 1.18, 2),
+                        'comment' => 'OS #' . ($lockedOrder->movement?->number ?? $lockedOrder->id),
+                        'parent_detail_id' => null,
+                        'complements' => [],
+                        'status' => 'A',
+                        'branch_id' => $branchId,
+                    ]);
+
+                    $movementForApisunat = $movement;
+
+                } else {
+                    // Mantener la misma lógica operativa del módulo de ventas:
+                    // si aún no existe venta asociada o hay líneas pendientes, primero se factura.
+                    $mustGenerateSale = (bool) ($validated['generate_sale'] ?? false);
+                    if ((int) ($lockedOrder->sales_movement_id ?? 0) <= 0 || $pendingLines > 0) {
+                        $mustGenerateSale = true;
+                    }
+
+                    if ($mustGenerateSale) {
+                        if (empty($validated['document_type_id'])) {
+                            throw new \RuntimeException('Debe seleccionar tipo de documento para generar la venta.');
+                        }
+
+                        $sale = $this->flowService->generateSale(
+                            $lockedOrder,
+                            (int) $validated['document_type_id'],
+                            $branchId,
+                            (int) $user?->id,
+                            (string) ($user?->name ?? 'Sistema'),
+                            $validated['sale_comment'] ?? null,
+                            null,
+                            $validated['billing_status'] ?? null,
+                            $validated['invoice_series'] ?? null,
+                            $validated['invoice_number'] ?? null
+                        );
+                    }
+                    
+                    if ($sale && $sale->movement) {
+                        $movementForApisunat = $sale->movement;
+                    } elseif ($lockedOrder->salesMovement && $lockedOrder->salesMovement->movement) {
+                        $movementForApisunat = $lockedOrder->salesMovement->movement;
+                    }
                 }
 
                 $freshOrder = WorkshopMovement::query()->findOrFail($lockedOrder->id);
-                $freshOrder->salesMovement?->update([
-                    'payment_type' => $isDebtCheckout ? 'CREDITO' : 'CONTADO',
-                ]);
+                if (!$isAnticipo && $freshOrder->salesMovement) {
+                    $freshOrder->salesMovement->update([
+                        'payment_type' => $isDebtCheckout ? 'CREDITO' : 'CONTADO',
+                    ]);
+                    
+                    if ((float) $lockedOrder->paid_total > 0) {
+                        $advances = \App\Models\SalesMovement::query()
+                            ->where('is_advance', true)
+                            ->whereHas('movement', function ($query) use ($lockedOrder) {
+                                $query->where('parent_movement_id', $lockedOrder->movement_id);
+                            })
+                            ->get();
+
+                        foreach ($advances as $advance) {
+                            $exists = \DB::table('sale_advances')
+                                ->where('final_movement_id', $freshOrder->salesMovement->movement_id)
+                                ->where('advance_movement_id', $advance->movement_id)
+                                ->exists();
+
+                            if (!$exists) {
+                                \DB::table('sale_advances')->insert([
+                                    'final_movement_id' => $freshOrder->salesMovement->movement_id,
+                                    'advance_movement_id' => $advance->movement_id,
+                                    'applied_amount' => $advance->total,
+                                    'created_at' => now(),
+                                    'updated_at' => now(),
+                                ]);
+                            }
+                        }
+                    }
+                }
 
                 $this->flowService->registerPayment(
                     $freshOrder,
@@ -2370,7 +2535,7 @@ class WorkshopMaintenanceBoardController extends Controller
                     $paymentType
                 );
 
-                if ($deliversOnConfirm) {
+                if (!$isAnticipo && $deliversOnConfirm) {
                     $afterPayment = WorkshopMovement::query()->findOrFail($lockedOrder->id);
                     $this->flowService->updateOrder($afterPayment, [
                         'status' => 'delivered',
@@ -2385,6 +2550,11 @@ class WorkshopMaintenanceBoardController extends Controller
                 ->withInput();
         } catch (\Throwable $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
+        }
+
+        if ($movementForApisunat) {
+            $apisunatService = app(\App\Services\ApisunatService::class);
+            $this->syncElectronicInvoiceForSale($movementForApisunat, $apisunatService);
         }
 
         return redirect()
@@ -2431,8 +2601,7 @@ class WorkshopMaintenanceBoardController extends Controller
         Vehicle $vehicle,
         int $mileageForFrequency,
         string $priceCcOverride = 'auto'
-    ): float
-    {
+    ): float {
         $override = trim($priceCcOverride);
         $unitPrice = null;
 
@@ -3040,5 +3209,51 @@ class WorkshopMaintenanceBoardController extends Controller
             'driver_name' => $lastMovement?->driver_name ?? '',
             'driver_phone' => $lastMovement?->driver_phone ?? '',
         ]);
+    }
+
+    private function syncElectronicInvoiceForSale(\App\Models\Movement $movement, \App\Services\ApisunatService $apisunatService): array
+    {
+        if (!$apisunatService->isEligibleDocument($movement)) {
+            return ['status' => 'SKIPPED'];
+        }
+        if (!$apisunatService->isConfiguredForBranch($movement->branch)) {
+            return ['status' => 'NOT_CONFIGURED', 'message' => 'La sucursal no tiene Apisunat configurado.'];
+        }
+        try {
+            $result = $apisunatService->emitSale($movement);
+            if ($result['status'] === 'SENT') {
+                $data = $result['data'];
+                $movement->update([
+                    'electronic_invoice_provider' => $data['provider'] ?? 'apisunat',
+                    'electronic_invoice_status' => 'SENT',
+                    'electronic_invoice_external_id' => $data['external_id'] ?? null,
+                    'electronic_invoice_series' => $data['series'] ?? null,
+                    'electronic_invoice_number' => $data['correlative'] ?? null,
+                    'electronic_invoice_file_name' => $data['file_name'] ?? null,
+                    'electronic_invoice_pdf_ticket_url' => $data['pdf_ticket_80mm'] ?? null,
+                    'electronic_invoice_pdf_a4_url' => $data['pdf_a4'] ?? null,
+                    'electronic_invoice_xml_url' => $data['xml_url'] ?? null,
+                    'electronic_invoice_cdr_url' => $data['cdr_url'] ?? null,
+                    'electronic_invoice_response' => $data['response'] ?? null,
+                ]);
+
+                if ($movement->salesMovement) {
+                    $movement->salesMovement->update([
+                        'billing_status' => 'INVOICED',
+                        'billing_number' => $data['correlative'] ?? null,
+                        'series' => $data['series'] ?? $movement->salesMovement->series,
+                    ]);
+                }
+            }
+            return $result;
+        } catch (\Exception $e) {
+            $movement->update([
+                'electronic_invoice_provider' => 'apisunat',
+                'electronic_invoice_status' => 'ERROR',
+                'electronic_invoice_response' => ['error' => $e->getMessage()],
+            ]);
+            \Illuminate\Support\Facades\Log::error('Error emitiendo comprobante electrónico en POS: ' . $e->getMessage());
+            return ['status' => 'ERROR', 'message' => $e->getMessage()];
+        }
     }
 }

@@ -15,6 +15,17 @@
             });
         </script>
     @endif
+    @if(session('show_anticipo_modal_for_order') && ($isSunatActive ?? false) && ($isAnticipoEnabled ?? false))
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('open-anticipo-modal', {
+                        detail: { orderId: @js(session('show_anticipo_modal_for_order')) }
+                    }));
+                }, 300);
+            });
+        </script>
+    @endif
     <x-common.page-breadcrumb pageTitle="Tablero de Mantenimiento" />
 
     <x-common.component-card title="Tablero Circular de Servicios" desc="Inicia y finaliza mantenimientos con visual de moto y cliente en tiempo real.">
@@ -86,7 +97,9 @@
                     $status = (string) $card->status;
                     $pendingDebtCard = max(0, (float) $card->total - (float) $card->paid_total);
                     $pendingBillingCountCard = (int) ($card->pending_billing_count ?? 0);
-                    $canQuoteCard = ((string) $card->status === 'awaiting_approval');
+                    $isAnticipoFeatureActive = ($isSunatActive ?? false) && ($isAnticipoEnabled ?? false);
+                    $canQuoteCard = ((string) $card->status === 'awaiting_approval') || 
+                                    ($isAnticipoFeatureActive && in_array((string) $card->status, ['approved', 'in_progress', 'paused'], true));
                     $canCheckoutCard = in_array((string) $card->status, ['in_progress', 'paused', 'finished'], true)
                         && ($pendingBillingCountCard > 0 || $pendingDebtCard > 0.00001 || (float) $card->total <= 0.00001);
                     $canEditBoardCard = !in_array((string) $card->status, ['cancelled', 'delivered'], true) && !$card->sales_movement_id;
@@ -313,6 +326,13 @@
                                    class="rounded-xl bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-amber-700">
                                     Editar
                                 </a>
+                            @endif
+                            @if(($isSunatActive ?? false) && ($isAnticipoEnabled ?? false) && in_array($card->status, ['approved', 'in_progress', 'paused']))
+                                <button type="button"
+                                        class="rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+                                        @click="$dispatch('open-anticipo-modal', { orderId: {{ $card->id }} })">
+                                    <i class="ri-money-dollar-circle-line"></i> Pago Anticipado
+                                </button>
                             @endif
                         @endif
 
@@ -742,6 +762,45 @@
                     </button>
                 </div>
             </form>
+        </div>
+    </x-ui.modal>
+
+    <x-ui.modal
+        x-data="{
+            open: false,
+            orderId: null,
+            redirectCheckoutUrl() {
+                return `{{ url('admin/taller/tablero-mantenimiento') }}/${this.orderId}/venta-cobro?anticipo=1`;
+            }
+        }"
+        x-on:open-anticipo-modal.window="
+            open = true;
+            orderId = $event.detail.orderId;
+        "
+        :isOpen="false"
+        class="max-w-md">
+        <div class="p-6">
+            <div class="mb-5 text-center">
+                <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
+                    <i class="ri-money-dollar-circle-line text-3xl"></i>
+                </div>
+                <h3 class="text-xl font-extrabold text-slate-800">¿Realizarás un pago anticipado?</h3>
+                <p class="mt-2 text-sm text-slate-500">
+                    La cotización ha sido aprobada con éxito. Puedes registrar un pago anticipado para esta orden de servicio.
+                </p>
+            </div>
+
+            <div class="flex flex-col gap-3 pt-4">
+                <a :href="redirectCheckoutUrl()"
+                   class="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3.5 text-sm font-bold text-white shadow-lg shadow-indigo-600/20 transition-all hover:bg-indigo-700 hover:shadow-indigo-600/30">
+                    <i class="ri-check-line text-lg"></i>
+                    <span>Sí, registrar anticipo</span>
+                </a>
+                <button type="button" @click="open = false"
+                        class="w-full rounded-xl border border-slate-200 py-3 text-sm font-bold text-slate-500 transition-all hover:bg-slate-50 hover:text-slate-700">
+                    No, continuar al tablero
+                </button>
+            </div>
         </div>
     </x-ui.modal>
 
