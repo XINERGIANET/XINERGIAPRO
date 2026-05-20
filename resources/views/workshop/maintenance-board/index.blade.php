@@ -87,7 +87,7 @@
                     $pendingDebtCard = max(0, (float) $card->total - (float) $card->paid_total);
                     $pendingBillingCountCard = (int) ($card->pending_billing_count ?? 0);
                     $canQuoteCard = ((string) $card->status === 'awaiting_approval');
-                    $canCheckoutCard = in_array((string) $card->status, ['in_progress', 'paused', 'finished'], true)
+                    $canCheckoutCard = in_array((string) $card->status, ['approved', 'in_progress', 'paused', 'finished'], true)
                         && ($pendingBillingCountCard > 0 || $pendingDebtCard > 0.00001 || (float) $card->total <= 0.00001);
                     $canEditBoardCard = !in_array((string) $card->status, ['cancelled', 'delivered'], true) && !$card->sales_movement_id;
                     $quotationPayload = [

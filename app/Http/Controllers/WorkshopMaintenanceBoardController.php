@@ -2032,10 +2032,10 @@ class WorkshopMaintenanceBoardController extends Controller
     {
         $this->assertOrderScope($order);
 
-        if (!in_array((string) $order->status, ['in_progress', 'paused', 'finished'], true)) {
+        if (!in_array((string) $order->status, ['approved', 'in_progress', 'paused', 'finished'], true)) {
             return redirect()
                 ->route('workshop.maintenance-board.index')
-                ->withErrors(['error' => 'La venta y cobro solo esta disponible para OS en reparacion, pausadas o terminadas.']);
+                ->withErrors(['error' => 'La venta y cobro solo esta disponible para OS aprobadas, en reparacion, pausadas o terminadas.']);
         }
 
         [$branchId, $companyId] = $this->branchScope();
@@ -2266,8 +2266,8 @@ class WorkshopMaintenanceBoardController extends Controller
                     ->firstOrFail();
 
                 $deliversOnConfirm = (string) $lockedOrder->status === 'finished';
-                if (!in_array((string) $lockedOrder->status, ['in_progress', 'paused', 'finished'], true)) {
-                    throw new \RuntimeException('Solo se puede registrar venta y cobro cuando la OS esta en reparacion, pausada o terminada.');
+                if (!in_array((string) $lockedOrder->status, ['approved', 'in_progress', 'paused', 'finished'], true)) {
+                    throw new \RuntimeException('Solo se puede registrar venta y cobro cuando la OS esta aprobada, en reparacion, pausada o terminada.');
                 }
 
                 $productLines = collect($validated['product_lines'] ?? [])
