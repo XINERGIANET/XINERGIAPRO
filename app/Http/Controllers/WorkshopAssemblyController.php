@@ -50,9 +50,7 @@ class WorkshopAssemblyController extends Controller
         [$branchId, $companyId] = $this->resolveContext();
 
         $month = (string) $request->input('month', now()->format('Y-m'));
-        $brandCompany = trim((string) $request->input('brand_company', ''));
-        $vehicleType = trim((string) $request->input('vehicle_type', ''));
-        $guiaRemision = trim((string) $request->input('guia_remision', ''));
+        $search = trim((string) $request->input('search', ''));
         $status = trim((string) $request->input('status', 'all'));
 
         $assemblies = WorkshopAssembly::query()
@@ -60,13 +58,20 @@ class WorkshopAssemblyController extends Controller
             ->where('company_id', $companyId)
             ->where('branch_id', $branchId)
             ->whereRaw("to_char(assembled_at, 'YYYY-MM') = ?", [$month])
-            ->when($brandCompany !== '', fn ($query) => $query->where('brand_company', 'ILIKE', "%{$brandCompany}%"))
-            ->when($vehicleType !== '', fn ($query) => $query->where('vehicle_type', 'ILIKE', "%{$vehicleType}%"))
-            ->when($guiaRemision !== '', fn ($query) => $query->where('guia_remision', 'ILIKE', "%{$guiaRemision}%"))
-            ->when($status === 'pending', fn ($query) => $query->whereNull('started_at'))
-            ->when($status === 'in_progress', fn ($query) => $query->whereNotNull('started_at')->whereNull('finished_at'))
-            ->when($status === 'finished', fn ($query) => $query->whereNotNull('finished_at')->whereNull('exit_at'))
-            ->when($status === 'delivered', fn ($query) => $query->whereNotNull('exit_at'))
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('brand_company', 'ILIKE', "%{$search}%")
+                        ->orWhere('vehicle_type', 'ILIKE', "%{$search}%")
+                        ->orWhere('model', 'ILIKE', "%{$search}%")
+                        ->orWhere('vin', 'ILIKE', "%{$search}%")
+                        ->orWhere('guia_remision', 'ILIKE', "%{$search}%")
+                        ->orWhereRaw('id::text ILIKE ?', ["%{$search}%"]);
+                });
+            })
+            ->when($status === 'pending', fn($query) => $query->whereNull('started_at'))
+            ->when($status === 'in_progress', fn($query) => $query->whereNotNull('started_at')->whereNull('finished_at'))
+            ->when($status === 'finished', fn($query) => $query->whereNotNull('finished_at')->whereNull('exit_at'))
+            ->when($status === 'delivered', fn($query) => $query->whereNotNull('exit_at'))
             ->orderByDesc('assembled_at')
             ->orderByDesc('id')
             ->paginate(20)
@@ -105,7 +110,7 @@ class WorkshopAssemblyController extends Controller
             ->whereHas('roles', function ($query) {
                 $query->where('roles.id', 2); // Role 2 = Empleado
             })
-            ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
+            ->when($branchId > 0, fn($query) => $query->where('branch_id', $branchId))
             ->orderBy('first_name')
             ->orderBy('last_name')
             ->get();
@@ -122,9 +127,7 @@ class WorkshopAssemblyController extends Controller
             'costTable',
             'summaryByType',
             'month',
-            'brandCompany',
-            'vehicleType',
-            'guiaRemision',
+            'search',
             'status',
             'assemblyLocations',
             'technicians',
@@ -166,7 +169,7 @@ class WorkshopAssemblyController extends Controller
             ->whereHas('roles', function ($query) {
                 $query->where('roles.id', 2);
             })
-            ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
+            ->when($branchId > 0, fn($query) => $query->where('branch_id', $branchId))
             ->orderBy('first_name')
             ->orderBy('last_name')
             ->get();
@@ -192,7 +195,7 @@ class WorkshopAssemblyController extends Controller
         [$branchId, $companyId] = $this->resolveContext();
 
         $assemblyIds = $request->query('ids', []);
-        
+
         if (empty($assemblyIds) || !is_array($assemblyIds)) {
             return redirect()->route('workshop.assemblies.index')
                 ->withErrors(['error' => 'No seleccionó ningún armado para el cobro.']);
@@ -211,20 +214,20 @@ class WorkshopAssemblyController extends Controller
         }
 
         $clients = Person::query()
-            ->when($branchId > 0, fn ($query) => $query->where('branch_id', $branchId))
+            ->when($branchId > 0, fn($query) => $query->where('branch_id', $branchId))
             ->orderBy('first_name')
             ->orderBy('last_name')
             ->get();
 
         $documentTypes = DocumentType::query()
-            ->whereHas('movementType', fn ($query) => $query->where('description', 'ILIKE', '%venta%'))
+            ->whereHas('movementType', fn($query) => $query->where('description', 'ILIKE', '%venta%'))
             ->orderBy('name')
             ->get();
 
         $cashRegisters = CashRegister::query()
             ->when(
                 Schema::hasColumn('cash_registers', 'branch_id') && $branchId > 0,
-                fn ($query) => $query->where('branch_id', $branchId)
+                fn($query) => $query->where('branch_id', $branchId)
             )
             ->orderBy('number')
             ->get();
@@ -271,7 +274,7 @@ class WorkshopAssemblyController extends Controller
                 ])
         )
             ->groupBy('payment_method_id')
-            ->map(fn ($rows) => collect($rows)->map(fn ($row) => [
+            ->map(fn($rows) => collect($rows)->map(fn($row) => [
                 'id' => (int) $row->id,
                 'description' => (string) ($row->description ?? ''),
             ])->values())
@@ -332,7 +335,7 @@ class WorkshopAssemblyController extends Controller
 
         if (is_numeric($configuredValue)) {
             $configuredId = (int) $configuredValue;
-            $exists = $cashRegisters->contains(fn ($cashRegister) => (int) ($cashRegister->id ?? 0) === $configuredId);
+            $exists = $cashRegisters->contains(fn($cashRegister) => (int) ($cashRegister->id ?? 0) === $configuredId);
             if ($exists) {
                 return $configuredId;
             }
@@ -347,7 +350,7 @@ class WorkshopAssemblyController extends Controller
             return false;
         }
 
-        $documentType = collect($documentTypes)->first(fn ($item) => (int) ($item->id ?? 0) === (int) $documentTypeId);
+        $documentType = collect($documentTypes)->first(fn($item) => (int) ($item->id ?? 0) === (int) $documentTypeId);
         $name = mb_strtolower(trim((string) ($documentType->name ?? '')), 'UTF-8');
 
         return str_contains($name, 'factura');
@@ -591,7 +594,7 @@ class WorkshopAssemblyController extends Controller
     public function updateCost(Request $request, WorkshopAssemblyCost $cost)
     {
         [$branchId, $companyId] = $this->resolveContext();
-        if ((int)$cost->company_id !== $companyId) {
+        if ((int) $cost->company_id !== $companyId) {
             abort(403);
         }
 
@@ -621,7 +624,7 @@ class WorkshopAssemblyController extends Controller
     public function destroyCost(Request $request, WorkshopAssemblyCost $cost)
     {
         [$branchId, $companyId] = $this->resolveContext();
-        if ((int)$cost->company_id !== $companyId) {
+        if ((int) $cost->company_id !== $companyId) {
             abort(403);
         }
 
@@ -759,7 +762,7 @@ class WorkshopAssemblyController extends Controller
                 $total = $assemblies->sum('total_cost');
                 $taxRate = TaxRate::where('tax_rate', '>', 0)->first(); // Buscamos IGV por defecto
                 $taxPercent = ($taxRate?->tax_rate ?? 18) / 100;
-                
+
                 $subtotal = round($total / (1 + $taxPercent), 2);
                 $tax = $total - $subtotal;
 
@@ -838,9 +841,9 @@ class WorkshopAssemblyController extends Controller
 
         $paymentConceptId = DB::table('payment_concepts')
             ->where('type', 'I')
-            ->where(function($q) {
+            ->where(function ($q) {
                 $q->where('description', 'ILIKE', '%venta%')
-                  ->orWhere('description', 'ILIKE', '%cliente%');
+                    ->orWhere('description', 'ILIKE', '%cliente%');
             })
             ->value('id') ?: 1;
 
@@ -883,7 +886,7 @@ class WorkshopAssemblyController extends Controller
             'branch_id' => $branchId,
         ]);
 
-        $debtPaymentMethod = PaymentMethod::where('description', 'ILIKE', '%deuda%')->first() 
+        $debtPaymentMethod = PaymentMethod::where('description', 'ILIKE', '%deuda%')->first()
             ?? PaymentMethod::where('description', 'ILIKE', '%credito%')->first()
             ?? PaymentMethod::first();
 
@@ -919,9 +922,9 @@ class WorkshopAssemblyController extends Controller
         // Asumimos concepto de pago de ingreso (Ventas)
         $paymentConceptId = DB::table('payment_concepts')
             ->where('type', 'I')
-            ->where(function($q) {
+            ->where(function ($q) {
                 $q->where('description', 'ILIKE', '%venta%')
-                  ->orWhere('description', 'ILIKE', '%cliente%');
+                    ->orWhere('description', 'ILIKE', '%cliente%');
             })
             ->value('id') ?: 1;
 
@@ -966,7 +969,7 @@ class WorkshopAssemblyController extends Controller
 
         foreach ($paymentMethodsData as $pmData) {
             $method = PaymentMethod::findOrFail($pmData['payment_method_id']);
-            
+
             CashMovementDetail::create([
                 'cash_movement_id' => $cashMovement->id,
                 'type' => 'PAGADO',

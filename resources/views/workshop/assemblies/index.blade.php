@@ -179,27 +179,25 @@
             </template>
         </div>
 
-        <form method="GET" action="{{ route('workshop.assemblies.index') }}" class="mb-4 grid grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-7 dark:border-gray-800 dark:bg-white/[0.02]">
+        <form id="filter-form" onsubmit="event.preventDefault(); applyFilters(0);" class="mb-4 grid grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-5 dark:border-gray-800 dark:bg-white/[0.02]">
             @if(request('view_id'))
                 <input type="hidden" name="view_id" value="{{ request('view_id') }}">
             @endif
-            <input type="month" name="month" value="{{ $month }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
-            <input name="brand_company" value="{{ $brandCompany }}" placeholder="Empresa/Marca" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
-            <input name="vehicle_type" value="{{ $vehicleType }}" placeholder="Tipo vehiculo" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
-            <input name="guia_remision" value="{{ $guiaRemision }}" placeholder="Guía de remisión" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
-            <select name="status" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
+            <input type="month" name="month" value="{{ $month }}" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" onchange="applyFilters(0)">
+            <input id="globalSearchInput" name="search" value="{{ $search ?? '' }}" placeholder="Buscar por marca, modelo, VIN o guía..." class="h-11 rounded-lg border border-gray-300 px-3 text-sm" oninput="applyFilters(600)" autocomplete="off">
+            <select name="status" class="h-11 rounded-lg border border-gray-300 px-3 text-sm" onchange="applyFilters(0)">
                 <option value="all" @selected(($status ?? 'all') === 'all')>Todos los estados</option>
                 <option value="pending" @selected(($status ?? 'all') === 'pending')>Pendiente</option>
                 <option value="in_progress" @selected(($status ?? 'all') === 'in_progress')>En proceso</option>
                 <option value="finished" @selected(($status ?? 'all') === 'finished')>Finalizado</option>
                 <option value="delivered" @selected(($status ?? 'all') === 'delivered')>Entregado</option>
             </select>
-            <button class="h-11 rounded-lg bg-[#244BB3] px-4 text-sm font-medium text-white">Filtrar</button>
-            <a href="{{ route('workshop.assemblies.index', request('view_id') ? ['view_id' => request('view_id')] : []) }}" class="h-11 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 inline-flex items-center justify-center">Limpiar</a>
+            <button type="submit" class="h-11 rounded-lg bg-[#244BB3] px-4 text-sm font-medium text-white hover:bg-[#1a388c] transition-colors">Filtrar</button>
+            <button type="button" onclick="clearFilters()" class="h-11 rounded-lg border border-gray-300 px-4 text-sm font-medium text-gray-700 inline-flex items-center justify-center hover:bg-gray-50 transition-colors">Limpiar</button>
         </form>
 
 
-        <div class="mt-6">
+        <div class="mt-6" id="assemblies-wrapper">
             <div class="mb-5 flex flex-wrap items-center justify-between gap-4 px-1">
                 <h2 class="text-lg font-bold text-gray-800 dark:text-white/90">Detalle de armados</h2>
                 
@@ -765,4 +763,62 @@
         </div>
     </x-ui.modal>
 </div>
+
+<script>
+    let filterDelay;
+    function applyFilters(delay = 600, fetchUrl = null) {
+        clearTimeout(filterDelay);
+        filterDelay = setTimeout(async () => {
+            const form = document.getElementById('filter-form');
+            let url = fetchUrl;
+            
+            if (!url) {
+                const urlObj = new URL('{{ route('workshop.assemblies.index') }}', window.location.origin);
+                const formData = new FormData(form);
+                formData.forEach((value, key) => {
+                    if (value) urlObj.searchParams.append(key, value);
+                });
+                url = urlObj.toString();
+            }
+            
+            // Actualizar la URL sin recargar
+            window.history.pushState({}, '', url);
+            
+            const wrapper = document.getElementById('assemblies-wrapper');
+            if (wrapper) wrapper.style.opacity = '0.5';
+
+            try {
+                const response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                const text = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(text, 'text/html');
+                
+                const newContent = doc.getElementById('assemblies-wrapper');
+                if (newContent && wrapper) {
+                    wrapper.innerHTML = newContent.innerHTML;
+                    wrapper.style.opacity = '1';
+                }
+            } catch (e) {
+                console.error(e);
+                if (wrapper) wrapper.style.opacity = '1';
+            }
+        }, delay);
+    }
+
+    function clearFilters() {
+        const form = document.getElementById('filter-form');
+        form.querySelector('input[name="search"]').value = '';
+        form.querySelector('select[name="status"]').value = 'all';
+        applyFilters(0);
+    }
+
+    // Interceptar la paginación para que tampoco recargue la página
+    document.addEventListener('click', function(e) {
+        const pageLink = e.target.closest('a[href*="page="]');
+        if (pageLink && document.getElementById('assemblies-wrapper')?.contains(pageLink)) {
+            e.preventDefault();
+            applyFilters(0, pageLink.href);
+        }
+    });
+</script>
 @endsection
