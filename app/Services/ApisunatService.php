@@ -16,11 +16,11 @@ class ApisunatService
     /** Catálogo 53: descuento global que afecta la base imponible del IGV (requerido con anticipos). */
     private const SUNAT_ADVANCE_GLOBAL_DISCOUNT_CODE = '02';
 
-    /** Catálogo 51: venta interna – anticipos (comprobante de anticipo). */
-    private const SUNAT_OPERATION_ADVANCE_LIST_ID = '0104';
+    /** Catálogo 51 (cbc:ProfileID): venta interna – anticipos. */
+    private const SUNAT_OPERATION_ADVANCE_CODE = '0104';
 
-    /** Catálogo 51: venta interna (comprobante final). */
-    private const SUNAT_OPERATION_STANDARD_LIST_ID = '0101';
+    /** Catálogo 51 (cbc:ProfileID): venta interna. */
+    private const SUNAT_OPERATION_STANDARD_CODE = '0101';
 
     /** Identificador de pago SUNAT (AdditionalDocumentReference / anticipo). */
     private const SUNAT_ADVANCE_PAYMENT_STATUS_LIST_ID = 'Anticipo';
@@ -185,8 +185,8 @@ class ApisunatService
             $responsePayload = [];
         }
         $responsePayload['sunat_operation_list_id'] = $isAdvanceInvoice
-            ? self::SUNAT_OPERATION_ADVANCE_LIST_ID
-            : self::SUNAT_OPERATION_STANDARD_LIST_ID;
+            ? self::SUNAT_OPERATION_ADVANCE_CODE
+            : self::SUNAT_OPERATION_STANDARD_CODE;
         $responsePayload['sunat_advance_ready'] = $isAdvanceInvoice;
 
         $sale->update([
@@ -551,21 +551,18 @@ class ApisunatService
         $defaultTaxPercent = $this->resolveDefaultTaxPercentForBranch($branch);
         $sale->loadMissing('salesMovement');
         $isAdvanceInvoice = (bool) ($sale->salesMovement?->is_advance ?? false);
+        $operationTypeCode = $isAdvanceInvoice
+            ? self::SUNAT_OPERATION_ADVANCE_CODE
+            : self::SUNAT_OPERATION_STANDARD_CODE;
 
         $documentBody = [
             'cbc:UBLVersionID' => ['_text' => '2.1'],
             'cbc:CustomizationID' => ['_text' => '2.0'],
+            'cbc:ProfileID' => $this->sunatOperationTypeProfileIdNode($operationTypeCode),
             'cbc:ID' => ['_text' => $catalog['serie'].'-'.$number],
             'cbc:IssueDate' => ['_text' => now()->format('Y-m-d')],
             'cbc:IssueTime' => ['_text' => now()->format('H:i:s')],
-            'cbc:InvoiceTypeCode' => [
-                '_attributes' => [
-                    'listID' => $isAdvanceInvoice
-                        ? self::SUNAT_OPERATION_ADVANCE_LIST_ID
-                        : self::SUNAT_OPERATION_STANDARD_LIST_ID,
-                ],
-                '_text' => $catalog['type'],
-            ],
+            'cbc:InvoiceTypeCode' => $this->sunatDocumentTypeCodeNode($catalog['type']),
             'cbc:Note' => [],
             'cbc:DocumentCurrencyCode' => ['_text' => 'PEN'],
             'cac:AccountingSupplierParty' => [
@@ -833,7 +830,7 @@ class ApisunatService
             return true;
         }
 
-        return trim((string) ($response['sunat_operation_list_id'] ?? '')) === self::SUNAT_OPERATION_ADVANCE_LIST_ID;
+        return trim((string) ($response['sunat_operation_list_id'] ?? '')) === self::SUNAT_OPERATION_ADVANCE_CODE;
     }
 
     /**
@@ -1213,6 +1210,30 @@ class ApisunatService
     /**
      * @return array<string, mixed>
      */
+    private function sunatOperationTypeProfileIdNode(string $operationTypeCode): array
+    {
+        return [
+            '_attributes' => [
+                'schemeName' => 'SUNAT:Identificador de Tipo de Operación',
+                'schemeAgencyName' => 'PE:SUNAT',
+                'schemeURI' => 'urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo51',
+            ],
+            '_text' => $operationTypeCode,
+        ];
+    }
+
+    private function sunatDocumentTypeCodeNode(string $documentTypeCode): array
+    {
+        return [
+            '_attributes' => [
+                'listAgencyName' => 'PE:SUNAT',
+                'listName' => 'SUNAT:Identificador de Tipo de Documento',
+                'listURI' => 'urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01',
+            ],
+            '_text' => $documentTypeCode,
+        ];
+    }
+
     private function buildSunatAdvanceReferenceNode(
         string $fullNumber,
         string $documentTypeCode,
