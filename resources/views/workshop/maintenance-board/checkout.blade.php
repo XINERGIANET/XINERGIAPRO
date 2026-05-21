@@ -49,22 +49,37 @@
                 return this.documentTypeOptions.find((item) => String(item.id) === String(this.selectedDocumentTypeId || '')) || null;
             },
             isInvoiceDocumentSelected() {
-                const name = String(this.currentDocumentType()?.name || '').toLowerCase();
-                return name.includes('factura');
+                return this.isInvoiceDocumentTypeId(this.selectedDocumentTypeId);
             },
             isDebtPaymentSelected() {
                 return String(this.paymentType || 'CONTADO').toUpperCase() === 'DEUDA';
             },
-            preferredCashRegisterId() {
-                return String(this.isInvoiceDocumentSelected() ? (this.invoiceCashRegisterId || '') : (this.standardCashRegisterId || '')).trim();
+            isInvoiceDocumentTypeId(docId) {
+                const resolvedId = docId != null ? docId : this.selectedDocumentTypeId;
+                const doc = this.documentTypeOptions.find((item) => String(item.id) === String(resolvedId || '')) || null;
+                return String(doc?.name || '').toLowerCase().includes('factura');
             },
-            applyCashRegisterByDocumentType() {
-                const preferredId = this.preferredCashRegisterId();
+            preferredCashRegisterIdFor(docId) {
+                return String(this.isInvoiceDocumentTypeId(docId) ? (this.invoiceCashRegisterId || '') : (this.standardCashRegisterId || '')).trim();
+            },
+            preferredCashRegisterId() {
+                return this.preferredCashRegisterIdFor(this.selectedDocumentTypeId);
+            },
+            applyCashRegisterByDocumentType(docId) {
+                const preferredId = this.preferredCashRegisterIdFor(docId);
                 if (!preferredId) return;
                 this.selectedCashRegisterId = preferredId;
             },
-            syncInvoiceBillingFields() {
-                if (!this.isInvoiceDocumentSelected()) {
+            async onDocumentTypeChange(event) {
+                const nextDocId = String(event?.target?.value ?? this.selectedDocumentTypeId ?? '');
+                this.selectedDocumentTypeId = nextDocId;
+                this.applyCashRegisterByDocumentType(nextDocId);
+                await this.$nextTick();
+                this.syncInvoiceBillingFields(nextDocId);
+                await this.refreshSaleHeaderPreview(nextDocId);
+            },
+            syncInvoiceBillingFields(docId) {
+                if (!this.isInvoiceDocumentTypeId(docId)) {
                     this.billingStatus = 'NOT_APPLICABLE';
                     this.invoiceSeries = this.invoiceSeries || '001';
                     this.invoiceNumber = '';
@@ -83,9 +98,9 @@
                     this.invoiceNumber = '';
                 }
             },
-            async refreshSaleHeaderPreview() {
-                const docId = Number(this.selectedDocumentTypeId || 0);
-                const cashId = Number(this.selectedCashRegisterId || this.$refs.cashRegisterSelect?.value || 0);
+            async refreshSaleHeaderPreview(docIdOverride, cashIdOverride) {
+                const docId = Number(docIdOverride ?? this.selectedDocumentTypeId ?? 0);
+                const cashId = Number(cashIdOverride ?? this.selectedCashRegisterId ?? this.$refs.cashRegisterSelect?.value ?? 0);
                 if (!docId || !cashId) return;
 
                 const url = new URL(@js(route('admin.sales.preview.header')), window.location.origin);
@@ -104,7 +119,7 @@
                     if (data?.number != null) {
                         this.saleHeaderNumber = String(data.number);
                     }
-                    if (this.isInvoiceDocumentSelected() && this.billingStatus === 'INVOICED') {
+                    if (this.isInvoiceDocumentTypeId(docId) && this.billingStatus === 'INVOICED') {
                         this.invoiceSeries = this.saleHeaderSeries || '001';
                         this.invoiceNumber = this.saleHeaderNumber || '';
                     }
@@ -433,7 +448,7 @@
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Documento de
                             venta</label>
                         <select x-model="selectedDocumentTypeId"
-                            @change="applyCashRegisterByDocumentType(); syncInvoiceBillingFields(); refreshSaleHeaderPreview()"
+                            @change="onDocumentTypeChange($event)"
                             name="document_type_id" required
                             class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
                             @foreach(($documentTypes ?? collect()) as $doc)
