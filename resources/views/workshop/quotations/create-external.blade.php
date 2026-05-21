@@ -67,7 +67,7 @@
             : route('admin.sales.quotations.store-external');
     @endphp
 
-    <div x-data="quotationExternalForm()" class="space-y-6">
+    <div x-data="quotationExternalForm()" x-init="init()" class="space-y-6">
         <x-common.page-breadcrumb pageTitle="Cotización externa" />
 
         <x-common.component-card title="{{ $isEdit ? 'Editar cotización externa' : 'Nueva cotización externa' }}" desc="Registro manual de cotización para cliente externo con repuestos y mano de obra.">
@@ -179,7 +179,7 @@
                                 </div>
                                 <button type="button"
                                         @click="externalQuotationToggleCreatingVehicle()"
-                                        :disabled="externalQuotationSelectedClientId <= 0 || vehicleTypes.length === 0"
+                                        :disabled="Number(externalQuotationSelectedClientId || 0) <= 0 || vehicleTypes.length === 0"
                                         class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-white hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40" style="background:linear-gradient(90deg,#465fff,#3b47d9);color:#fff;">
                                     <i class="ri-add-line text-lg"></i>
                                 </button>
@@ -380,7 +380,7 @@
                         <i class="ri-arrow-left-line text-sm"></i>
                         <span>Volver</span>
                     </a>
-                    <button type="submit" id="quotation-external-submit" @if ((int) old('client_person_id', $clientId) <= 0) disabled @endif class="h-11 rounded-xl bg-[#465fff] px-8 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-indigo-500/25 hover:bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-40">
+                    <button type="submit" id="quotation-external-submit" :disabled="!canSubmitExternalQuotation()" class="h-11 rounded-xl bg-[#465fff] px-8 text-xs font-black uppercase tracking-widest text-white shadow-lg shadow-indigo-500/25 hover:bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-40">
                         {{ $isEdit ? 'Actualizar cotización externa' : 'Guardar cotización externa' }}
                     </button>
                 </div>
@@ -733,6 +733,22 @@
                     tax_rate_id: '{{ $resolvedDefaultTaxRateId ? (string) $resolvedDefaultTaxRateId : '' }}',
                     discount_amount: 0,
                 },
+                init() {
+                    const clientId = parseInt(String(this.externalQuotationSelectedClientId || ''), 10);
+                    if (clientId > 0) {
+                        const client = this.allClients.find((c) => Number(c.id) === clientId);
+                        if (client) {
+                            this.externalQuotationClientSearch = `${client.document_number || ''} - ${((client.first_name || '') + ' ' + (client.last_name || '')).trim()}`;
+                        }
+                    }
+                    const vehicleId = parseInt(String(this.externalQuotationSelectedVehicleId || ''), 10);
+                    if (vehicleId > 0) {
+                        const vehicle = this.allVehicles.find((v) => Number(v.id) === vehicleId);
+                        if (vehicle) {
+                            this.externalQuotationVehicleSearch = vehicle.label || '';
+                        }
+                    }
+                },
                 externalQuotationFilteredClients() {
                     const q = String(this.externalQuotationClientSearch || '').trim().toLowerCase();
                     if (!q) return this.allClients.slice(0, 30);
@@ -963,6 +979,19 @@
                     } finally {
                         this.lookingUpPlate = false;
                     }
+                },
+                canSubmitExternalQuotation() {
+                    const clientId = parseInt(String(this.externalQuotationSelectedClientId || ''), 10);
+                    if (!clientId || clientId <= 0) {
+                        return false;
+                    }
+
+                    return (this.rows || []).some((row) => {
+                        const desc = String(row.description || '').trim();
+                        const qty = this.toNumber(row.qty);
+                        const price = this.toNumber(row.unit_price);
+                        return desc !== '' && qty > 0 && price >= 0;
+                    });
                 },
                 get summary() {
                     let subtotal = 0;

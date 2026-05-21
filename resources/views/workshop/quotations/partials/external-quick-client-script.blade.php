@@ -481,11 +481,7 @@
 
     const loadVehiclesForQuotationClient = (clientPersonId) => {
         const vehicleSelect = document.getElementById('quotation-external-vehicle-select');
-        const submitBtn = document.getElementById('quotation-external-submit');
         const cid = Number(clientPersonId || 0);
-        if (submitBtn) {
-            submitBtn.disabled = cid <= 0;
-        }
         if (!vehicleSelect) {
             return;
         }
@@ -558,7 +554,10 @@
         event.preventDefault();
         saveQuickClient();
     });
-    document.getElementById('quotation-external-client-select')?.addEventListener('change', onQuotationExternalClientChanged);
-    onQuotationExternalClientChanged();
+    const legacyClientSelect = document.getElementById('quotation-external-client-select');
+    if (legacyClientSelect) {
+        legacyClientSelect.addEventListener('change', onQuotationExternalClientChanged);
+        onQuotationExternalClientChanged();
+    }
 })();
 </script>
