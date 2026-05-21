@@ -1042,6 +1042,7 @@ class WorkshopMaintenanceBoardController extends Controller
 
         $redirectUrl = route('workshop.maintenance-board.index', array_filter([
             'view_id' => $request->query('view_id'),
+            'status' => $this->boardIndexFilterForStatus((string) $workshop->status),
         ]));
 
         if (($workshop->service_type ?? '') === 'correctivo') {
@@ -1396,9 +1397,10 @@ class WorkshopMaintenanceBoardController extends Controller
                 ->with('status', 'Cotización generada y fase avanzada exitosamente.');
         }
 
-        return redirect()
-            ->route('workshop.maintenance-board.index')
-            ->with('status', 'Orden de servicio actualizada.');
+        return $this->redirectToBoardWithStatus(
+            (string) $order->fresh()->status,
+            'Orden de servicio actualizada.'
+        );
     }
 
     public function quotation(Request $request, WorkshopMovement $order): RedirectResponse
@@ -1423,9 +1425,9 @@ class WorkshopMaintenanceBoardController extends Controller
                     ->lockForUpdate()
                     ->firstOrFail();
 
-                $editableStatuses = ['awaiting_approval', 'approved', 'in_progress', 'paused'];
+                $editableStatuses = ['awaiting_approval', 'approved'];
                 if (!in_array((string) $lockedOrder->status, $editableStatuses, true)) {
-                    throw new \RuntimeException('La cotizacion solo se puede editar en espera de aprobacion, aprobado, en reparacion o pausado.');
+                    throw new \RuntimeException('La cotizacion solo se puede editar en espera de aprobacion o aprobado.');
                 }
 
                 $detailsById = $lockedOrder->details()
@@ -1487,10 +1489,17 @@ class WorkshopMaintenanceBoardController extends Controller
         }
 
         if ($showAnticipo ?? false) {
-            return back()->with('status', 'Cotización aprobada correctamente.')->with('show_anticipo_modal_for_order', $order->id);
+            return $this->redirectToBoardWithStatus(
+                'approved',
+                'Cotización aprobada correctamente.',
+                ['show_anticipo_modal_for_order' => $order->id]
+            );
         }
 
-        return back()->with('status', 'Cotización aprobada correctamente.');
+        return $this->redirectToBoardWithStatus(
+            (string) $order->fresh()->status,
+            'Cotización actualizada correctamente.'
+        );
     }
 
     public function storeVehicleQuick(Request $request): JsonResponse
@@ -1873,8 +1882,10 @@ class WorkshopMaintenanceBoardController extends Controller
             'glosa' => ['required_if:service_type,external', 'nullable', 'string', 'max:1000'],
         ]);
 
+        $newBoardStatus = 'in_progress';
+
         try {
-            DB::transaction(function () use ($order, $validated) {
+            DB::transaction(function () use ($order, $validated, &$newBoardStatus) {
                 if ($validated['service_type'] === 'internal') {
                     // Assign technician
                     WorkshopMovementTechnician::query()->updateOrCreate(
@@ -1893,6 +1904,7 @@ class WorkshopMaintenanceBoardController extends Controller
                         'comment' => 'Inicio de mantenimiento (Interno) desde tablero',
                     ]);
                 } else {
+                    $newBoardStatus = 'in_progress_external';
                     // External service
                     $glosa = trim($validated['glosa'] ?? '');
                     $newObservations = trim(($order->observations ?? '') . "\n" . "[SERVICIO EXTERNO - " . now()->format('Y-m-d H:i') . "] " . $glosa);
@@ -1910,7 +1922,7 @@ class WorkshopMaintenanceBoardController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
 
-        return back()->with('status', 'Servicio iniciado.');
+        return $this->redirectToBoardWithStatus($newBoardStatus, 'Servicio iniciado.');
     }
 
     public function finishExternal(Request $request, WorkshopMovement $order): RedirectResponse
@@ -1920,6 +1932,8 @@ class WorkshopMaintenanceBoardController extends Controller
         $request->validate([
             'finished_photo' => ['required', 'image', 'max:10240'],
         ]);
+
+        $targetStatus = 'approved';
 
         try {
             if ($order->status !== 'in_progress_external') {
@@ -1932,7 +1946,7 @@ class WorkshopMaintenanceBoardController extends Controller
                 $photoPath = $request->file('finished_photo')->store("workshop/finished/{$branchId}", 'public');
             }
 
-            $targetStatus = $order->last_status ?? 'approved';
+            $targetStatus = (string) ($order->last_status ?? 'approved');
 
             $this->flowService->updateOrder($order, [
                 'status' => $targetStatus,
@@ -1944,7 +1958,7 @@ class WorkshopMaintenanceBoardController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
 
-        return back()->with('status', 'Servicio externo finalizado.');
+        return $this->redirectToBoardWithStatus($targetStatus, 'Servicio externo finalizado.');
     }
 
     public function finish(Request $request, WorkshopMovement $order): RedirectResponse
@@ -1972,7 +1986,7 @@ class WorkshopMaintenanceBoardController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
 
-        return back()->with('status', 'Servicio finalizado. Puede continuar con cobro y entrega.');
+        return $this->redirectToBoardWithStatus('finished', 'Servicio finalizado. Puede continuar con cobro y entrega.');
     }
 
     public function pause(Request $request, WorkshopMovement $order): RedirectResponse
@@ -1996,7 +2010,7 @@ class WorkshopMaintenanceBoardController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
 
-        return back()->with('status', 'Servicio pausado correctamente.');
+        return $this->redirectToBoardWithStatus('paused', 'Servicio pausado correctamente.');
     }
 
     public function resume(WorkshopMovement $order): RedirectResponse
@@ -2024,7 +2038,7 @@ class WorkshopMaintenanceBoardController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
 
-        return back()->with('status', 'Servicio reanudado.');
+        return $this->redirectToBoardWithStatus('in_progress', 'Servicio reanudado.');
     }
 
     public function checkoutPage(WorkshopMovement $order): \Illuminate\View\View|RedirectResponse
@@ -2567,9 +2581,12 @@ class WorkshopMaintenanceBoardController extends Controller
             $this->syncElectronicInvoiceForSale($movementForApisunat, $apisunatService);
         }
 
-        return redirect()
-            ->route('workshop.maintenance-board.index')
-            ->with('status', 'Venta y cobro registrados correctamente.');
+        $order->refresh();
+
+        return $this->redirectToBoardWithStatus(
+            (string) $order->status,
+            'Venta y cobro registrados correctamente.'
+        );
     }
 
     private function mergeExistingWorkshopDamagePhotos(WorkshopMovement $order, array $damagesWithPhotos): array
@@ -3310,6 +3327,35 @@ class WorkshopMaintenanceBoardController extends Controller
                 'electronic_status' => trim((string) ($movement?->electronic_invoice_status ?? '')),
             ];
         })->values()->all();
+    }
+
+    private function boardIndexFilterForStatus(string $status): string
+    {
+        return match ($status) {
+            'in_progress', 'paused' => 'in_progress',
+            'in_progress_external' => 'in_progress_external',
+            default => $status,
+        };
+    }
+
+    private function redirectToBoardWithStatus(string $orderStatus, ?string $message = null, array $flash = []): RedirectResponse
+    {
+        $params = array_filter([
+            'status' => $this->boardIndexFilterForStatus($orderStatus),
+            'view_id' => request()->query('view_id'),
+        ]);
+
+        $redirect = redirect()->route('workshop.maintenance-board.index', $params);
+
+        if ($message !== null && $message !== '') {
+            $redirect->with('status', $message);
+        }
+
+        foreach ($flash as $key => $value) {
+            $redirect->with($key, $value);
+        }
+
+        return $redirect;
     }
 
     private function syncElectronicInvoiceForSale(\App\Models\Movement $movement, \App\Services\ApisunatService $apisunatService): array

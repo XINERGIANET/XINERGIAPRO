@@ -101,8 +101,7 @@
                     $canAnticipoCard = $isAnticipoFeatureActive
                         && in_array((string) $card->status, ['approved', 'in_progress', 'paused'], true)
                         && $pendingDebtCard > 0.00001;
-                    $canQuoteCard = ((string) $card->status === 'awaiting_approval') || 
-                                    ($isAnticipoFeatureActive && in_array((string) $card->status, ['approved', 'in_progress', 'paused'], true));
+                    $canQuoteCard = in_array((string) $card->status, ['awaiting_approval', 'approved'], true);
                     $canCheckoutCard = in_array((string) $card->status, ['in_progress', 'paused', 'finished'], true)
                         && ($pendingBillingCountCard > 0 || $pendingDebtCard > 0.00001 || (float) $card->total <= 0.00001);
                     $canEditBoardCard = !in_array((string) $card->status, ['cancelled', 'delivered'], true) && !$card->sales_movement_id;
