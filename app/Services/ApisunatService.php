@@ -89,66 +89,23 @@ class ApisunatService
         $customerDocType = $this->resolveCustomerDocumentType($customerDocument, $catalog['type']);
         $totals = $this->resolveMovementTotals($sale);
         $apiUrl = $this->resolveApiUrl($config);
+        $number = $this->fetchSuggestedCorrelativeNumber($config, $catalog, $apiUrl);
 
-        $correlativeResp = Http::timeout(20)->post($apiUrl.'/personas/lastDocument', [
-            'personaId' => (string) $config->persona_id,
-            'personaToken' => (string) $config->persona_token,
-            'type' => $catalog['type'],
-            'serie' => $catalog['serie'],
-        ]);
-
-        if ($correlativeResp->failed()) {
-            throw new \RuntimeException('Error consultando correlativo en Apisunat: '.$correlativeResp->body());
-        }
-
-        $suggestedNumber = trim((string) data_get($correlativeResp->object(), 'suggestedNumber', ''));
-        if ($suggestedNumber === '' || ! ctype_digit($suggestedNumber)) {
-            throw new \RuntimeException('Apisunat devolvió un correlativo inválido.');
-        }
-
-        $number = str_pad($suggestedNumber, 8, '0', STR_PAD_LEFT);
-        $fileName = trim((string) ($branch?->ruc ?? '0')).'-'.$catalog['type'].'-'.$catalog['serie'].'-'.$number;
-        $documentBody = $this->buildDocumentBody($sale, $catalog, $customerDocument, $customerDocType, $totals, $number);
-        $this->validateDocumentBodyForSunat($documentBody);
-
-        $sendResp = Http::timeout(35)->post($apiUrl.'/personas/v1/sendBill', [
-            'personaId' => (string) $config->persona_id,
-            'personaToken' => (string) $config->persona_token,
-            'fileName' => $fileName,
-            'documentBody' => $documentBody,
-        ]);
-
-        if ($sendResp->failed()) {
-            $errorMessage = data_get($sendResp->object(), 'error.message')
-                ?: data_get($sendResp->json(), 'error.message')
-                ?: $sendResp->body();
-
-            throw new \RuntimeException('Error enviando comprobante a Apisunat: '.$errorMessage);
-        }
-
-        $result = $sendResp->object();
-        $documentId = trim((string) data_get($result, 'documentId', ''));
-        if ($documentId === '') {
-            throw new \RuntimeException('Apisunat no devolvió documentId.');
-        }
-
-        $extraDocumentData = $this->getDocumentById($documentId, $branch);
-        $urls = $this->extractDocumentUrls($extraDocumentData);
-
-        return $this->buildEmitSuccessPayload(
+        return $this->sendSaleBillToApisunat(
+            $sale,
+            $config,
             $catalog,
+            $customerDocument,
+            $customerDocType,
+            $totals,
             $number,
-            $fileName,
-            $documentId,
-            $sendResp,
-            $extraDocumentData,
-            $urls,
-            $apiUrl
+            true,
+            'Comprobante enviado correctamente a Apisunat.'
         );
     }
 
     /**
-     * Reenvía a SUNAT un comprobante ya registrado localmente (misma serie y correlativo).
+     * Reenvía a SUNAT. Si el correlativo local ya existe en Apisunat, usa el siguiente disponible.
      */
     public function reemitSale(Movement $sale): array
     {
@@ -177,51 +134,59 @@ class ApisunatService
         $catalog = $this->resolveDocumentCatalog($sale, $config);
         $billingCorrelative = $this->resolveBillingCorrelativeForResend($sale, $catalog['serie']);
         $catalog['serie'] = $billingCorrelative['serie'];
-        $number = $billingCorrelative['number'];
+        $apiUrl = $this->resolveApiUrl($config);
 
         $customerDocument = $this->resolveCustomerDocument($sale, $catalog['type']);
         $customerDocType = $this->resolveCustomerDocumentType($customerDocument, $catalog['type']);
         $totals = $this->resolveMovementTotals($sale);
-        $apiUrl = $this->resolveApiUrl($config);
-        $fileName = trim((string) ($branch?->ruc ?? '0')).'-'.$catalog['type'].'-'.$catalog['serie'].'-'.$number;
-        $documentBody = $this->buildDocumentBody($sale, $catalog, $customerDocument, $customerDocType, $totals, $number);
-        $this->validateDocumentBodyForSunat($documentBody);
 
-        $sendResp = Http::timeout(35)->post($apiUrl.'/personas/v1/sendBill', [
-            'personaId' => (string) $config->persona_id,
-            'personaToken' => (string) $config->persona_token,
-            'fileName' => $fileName,
-            'documentBody' => $documentBody,
-        ]);
-
-        if ($sendResp->failed()) {
-            $errorMessage = data_get($sendResp->object(), 'error.message')
-                ?: data_get($sendResp->json(), 'error.message')
-                ?: $sendResp->body();
-
-            throw new \RuntimeException('Error reenviando comprobante a Apisunat: '.$errorMessage);
+        $electronicStatus = strtoupper(trim((string) ($sale->electronic_invoice_status ?? '')));
+        $initialNumber = $billingCorrelative['number'];
+        if ($electronicStatus === 'ERROR' || $electronicStatus === '') {
+            $initialNumber = $this->fetchSuggestedCorrelativeNumber($config, $catalog, $apiUrl);
         }
 
-        $result = $sendResp->object();
-        $documentId = trim((string) data_get($result, 'documentId', ''));
-        if ($documentId === '') {
-            throw new \RuntimeException('Apisunat no devolvió documentId.');
-        }
-
-        $extraDocumentData = $this->getDocumentById($documentId, $branch);
-        $urls = $this->extractDocumentUrls($extraDocumentData);
-
-        return $this->buildEmitSuccessPayload(
+        return $this->sendSaleBillToApisunat(
+            $sale,
+            $config,
             $catalog,
-            $number,
-            $fileName,
-            $documentId,
-            $sendResp,
-            $extraDocumentData,
-            $urls,
-            $apiUrl,
+            $customerDocument,
+            $customerDocType,
+            $totals,
+            $initialNumber,
+            true,
             'Comprobante reenviado correctamente a Apisunat.'
         );
+    }
+
+    public function persistEmittedElectronicData(Movement $sale, array $result): void
+    {
+        if (($result['status'] ?? '') !== 'SENT' || empty($result['data'])) {
+            return;
+        }
+
+        $data = $result['data'];
+        $sale->update([
+            'electronic_invoice_provider' => $data['provider'] ?? 'apisunat',
+            'electronic_invoice_status' => 'SENT',
+            'electronic_invoice_external_id' => $data['external_id'] ?? null,
+            'electronic_invoice_series' => $data['series'] ?? null,
+            'electronic_invoice_number' => $data['correlative'] ?? null,
+            'electronic_invoice_file_name' => $data['file_name'] ?? null,
+            'electronic_invoice_pdf_ticket_url' => $data['pdf_ticket_80mm'] ?? null,
+            'electronic_invoice_pdf_a4_url' => $data['pdf_a4'] ?? null,
+            'electronic_invoice_xml_url' => $data['xml_url'] ?? null,
+            'electronic_invoice_cdr_url' => $data['cdr_url'] ?? null,
+            'electronic_invoice_response' => $data['response'] ?? null,
+        ]);
+
+        if ($sale->salesMovement) {
+            $sale->salesMovement->update([
+                'billing_status' => 'INVOICED',
+                'billing_number' => $data['correlative'] ?? $sale->salesMovement->billing_number,
+                'series' => $data['series'] ?? $sale->salesMovement->series,
+            ]);
+        }
     }
 
     /**
@@ -250,6 +215,138 @@ class ApisunatService
         ];
     }
 
+    private function sendSaleBillToApisunat(
+        Movement $sale,
+        BranchElectronicBillingConfig $config,
+        array $catalog,
+        string $customerDocument,
+        string $customerDocType,
+        array $totals,
+        string $initialNumber,
+        bool $retryOnDuplicate,
+        string $successMessage
+    ): array {
+        $branch = $sale->branch;
+        $apiUrl = $this->resolveApiUrl($config);
+        $originalNumber = $this->normalizeCorrelativeNumber($initialNumber);
+        $number = $originalNumber;
+        $maxAttempts = $retryOnDuplicate ? 6 : 1;
+        $lastError = '';
+
+        for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+            $fileName = trim((string) ($branch?->ruc ?? '0')).'-'.$catalog['type'].'-'.$catalog['serie'].'-'.$number;
+            $documentBody = $this->buildDocumentBody($sale, $catalog, $customerDocument, $customerDocType, $totals, $number);
+            $this->validateDocumentBodyForSunat($documentBody);
+
+            $sendResp = Http::timeout(35)->post($apiUrl.'/personas/v1/sendBill', [
+                'personaId' => (string) $config->persona_id,
+                'personaToken' => (string) $config->persona_token,
+                'fileName' => $fileName,
+                'documentBody' => $documentBody,
+            ]);
+
+            if (! $sendResp->failed()) {
+                $result = $sendResp->object();
+                $documentId = trim((string) data_get($result, 'documentId', ''));
+                if ($documentId === '') {
+                    throw new \RuntimeException('Apisunat no devolvió documentId.');
+                }
+
+                $extraDocumentData = $this->getDocumentById($documentId, $branch);
+                $urls = $this->extractDocumentUrls($extraDocumentData);
+                $previousCorrelative = $originalNumber !== $number ? $originalNumber : null;
+
+                if ($previousCorrelative !== null) {
+                    $successMessage .= ' Se actualizó el correlativo interno de '
+                        .$catalog['serie'].'-'.$previousCorrelative.' a '.$catalog['serie'].'-'.$number.'.';
+                }
+
+                return $this->buildEmitSuccessPayload(
+                    $catalog,
+                    $number,
+                    $fileName,
+                    $documentId,
+                    $sendResp,
+                    $extraDocumentData,
+                    $urls,
+                    $apiUrl,
+                    $successMessage,
+                    $previousCorrelative
+                );
+            }
+
+            $lastError = (string) (data_get($sendResp->object(), 'error.message')
+                ?: data_get($sendResp->json(), 'error.message')
+                ?: $sendResp->body());
+
+            if (! $retryOnDuplicate || ! $this->isDuplicateCorrelativeError($lastError)) {
+                break;
+            }
+
+            $nextNumber = $this->fetchSuggestedCorrelativeNumber($config, $catalog, $apiUrl);
+            if ($nextNumber === $number) {
+                $nextNumber = $this->bumpCorrelativeNumber($number);
+            }
+            $number = $nextNumber;
+        }
+
+        $actionLabel = str_contains(mb_strtolower($successMessage, 'UTF-8'), 'reenvi')
+            ? 'reenviando'
+            : 'enviando';
+
+        throw new \RuntimeException('Error '.$actionLabel.' comprobante a Apisunat: '.$lastError);
+    }
+
+    private function fetchSuggestedCorrelativeNumber(
+        BranchElectronicBillingConfig $config,
+        array $catalog,
+        string $apiUrl
+    ): string {
+        $correlativeResp = Http::timeout(20)->post($apiUrl.'/personas/lastDocument', [
+            'personaId' => (string) $config->persona_id,
+            'personaToken' => (string) $config->persona_token,
+            'type' => $catalog['type'],
+            'serie' => $catalog['serie'],
+        ]);
+
+        if ($correlativeResp->failed()) {
+            throw new \RuntimeException('Error consultando correlativo en Apisunat: '.$correlativeResp->body());
+        }
+
+        $suggestedNumber = trim((string) data_get($correlativeResp->object(), 'suggestedNumber', ''));
+        if ($suggestedNumber === '' || ! ctype_digit($suggestedNumber)) {
+            throw new \RuntimeException('Apisunat devolvió un correlativo inválido.');
+        }
+
+        return $this->normalizeCorrelativeNumber($suggestedNumber);
+    }
+
+    private function normalizeCorrelativeNumber(string $number): string
+    {
+        $digits = preg_replace('/\D+/', '', $number) ?: '';
+
+        return str_pad($digits !== '' ? $digits : '1', 8, '0', STR_PAD_LEFT);
+    }
+
+    private function bumpCorrelativeNumber(string $number): string
+    {
+        $digits = (int) (preg_replace('/\D+/', '', $number) ?: '0');
+
+        return str_pad((string) ($digits + 1), 8, '0', STR_PAD_LEFT);
+    }
+
+    private function isDuplicateCorrelativeError(string $message): bool
+    {
+        $normalized = mb_strtolower($message, 'UTF-8');
+
+        return str_contains($normalized, 'numeración repetida')
+            || str_contains($normalized, 'numeracion repetida')
+            || str_contains($normalized, 'número repetido')
+            || str_contains($normalized, 'numero repetido')
+            || str_contains($normalized, 'ya existe')
+            || str_contains($normalized, 'repetid');
+    }
+
     private function buildEmitSuccessPayload(
         array $catalog,
         string $number,
@@ -259,27 +356,35 @@ class ApisunatService
         array $extraDocumentData,
         array $urls,
         string $apiUrl,
-        string $message = 'Comprobante enviado correctamente a Apisunat.'
+        string $message = 'Comprobante enviado correctamente a Apisunat.',
+        ?string $previousCorrelative = null
     ): array {
+        $data = [
+            'provider' => 'apisunat',
+            'external_id' => $documentId,
+            'series' => $catalog['serie'],
+            'correlative' => $number,
+            'full_number' => $catalog['serie'].'-'.$number,
+            'file_name' => $fileName.'.pdf',
+            'pdf_ticket_80mm' => $apiUrl.'/documents/'.$documentId.'/getPDF/ticket80mm/'.$fileName.'.pdf',
+            'pdf_a4' => $apiUrl.'/documents/'.$documentId.'/getPDF/A4/'.$fileName.'.pdf',
+            'xml_url' => $urls['xml_url'] ?? null,
+            'cdr_url' => $urls['cdr_url'] ?? null,
+            'response' => [
+                'send' => $sendResp->json(),
+                'document' => $extraDocumentData,
+            ],
+        ];
+
+        if ($previousCorrelative !== null) {
+            $data['previous_correlative'] = $previousCorrelative;
+            $data['correlative_changed'] = true;
+        }
+
         return [
             'status' => 'SENT',
             'message' => $message,
-            'data' => [
-                'provider' => 'apisunat',
-                'external_id' => $documentId,
-                'series' => $catalog['serie'],
-                'correlative' => $number,
-                'full_number' => $catalog['serie'].'-'.$number,
-                'file_name' => $fileName.'.pdf',
-                'pdf_ticket_80mm' => $apiUrl.'/documents/'.$documentId.'/getPDF/ticket80mm/'.$fileName.'.pdf',
-                'pdf_a4' => $apiUrl.'/documents/'.$documentId.'/getPDF/A4/'.$fileName.'.pdf',
-                'xml_url' => $urls['xml_url'] ?? null,
-                'cdr_url' => $urls['cdr_url'] ?? null,
-                'response' => [
-                    'send' => $sendResp->json(),
-                    'document' => $extraDocumentData,
-                ],
-            ],
+            'data' => $data,
         ];
     }
 
