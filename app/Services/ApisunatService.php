@@ -515,7 +515,7 @@ class ApisunatService
             }
         }
 
-        $documentBody['cac:LegalMonetaryTotal'] = [
+        $legalMonetaryTotal = [
             'cbc:LineExtensionAmount' => [
                 '_attributes' => ['currencyID' => 'PEN'],
                 '_text' => $headerSubtotal,
@@ -524,18 +524,21 @@ class ApisunatService
                 '_attributes' => ['currencyID' => 'PEN'],
                 '_text' => $headerTotal,
             ],
-            'cbc:PayableAmount' => [
-                '_attributes' => ['currencyID' => 'PEN'],
-                '_text' => $payableAmount,
-            ],
         ];
 
         if ($prepaidTotal > 0) {
-            $documentBody['cac:LegalMonetaryTotal']['cbc:PrepaidAmount'] = [
+            $legalMonetaryTotal['cbc:PrepaidAmount'] = [
                 '_attributes' => ['currencyID' => 'PEN'],
                 '_text' => $prepaidTotal,
             ];
         }
+
+        $legalMonetaryTotal['cbc:PayableAmount'] = [
+            '_attributes' => ['currencyID' => 'PEN'],
+            '_text' => $payableAmount,
+        ];
+
+        $documentBody['cac:LegalMonetaryTotal'] = $legalMonetaryTotal;
 
         return $documentBody;
     }
