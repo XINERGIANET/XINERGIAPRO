@@ -2075,6 +2075,10 @@ class WorkshopMaintenanceBoardController extends Controller
             ];
         })->values();
 
+        $previousAdvances = (!$isAnticipo && (float) $order->paid_total > 0)
+            ? $this->resolveWorkshopAdvanceDocuments($order)
+            : [];
+
         if ($isAnticipo) {
             $pendingLines->prepend([
                 'detail_id' => 'anticipo',
@@ -2085,14 +2089,15 @@ class WorkshopMaintenanceBoardController extends Controller
                 'subtotal' => 0,
             ]);
         } else {
-            if ((float) $order->paid_total > 0) {
+            foreach ($previousAdvances as $advance) {
                 $pendingLines->push([
-                    'detail_id' => 'anticipo',
+                    'detail_id' => 'anticipo-' . (int) ($advance['movement_id'] ?? 0),
                     'line_type' => 'ANTICIPO',
-                    'description' => 'ANTICIPOS PREVIAMENTE PAGADOS',
+                    'description' => trim((string) ($advance['document_name'] ?? 'Comprobante')) . ' ' . trim((string) ($advance['full_number'] ?? '')),
                     'qty' => 1,
-                    'unit_price' => -1 * (float) $order->paid_total,
-                    'subtotal' => -1 * (float) $order->paid_total,
+                    'unit_price' => -1 * (float) ($advance['amount'] ?? 0),
+                    'subtotal' => -1 * (float) ($advance['amount'] ?? 0),
+                    'advance' => $advance,
                 ]);
             }
         }
@@ -2165,6 +2170,7 @@ class WorkshopMaintenanceBoardController extends Controller
         return view('workshop.maintenance-board.checkout', array_merge($formData, [
             'order' => $order,
             'pendingLines' => $pendingLines,
+            'previousAdvances' => $previousAdvances,
             'isAnticipo' => $isAnticipo ?? false,
             'totalOs' => (float) $order->total,
             'paidOs' => (float) $order->paid_total,
@@ -3209,6 +3215,53 @@ class WorkshopMaintenanceBoardController extends Controller
             'driver_name' => $lastMovement?->driver_name ?? '',
             'driver_phone' => $lastMovement?->driver_phone ?? '',
         ]);
+    }
+
+    private function resolveWorkshopAdvanceDocuments(WorkshopMovement $order): array
+    {
+        if ((int) ($order->movement_id ?? 0) <= 0) {
+            return [];
+        }
+
+        $advances = \App\Models\SalesMovement::query()
+            ->where('is_advance', true)
+            ->whereHas('movement', function ($query) use ($order) {
+                $query->where('parent_movement_id', (int) $order->movement_id);
+            })
+            ->with(['movement.documentType'])
+            ->orderBy('id')
+            ->get();
+
+        return $advances->map(function (\App\Models\SalesMovement $sale) {
+            $movement = $sale->movement;
+            $series = trim((string) ($movement?->electronic_invoice_series ?? $sale->series ?? ''));
+            $correlative = trim((string) ($movement?->electronic_invoice_number ?? $sale->billing_number ?? $movement?->number ?? ''));
+            $correlativeDigits = preg_replace('/\D+/', '', $correlative) ?: '';
+            if ($correlativeDigits !== '') {
+                $correlative = str_pad($correlativeDigits, 8, '0', STR_PAD_LEFT);
+            }
+
+            $fullNumber = ($series !== '' && $correlative !== '')
+                ? $series . '-' . $correlative
+                : trim((string) ($movement?->number ?? ('#' . $sale->id)));
+
+            $docName = mb_strtolower(trim((string) ($movement?->documentType?->name ?? '')), 'UTF-8');
+            $documentTypeCode = str_contains($docName, 'factura') ? '01' : '03';
+
+            return [
+                'sales_movement_id' => (int) $sale->id,
+                'movement_id' => (int) ($movement?->id ?? 0),
+                'document_name' => trim((string) ($movement?->documentType?->name ?? 'Comprobante')),
+                'document_type_code' => $documentTypeCode,
+                'series' => $series,
+                'correlative' => $correlative,
+                'full_number' => $fullNumber,
+                'amount' => round((float) $sale->total, 2),
+                'issue_date' => optional($movement?->moved_at)->format('Y-m-d'),
+                'issue_time' => optional($movement?->moved_at)->format('H:i:s'),
+                'electronic_status' => trim((string) ($movement?->electronic_invoice_status ?? '')),
+            ];
+        })->values()->all();
     }
 
     private function syncElectronicInvoiceForSale(\App\Models\Movement $movement, \App\Services\ApisunatService $apisunatService): array

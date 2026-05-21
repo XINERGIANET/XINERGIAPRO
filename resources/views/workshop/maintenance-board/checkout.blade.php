@@ -300,6 +300,38 @@
                     </div>
                 </div>
 
+                @if(!($isAnticipo ?? false) && !empty($previousAdvances))
+                    <div class="overflow-hidden rounded-xl border border-emerald-200 bg-emerald-50/50">
+                        <div class="border-b border-emerald-200 bg-emerald-100/60 px-3 py-2 text-sm font-semibold text-emerald-800">
+                            Anticipos registrados (se referenciarán en el comprobante final)
+                        </div>
+                        <div class="divide-y divide-emerald-100 p-3">
+                            @foreach($previousAdvances as $advance)
+                                <div class="flex flex-wrap items-center justify-between gap-3 py-2">
+                                    <div>
+                                        <p class="text-sm font-semibold text-emerald-900">{{ $advance['document_name'] ?? 'Comprobante' }}</p>
+                                        <p class="text-xs text-emerald-700">
+                                            Serie: <span class="font-semibold">{{ $advance['series'] ?: '—' }}</span>
+                                            · Correlativo: <span class="font-semibold">{{ $advance['correlative'] ?: '—' }}</span>
+                                            · Número: <span class="font-semibold">{{ $advance['full_number'] ?? '—' }}</span>
+                                        </p>
+                                        @if(!empty($advance['issue_date']))
+                                            <p class="text-xs text-emerald-600">Emitido: {{ $advance['issue_date'] }} {{ $advance['issue_time'] ?? '' }}</p>
+                                        @endif
+                                        @if(!empty($advance['electronic_status']))
+                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-600">Estado electrónico: {{ $advance['electronic_status'] }}</p>
+                                        @endif
+                                    </div>
+                                    <div class="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-right">
+                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-600">Monto anticipo</p>
+                                        <p class="text-lg font-bold text-emerald-800">S/ {{ number_format((float) ($advance['amount'] ?? 0), 2) }}</p>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
                 <div class="overflow-hidden rounded-xl border border-slate-200">
                     <div class="border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
                         Servicios y líneas pendientes a cobrar

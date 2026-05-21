@@ -7,6 +7,7 @@ use App\Models\BranchElectronicBillingConfig;
 use App\Models\Movement;
 use App\Models\TaxRate;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
@@ -477,6 +478,43 @@ class ApisunatService
             ],
         ];
 
+        $prepaidTotal = 0.0;
+        $payableAmount = $headerTotal;
+        $linkedAdvances = $this->resolveLinkedAdvancePayments($sale);
+
+        if ($linkedAdvances !== []) {
+            $prepaidTotal = round(collect($linkedAdvances)->sum('amount'), 2);
+            $payableAmount = round(max(0, $headerTotal - $prepaidTotal), 2);
+            $supplierRuc = trim((string) ($branch?->ruc ?? '0'));
+
+            $documentBody['cac:AdditionalDocumentReference'] = [];
+            $documentBody['cac:PrepaidPayment'] = [];
+
+            foreach ($linkedAdvances as $index => $advance) {
+                $documentBody['cac:AdditionalDocumentReference'][] = [
+                    'cbc:ID' => ['_text' => (string) $advance['full_number']],
+                    'cbc:DocumentTypeCode' => ['_text' => (string) $advance['document_type_code']],
+                    'cbc:DocumentStatusCode' => ['_text' => '01'],
+                    'cac:IssuerParty' => [
+                        'cac:PartyIdentification' => [
+                            'cbc:ID' => [
+                                '_attributes' => ['schemeID' => '6'],
+                                '_text' => $supplierRuc,
+                            ],
+                        ],
+                    ],
+                ];
+
+                $documentBody['cac:PrepaidPayment'][] = [
+                    'cbc:ID' => ['_text' => str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT)],
+                    'cbc:PaidAmount' => [
+                        '_attributes' => ['currencyID' => 'PEN'],
+                        '_text' => round((float) $advance['amount'], 2),
+                    ],
+                ];
+            }
+        }
+
         $documentBody['cac:LegalMonetaryTotal'] = [
             'cbc:LineExtensionAmount' => [
                 '_attributes' => ['currencyID' => 'PEN'],
@@ -488,11 +526,77 @@ class ApisunatService
             ],
             'cbc:PayableAmount' => [
                 '_attributes' => ['currencyID' => 'PEN'],
-                '_text' => $headerTotal,
+                '_text' => $payableAmount,
             ],
         ];
 
+        if ($prepaidTotal > 0) {
+            $documentBody['cac:LegalMonetaryTotal']['cbc:PrepaidAmount'] = [
+                '_attributes' => ['currencyID' => 'PEN'],
+                '_text' => $prepaidTotal,
+            ];
+        }
+
         return $documentBody;
+    }
+
+    private function resolveLinkedAdvancePayments(Movement $sale): array
+    {
+        $advanceMovementIds = DB::table('sale_advances')
+            ->where('final_movement_id', (int) $sale->id)
+            ->pluck('advance_movement_id')
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->values()
+            ->all();
+
+        if ($advanceMovementIds === [] && (int) ($sale->parent_movement_id ?? 0) > 0) {
+            $advanceMovementIds = DB::table('movements as m')
+                ->join('sales_movements as sm', 'sm.movement_id', '=', 'm.id')
+                ->where('m.parent_movement_id', (int) $sale->parent_movement_id)
+                ->where('sm.is_advance', true)
+                ->whereNull('m.deleted_at')
+                ->whereNull('sm.deleted_at')
+                ->where('m.id', '!=', (int) $sale->id)
+                ->pluck('m.id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        }
+
+        if ($advanceMovementIds === []) {
+            return [];
+        }
+
+        $movements = Movement::query()
+            ->with(['documentType', 'salesMovement'])
+            ->whereIn('id', $advanceMovementIds)
+            ->get();
+
+        return $movements->map(function (Movement $advanceMovement) {
+            $sale = $advanceMovement->salesMovement;
+            $series = trim((string) ($advanceMovement->electronic_invoice_series ?? $sale?->series ?? ''));
+            $correlative = trim((string) ($advanceMovement->electronic_invoice_number ?? $sale?->billing_number ?? $advanceMovement->number ?? ''));
+            $correlativeDigits = preg_replace('/\D+/', '', $correlative) ?: '';
+            if ($correlativeDigits !== '') {
+                $correlative = str_pad($correlativeDigits, 8, '0', STR_PAD_LEFT);
+            }
+
+            $fullNumber = ($series !== '' && $correlative !== '')
+                ? $series . '-' . $correlative
+                : trim((string) ($advanceMovement->number ?? ''));
+
+            $docName = mb_strtolower(trim((string) ($advanceMovement->documentType?->name ?? '')), 'UTF-8');
+
+            return [
+                'movement_id' => (int) $advanceMovement->id,
+                'full_number' => $fullNumber,
+                'document_type_code' => str_contains($docName, 'factura') ? '02' : '03',
+                'amount' => round((float) ($sale?->total ?? 0), 2),
+            ];
+        })
+            ->filter(fn (array $row) => $row['full_number'] !== '' && $row['amount'] > 0)
+            ->values()
+            ->all();
     }
 
     private function validateDocumentBodyForSunat(array $documentBody): void
