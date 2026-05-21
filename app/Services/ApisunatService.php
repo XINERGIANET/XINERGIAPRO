@@ -22,6 +22,9 @@ class ApisunatService
     /** Catálogo 51: venta interna (comprobante final). */
     private const SUNAT_OPERATION_STANDARD_LIST_ID = '0101';
 
+    /** Identificador de pago SUNAT (AdditionalDocumentReference / anticipo). */
+    private const SUNAT_ADVANCE_PAYMENT_STATUS_LIST_ID = 'Anticipo';
+
     public function isEligibleDocument(Movement $sale): bool
     {
         $docName = mb_strtolower(trim((string) ($sale->documentType?->name ?? '')), 'UTF-8');
@@ -595,6 +598,20 @@ class ApisunatService
             ]];
         }
 
+        if ($isAdvanceInvoice) {
+            $supplierRuc = trim((string) ($branch?->ruc ?? '0'));
+            $advanceDocName = mb_strtolower(trim((string) ($sale->documentType?->name ?? '')), 'UTF-8');
+            $advanceDocTypeCode = str_contains($advanceDocName, 'factura') ? '02' : '03';
+            $documentBody['cac:AdditionalDocumentReference'] = [
+                $this->buildSunatAdvanceReferenceNode(
+                    $catalog['serie'].'-'.$number,
+                    $advanceDocTypeCode,
+                    '1',
+                    $supplierRuc
+                ),
+            ];
+        }
+
         $lineIndex = 1;
         $headerSubtotal = 0.0;
         $headerTax = 0.0;
@@ -920,7 +937,7 @@ class ApisunatService
         $prepaidTaxTotal = 0.0;
         $prepaidInclusiveTotal = 0.0;
 
-        foreach ($linkedAdvances as $advance) {
+        foreach ($linkedAdvances as $index => $advance) {
             $valorVenta = round((float) ($advance['valor_venta'] ?? 0), 2);
             $igv = round((float) ($advance['igv'] ?? 0), 2);
             $totalIncl = round((float) ($advance['total'] ?? 0), 2);
@@ -929,22 +946,17 @@ class ApisunatService
                 continue;
             }
 
+            $paymentIdentifier = (string) ($index + 1);
             $prepaidValorVentaTotal += $valorVenta;
             $prepaidTaxTotal += $igv;
             $prepaidInclusiveTotal += $totalIncl > 0 ? $totalIncl : round($valorVenta + $igv, 2);
 
-            $references[] = [
-                'cbc:ID' => ['_text' => (string) $advance['full_number']],
-                'cbc:DocumentTypeCode' => $this->sunatCatalog12DocumentTypeCodeNode((string) $advance['document_type_code']),
-                'cac:IssuerParty' => [
-                    'cac:PartyIdentification' => [
-                        'cbc:ID' => [
-                            '_attributes' => ['schemeID' => '6'],
-                            '_text' => $supplierRuc,
-                        ],
-                    ],
-                ],
-            ];
+            $references[] = $this->buildSunatAdvanceReferenceNode(
+                (string) $advance['full_number'],
+                (string) $advance['document_type_code'],
+                $paymentIdentifier,
+                $supplierRuc
+            );
 
             $prepaidPayments[] = [
                 'cbc:ID' => [
@@ -960,7 +972,11 @@ class ApisunatService
                     '_text' => $valorVenta,
                 ],
                 'cbc:InstructionID' => [
-                    '_attributes' => ['schemeID' => '6'],
+                    '_attributes' => [
+                        'schemeID' => '6',
+                        'schemeName' => 'SUNAT:Identificador de Documento de Identidad',
+                        'schemeAgencyName' => 'PE:SUNAT',
+                    ],
                     '_text' => $supplierRuc,
                 ],
             ];
@@ -1010,6 +1026,43 @@ class ApisunatService
                 'listURI' => 'urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo12',
             ],
             '_text' => $code,
+        ];
+    }
+
+    /**
+     * Identificador de pago del anticipo (obligatorio para vincular con PrepaidPayment).
+     *
+     * @return array{_attributes: array<string, string>, _text: string}
+     */
+    private function sunatAdvancePaymentStatusCodeNode(string $paymentIdentifier): array
+    {
+        return [
+            '_attributes' => ['listID' => self::SUNAT_ADVANCE_PAYMENT_STATUS_LIST_ID],
+            '_text' => $paymentIdentifier,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildSunatAdvanceReferenceNode(
+        string $fullNumber,
+        string $documentTypeCode,
+        string $paymentIdentifier,
+        string $supplierRuc
+    ): array {
+        return [
+            'cbc:ID' => ['_text' => $fullNumber],
+            'cbc:DocumentTypeCode' => $this->sunatCatalog12DocumentTypeCodeNode($documentTypeCode),
+            'cbc:DocumentStatusCode' => $this->sunatAdvancePaymentStatusCodeNode($paymentIdentifier),
+            'cac:IssuerParty' => [
+                'cac:PartyIdentification' => [
+                    'cbc:ID' => [
+                        '_attributes' => ['schemeID' => '6'],
+                        '_text' => $supplierRuc,
+                    ],
+                ],
+            ],
         ];
     }
 
