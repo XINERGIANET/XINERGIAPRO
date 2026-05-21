@@ -565,7 +565,7 @@ class ApisunatService
             'cbc:IssueTime' => ['_text' => now()->format('H:i:s')],
             'cbc:InvoiceTypeCode' => $this->sunatInvoiceTypeCodeNode(
                 $catalog['type'],
-                $isAdvanceInvoice ? null : self::SUNAT_OPERATION_STANDARD_CODE
+                $this->resolveSunatInvoiceTypeListId($catalog['type'], $isAdvanceInvoice)
             ),
             'cbc:Note' => [],
             'cbc:DocumentCurrencyCode' => ['_text' => 'PEN'],
@@ -1236,25 +1236,24 @@ class ApisunatService
      * @return array{_attributes: array<string, string>, _text: string}
      */
     /**
-     * Catálogo 01 en InvoiceTypeCode. El tipo de operación (cat. 51) va en ProfileID.
-     * Factura final: listID=0101 (formato Apisunat). Anticipo: sin listID (solo ProfileID=0104).
+     * listID en InvoiceTypeCode lo exige Apisunat. El tipo de operación SUNAT (cat. 51) va en ProfileID.
+     * Factura de anticipo: ProfileID=0104 y listID=0101 (evita error SUNAT 3206).
+     * Boleta de anticipo: ProfileID=0104 y listID=0104.
      */
-    private function sunatInvoiceTypeCodeNode(string $documentTypeCode, ?string $operationListIdForApisunat): array
+    private function resolveSunatInvoiceTypeListId(string $documentTypeCode, bool $isAdvanceInvoice): string
     {
-        if ($operationListIdForApisunat !== null && $operationListIdForApisunat !== '') {
-            return [
-                '_text' => $documentTypeCode,
-                '_attributes' => ['listID' => $operationListIdForApisunat],
-            ];
+        if ($isAdvanceInvoice && $documentTypeCode === '03') {
+            return self::SUNAT_OPERATION_ADVANCE_CODE;
         }
 
+        return self::SUNAT_OPERATION_STANDARD_CODE;
+    }
+
+    private function sunatInvoiceTypeCodeNode(string $documentTypeCode, string $operationListId): array
+    {
         return [
             '_text' => $documentTypeCode,
-            '_attributes' => [
-                'listAgencyName' => 'PE:SUNAT',
-                'listName' => 'SUNAT:Identificador de Tipo de Documento',
-                'listURI' => 'urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01',
-            ],
+            '_attributes' => ['listID' => $operationListId],
         ];
     }
 
