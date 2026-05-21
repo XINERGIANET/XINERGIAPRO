@@ -1323,21 +1323,22 @@ class ApisunatService
     ): array {
         $node = [
             'cbc:ID' => ['_text' => $fullNumber],
-            'cbc:DocumentTypeCode' => $this->sunatCatalog12DocumentTypeCodeNode($documentTypeCode),
-            'cbc:DocumentStatusCode' => $this->sunatAdvancePaymentStatusCodeNode($paymentIdentifier),
-            'cac:IssuerParty' => [
-                'cac:PartyIdentification' => [
-                    'cbc:ID' => [
-                        '_attributes' => ['schemeID' => '6'],
-                        '_text' => $supplierRuc,
-                    ],
-                ],
-            ],
         ];
 
         if ($issueDate !== '') {
             $node['cbc:IssueDate'] = ['_text' => $issueDate];
         }
+
+        $node['cbc:DocumentTypeCode'] = $this->sunatCatalog12DocumentTypeCodeNode($documentTypeCode);
+        $node['cbc:DocumentStatusCode'] = $this->sunatAdvancePaymentStatusCodeNode($paymentIdentifier);
+        $node['cac:IssuerParty'] = [
+            'cac:PartyIdentification' => [
+                'cbc:ID' => [
+                    '_attributes' => ['schemeID' => '6'],
+                    '_text' => $supplierRuc,
+                ],
+            ],
+        ];
 
         return $node;
     }
