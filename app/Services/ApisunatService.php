@@ -13,6 +13,9 @@ use Illuminate\Support\Str;
 
 class ApisunatService
 {
+    /** Catálogo 53: descuento global que afecta la base imponible del IGV (requerido con anticipos). */
+    private const SUNAT_ADVANCE_GLOBAL_DISCOUNT_CODE = '02';
+
     public function isEligibleDocument(Movement $sale): bool
     {
         $docName = mb_strtolower(trim((string) ($sale->documentType?->name ?? '')), 'UTF-8');
@@ -604,41 +607,55 @@ class ApisunatService
             ],
         ];
 
-        $prepaidTotal = 0.0;
         $payableAmount = $headerTotal;
         $linkedAdvances = $this->resolveLinkedAdvancePayments($sale);
 
         if ($linkedAdvances !== []) {
-            $prepaidTotal = round(collect($linkedAdvances)->sum('amount'), 2);
-            $payableAmount = round(max(0, $headerTotal - $prepaidTotal), 2);
             $supplierRuc = trim((string) ($branch?->ruc ?? '0'));
+            $advanceBlocks = $this->buildSunatAdvanceBlocks($linkedAdvances, $headerSubtotal, $supplierRuc);
 
-            $documentBody['cac:AdditionalDocumentReference'] = [];
-            $documentBody['cac:PrepaidPayment'] = [];
+            $documentBody['cac:AdditionalDocumentReference'] = $advanceBlocks['references'];
+            $documentBody['cac:AllowanceCharge'] = $advanceBlocks['allowance_charges'];
+            $documentBody['cac:PrepaidPayment'] = $advanceBlocks['prepaid_payments'];
 
-            foreach ($linkedAdvances as $index => $advance) {
-                $documentBody['cac:AdditionalDocumentReference'][] = [
-                    'cbc:ID' => ['_text' => (string) $advance['full_number']],
-                    'cbc:DocumentTypeCode' => ['_text' => (string) $advance['document_type_code']],
-                    'cbc:DocumentStatusCode' => ['_text' => '01'],
-                    'cac:IssuerParty' => [
-                        'cac:PartyIdentification' => [
-                            'cbc:ID' => [
-                                '_attributes' => ['schemeID' => '6'],
-                                '_text' => $supplierRuc,
-                            ],
-                        ],
-                    ],
-                ];
+            $prepaidValorVentaTotal = round((float) $advanceBlocks['prepaid_valor_venta_total'], 2);
+            $prepaidTaxTotal = round((float) $advanceBlocks['prepaid_tax_total'], 2);
+            $prepaidInclusiveTotal = round((float) $advanceBlocks['prepaid_inclusive_total'], 2);
 
-                $documentBody['cac:PrepaidPayment'][] = [
-                    'cbc:ID' => ['_text' => str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT)],
-                    'cbc:PaidAmount' => [
-                        '_attributes' => ['currencyID' => 'PEN'],
-                        '_text' => round((float) $advance['amount'], 2),
-                    ],
-                ];
+            $adjustedSubtotal = round(max(0, $headerSubtotal - $prepaidValorVentaTotal), 2);
+            $adjustedTax = round(max(0, $headerTax - $prepaidTaxTotal), 2);
+            if ($adjustedTax <= 0 && $adjustedSubtotal > 0 && $headerSubtotal > 0) {
+                $taxFactor = $headerTax > 0 ? ($headerTax / $headerSubtotal) : 0.18;
+                $adjustedTax = round($adjustedSubtotal * $taxFactor, 2);
             }
+            $documentBody['cac:TaxTotal']['cac:TaxSubtotal']['cbc:TaxableAmount']['_text'] = $adjustedSubtotal;
+            $documentBody['cac:TaxTotal']['cac:TaxSubtotal']['cbc:TaxAmount']['_text'] = $adjustedTax;
+            $documentBody['cac:TaxTotal']['cbc:TaxAmount']['_text'] = $adjustedTax;
+
+            $payableAmount = round(max(0, $headerTotal - $prepaidInclusiveTotal), 2);
+
+            $legalMonetaryTotal = [
+                'cbc:LineExtensionAmount' => [
+                    '_attributes' => ['currencyID' => 'PEN'],
+                    '_text' => $adjustedSubtotal,
+                ],
+                'cbc:TaxInclusiveAmount' => [
+                    '_attributes' => ['currencyID' => 'PEN'],
+                    '_text' => $headerTotal,
+                ],
+                'cbc:PrepaidAmount' => [
+                    '_attributes' => ['currencyID' => 'PEN'],
+                    '_text' => $prepaidValorVentaTotal,
+                ],
+                'cbc:PayableAmount' => [
+                    '_attributes' => ['currencyID' => 'PEN'],
+                    '_text' => $payableAmount,
+                ],
+            ];
+
+            $documentBody['cac:LegalMonetaryTotal'] = $legalMonetaryTotal;
+
+            return $documentBody;
         }
 
         $legalMonetaryTotal = [
@@ -650,18 +667,10 @@ class ApisunatService
                 '_attributes' => ['currencyID' => 'PEN'],
                 '_text' => $headerTotal,
             ],
-        ];
-
-        if ($prepaidTotal > 0) {
-            $legalMonetaryTotal['cbc:PrepaidAmount'] = [
+            'cbc:PayableAmount' => [
                 '_attributes' => ['currencyID' => 'PEN'],
-                '_text' => $prepaidTotal,
-            ];
-        }
-
-        $legalMonetaryTotal['cbc:PayableAmount'] = [
-            '_attributes' => ['currencyID' => 'PEN'],
-            '_text' => $payableAmount,
+                '_text' => $payableAmount,
+            ],
         ];
 
         $documentBody['cac:LegalMonetaryTotal'] = $legalMonetaryTotal;
@@ -671,12 +680,19 @@ class ApisunatService
 
     private function resolveLinkedAdvancePayments(Movement $sale): array
     {
-        $advanceMovementIds = DB::table('sale_advances')
+        $advanceLinks = DB::table('sale_advances')
             ->where('final_movement_id', (int) $sale->id)
+            ->get(['advance_movement_id', 'applied_amount']);
+
+        $advanceMovementIds = $advanceLinks
             ->pluck('advance_movement_id')
             ->map(fn ($id) => (int) $id)
             ->filter(fn ($id) => $id > 0)
             ->values()
+            ->all();
+
+        $appliedByMovementId = $advanceLinks
+            ->mapWithKeys(fn ($row) => [(int) $row->advance_movement_id => (float) $row->applied_amount])
             ->all();
 
         if ($advanceMovementIds === [] && (int) ($sale->parent_movement_id ?? 0) > 0) {
@@ -701,10 +717,10 @@ class ApisunatService
             ->whereIn('id', $advanceMovementIds)
             ->get();
 
-        return $movements->map(function (Movement $advanceMovement) {
-            $sale = $advanceMovement->salesMovement;
-            $series = trim((string) ($advanceMovement->electronic_invoice_series ?? $sale?->series ?? ''));
-            $correlative = trim((string) ($advanceMovement->electronic_invoice_number ?? $sale?->billing_number ?? $advanceMovement->number ?? ''));
+        return $movements->map(function (Movement $advanceMovement) use ($appliedByMovementId) {
+            $advanceSale = $advanceMovement->salesMovement;
+            $series = trim((string) ($advanceMovement->electronic_invoice_series ?? $advanceSale?->series ?? ''));
+            $correlative = trim((string) ($advanceMovement->electronic_invoice_number ?? $advanceSale?->billing_number ?? $advanceMovement->number ?? ''));
             $correlativeDigits = preg_replace('/\D+/', '', $correlative) ?: '';
             if ($correlativeDigits !== '') {
                 $correlative = str_pad($correlativeDigits, 8, '0', STR_PAD_LEFT);
@@ -715,17 +731,149 @@ class ApisunatService
                 : trim((string) ($advanceMovement->number ?? ''));
 
             $docName = mb_strtolower(trim((string) ($advanceMovement->documentType?->name ?? '')), 'UTF-8');
+            $amounts = $this->resolveAdvanceAmountBreakdown(
+                (float) ($appliedByMovementId[(int) $advanceMovement->id] ?? 0),
+                (float) ($advanceSale?->subtotal ?? 0),
+                (float) ($advanceSale?->tax ?? 0),
+                (float) ($advanceSale?->total ?? 0)
+            );
 
             return [
                 'movement_id' => (int) $advanceMovement->id,
                 'full_number' => $fullNumber,
                 'document_type_code' => str_contains($docName, 'factura') ? '02' : '03',
-                'amount' => round((float) ($sale?->total ?? 0), 2),
+                'valor_venta' => $amounts['valor_venta'],
+                'igv' => $amounts['igv'],
+                'total' => $amounts['total'],
             ];
         })
-            ->filter(fn (array $row) => $row['full_number'] !== '' && $row['amount'] > 0)
+            ->filter(fn (array $row) => $row['full_number'] !== '' && $row['valor_venta'] > 0)
             ->values()
             ->all();
+    }
+
+    /**
+     * @return array{valor_venta: float, igv: float, total: float}
+     */
+    private function resolveAdvanceAmountBreakdown(float $appliedAmount, float $subtotal, float $tax, float $total): array
+    {
+        $total = round(max(0, $total), 2);
+        $subtotal = round(max(0, $subtotal), 2);
+        $tax = round(max(0, $tax), 2);
+
+        if ($total <= 0 && $appliedAmount > 0) {
+            $taxFactor = 0.18;
+            $total = round($appliedAmount, 2);
+            $subtotal = round($total / (1 + $taxFactor), 2);
+            $tax = round($total - $subtotal, 2);
+        } elseif ($appliedAmount > 0 && $total > 0 && abs($appliedAmount - $total) > 0.009) {
+            $ratio = min(1, max(0, $appliedAmount / $total));
+            $subtotal = round($subtotal * $ratio, 2);
+            $tax = round($tax * $ratio, 2);
+            $total = round($appliedAmount, 2);
+        } elseif ($total > 0 && $subtotal <= 0) {
+            $taxFactor = $tax > 0 && $total > $tax ? ($tax / max(0.01, $total - $tax)) : 0.18;
+            $subtotal = round($total / (1 + $taxFactor), 2);
+            $tax = round($total - $subtotal, 2);
+        }
+
+        return [
+            'valor_venta' => $subtotal,
+            'igv' => $tax,
+            'total' => $total > 0 ? $total : round($subtotal + $tax, 2),
+        ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $linkedAdvances
+     * @return array{
+     *     references: array<int, array<string, mixed>>,
+     *     allowance_charges: array<int, array<string, mixed>>,
+     *     prepaid_payments: array<int, array<string, mixed>>,
+     *     prepaid_valor_venta_total: float,
+     *     prepaid_tax_total: float,
+     *     prepaid_inclusive_total: float
+     * }
+     */
+    private function buildSunatAdvanceBlocks(array $linkedAdvances, float $headerSubtotal, string $supplierRuc): array
+    {
+        $references = [];
+        $prepaidPayments = [];
+        $prepaidValorVentaTotal = 0.0;
+        $prepaidTaxTotal = 0.0;
+        $prepaidInclusiveTotal = 0.0;
+
+        foreach ($linkedAdvances as $advance) {
+            $valorVenta = round((float) ($advance['valor_venta'] ?? 0), 2);
+            $igv = round((float) ($advance['igv'] ?? 0), 2);
+            $totalIncl = round((float) ($advance['total'] ?? 0), 2);
+
+            if ($valorVenta <= 0) {
+                continue;
+            }
+
+            $prepaidValorVentaTotal += $valorVenta;
+            $prepaidTaxTotal += $igv;
+            $prepaidInclusiveTotal += $totalIncl > 0 ? $totalIncl : round($valorVenta + $igv, 2);
+
+            $references[] = [
+                'cbc:ID' => ['_text' => (string) $advance['full_number']],
+                'cbc:DocumentTypeCode' => ['_text' => (string) $advance['document_type_code']],
+                'cbc:DocumentStatusCode' => ['_text' => '01'],
+                'cac:IssuerParty' => [
+                    'cac:PartyIdentification' => [
+                        'cbc:ID' => [
+                            '_attributes' => ['schemeID' => '6'],
+                            '_text' => $supplierRuc,
+                        ],
+                    ],
+                ],
+            ];
+
+            $prepaidPayments[] = [
+                'cbc:ID' => [
+                    '_attributes' => ['schemeID' => (string) $advance['document_type_code']],
+                    '_text' => (string) $advance['full_number'],
+                ],
+                'cbc:PaidAmount' => [
+                    '_attributes' => ['currencyID' => 'PEN'],
+                    '_text' => $valorVenta,
+                ],
+                'cbc:InstructionID' => [
+                    '_attributes' => ['schemeID' => '6'],
+                    '_text' => $supplierRuc,
+                ],
+            ];
+        }
+
+        $prepaidValorVentaTotal = round($prepaidValorVentaTotal, 2);
+        $prepaidTaxTotal = round($prepaidTaxTotal, 2);
+        $prepaidInclusiveTotal = round($prepaidInclusiveTotal, 2);
+        $baseSubtotal = round(max(0, $headerSubtotal), 2);
+
+        $allowanceCharges = $prepaidValorVentaTotal > 0
+            ? [[
+                'cbc:ChargeIndicator' => ['_text' => 'false'],
+                'cbc:AllowanceChargeReasonCode' => ['_text' => self::SUNAT_ADVANCE_GLOBAL_DISCOUNT_CODE],
+                'cbc:Amount' => [
+                    '_attributes' => ['currencyID' => 'PEN'],
+                    '_text' => $prepaidValorVentaTotal,
+                ],
+                'cbc:BaseAmount' => [
+                    '_attributes' => ['currencyID' => 'PEN'],
+                    '_text' => $baseSubtotal,
+                ],
+            ]]
+            : [];
+
+        return [
+            'references' => $references,
+            'allowance_charges' => $allowanceCharges,
+            'prepaid_payments' => $prepaidPayments,
+            'prepaid_valor_venta_total' => $prepaidValorVentaTotal,
+            'prepaid_tax_total' => $prepaidTaxTotal,
+            'prepaid_inclusive_total' => $prepaidInclusiveTotal,
+        ];
     }
 
     private function validateDocumentBodyForSunat(array $documentBody): void

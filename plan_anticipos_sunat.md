@@ -51,25 +51,34 @@ Para que la SUNAT valide la resta del anticipo en la factura final, se debe modi
    </cac:AdditionalDocumentReference>
    ```
 
-2. **`cac:PrepaidPayment`**:
-   El monto exacto que se está descontando de ese documento.
-   ```xml
-   <cac:PrepaidPayment>
-       <cbc:ID>F001-00000001</cbc:ID>
-       <cbc:PaidAmount currencyID="PEN">30.00</cbc:PaidAmount>
-   </cac:PrepaidPayment>
-   ```
+2. **`cac:PrepaidPayment`** (por cada anticipo):
+   - `cbc:ID` con `@schemeID` = tipo doc. anticipo (cat. 12: 02 factura / 03 boleta) y texto `F001-00000001`.
+   - `cbc:PaidAmount` = **valor de venta** del anticipo (sin IGV), no el total con IGV.
+   - `cbc:InstructionID` con `@schemeID="6"` = RUC del emisor.
 
-3. **Ajuste en `cac:LegalMonetaryTotal`**:
-   Se debe agregar la etiqueta `cbc:PrepaidAmount` y recalcular el `cbc:PayableAmount` (Monto a pagar).
+3. **`cac:AllowanceCharge`** (obligatorio si hay `PrepaidAmount` — error SUNAT 3287):
+   Descuento global por anticipo (catálogo 53 código **02**, afecta base IGV).
+   ```xml
+   <cac:AllowanceCharge>
+       <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+       <cbc:AllowanceChargeReasonCode>02</cbc:AllowanceChargeReasonCode>
+       <cbc:Amount currencyID="PEN">25.42</cbc:Amount>
+       <cbc:BaseAmount currencyID="PEN">84.75</cbc:BaseAmount>
+   </cac:AllowanceCharge>
+   ```
+   El `Amount` debe coincidir con la suma de `PaidAmount` de los `PrepaidPayment`.
+
+4. **Ajuste en `cac:LegalMonetaryTotal`** (orden UBL: `PrepaidAmount` antes de `PayableAmount`):
    ```xml
    <cac:LegalMonetaryTotal>
-       <cbc:LineExtensionAmount currencyID="PEN">84.75</cbc:LineExtensionAmount> <!-- Subtotal -->
-       <cbc:TaxInclusiveAmount currencyID="PEN">100.00</cbc:TaxInclusiveAmount> <!-- Total Venta -->
-       <cbc:PrepaidAmount currencyID="PEN">30.00</cbc:PrepaidAmount>            <!-- Total Anticipos -->
-       <cbc:PayableAmount currencyID="PEN">70.00</cbc:PayableAmount>            <!-- Total a Pagar real -->
+       <cbc:LineExtensionAmount currencyID="PEN">59.33</cbc:LineExtensionAmount>
+       <cbc:TaxInclusiveAmount currencyID="PEN">100.00</cbc:TaxInclusiveAmount>
+       <cbc:PrepaidAmount currencyID="PEN">25.42</cbc:PrepaidAmount>
+       <cbc:PayableAmount currencyID="PEN">70.00</cbc:PayableAmount>
    </cac:LegalMonetaryTotal>
    ```
+   - `PrepaidAmount` = suma de valores de venta de anticipos (sin IGV).
+   - `PayableAmount` = total factura − total anticipos **con IGV**.
 
 ## 5. Cambios en la Interfaz de Usuario (Frontend)
 
