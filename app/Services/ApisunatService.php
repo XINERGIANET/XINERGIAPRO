@@ -16,6 +16,12 @@ class ApisunatService
     /** Catálogo 53: descuento global que afecta la base imponible del IGV (requerido con anticipos). */
     private const SUNAT_ADVANCE_GLOBAL_DISCOUNT_CODE = '02';
 
+    /** Catálogo 51: venta interna – anticipos (comprobante de anticipo). */
+    private const SUNAT_OPERATION_ADVANCE_LIST_ID = '0104';
+
+    /** Catálogo 51: venta interna (comprobante final). */
+    private const SUNAT_OPERATION_STANDARD_LIST_ID = '0101';
+
     public function isEligibleDocument(Movement $sale): bool
     {
         $docName = mb_strtolower(trim((string) ($sale->documentType?->name ?? '')), 'UTF-8');
@@ -526,6 +532,8 @@ class ApisunatService
         $customerName = trim((string) ($sale->person_name ?: 'CLIENTES VARIOS'));
         $details = $this->resolveDetailsForSale($sale);
         $defaultTaxPercent = $this->resolveDefaultTaxPercentForBranch($branch);
+        $sale->loadMissing('salesMovement');
+        $isAdvanceInvoice = (bool) ($sale->salesMovement?->is_advance ?? false);
 
         $documentBody = [
             'cbc:UBLVersionID' => ['_text' => '2.1'],
@@ -534,7 +542,11 @@ class ApisunatService
             'cbc:IssueDate' => ['_text' => now()->format('Y-m-d')],
             'cbc:IssueTime' => ['_text' => now()->format('H:i:s')],
             'cbc:InvoiceTypeCode' => [
-                '_attributes' => ['listID' => '0101'],
+                '_attributes' => [
+                    'listID' => $isAdvanceInvoice
+                        ? self::SUNAT_OPERATION_ADVANCE_LIST_ID
+                        : self::SUNAT_OPERATION_STANDARD_LIST_ID,
+                ],
                 '_text' => $catalog['type'],
             ],
             'cbc:Note' => [],
@@ -923,8 +935,7 @@ class ApisunatService
 
             $references[] = [
                 'cbc:ID' => ['_text' => (string) $advance['full_number']],
-                'cbc:DocumentTypeCode' => ['_text' => (string) $advance['document_type_code']],
-                'cbc:DocumentStatusCode' => ['_text' => '01'],
+                'cbc:DocumentTypeCode' => $this->sunatCatalog12DocumentTypeCodeNode((string) $advance['document_type_code']),
                 'cac:IssuerParty' => [
                     'cac:PartyIdentification' => [
                         'cbc:ID' => [
@@ -937,7 +948,11 @@ class ApisunatService
 
             $prepaidPayments[] = [
                 'cbc:ID' => [
-                    '_attributes' => ['schemeID' => (string) $advance['document_type_code']],
+                    '_attributes' => [
+                        'schemeID' => (string) $advance['document_type_code'],
+                        'schemeName' => 'SUNAT:Identificador de Documentos Relacionados',
+                        'schemeAgencyName' => 'PE:SUNAT',
+                    ],
                     '_text' => (string) $advance['full_number'],
                 ],
                 'cbc:PaidAmount' => [
@@ -978,6 +993,23 @@ class ApisunatService
             'prepaid_valor_venta_total' => $prepaidValorVentaTotal,
             'prepaid_tax_total' => $prepaidTaxTotal,
             'prepaid_inclusive_total' => $prepaidInclusiveTotal,
+        ];
+    }
+
+    /**
+     * Catálogo N°12 – documentos relacionados tributarios (anticipo factura/boleta).
+     *
+     * @return array{_attributes: array<string, string>, _text: string}
+     */
+    private function sunatCatalog12DocumentTypeCodeNode(string $code): array
+    {
+        return [
+            '_attributes' => [
+                'listAgencyName' => 'PE:SUNAT',
+                'listName' => 'SUNAT:Identificador de documento relacionado',
+                'listURI' => 'urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo12',
+            ],
+            '_text' => $code,
         ];
     }
 
