@@ -868,6 +868,64 @@ class ApisunatService
             ->exists();
     }
 
+    /**
+     * @param  array<int, array<string, mixed>>  $checkoutAdvances
+     */
+    public function linkCheckoutAdvancesToFinalMovement(Movement $finalMovement, array $checkoutAdvances): void
+    {
+        $finalMovementId = (int) $finalMovement->id;
+        if ($finalMovementId <= 0 || $checkoutAdvances === []) {
+            return;
+        }
+
+        $finalMovement->loadMissing('salesMovement');
+        if ((bool) ($finalMovement->salesMovement?->is_advance ?? false)) {
+            return;
+        }
+
+        foreach ($checkoutAdvances as $advanceRow) {
+            $advanceMovementId = (int) ($advanceRow['movement_id'] ?? 0);
+            if ($advanceMovementId <= 0 || $advanceMovementId === $finalMovementId) {
+                continue;
+            }
+
+            $advanceMovement = Movement::query()->with('salesMovement')->find($advanceMovementId);
+            if (! $advanceMovement) {
+                continue;
+            }
+
+            if ($this->isConfiguredForBranch($advanceMovement->branch)
+                && ! $this->isAdvanceSunatReady($advanceMovement)) {
+                continue;
+            }
+
+            $appliedAmount = (float) ($advanceRow['amount'] ?? 0);
+            if ($appliedAmount <= 0) {
+                $appliedAmount = (float) ($advanceMovement->salesMovement?->total ?? 0);
+            }
+            if ($appliedAmount <= 0) {
+                continue;
+            }
+
+            $exists = DB::table('sale_advances')
+                ->where('final_movement_id', $finalMovementId)
+                ->where('advance_movement_id', $advanceMovementId)
+                ->exists();
+
+            if ($exists) {
+                continue;
+            }
+
+            DB::table('sale_advances')->insert([
+                'final_movement_id' => $finalMovementId,
+                'advance_movement_id' => $advanceMovementId,
+                'applied_amount' => $appliedAmount,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
     public function assertFinalSaleAdvancesReadyForSunat(Movement $finalSale): void
     {
         $finalSale->loadMissing('salesMovement');

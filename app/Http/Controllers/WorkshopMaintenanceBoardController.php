@@ -2552,58 +2552,19 @@ class WorkshopMaintenanceBoardController extends Controller
                 }
 
                 $freshOrder = WorkshopMovement::query()->findOrFail($lockedOrder->id);
-                if (!$isAnticipo && $freshOrder->salesMovement) {
-                    $freshOrder->salesMovement->update([
-                        'payment_type' => $isDebtCheckout ? 'CREDITO' : 'CONTADO',
-                    ]);
-                    
-                    if ((float) $lockedOrder->paid_total > 0 && count($checkoutPreviousAdvances) > 0) {
-                        $advanceMovementIds = collect($checkoutPreviousAdvances)
-                            ->pluck('movement_id')
-                            ->map(fn ($id) => (int) $id)
-                            ->filter(fn ($id) => $id > 0)
-                            ->values()
-                            ->all();
+                if (!$isAnticipo && $movementForApisunat) {
+                    $movementForApisunat->loadMissing('salesMovement');
+                    if ($movementForApisunat->salesMovement) {
+                        $movementForApisunat->salesMovement->update([
+                            'payment_type' => $isDebtCheckout ? 'CREDITO' : 'CONTADO',
+                        ]);
+                    }
 
-                        $advances = \App\Models\SalesMovement::query()
-                            ->where('is_advance', true)
-                            ->whereIn('movement_id', $advanceMovementIds)
-                            ->with('movement')
-                            ->get();
-
-                        foreach ($advances as $advance) {
-                            $advanceMovement = $advance->movement;
-                            if (! $advanceMovement) {
-                                continue;
-                            }
-
-                            $apisunatForLink = app(\App\Services\ApisunatService::class);
-                            if ($apisunatForLink->isConfiguredForBranch($advanceMovement->branch)
-                                && ! $apisunatForLink->isAdvanceSunatReady($advanceMovement)) {
-                                continue;
-                            }
-
-                            $exists = \DB::table('sale_advances')
-                                ->where('final_movement_id', $freshOrder->salesMovement->movement_id)
-                                ->where('advance_movement_id', $advance->movement_id)
-                                ->exists();
-
-                            $finalMovementId = (int) $freshOrder->salesMovement->movement_id;
-                            $advanceMovementId = (int) $advance->movement_id;
-                            if ($finalMovementId <= 0 || $advanceMovementId <= 0 || $finalMovementId === $advanceMovementId) {
-                                continue;
-                            }
-
-                            if (!$exists) {
-                                \DB::table('sale_advances')->insert([
-                                    'final_movement_id' => $finalMovementId,
-                                    'advance_movement_id' => $advanceMovementId,
-                                    'applied_amount' => $advance->total,
-                                    'created_at' => now(),
-                                    'updated_at' => now(),
-                                ]);
-                            }
-                        }
+                    if (count($checkoutPreviousAdvances) > 0) {
+                        app(\App\Services\ApisunatService::class)->linkCheckoutAdvancesToFinalMovement(
+                            $movementForApisunat,
+                            $checkoutPreviousAdvances
+                        );
                     }
                 }
 
