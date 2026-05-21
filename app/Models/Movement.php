@@ -42,6 +42,7 @@ class Movement extends Model
 
     protected $casts = [
         'moved_at' => 'datetime',
+        'electronic_invoice_response' => 'array',
     ];
 
     public function branch()
@@ -172,5 +173,29 @@ class Movement extends Model
         $number = $this->salesDocumentNumber();
 
         return trim($abbr . $series . ($number !== '' ? '-' . $number : ''), '-');
+    }
+
+    public function electronicInvoiceErrorMessage(): ?string
+    {
+        $response = $this->electronic_invoice_response;
+
+        if (is_array($response)) {
+            $message = trim((string) ($response['error'] ?? $response['message'] ?? ''));
+
+            return $message !== '' ? $message : null;
+        }
+
+        if (! is_string($response) || trim($response) === '') {
+            return null;
+        }
+
+        $decoded = json_decode($response, true);
+        if (is_array($decoded)) {
+            $message = trim((string) ($decoded['error'] ?? $decoded['message'] ?? ''));
+
+            return $message !== '' ? $message : $response;
+        }
+
+        return $response;
     }
 }

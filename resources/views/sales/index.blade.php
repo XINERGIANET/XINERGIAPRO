@@ -793,12 +793,15 @@
                                                             </a>
                                                         @endif
                                                     @elseif ($sale->electronic_invoice_status === 'ERROR')
-                                                        <span class="inline-flex items-center gap-1 rounded bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 dark:bg-rose-950/30 dark:text-rose-400" title="{{ is_array($sale->electronic_invoice_response) ? json_encode($sale->electronic_invoice_response) : (is_string($sale->electronic_invoice_response) ? $sale->electronic_invoice_response : 'Error desconocido') }}">
-                                                            <i class="ri-close-circle-fill"></i> Error
-                                                        </span>
-                                                        <span class="text-xs text-rose-600 font-medium max-w-xs truncate" title="{{ is_array($sale->electronic_invoice_response) ? json_encode($sale->electronic_invoice_response) : (is_string($sale->electronic_invoice_response) ? $sale->electronic_invoice_response : 'Error') }}">
-                                                            {{ is_array($sale->electronic_invoice_response) ? ($sale->electronic_invoice_response['error'] ?? 'Error') : (is_string($sale->electronic_invoice_response) ? $sale->electronic_invoice_response : 'Error') }}
-                                                        </span>
+                                                        <div class="flex w-full flex-col gap-2">
+                                                            <span class="inline-flex w-fit items-center gap-1 rounded bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 dark:bg-rose-950/30 dark:text-rose-400">
+                                                                <i class="ri-close-circle-fill"></i> Error
+                                                            </span>
+                                                            <div class="rounded-md border border-rose-200 bg-rose-50/80 px-3 py-2 dark:border-rose-900/50 dark:bg-rose-950/40">
+                                                                <p class="text-xs font-semibold uppercase tracking-wide text-rose-800 dark:text-rose-300">Detalle del error</p>
+                                                                <p class="mt-1 text-xs leading-relaxed text-rose-700 break-words whitespace-pre-wrap dark:text-rose-400">{{ $sale->electronicInvoiceErrorMessage() ?: 'Error desconocido al emitir el comprobante electrónico.' }}</p>
+                                                            </div>
+                                                        </div>
                                                     @else
                                                         <span class="inline-flex items-center gap-1 rounded bg-gray-50 px-2 py-1 text-xs font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-400">
                                                             <i class="ri-time-line"></i> {{ $sale->electronic_invoice_status }}
