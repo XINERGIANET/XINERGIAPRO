@@ -558,11 +558,16 @@ class ApisunatService
         $documentBody = [
             'cbc:UBLVersionID' => ['_text' => '2.1'],
             'cbc:CustomizationID' => ['_text' => '2.0'],
-            'cbc:ProfileID' => $this->sunatOperationTypeProfileIdNode($operationTypeCode),
+            'cbc:ProfileID' => $operationTypeCode,
             'cbc:ID' => ['_text' => $catalog['serie'].'-'.$number],
             'cbc:IssueDate' => ['_text' => now()->format('Y-m-d')],
             'cbc:IssueTime' => ['_text' => now()->format('H:i:s')],
-            'cbc:InvoiceTypeCode' => $this->sunatDocumentTypeCodeNode($catalog['type']),
+            'cbc:InvoiceTypeCode' => $this->sunatInvoiceTypeCodeNode(
+                $catalog['type'],
+                $catalog['type'] === '03'
+                    ? $operationTypeCode
+                    : self::SUNAT_OPERATION_STANDARD_CODE
+            ),
             'cbc:Note' => [],
             'cbc:DocumentCurrencyCode' => ['_text' => 'PEN'],
             'cac:AccountingSupplierParty' => [
@@ -1208,24 +1213,14 @@ class ApisunatService
     }
 
     /**
-     * @return array<string, mixed>
+     * Apisunat toma el tipo de operación desde listID de InvoiceTypeCode (cat. 51).
+     * Para factura, 0104 no es válido en ese nodo (SUNAT 3206); el anticipo va en ProfileID.
      */
-    private function sunatOperationTypeProfileIdNode(string $operationTypeCode): array
+    private function sunatInvoiceTypeCodeNode(string $documentTypeCode, string $operationTypeForListId): array
     {
         return [
             '_attributes' => [
-                'schemeName' => 'SUNAT:Identificador de Tipo de Operación',
-                'schemeAgencyName' => 'PE:SUNAT',
-                'schemeURI' => 'urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo51',
-            ],
-            '_text' => $operationTypeCode,
-        ];
-    }
-
-    private function sunatDocumentTypeCodeNode(string $documentTypeCode): array
-    {
-        return [
-            '_attributes' => [
+                'listID' => $operationTypeForListId,
                 'listAgencyName' => 'PE:SUNAT',
                 'listName' => 'SUNAT:Identificador de Tipo de Documento',
                 'listURI' => 'urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01',
@@ -1289,6 +1284,15 @@ class ApisunatService
         $headerTaxSchemeId = trim((string) data_get($documentBody, 'cac:TaxTotal.cac:TaxSubtotal.cac:TaxCategory.cac:TaxScheme.cbc:ID._text', ''));
         if ($headerTaxSchemeId === '') {
             throw new \RuntimeException('No se puede emitir electrónicamente: el resumen tributario del comprobante está incompleto.');
+        }
+
+        $profileId = data_get($documentBody, 'cbc:ProfileID');
+        $operationTypeCode = is_string($profileId)
+            ? trim($profileId)
+            : trim((string) data_get($profileId, '_text', ''));
+        $invoiceTypeListId = trim((string) data_get($documentBody, 'cbc:InvoiceTypeCode._attributes.listID', ''));
+        if ($operationTypeCode === '' && $invoiceTypeListId === '') {
+            throw new \RuntimeException('No se puede emitir electrónicamente: falta el tipo de operación SUNAT (ProfileID o listID en InvoiceTypeCode).');
         }
     }
 
