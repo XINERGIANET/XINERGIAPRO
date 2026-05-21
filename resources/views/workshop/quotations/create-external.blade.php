@@ -661,13 +661,19 @@
             const allClients = {{ \Illuminate\Support\Js::from($clients->map(fn($c) => ['id' => $c->id, 'first_name' => $c->first_name, 'last_name' => $c->last_name, 'person_type' => $c->person_type, 'document_number' => $c->document_number])) }};
             const allVehicles = {{ \Illuminate\Support\Js::from($vehicles->map(fn($v) => ['id' => $v->id, 'client_person_id' => $v->client_person_id, 'plate' => $v->plate, 'brand' => $v->brand, 'model' => $v->model, 'engine_displacement_cc' => $v->engine_displacement_cc, 'label' => trim($v->brand . ' ' . $v->model . ' ' . ($v->plate ? ('- ' . $v->plate) : '')), 'client_name' => trim(($clients->firstWhere('id', $v->client_person_id)?->first_name ?? '') . ' ' . ($clients->firstWhere('id', $v->client_person_id)?->last_name ?? ''))])) }};
 
-            return Object.assign(typeof formAutocompleteHelpers === 'function' ? formAutocompleteHelpers() : {}, {
+            const autocompleteHelpers = typeof formAutocompleteHelpers === 'function' ? formAutocompleteHelpers() : {};
+
+            return {
+                ...autocompleteHelpers,
                 rows: initialRows,
                 products,
                 services,
                 taxMap,
                 allClients,
                 allVehicles,
+                departments: {{ \Illuminate\Support\Js::from($departments ?? []) }},
+                provinces: {{ \Illuminate\Support\Js::from($provinces ?? []) }},
+                districts: {{ \Illuminate\Support\Js::from($districts ?? []) }},
                 externalQuotationSelectedClientId: @json((string) $selectedClientId),
                 externalQuotationSelectedVehicleId: @json((string) $selectedVehicleId),
                 externalQuotationClientSearch: '',
@@ -896,14 +902,18 @@
                 isQuickClientRuc() {
                     return String(this.quickClient.person_type || '').toUpperCase() === 'RUC';
                 },
+                get filteredProvinces() {
+                    return (this.provinces || []).filter(p => String(p.parent_location_id) === String(this.quickClient.department_id || ''));
+                },
+                get filteredDistricts() {
+                    return (this.districts || []).filter(d => String(d.parent_location_id) === String(this.quickClient.province_id || ''));
+                },
                 onClientDepartmentChange() {
                     this.quickClient.province_id = '';
                     this.quickClient.location_id = '';
-                    this.filteredProvinces = this.provinces.filter(p => String(p.parent_location_id) === String(this.quickClient.department_id));
                 },
                 onClientProvinceChange() {
                     this.quickClient.location_id = '';
-                    this.filteredDistricts = this.districts.filter(d => String(d.parent_location_id) === String(this.quickClient.province_id));
                 },
                 async fetchQuickClientDocumentData() {
                     const doc = String(this.quickClient.document_number || '').trim();
@@ -1047,7 +1057,7 @@
                         maximumFractionDigits: 2,
                     });
                 },
-            });
+            };
         }
     </script>
 
