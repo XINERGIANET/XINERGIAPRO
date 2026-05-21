@@ -2051,6 +2051,15 @@ class WorkshopMaintenanceBoardController extends Controller
 
         $isAnticipo = request()->has('anticipo') && request()->query('anticipo') == '1';
 
+        if ($isAnticipo) {
+            $pendingDebt = max(0, (float) $order->total - (float) $order->paid_total);
+            if ($pendingDebt <= 0.00001) {
+                return redirect()
+                    ->route('workshop.maintenance-board.index')
+                    ->withErrors(['error' => 'La OS ya no tiene saldo pendiente para registrar un pago anticipado.']);
+            }
+        }
+
         [$branchId, $companyId] = $this->branchScope();
         $formData = $this->maintenanceFormData($branchId, $companyId);
 
@@ -2312,6 +2321,13 @@ class WorkshopMaintenanceBoardController extends Controller
                 $deliversOnConfirm = (string) $lockedOrder->status === 'finished';
                 if (!in_array((string) $lockedOrder->status, ['approved', 'in_progress', 'paused', 'finished'], true)) {
                     throw new \RuntimeException('Solo se puede registrar venta y cobro cuando la OS esta aprobada, en reparacion, pausada o terminada.');
+                }
+
+                if ($isAnticipo) {
+                    $pendingDebt = max(0, (float) $lockedOrder->total - (float) $lockedOrder->paid_total);
+                    if ($pendingDebt <= 0.00001) {
+                        throw new \RuntimeException('La OS ya no tiene saldo pendiente para registrar un pago anticipado.');
+                    }
                 }
 
                 if (!$isAnticipo) {

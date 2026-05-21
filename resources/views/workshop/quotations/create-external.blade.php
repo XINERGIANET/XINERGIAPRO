@@ -132,7 +132,7 @@
                                         </template>
                                     </div>
                                 </div>
-                                <button type="button" @click="$dispatch('open-quotation-external-client-modal')" title="Nuevo cliente" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white hover:shadow-lg" style="background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff;">
+                                <button type="button" @click="creatingClient = true" title="Nuevo cliente" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white hover:shadow-lg" style="background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff;">
                                     <i class="ri-add-line text-lg"></i>
                                 </button>
                             </div>
@@ -386,14 +386,14 @@
                 </div>
             </form>
         </x-common.component-card>
-    </div>
 
     <!-- Modal Cliente -->
-    <x-ui.modal x-data="{ open: false }" x-on:open-quotation-external-client-modal.window="open = true" x-on:close-quotation-external-client-modal.window="open = false" :isOpen="false" :showCloseButton="false" class="max-w-6xl">
+    <div x-show="creatingClient" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+        <div class="max-h-[90vh] w-full max-w-6xl overflow-auto rounded-2xl bg-white shadow-2xl">
         <div class="p-6 sm:p-8">
             <div class="mb-6 flex items-center justify-between">
                 <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Registrar cliente</h3>
-                <button type="button" @click="open = false" class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
+                <button type="button" @click="creatingClient = false" class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
                     <i class="ri-close-line text-xl"></i>
                 </button>
             </div>
@@ -531,11 +531,12 @@
                     <x-ui.button type="submit" size="md" variant="primary" style="background-color:#00A389;color:#fff;">
                         <i class="ri-save-line"></i><span x-text="creatingClientLoading ? 'Guardando...' : 'Guardar cliente'"></span>
                     </x-ui.button>
-                    <x-ui.button type="button" size="md" variant="outline" @click="open = false"><i class="ri-close-line"></i><span>Cancelar</span></x-ui.button>
+                    <x-ui.button type="button" size="md" variant="outline" @click="creatingClient = false"><i class="ri-close-line"></i><span>Cancelar</span></x-ui.button>
                 </div>
             </form>
         </div>
-    </x-ui.modal>
+        </div>
+    </div>
 
     <!-- Modal Vehículo -->
     <div x-show="creatingVehicle" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
@@ -642,14 +643,14 @@
         </div>
     </div>
 
+    </div>
+
     @include('sales.partials.quick-client-modal')
-    @include('workshop.quotations.partials.quick-vehicle-modal')
     <script>
         window.__quotationExternalOldVehicleId = {{ (int) old('vehicle_id', $selectedVehicleId) }};
         window.__quotationExternalHasVehicleTypes = @json(!$vehicleTypes->isEmpty());
     </script>
     @include('workshop.quotations.partials.external-quick-client-script')
-    @include('workshop.quotations.partials.external-quick-vehicle-script')
 
     <script>
         function quotationExternalForm() {

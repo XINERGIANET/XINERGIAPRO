@@ -98,6 +98,9 @@
                     $pendingDebtCard = max(0, (float) $card->total - (float) $card->paid_total);
                     $pendingBillingCountCard = (int) ($card->pending_billing_count ?? 0);
                     $isAnticipoFeatureActive = ($isSunatActive ?? false) && ($isAnticipoEnabled ?? false);
+                    $canAnticipoCard = $isAnticipoFeatureActive
+                        && in_array((string) $card->status, ['approved', 'in_progress', 'paused'], true)
+                        && $pendingDebtCard > 0.00001;
                     $canQuoteCard = ((string) $card->status === 'awaiting_approval') || 
                                     ($isAnticipoFeatureActive && in_array((string) $card->status, ['approved', 'in_progress', 'paused'], true));
                     $canCheckoutCard = in_array((string) $card->status, ['in_progress', 'paused', 'finished'], true)
@@ -327,7 +330,7 @@
                                     Editar
                                 </a>
                             @endif
-                            @if(($isSunatActive ?? false) && ($isAnticipoEnabled ?? false) && in_array($card->status, ['approved', 'in_progress', 'paused']))
+                            @if($canAnticipoCard)
                                 <button type="button"
                                         class="rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700"
                                         @click="$dispatch('open-anticipo-modal', { orderId: {{ $card->id }} })">
