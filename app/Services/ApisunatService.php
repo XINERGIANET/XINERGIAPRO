@@ -564,8 +564,8 @@ class ApisunatService
             'cbc:IssueTime' => ['_text' => now()->format('H:i:s')],
             'cbc:InvoiceTypeCode' => $this->sunatInvoiceTypeCodeNode(
                 $catalog['type'],
-                $catalog['type'] === '03'
-                    ? $operationTypeCode
+                $isAdvanceInvoice
+                    ? ($catalog['type'] === '03' ? $operationTypeCode : null)
                     : self::SUNAT_OPERATION_STANDARD_CODE
             ),
             'cbc:Note' => [],
@@ -1071,6 +1071,7 @@ class ApisunatService
                 'movement_id' => (int) $advanceMovement->id,
                 'full_number' => $fullNumber,
                 'document_type_code' => str_contains($docName, 'factura') ? '02' : '03',
+                'issue_date' => $this->resolveAdvanceIssueDate($advanceMovement),
                 'valor_venta' => $amounts['valor_venta'],
                 'igv' => $amounts['igv'],
                 'total' => $amounts['total'],
@@ -1141,7 +1142,7 @@ class ApisunatService
                 continue;
             }
 
-            $paymentIdentifier = (string) ($index + 1);
+            $paymentIdentifier = str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT);
             $prepaidValorVentaTotal += $valorVenta;
             $prepaidTaxTotal += $igv;
             $prepaidInclusiveTotal += $totalIncl > 0 ? $totalIncl : round($valorVenta + $igv, 2);
@@ -1150,7 +1151,8 @@ class ApisunatService
                 (string) $advance['full_number'],
                 (string) $advance['document_type_code'],
                 $paymentIdentifier,
-                $supplierRuc
+                $supplierRuc,
+                (string) ($advance['issue_date'] ?? '')
             );
 
             $prepaidPayments[] = [
@@ -1265,32 +1267,48 @@ class ApisunatService
     private function sunatAdvancePaymentStatusCodeNode(string $paymentIdentifier): array
     {
         return [
-            '_attributes' => ['listID' => self::SUNAT_ADVANCE_PAYMENT_STATUS_LIST_ID],
+            '_attributes' => [
+                'listID' => self::SUNAT_ADVANCE_PAYMENT_STATUS_LIST_ID,
+                'listAgencyName' => 'PE:SUNAT',
+                'listName' => 'SUNAT:Identificador de pago',
+            ],
             '_text' => $paymentIdentifier,
         ];
     }
 
     /**
-     * Apisunat toma el tipo de operación desde listID de InvoiceTypeCode (cat. 51).
-     * Para factura, 0104 no es válido en ese nodo (SUNAT 3206); el anticipo va en ProfileID.
+     * listID en InvoiceTypeCode (cat. 51) lo usa Apisunat como tipo de operación en SUNAT.
+     * En factura de anticipo no puede ser 0104 (error 3206); solo ProfileID=0104.
+     * En boleta de anticipo sí puede ir listID=0104.
      */
-    private function sunatInvoiceTypeCodeNode(string $documentTypeCode, string $operationTypeForListId): array
+    private function sunatInvoiceTypeCodeNode(string $documentTypeCode, ?string $operationTypeForListId): array
     {
-        return [
-            '_attributes' => [
-                'listID' => $operationTypeForListId,
-            ],
-            '_text' => $documentTypeCode,
-        ];
+        $node = ['_text' => $documentTypeCode];
+        if ($operationTypeForListId !== null && $operationTypeForListId !== '') {
+            $node['_attributes'] = ['listID' => $operationTypeForListId];
+        }
+
+        return $node;
+    }
+
+    private function resolveAdvanceIssueDate(Movement $advanceMovement): string
+    {
+        $movedAt = $advanceMovement->moved_at;
+        if ($movedAt) {
+            return $movedAt->format('Y-m-d');
+        }
+
+        return now()->format('Y-m-d');
     }
 
     private function buildSunatAdvanceReferenceNode(
         string $fullNumber,
         string $documentTypeCode,
         string $paymentIdentifier,
-        string $supplierRuc
+        string $supplierRuc,
+        string $issueDate = ''
     ): array {
-        return [
+        $node = [
             'cbc:ID' => ['_text' => $fullNumber],
             'cbc:DocumentTypeCode' => $this->sunatCatalog12DocumentTypeCodeNode($documentTypeCode),
             'cbc:DocumentStatusCode' => $this->sunatAdvancePaymentStatusCodeNode($paymentIdentifier),
@@ -1303,6 +1321,12 @@ class ApisunatService
                 ],
             ],
         ];
+
+        if ($issueDate !== '') {
+            $node['cbc:IssueDate'] = ['_text' => $issueDate];
+        }
+
+        return $node;
     }
 
     private function validateDocumentBodyForSunat(array $documentBody): void
