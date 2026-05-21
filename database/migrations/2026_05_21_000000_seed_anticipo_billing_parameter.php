@@ -6,15 +6,15 @@ use Illuminate\Support\Facades\DB;
 return new class extends Migration {
     public function up(): void
     {
-        // Buscar o crear la categoría VENTAS
         $categoryId = DB::table('parameter_categories')
-            ->where('description', 'VENTAS')
             ->whereNull('deleted_at')
+            ->whereRaw('LOWER(TRIM(description)) = ?', ['ventas'])
+            ->orderBy('id')
             ->value('id');
 
         if (!$categoryId) {
             $categoryId = DB::table('parameter_categories')->insertGetId([
-                'description' => 'VENTAS',
+                'description' => 'Ventas',
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
