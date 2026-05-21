@@ -1221,9 +1221,6 @@ class ApisunatService
         return [
             '_attributes' => [
                 'listID' => $operationTypeForListId,
-                'listAgencyName' => 'PE:SUNAT',
-                'listName' => 'SUNAT:Identificador de Tipo de Documento',
-                'listURI' => 'urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01',
             ],
             '_text' => $documentTypeCode,
         ];
