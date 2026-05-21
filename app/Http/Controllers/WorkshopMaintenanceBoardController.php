@@ -2067,6 +2067,7 @@ class WorkshopMaintenanceBoardController extends Controller
 
         $order->load([
             'movement',
+            'branch',
             'vehicle',
             'client',
             'details' => fn($query) => $query
@@ -2086,9 +2087,26 @@ class WorkshopMaintenanceBoardController extends Controller
             ];
         })->values();
 
-        $previousAdvances = (!$isAnticipo && (float) $order->paid_total > 0)
-            ? $this->resolveWorkshopAdvanceDocuments($order)
+        $apisunatService = app(\App\Services\ApisunatService::class);
+        $allOrderAdvances = (!$isAnticipo && (float) $order->paid_total > 0)
+            ? $this->resolveWorkshopAdvanceDocuments($order, false)
             : [];
+        $previousAdvances = collect($allOrderAdvances)
+            ->filter(function (array $advance) use ($apisunatService) {
+                $movementId = (int) ($advance['movement_id'] ?? 0);
+                if ($movementId <= 0) {
+                    return false;
+                }
+                $movement = \App\Models\Movement::query()->find($movementId);
+
+                return $movement && $apisunatService->isAdvanceSunatReady($movement);
+            })
+            ->values()
+            ->all();
+        $blockedAdvances = collect($allOrderAdvances)
+            ->filter(fn (array $advance) => ! (bool) ($advance['sunat_ready'] ?? false))
+            ->values()
+            ->all();
 
         if ($isAnticipo) {
             $pendingLines->prepend([
@@ -2195,6 +2213,8 @@ class WorkshopMaintenanceBoardController extends Controller
             'standardCashRegisterId' => $standardCashRegisterId,
             'invoiceCashRegisterId' => $invoiceCashRegisterId,
             'deliversOnConfirm' => (string) $order->status === 'finished',
+            'blockedAdvances' => $blockedAdvances ?? [],
+            'isSunatActive' => $apisunatService->isConfiguredForBranch($order->branch ?? null),
         ]));
     }
 
@@ -2530,6 +2550,17 @@ class WorkshopMaintenanceBoardController extends Controller
                             ->get();
 
                         foreach ($advances as $advance) {
+                            $advanceMovement = $advance->movement;
+                            if (! $advanceMovement) {
+                                continue;
+                            }
+
+                            $apisunatForLink = app(\App\Services\ApisunatService::class);
+                            if ($apisunatForLink->isConfiguredForBranch($advanceMovement->branch)
+                                && ! $apisunatForLink->isAdvanceSunatReady($advanceMovement)) {
+                                continue;
+                            }
+
                             $exists = \DB::table('sale_advances')
                                 ->where('final_movement_id', $freshOrder->salesMovement->movement_id)
                                 ->where('advance_movement_id', $advance->movement_id)
@@ -2578,14 +2609,29 @@ class WorkshopMaintenanceBoardController extends Controller
 
         if ($movementForApisunat) {
             $apisunatService = app(\App\Services\ApisunatService::class);
-            $this->syncElectronicInvoiceForSale($movementForApisunat, $apisunatService);
+            $electronicResult = $this->syncCheckoutElectronicInvoices(
+                $order,
+                $movementForApisunat,
+                $apisunatService,
+                (bool) $isAnticipo
+            );
+            if (($electronicResult['status'] ?? '') === 'ERROR') {
+                return back()->withErrors([
+                    'error' => (string) ($electronicResult['message'] ?? 'No se pudo emitir el comprobante electrónico.'),
+                ]);
+            }
         }
 
         $order->refresh();
 
+        $successMessage = 'Venta y cobro registrados correctamente.';
+        if ($movementForApisunat && (($electronicResult['status'] ?? '') === 'SENT')) {
+            $successMessage .= ' Comprobante electrónico enviado a SUNAT.';
+        }
+
         return $this->redirectToBoardWithStatus(
             (string) $order->status,
-            'Venta y cobro registrados correctamente.'
+            $successMessage
         );
     }
 
@@ -3282,7 +3328,45 @@ class WorkshopMaintenanceBoardController extends Controller
         ]);
     }
 
-    private function resolveWorkshopAdvanceDocuments(WorkshopMovement $order): array
+    private function syncCheckoutElectronicInvoices(
+        WorkshopMovement $order,
+        \App\Models\Movement $movementForApisunat,
+        \App\Services\ApisunatService $apisunatService,
+        bool $isAnticipo
+    ): array {
+        if (! $apisunatService->isConfiguredForBranch($movementForApisunat->branch)) {
+            return ['status' => 'NOT_CONFIGURED'];
+        }
+
+        if (! $isAnticipo && (int) ($order->movement_id ?? 0) > 0) {
+            $pendingAdvances = \App\Models\SalesMovement::query()
+                ->where('is_advance', true)
+                ->whereHas('movement', function ($query) use ($order) {
+                    $query->where('parent_movement_id', (int) $order->movement_id);
+                })
+                ->with(['movement.branch', 'movement.documentType', 'movement.salesMovement'])
+                ->get();
+
+            foreach ($pendingAdvances as $advanceSale) {
+                $advanceMovement = $advanceSale->movement;
+                if (! $advanceMovement || $apisunatService->isAdvanceSunatReady($advanceMovement)) {
+                    continue;
+                }
+                if (! $apisunatService->isEligibleDocument($advanceMovement)) {
+                    continue;
+                }
+
+                $advanceResult = $this->syncElectronicInvoiceForSale($advanceMovement, $apisunatService);
+                if (($advanceResult['status'] ?? '') === 'ERROR') {
+                    return $advanceResult;
+                }
+            }
+        }
+
+        return $this->syncElectronicInvoiceForSale($movementForApisunat, $apisunatService);
+    }
+
+    private function resolveWorkshopAdvanceDocuments(WorkshopMovement $order, bool $onlySunatReady = true): array
     {
         if ((int) ($order->movement_id ?? 0) <= 0) {
             return [];
@@ -3297,7 +3381,9 @@ class WorkshopMaintenanceBoardController extends Controller
             ->orderBy('id')
             ->get();
 
-        return $advances->map(function (\App\Models\SalesMovement $sale) {
+        $apisunatService = app(\App\Services\ApisunatService::class);
+
+        return $advances->map(function (\App\Models\SalesMovement $sale) use ($apisunatService) {
             $movement = $sale->movement;
             $series = trim((string) ($movement?->electronic_invoice_series ?? $sale->series ?? ''));
             $correlative = trim((string) ($movement?->electronic_invoice_number ?? $sale->billing_number ?? $movement?->number ?? ''));
@@ -3312,6 +3398,7 @@ class WorkshopMaintenanceBoardController extends Controller
 
             $docName = mb_strtolower(trim((string) ($movement?->documentType?->name ?? '')), 'UTF-8');
             $documentTypeCode = str_contains($docName, 'factura') ? '01' : '03';
+            $sunatReady = $movement ? $apisunatService->isAdvanceSunatReady($movement) : false;
 
             return [
                 'sales_movement_id' => (int) $sale->id,
@@ -3325,8 +3412,12 @@ class WorkshopMaintenanceBoardController extends Controller
                 'issue_date' => optional($movement?->moved_at)->format('Y-m-d'),
                 'issue_time' => optional($movement?->moved_at)->format('H:i:s'),
                 'electronic_status' => trim((string) ($movement?->electronic_invoice_status ?? '')),
+                'sunat_ready' => $sunatReady,
             ];
-        })->values()->all();
+        })
+            ->when($onlySunatReady, fn ($rows) => $rows->filter(fn (array $row) => (bool) ($row['sunat_ready'] ?? false)))
+            ->values()
+            ->all();
     }
 
     private function boardIndexFilterForStatus(string $status): string

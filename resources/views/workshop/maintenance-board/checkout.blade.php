@@ -278,6 +278,17 @@
                 <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first() }}
                 </div>
             @endif
+            @if (($isSunatActive ?? false) && !($isAnticipo ?? false) && count($blockedAdvances ?? []) > 0)
+                <div class="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                    <p class="font-semibold">Anticipos pendientes de validar en SUNAT</p>
+                    <p class="mt-1">No se podrá emitir la factura/boleta final hasta corregir estos comprobantes (reenvíelos desde Ventas con «Reenviar SUNAT»):</p>
+                    <ul class="mt-2 list-disc pl-5">
+                        @foreach($blockedAdvances as $blocked)
+                            <li>{{ $blocked['full_number'] ?? 'Anticipo' }} — estado: {{ $blocked['electronic_status'] ?: 'SIN EMITIR' }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
 
             <div class="mb-4">
                 <x-ui.link-button size="sm" variant="outline" href="{{ route('workshop.maintenance-board.index') }}">

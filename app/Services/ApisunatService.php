@@ -879,10 +879,68 @@ class ApisunatService
             return;
         }
 
-        $issues = $this->collectAdvanceSunatBlockingIssues($finalSale);
+        $issues = array_values(array_unique(array_merge(
+            $this->collectAdvanceSunatBlockingIssues($finalSale),
+            (int) ($finalSale->parent_movement_id ?? 0) > 0
+                ? $this->collectOrderAdvanceSunatBlockingIssues((int) $finalSale->parent_movement_id)
+                : []
+        )));
+
         if ($issues !== []) {
             throw new \RuntimeException(implode(' ', $issues));
         }
+    }
+
+    /**
+     * @return Collection<int, Movement>
+     */
+    public function collectOrderAdvanceMovements(int $orderMovementId): Collection
+    {
+        if ($orderMovementId <= 0) {
+            return collect();
+        }
+
+        $advanceMovementIds = DB::table('movements as m')
+            ->join('sales_movements as sm', 'sm.movement_id', '=', 'm.id')
+            ->where('m.parent_movement_id', $orderMovementId)
+            ->where('sm.is_advance', true)
+            ->whereNull('m.deleted_at')
+            ->whereNull('sm.deleted_at')
+            ->pluck('m.id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if ($advanceMovementIds === []) {
+            return collect();
+        }
+
+        return Movement::query()
+            ->with(['documentType', 'salesMovement'])
+            ->whereIn('id', $advanceMovementIds)
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function collectOrderAdvanceSunatBlockingIssues(int $orderMovementId): array
+    {
+        $issues = [];
+        foreach ($this->collectOrderAdvanceMovements($orderMovementId) as $advanceMovement) {
+            if ($this->isAdvanceSunatReady($advanceMovement)) {
+                continue;
+            }
+
+            $fullNumber = $this->formatAdvanceFullNumber($advanceMovement);
+            $status = strtoupper(trim((string) ($advanceMovement->electronic_invoice_status ?? '')));
+            $statusLabel = $status !== '' ? $status : 'SIN EMITIR';
+
+            $issues[] = 'El anticipo '.$fullNumber.' de la orden no está aceptado por SUNAT como anticipo (estado: '.$statusLabel.'). '
+                .'Reenvíe ese comprobante desde Ventas (botón Reenviar SUNAT) y espere estado ACEPTADO.';
+        }
+
+        return $issues;
     }
 
     /**
