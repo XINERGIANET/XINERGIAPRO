@@ -184,9 +184,13 @@ class ApisunatService
         if (! is_array($responsePayload)) {
             $responsePayload = [];
         }
-        $responsePayload['sunat_operation_list_id'] = $isAdvanceInvoice
+        $sale->loadMissing('documentType');
+        $docName = mb_strtolower(trim((string) ($sale->documentType?->name ?? '')), 'UTF-8');
+        $documentTypeCode = str_contains($docName, 'boleta') ? '03' : '01';
+        $responsePayload['sunat_profile_id'] = $isAdvanceInvoice
             ? self::SUNAT_OPERATION_ADVANCE_CODE
             : self::SUNAT_OPERATION_STANDARD_CODE;
+        $responsePayload['sunat_operation_list_id'] = $this->resolveSunatInvoiceTypeListId($documentTypeCode, $isAdvanceInvoice);
         $responsePayload['sunat_advance_ready'] = $isAdvanceInvoice;
 
         $sale->update([
@@ -564,9 +568,7 @@ class ApisunatService
             'cbc:IssueTime' => ['_text' => now()->format('H:i:s')],
             'cbc:InvoiceTypeCode' => $this->sunatInvoiceTypeCodeNode(
                 $catalog['type'],
-                $isAdvanceInvoice
-                    ? ($catalog['type'] === '03' ? $operationTypeCode : null)
-                    : self::SUNAT_OPERATION_STANDARD_CODE
+                $this->resolveSunatInvoiceTypeListId($catalog['type'], $isAdvanceInvoice)
             ),
             'cbc:Note' => [],
             'cbc:DocumentCurrencyCode' => ['_text' => 'PEN'],
@@ -832,6 +834,10 @@ class ApisunatService
         $response = $this->normalizeElectronicInvoiceResponse($advanceMovement->electronic_invoice_response);
 
         if (! empty($response['sunat_advance_ready'])) {
+            return true;
+        }
+
+        if (trim((string) ($response['sunat_profile_id'] ?? '')) === self::SUNAT_OPERATION_ADVANCE_CODE) {
             return true;
         }
 
@@ -1277,18 +1283,25 @@ class ApisunatService
     }
 
     /**
-     * listID en InvoiceTypeCode (cat. 51) lo usa Apisunat como tipo de operación en SUNAT.
-     * En factura de anticipo no puede ser 0104 (error 3206); solo ProfileID=0104.
-     * En boleta de anticipo sí puede ir listID=0104.
+     * listID en InvoiceTypeCode (cat. 51): Apisunat lo exige siempre (_attributes.listID).
+     * Factura de anticipo: listID=0101 (evita error SUNAT 3206) y ProfileID=0104.
+     * Boleta de anticipo: listID=0104.
      */
-    private function sunatInvoiceTypeCodeNode(string $documentTypeCode, ?string $operationTypeForListId): array
+    private function resolveSunatInvoiceTypeListId(string $documentTypeCode, bool $isAdvanceInvoice): string
     {
-        $node = ['_text' => $documentTypeCode];
-        if ($operationTypeForListId !== null && $operationTypeForListId !== '') {
-            $node['_attributes'] = ['listID' => $operationTypeForListId];
+        if ($isAdvanceInvoice && $documentTypeCode === '03') {
+            return self::SUNAT_OPERATION_ADVANCE_CODE;
         }
 
-        return $node;
+        return self::SUNAT_OPERATION_STANDARD_CODE;
+    }
+
+    private function sunatInvoiceTypeCodeNode(string $documentTypeCode, string $operationTypeForListId): array
+    {
+        return [
+            '_text' => $documentTypeCode,
+            '_attributes' => ['listID' => $operationTypeForListId],
+        ];
     }
 
     private function resolveAdvanceIssueDate(Movement $advanceMovement): string
@@ -1370,8 +1383,11 @@ class ApisunatService
             ? trim($profileId)
             : trim((string) data_get($profileId, '_text', ''));
         $invoiceTypeListId = trim((string) data_get($documentBody, 'cbc:InvoiceTypeCode._attributes.listID', ''));
-        if ($operationTypeCode === '' && $invoiceTypeListId === '') {
-            throw new \RuntimeException('No se puede emitir electrónicamente: falta el tipo de operación SUNAT (ProfileID o listID en InvoiceTypeCode).');
+        if ($invoiceTypeListId === '') {
+            throw new \RuntimeException('No se puede emitir electrónicamente: falta listID en InvoiceTypeCode (requerido por Apisunat).');
+        }
+        if ($operationTypeCode === '') {
+            throw new \RuntimeException('No se puede emitir electrónicamente: falta ProfileID (tipo de operación SUNAT).');
         }
     }
 
