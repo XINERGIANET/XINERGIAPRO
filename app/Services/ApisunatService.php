@@ -100,6 +100,8 @@ class ApisunatService
         $apiUrl = $this->resolveApiUrl($config);
         $number = $this->fetchSuggestedCorrelativeNumber($config, $catalog, $apiUrl);
 
+        $this->assertFinalSaleAdvancesReadyForSunat($sale);
+
         return $this->sendSaleBillToApisunat(
             $sale,
             $config,
@@ -141,6 +143,7 @@ class ApisunatService
         }
 
         $catalog = $this->resolveDocumentCatalog($sale, $config);
+        $this->assertFinalSaleAdvancesReadyForSunat($sale);
         $billingCorrelative = $this->resolveBillingCorrelativeForResend($sale, $catalog['serie']);
         $catalog['serie'] = $billingCorrelative['serie'];
         $apiUrl = $this->resolveApiUrl($config);
@@ -175,6 +178,17 @@ class ApisunatService
         }
 
         $data = $result['data'];
+        $sale->loadMissing('salesMovement');
+        $isAdvanceInvoice = (bool) ($sale->salesMovement?->is_advance ?? false);
+        $responsePayload = $data['response'] ?? [];
+        if (! is_array($responsePayload)) {
+            $responsePayload = [];
+        }
+        $responsePayload['sunat_operation_list_id'] = $isAdvanceInvoice
+            ? self::SUNAT_OPERATION_ADVANCE_LIST_ID
+            : self::SUNAT_OPERATION_STANDARD_LIST_ID;
+        $responsePayload['sunat_advance_ready'] = $isAdvanceInvoice;
+
         $sale->update([
             'electronic_invoice_provider' => $data['provider'] ?? 'apisunat',
             'electronic_invoice_status' => 'SENT',
@@ -186,7 +200,7 @@ class ApisunatService
             'electronic_invoice_pdf_a4_url' => $data['pdf_a4'] ?? null,
             'electronic_invoice_xml_url' => $data['xml_url'] ?? null,
             'electronic_invoice_cdr_url' => $data['cdr_url'] ?? null,
-            'electronic_invoice_response' => $data['response'] ?? null,
+            'electronic_invoice_response' => $responsePayload,
         ]);
 
         if ($sale->salesMovement) {
@@ -812,7 +826,69 @@ class ApisunatService
         return $documentBody;
     }
 
-    private function resolveLinkedAdvancePayments(Movement $sale): array
+    public function isAdvanceSunatReady(Movement $advanceMovement): bool
+    {
+        $advanceMovement->loadMissing('salesMovement');
+        if (! (bool) ($advanceMovement->salesMovement?->is_advance ?? false)) {
+            return false;
+        }
+
+        if (strtoupper(trim((string) ($advanceMovement->electronic_invoice_status ?? ''))) !== 'SENT') {
+            return false;
+        }
+
+        if (trim((string) ($advanceMovement->electronic_invoice_external_id ?? '')) === '') {
+            return false;
+        }
+
+        $response = $this->normalizeElectronicInvoiceResponse($advanceMovement->electronic_invoice_response);
+
+        if (! empty($response['sunat_advance_ready'])) {
+            return true;
+        }
+
+        return trim((string) ($response['sunat_operation_list_id'] ?? '')) === self::SUNAT_OPERATION_ADVANCE_LIST_ID;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function collectAdvanceSunatBlockingIssues(Movement $finalSale): array
+    {
+        $issues = [];
+        foreach ($this->collectLinkedAdvanceMovements($finalSale) as $advanceMovement) {
+            if ($this->isAdvanceSunatReady($advanceMovement)) {
+                continue;
+            }
+
+            $fullNumber = $this->formatAdvanceFullNumber($advanceMovement);
+            $status = strtoupper(trim((string) ($advanceMovement->electronic_invoice_status ?? '')));
+            $statusLabel = $status !== '' ? $status : 'SIN EMITIR';
+
+            $issues[] = 'El anticipo '.$fullNumber.' no está aceptado por SUNAT como comprobante de anticipo (estado: '.$statusLabel.'). '
+                .'Debe emitirlo o reenviarlo desde ventas/tablero y esperar que quede ACEPTADO antes de facturar el saldo.';
+        }
+
+        return $issues;
+    }
+
+    public function assertFinalSaleAdvancesReadyForSunat(Movement $finalSale): void
+    {
+        $finalSale->loadMissing('salesMovement');
+        if ((bool) ($finalSale->salesMovement?->is_advance ?? false)) {
+            return;
+        }
+
+        $issues = $this->collectAdvanceSunatBlockingIssues($finalSale);
+        if ($issues !== []) {
+            throw new \RuntimeException(implode(' ', $issues));
+        }
+    }
+
+    /**
+     * @return Collection<int, Movement>
+     */
+    public function collectLinkedAdvanceMovements(Movement $sale): Collection
     {
         $advanceLinks = DB::table('sale_advances')
             ->where('final_movement_id', (int) $sale->id)
@@ -823,10 +899,6 @@ class ApisunatService
             ->map(fn ($id) => (int) $id)
             ->filter(fn ($id) => $id > 0)
             ->values()
-            ->all();
-
-        $appliedByMovementId = $advanceLinks
-            ->mapWithKeys(fn ($row) => [(int) $row->advance_movement_id => (float) $row->applied_amount])
             ->all();
 
         if ($advanceMovementIds === [] && (int) ($sale->parent_movement_id ?? 0) > 0) {
@@ -843,13 +915,28 @@ class ApisunatService
         }
 
         if ($advanceMovementIds === []) {
-            return [];
+            return collect();
         }
 
-        $movements = Movement::query()
+        return Movement::query()
             ->with(['documentType', 'salesMovement'])
             ->whereIn('id', $advanceMovementIds)
+            ->orderBy('id')
             ->get();
+    }
+
+    private function resolveLinkedAdvancePayments(Movement $sale): array
+    {
+        $advanceLinks = DB::table('sale_advances')
+            ->where('final_movement_id', (int) $sale->id)
+            ->get(['advance_movement_id', 'applied_amount']);
+
+        $appliedByMovementId = $advanceLinks
+            ->mapWithKeys(fn ($row) => [(int) $row->advance_movement_id => (float) $row->applied_amount])
+            ->all();
+
+        $movements = $this->collectLinkedAdvanceMovements($sale)
+            ->filter(fn (Movement $advanceMovement) => $this->isAdvanceSunatReady($advanceMovement));
 
         return $movements->map(function (Movement $advanceMovement) use ($appliedByMovementId) {
             $advanceSale = $advanceMovement->salesMovement;
@@ -1010,6 +1097,39 @@ class ApisunatService
             'prepaid_tax_total' => $prepaidTaxTotal,
             'prepaid_inclusive_total' => $prepaidInclusiveTotal,
         ];
+    }
+
+    private function normalizeElectronicInvoiceResponse(mixed $response): array
+    {
+        if (is_array($response)) {
+            return $response;
+        }
+
+        if (is_string($response) && trim($response) !== '') {
+            $decoded = json_decode($response, true);
+
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        return [];
+    }
+
+    private function formatAdvanceFullNumber(Movement $advanceMovement): string
+    {
+        $advanceMovement->loadMissing(['salesMovement', 'documentType']);
+        $advanceSale = $advanceMovement->salesMovement;
+        $series = trim((string) ($advanceMovement->electronic_invoice_series ?? $advanceSale?->series ?? ''));
+        $correlative = trim((string) ($advanceMovement->electronic_invoice_number ?? $advanceSale?->billing_number ?? $advanceMovement->number ?? ''));
+        $correlativeDigits = preg_replace('/\D+/', '', $correlative) ?: '';
+        if ($correlativeDigits !== '') {
+            $correlative = str_pad($correlativeDigits, 8, '0', STR_PAD_LEFT);
+        }
+
+        if ($series !== '' && $correlative !== '') {
+            return $series.'-'.$correlative;
+        }
+
+        return trim((string) ($advanceMovement->number ?? ('#'.$advanceMovement->id)));
     }
 
     /**
