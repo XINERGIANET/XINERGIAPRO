@@ -2332,9 +2332,25 @@ class WorkshopMaintenanceBoardController extends Controller
         $branchId = (int) session('branch_id');
         $movementForApisunat = null;
         $isAnticipo = $request->has('anticipo') && $request->query('anticipo') == '1';
+        $checkoutPreviousAdvances = [];
+        if (! $isAnticipo && (float) $orderForPaymentRule->paid_total > 0) {
+            $apisunatForCheckoutAdvances = app(\App\Services\ApisunatService::class);
+            $checkoutPreviousAdvances = collect($this->resolveWorkshopAdvanceDocuments($orderForPaymentRule, false))
+                ->filter(function (array $advance) use ($apisunatForCheckoutAdvances) {
+                    $movementId = (int) ($advance['movement_id'] ?? 0);
+                    if ($movementId <= 0) {
+                        return false;
+                    }
+                    $movement = \App\Models\Movement::query()->find($movementId);
+
+                    return $movement && $apisunatForCheckoutAdvances->isAdvanceSunatReady($movement);
+                })
+                ->values()
+                ->all();
+        }
 
         try {
-            DB::transaction(function () use ($order, $validated, $branchId, $user, $paymentType, $isDebtCheckout, $isAnticipo, &$movementForApisunat) {
+            DB::transaction(function () use ($order, $validated, $branchId, $user, $paymentType, $isDebtCheckout, $isAnticipo, $checkoutPreviousAdvances, &$movementForApisunat) {
                 $lockedOrder = WorkshopMovement::query()
                     ->where('id', $order->id)
                     ->lockForUpdate()
@@ -2541,12 +2557,18 @@ class WorkshopMaintenanceBoardController extends Controller
                         'payment_type' => $isDebtCheckout ? 'CREDITO' : 'CONTADO',
                     ]);
                     
-                    if ((float) $lockedOrder->paid_total > 0) {
+                    if ((float) $lockedOrder->paid_total > 0 && count($checkoutPreviousAdvances) > 0) {
+                        $advanceMovementIds = collect($checkoutPreviousAdvances)
+                            ->pluck('movement_id')
+                            ->map(fn ($id) => (int) $id)
+                            ->filter(fn ($id) => $id > 0)
+                            ->values()
+                            ->all();
+
                         $advances = \App\Models\SalesMovement::query()
                             ->where('is_advance', true)
-                            ->whereHas('movement', function ($query) use ($lockedOrder) {
-                                $query->where('parent_movement_id', $lockedOrder->movement_id);
-                            })
+                            ->whereIn('movement_id', $advanceMovementIds)
+                            ->with('movement')
                             ->get();
 
                         foreach ($advances as $advance) {
@@ -2566,10 +2588,16 @@ class WorkshopMaintenanceBoardController extends Controller
                                 ->where('advance_movement_id', $advance->movement_id)
                                 ->exists();
 
+                            $finalMovementId = (int) $freshOrder->salesMovement->movement_id;
+                            $advanceMovementId = (int) $advance->movement_id;
+                            if ($finalMovementId <= 0 || $advanceMovementId <= 0 || $finalMovementId === $advanceMovementId) {
+                                continue;
+                            }
+
                             if (!$exists) {
                                 \DB::table('sale_advances')->insert([
-                                    'final_movement_id' => $freshOrder->salesMovement->movement_id,
-                                    'advance_movement_id' => $advance->movement_id,
+                                    'final_movement_id' => $finalMovementId,
+                                    'advance_movement_id' => $advanceMovementId,
                                     'applied_amount' => $advance->total,
                                     'created_at' => now(),
                                     'updated_at' => now(),
@@ -3338,7 +3366,9 @@ class WorkshopMaintenanceBoardController extends Controller
             return ['status' => 'NOT_CONFIGURED'];
         }
 
-        if (! $isAnticipo && (int) ($order->movement_id ?? 0) > 0) {
+        if (! $isAnticipo
+            && (int) ($order->movement_id ?? 0) > 0
+            && $apisunatService->saleHasExplicitAdvanceApplications($movementForApisunat)) {
             $pendingAdvances = \App\Models\SalesMovement::query()
                 ->where('is_advance', true)
                 ->whereHas('movement', function ($query) use ($order) {

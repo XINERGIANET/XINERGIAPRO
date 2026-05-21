@@ -612,20 +612,6 @@ class ApisunatService
             ]];
         }
 
-        if ($isAdvanceInvoice) {
-            $supplierRuc = trim((string) ($branch?->ruc ?? '0'));
-            $advanceDocName = mb_strtolower(trim((string) ($sale->documentType?->name ?? '')), 'UTF-8');
-            $advanceDocTypeCode = str_contains($advanceDocName, 'factura') ? '02' : '03';
-            $documentBody['cac:AdditionalDocumentReference'] = [
-                $this->buildSunatAdvanceReferenceNode(
-                    $catalog['serie'].'-'.$number,
-                    $advanceDocTypeCode,
-                    '1',
-                    $supplierRuc
-                ),
-            ];
-        }
-
         $lineIndex = 1;
         $headerSubtotal = 0.0;
         $headerTax = 0.0;
@@ -756,7 +742,7 @@ class ApisunatService
         ];
 
         $payableAmount = $headerTotal;
-        $linkedAdvances = $this->resolveLinkedAdvancePayments($sale);
+        $linkedAdvances = $isAdvanceInvoice ? [] : $this->resolveLinkedAdvancePayments($sale);
 
         if ($linkedAdvances !== []) {
             $supplierRuc = trim((string) ($branch?->ruc ?? '0'));
@@ -872,6 +858,14 @@ class ApisunatService
         return $issues;
     }
 
+    public function saleHasExplicitAdvanceApplications(Movement $finalSale): bool
+    {
+        return DB::table('sale_advances')
+            ->where('final_movement_id', (int) $finalSale->id)
+            ->where('advance_movement_id', '!=', (int) $finalSale->id)
+            ->exists();
+    }
+
     public function assertFinalSaleAdvancesReadyForSunat(Movement $finalSale): void
     {
         $finalSale->loadMissing('salesMovement');
@@ -879,13 +873,11 @@ class ApisunatService
             return;
         }
 
-        $issues = array_values(array_unique(array_merge(
-            $this->collectAdvanceSunatBlockingIssues($finalSale),
-            (int) ($finalSale->parent_movement_id ?? 0) > 0
-                ? $this->collectOrderAdvanceSunatBlockingIssues((int) $finalSale->parent_movement_id)
-                : []
-        )));
+        if (! $this->saleHasExplicitAdvanceApplications($finalSale)) {
+            return;
+        }
 
+        $issues = $this->collectAdvanceSunatBlockingIssues($finalSale);
         if ($issues !== []) {
             throw new \RuntimeException(implode(' ', $issues));
         }
@@ -952,25 +944,13 @@ class ApisunatService
             ->where('final_movement_id', (int) $sale->id)
             ->get(['advance_movement_id', 'applied_amount']);
 
+        $saleMovementId = (int) $sale->id;
         $advanceMovementIds = $advanceLinks
             ->pluck('advance_movement_id')
             ->map(fn ($id) => (int) $id)
-            ->filter(fn ($id) => $id > 0)
+            ->filter(fn ($id) => $id > 0 && $id !== $saleMovementId)
             ->values()
             ->all();
-
-        if ($advanceMovementIds === [] && (int) ($sale->parent_movement_id ?? 0) > 0) {
-            $advanceMovementIds = DB::table('movements as m')
-                ->join('sales_movements as sm', 'sm.movement_id', '=', 'm.id')
-                ->where('m.parent_movement_id', (int) $sale->parent_movement_id)
-                ->where('sm.is_advance', true)
-                ->whereNull('m.deleted_at')
-                ->whereNull('sm.deleted_at')
-                ->where('m.id', '!=', (int) $sale->id)
-                ->pluck('m.id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
-        }
 
         if ($advanceMovementIds === []) {
             return collect();
@@ -979,12 +959,22 @@ class ApisunatService
         return Movement::query()
             ->with(['documentType', 'salesMovement'])
             ->whereIn('id', $advanceMovementIds)
+            ->where('id', '!=', $saleMovementId)
             ->orderBy('id')
             ->get();
     }
 
     private function resolveLinkedAdvancePayments(Movement $sale): array
     {
+        $sale->loadMissing('salesMovement');
+        if ((bool) ($sale->salesMovement?->is_advance ?? false)) {
+            return [];
+        }
+
+        if (! $this->saleHasExplicitAdvanceApplications($sale)) {
+            return [];
+        }
+
         $advanceLinks = DB::table('sale_advances')
             ->where('final_movement_id', (int) $sale->id)
             ->get(['advance_movement_id', 'applied_amount']);
