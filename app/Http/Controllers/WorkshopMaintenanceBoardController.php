@@ -267,19 +267,7 @@ class WorkshopMaintenanceBoardController extends Controller
                     $editingClientLabel = trim(($quotation->client->document_number ?? '') . ' - ' . ($quotation->client->name ?? ''));
                 }
 
-                $initialServiceLines = $quotation->details
-                    ->where('line_type', 'SERVICE')
-                    ->values()
-                    ->map(fn($d) => [
-                        'detail_id' => 0, // 0 because it's new for the order
-                        'service_id' => $d->service_id !== null ? (string) $d->service_id : '',
-                        'description' => (string) ($d->description ?? ''),
-                        'qty' => (float) $d->qty,
-                        'unit_price' => (float) $d->unit_price,
-                        'validity_months' => $d->validity_months,
-                        'is_terciarizado' => (bool) $d->is_terciarizado,
-                    ])
-                    ->all();
+                $initialServiceLines = $this->mapQuotationDetailsToInitialServiceLines($quotation->details);
 
                 $initialProductLines = $quotation->details
                     ->where('line_type', 'PART')
@@ -2679,6 +2667,50 @@ class WorkshopMaintenanceBoardController extends Controller
         ));
 
         return $parts === [] ? '' : implode(' - ', $parts);
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, \App\Models\WorkshopMovementDetail>|\Illuminate\Database\Eloquent\Collection  $details
+     * @return array<int, array<string, mixed>>
+     */
+    private function mapQuotationDetailsToInitialServiceLines($details): array
+    {
+        return collect($details)
+            ->whereIn('line_type', ['SERVICE', 'LABOR'])
+            ->values()
+            ->map(function ($detail) {
+                $lineType = strtoupper((string) ($detail->line_type ?? ''));
+                $hasCatalogService = $lineType === 'SERVICE' && !empty($detail->service_id);
+
+                if (!$hasCatalogService) {
+                    $description = trim((string) ($detail->description ?? ''));
+                    if ($description === '') {
+                        $description = $lineType === 'LABOR' ? 'Mano de obra' : 'Servicio';
+                    }
+
+                    return [
+                        'detail_id' => 0,
+                        'service_id' => '',
+                        'description' => $description,
+                        'qty' => (float) $detail->qty,
+                        'unit_price' => (float) $detail->unit_price,
+                        'validity_months' => $detail->validity_months,
+                        'is_terciarizado' => (bool) $detail->is_terciarizado,
+                        'line_uid' => 'qglosa_' . (int) $detail->id,
+                    ];
+                }
+
+                return [
+                    'detail_id' => 0,
+                    'service_id' => (string) $detail->service_id,
+                    'description' => (string) ($detail->description ?? ''),
+                    'qty' => (float) $detail->qty,
+                    'unit_price' => (float) $detail->unit_price,
+                    'validity_months' => $detail->validity_months,
+                    'is_terciarizado' => (bool) $detail->is_terciarizado,
+                ];
+            })
+            ->all();
     }
 
     private function productBranchRowForMaintenance(int $branchId, int $productId): ?object

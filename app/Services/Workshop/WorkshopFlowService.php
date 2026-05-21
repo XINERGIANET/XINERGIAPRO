@@ -849,14 +849,22 @@ class WorkshopFlowService
                 ->get();
 
             foreach ($details as $detail) {
+                $sourceLineType = strtoupper((string) ($detail->line_type ?? ''));
+                $isLaborOrFreeText = $sourceLineType === 'LABOR'
+                    || ($sourceLineType === 'SERVICE' && empty($detail->service_id));
+                $description = trim((string) ($detail->description ?? ''));
+                if ($description === '') {
+                    $description = $sourceLineType === 'LABOR' ? 'Mano de obra' : 'Servicio';
+                }
+
                 $this->addDetail($order, [
-                    'line_type' => (string) $detail->line_type,
-                    'description' => (string) $detail->description,
+                    'line_type' => $isLaborOrFreeText ? 'SERVICE' : (string) $detail->line_type,
+                    'description' => $description,
                     'qty' => (float) $detail->qty,
                     'unit_price' => (float) $detail->unit_price,
                     'discount_amount' => (float) $detail->discount_amount,
                     'product_id' => $detail->product_id ?: null,
-                    'service_id' => $detail->service_id ?: null,
+                    'service_id' => $isLaborOrFreeText ? null : ($detail->service_id ?: null),
                     'tax_rate_id' => $detail->tax_rate_id ?: null,
                     'technician_person_id' => $detail->technician_person_id ?: null,
                     'validity_months' => $detail->validity_months,
