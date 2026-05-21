@@ -144,6 +144,8 @@ Route::middleware('auth')->group(function () {
         ->name('admin.sales.vehicles.store');
     Route::post('/admin/ventas/{sale}/facturar', [SalesController::class, 'invoice'])
         ->name('admin.sales.invoice');
+    Route::post('/admin/ventas/{sale}/reenviar-electronico', [SalesController::class, 'resendElectronicInvoice'])
+        ->name('admin.sales.resend-electronic');
     Route::resource('/admin/compras', PurchaseController::class)
         ->names('admin.purchases')
         ->parameters(['compras' => 'purchase'])

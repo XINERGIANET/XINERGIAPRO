@@ -2193,6 +2193,57 @@ class SalesController extends Controller
             ->with('status', 'Factura registrada correctamente.');
     }
 
+    public function resendElectronicInvoice(Request $request, Movement $sale, \App\Services\ApisunatService $apisunatService)
+    {
+        $branchId = (int) ($request->session()->get('branch_id') ?? 0);
+        if ($branchId > 0 && (int) $sale->branch_id !== $branchId) {
+            abort(404);
+        }
+
+        $sale->loadMissing(['salesMovement', 'documentType', 'branch']);
+
+        if (!$apisunatService->isEligibleDocument($sale)) {
+            return back()->withErrors(['error' => 'Este comprobante no es boleta ni factura electrónica.']);
+        }
+
+        if (!$apisunatService->isConfiguredForBranch($sale->branch)) {
+            return back()->withErrors(['error' => 'La sucursal no tiene Apisunat configurado.']);
+        }
+
+        try {
+            $result = $apisunatService->reemitSale($sale);
+            if (($result['status'] ?? '') === 'SENT' && !empty($result['data'])) {
+                $data = $result['data'];
+                $sale->update([
+                    'electronic_invoice_provider' => $data['provider'] ?? 'apisunat',
+                    'electronic_invoice_status' => 'SENT',
+                    'electronic_invoice_external_id' => $data['external_id'] ?? null,
+                    'electronic_invoice_series' => $data['series'] ?? null,
+                    'electronic_invoice_number' => $data['correlative'] ?? null,
+                    'electronic_invoice_file_name' => $data['file_name'] ?? null,
+                    'electronic_invoice_pdf_ticket_url' => $data['pdf_ticket_80mm'] ?? null,
+                    'electronic_invoice_pdf_a4_url' => $data['pdf_a4'] ?? null,
+                    'electronic_invoice_xml_url' => $data['xml_url'] ?? null,
+                    'electronic_invoice_cdr_url' => $data['cdr_url'] ?? null,
+                    'electronic_invoice_response' => $data['response'] ?? null,
+                ]);
+            }
+
+            return redirect()
+                ->route('admin.sales.index', $request->filled('view_id') ? ['view_id' => $request->input('view_id')] : [])
+                ->with('status', (string) ($result['message'] ?? 'Comprobante reenviado.'));
+        } catch (\Throwable $e) {
+            $sale->update([
+                'electronic_invoice_provider' => 'apisunat',
+                'electronic_invoice_status' => 'ERROR',
+                'electronic_invoice_response' => ['error' => $e->getMessage()],
+            ]);
+            Log::error('Error reenviando comprobante electrónico: ' . $e->getMessage());
+
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+    }
+
     public function destroy(Movement $sale)
     {
         app(KardexSyncService::class)->deleteMovement($sale->id);

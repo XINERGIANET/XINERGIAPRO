@@ -679,6 +679,33 @@
                                                 </span>
                                             </div>
                                         @endif
+
+                                        <form
+                                            method="POST"
+                                            action="{{ route('admin.sales.resend-electronic', array_merge([$sale], $viewId ? ['view_id' => $viewId] : [])) }}"
+                                            class="relative group"
+                                            style="display: none;"
+                                            data-resend-electronic-invoice
+                                            onsubmit="return confirm('¿Reenviar {{ $sale->salesDocumentCode() }} a SUNAT/Apisunat con el mismo correlativo?');"
+                                        >
+                                            @csrf
+                                            @if ($viewId)
+                                                <input type="hidden" name="view_id" value="{{ $viewId }}">
+                                            @endif
+                                            <x-ui.button
+                                                size="icon"
+                                                variant="primary"
+                                                type="submit"
+                                                className="rounded-xl border-0 shadow-none"
+                                                style="background-color: #0891b2; color: #ffffff;"
+                                                aria-label="Reenviar electrónico"
+                                            >
+                                                <i class="ri-refresh-line"></i>
+                                            </x-ui.button>
+                                            <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                Reenviar SUNAT
+                                            </span>
+                                        </form>
                                     </div>
                                 </td>
                             </tr>

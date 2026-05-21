@@ -132,9 +132,135 @@ class ApisunatService
         $extraDocumentData = $this->getDocumentById($documentId, $branch);
         $urls = $this->extractDocumentUrls($extraDocumentData);
 
+        return $this->buildEmitSuccessPayload(
+            $catalog,
+            $number,
+            $fileName,
+            $documentId,
+            $sendResp,
+            $extraDocumentData,
+            $urls,
+            $apiUrl
+        );
+    }
+
+    /**
+     * Reenvía a SUNAT un comprobante ya registrado localmente (misma serie y correlativo).
+     */
+    public function reemitSale(Movement $sale): array
+    {
+        $sale->loadMissing([
+            'documentType',
+            'person',
+            'branch',
+            'salesMovement.details.taxRate',
+            'orderMovement.details.taxRate',
+        ]);
+
+        if (! $this->isEligibleDocument($sale)) {
+            return [
+                'status' => 'SKIPPED',
+                'message' => 'El tipo de documento no requiere envío electrónico.',
+            ];
+        }
+
+        $branch = $sale->branch;
+        $config = $this->resolveConfigForBranch($branch);
+
+        if (! $config || ! $config->enabled) {
+            throw new \RuntimeException('La sucursal no tiene configurada la facturación electrónica.');
+        }
+
+        $catalog = $this->resolveDocumentCatalog($sale, $config);
+        $billingCorrelative = $this->resolveBillingCorrelativeForResend($sale, $catalog['serie']);
+        $catalog['serie'] = $billingCorrelative['serie'];
+        $number = $billingCorrelative['number'];
+
+        $customerDocument = $this->resolveCustomerDocument($sale, $catalog['type']);
+        $customerDocType = $this->resolveCustomerDocumentType($customerDocument, $catalog['type']);
+        $totals = $this->resolveMovementTotals($sale);
+        $apiUrl = $this->resolveApiUrl($config);
+        $fileName = trim((string) ($branch?->ruc ?? '0')).'-'.$catalog['type'].'-'.$catalog['serie'].'-'.$number;
+        $documentBody = $this->buildDocumentBody($sale, $catalog, $customerDocument, $customerDocType, $totals, $number);
+        $this->validateDocumentBodyForSunat($documentBody);
+
+        $sendResp = Http::timeout(35)->post($apiUrl.'/personas/v1/sendBill', [
+            'personaId' => (string) $config->persona_id,
+            'personaToken' => (string) $config->persona_token,
+            'fileName' => $fileName,
+            'documentBody' => $documentBody,
+        ]);
+
+        if ($sendResp->failed()) {
+            $errorMessage = data_get($sendResp->object(), 'error.message')
+                ?: data_get($sendResp->json(), 'error.message')
+                ?: $sendResp->body();
+
+            throw new \RuntimeException('Error reenviando comprobante a Apisunat: '.$errorMessage);
+        }
+
+        $result = $sendResp->object();
+        $documentId = trim((string) data_get($result, 'documentId', ''));
+        if ($documentId === '') {
+            throw new \RuntimeException('Apisunat no devolvió documentId.');
+        }
+
+        $extraDocumentData = $this->getDocumentById($documentId, $branch);
+        $urls = $this->extractDocumentUrls($extraDocumentData);
+
+        return $this->buildEmitSuccessPayload(
+            $catalog,
+            $number,
+            $fileName,
+            $documentId,
+            $sendResp,
+            $extraDocumentData,
+            $urls,
+            $apiUrl,
+            'Comprobante reenviado correctamente a Apisunat.'
+        );
+    }
+
+    /**
+     * @return array{serie: string, number: string}
+     */
+    private function resolveBillingCorrelativeForResend(Movement $sale, string $defaultSerie): array
+    {
+        $serie = trim((string) ($sale->salesMovement?->series ?? $sale->electronic_invoice_series ?? ''));
+        if ($serie === '' || $serie === '001') {
+            $serie = trim($defaultSerie);
+        }
+
+        $billingRaw = trim((string) ($sale->salesMovement?->billing_number ?? $sale->electronic_invoice_number ?? ''));
+        if ($billingRaw === '' && $sale->isSalesInvoice()) {
+            $billingRaw = trim((string) $sale->salesDocumentNumber());
+        }
+
+        $digits = preg_replace('/\D+/', '', $billingRaw) ?: '';
+        if ($digits === '') {
+            throw new \RuntimeException('La venta no tiene serie/correlativo registrado para reenviar el comprobante electrónico.');
+        }
+
+        return [
+            'serie' => $serie,
+            'number' => str_pad($digits, 8, '0', STR_PAD_LEFT),
+        ];
+    }
+
+    private function buildEmitSuccessPayload(
+        array $catalog,
+        string $number,
+        string $fileName,
+        string $documentId,
+        \Illuminate\Http\Client\Response $sendResp,
+        array $extraDocumentData,
+        array $urls,
+        string $apiUrl,
+        string $message = 'Comprobante enviado correctamente a Apisunat.'
+    ): array {
         return [
             'status' => 'SENT',
-            'message' => 'Comprobante enviado correctamente a Apisunat.',
+            'message' => $message,
             'data' => [
                 'provider' => 'apisunat',
                 'external_id' => $documentId,
