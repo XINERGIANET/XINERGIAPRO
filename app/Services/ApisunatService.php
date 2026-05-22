@@ -754,25 +754,14 @@ class ApisunatService
             $documentBody['cac:PrepaidPayment'] = $advanceBlocks['prepaid_payments'];
 
             $prepaidValorVentaTotal = round((float) $advanceBlocks['prepaid_valor_venta_total'], 2);
-            $prepaidTaxTotal = round((float) $advanceBlocks['prepaid_tax_total'], 2);
             $prepaidInclusiveTotal = round((float) $advanceBlocks['prepaid_inclusive_total'], 2);
-
-            $adjustedSubtotal = round(max(0, $headerSubtotal - $prepaidValorVentaTotal), 2);
-            $adjustedTax = round(max(0, $headerTax - $prepaidTaxTotal), 2);
-            if ($adjustedTax <= 0 && $adjustedSubtotal > 0 && $headerSubtotal > 0) {
-                $taxFactor = $headerTax > 0 ? ($headerTax / $headerSubtotal) : 0.18;
-                $adjustedTax = round($adjustedSubtotal * $taxFactor, 2);
-            }
-            $documentBody['cac:TaxTotal']['cac:TaxSubtotal']['cbc:TaxableAmount']['_text'] = $adjustedSubtotal;
-            $documentBody['cac:TaxTotal']['cac:TaxSubtotal']['cbc:TaxAmount']['_text'] = $adjustedTax;
-            $documentBody['cac:TaxTotal']['cbc:TaxAmount']['_text'] = $adjustedTax;
 
             $payableAmount = round(max(0, $headerTotal - $prepaidInclusiveTotal), 2);
 
             $legalMonetaryTotal = [
                 'cbc:LineExtensionAmount' => [
                     '_attributes' => ['currencyID' => 'PEN'],
-                    '_text' => $adjustedSubtotal,
+                    '_text' => $headerSubtotal,
                 ],
                 'cbc:TaxInclusiveAmount' => [
                     '_attributes' => ['currencyID' => 'PEN'],
