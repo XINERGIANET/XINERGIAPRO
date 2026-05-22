@@ -1176,8 +1176,9 @@ class ApisunatService
     }
 
     /**
-     * Con anticipos SUNAT exige que la base gravada (líneas y TaxSubtotal) sea el saldo neto,
-     * mientras TaxInclusiveAmount conserva el total de la operación.
+     * Factura final con anticipo (SUNAT): el detalle conserva el total de la operación (ej. 10),
+     * el resumen gravado (TaxSubtotal) debe igualar la suma de líneas gravadas (3277),
+     * y el anticipo se descuenta con AllowanceCharge + PrepaidAmount.
      *
      * @param  array<string, mixed>  $documentBody
      */
@@ -1191,73 +1192,53 @@ class ApisunatService
         float $prepaidInclusiveTotal,
         float $defaultTaxPercent
     ): void {
-        $netSubtotal = round(max(0, $grossSubtotal - $prepaidValorVentaTotal), 2);
-        $netTax = round(max(0, $grossTax - $prepaidTaxTotal), 2);
-        $payableAmount = round(max(0, $grossTotal - $prepaidInclusiveTotal), 2);
+        $linesSubtotal = $this->sumInvoiceLineExtensionAmounts($documentBody);
+        $linesTax = $this->sumInvoiceLineTaxAmounts($documentBody);
+        $linesTotal = round($linesSubtotal + $linesTax, 2);
 
-        if ($netSubtotal <= 0) {
-            throw new \RuntimeException('No se puede emitir electrónicamente: el anticipo cubre el total de la venta y no queda saldo facturable.');
+        $operationTotal = $this->resolveAdvanceFinalOperationTotal($linesTotal, $prepaidInclusiveTotal);
+        if ($operationTotal > $linesTotal + 0.009) {
+            $this->scaleInvoiceLinesToOperationTotal($documentBody, $operationTotal, $defaultTaxPercent);
+            $linesSubtotal = $this->sumInvoiceLineExtensionAmounts($documentBody);
+            $linesTax = $this->sumInvoiceLineTaxAmounts($documentBody);
+            $linesTotal = round($linesSubtotal + $linesTax, 2);
         }
 
-        $lines = $documentBody['cac:InvoiceLine'] ?? [];
-        if (! is_array($lines)) {
-            $lines = [];
+        if ($linesSubtotal > 0) {
+            $grossSubtotal = $linesSubtotal;
+        }
+
+        if ($linesTax > 0) {
+            $grossTax = $linesTax;
+        }
+
+        $grossTotal = round($grossSubtotal + $grossTax, 2);
+        if ($linesTotal > $grossTotal) {
+            $grossTotal = $linesTotal;
+        }
+
+        $payableAmount = round(max(0, $grossTotal - $prepaidInclusiveTotal), 2);
+
+        if ($payableAmount <= 0) {
+            throw new \RuntimeException('No se puede emitir electrónicamente: el anticipo cubre el total de la venta y no queda saldo facturable.');
         }
 
         $taxFactor = $defaultTaxPercent > 0 ? ($defaultTaxPercent / 100) : 0.18;
         $taxPercentDisplay = round($taxFactor * 100, 2);
 
-        if ($grossSubtotal > 0 && $lines !== []) {
-            $remainingSubtotal = $netSubtotal;
-            $remainingTax = $netTax;
-            $lineCount = count($lines);
-
-            foreach ($lines as $index => &$line) {
-                $lineSubtotal = round((float) data_get($line, 'cbc:LineExtensionAmount._text', 0), 2);
-                $isLast = $index === $lineCount - 1;
-
-                if ($isLast) {
-                    $scaledSubtotal = round($remainingSubtotal, 2);
-                    $scaledTax = round($remainingTax, 2);
-                } else {
-                    $ratio = $lineSubtotal / $grossSubtotal;
-                    $scaledSubtotal = round($netSubtotal * $ratio, 2);
-                    $scaledTax = round($netTax * $ratio, 2);
-                    $remainingSubtotal = round($remainingSubtotal - $scaledSubtotal, 2);
-                    $remainingTax = round($remainingTax - $scaledTax, 2);
-                }
-
-                $scaledGross = round($scaledSubtotal + $scaledTax, 2);
-                $qty = max(0.0001, (float) data_get($line, 'cbc:InvoicedQuantity._text', 1));
-                $grossUnitPrice = round($scaledGross / $qty, 2);
-                $unitValue = round($scaledSubtotal / $qty, 2);
-
-                data_set($line, 'cbc:LineExtensionAmount._text', $scaledSubtotal);
-                data_set($line, 'cac:TaxTotal.cbc:TaxAmount._text', $scaledTax);
-                data_set($line, 'cac:TaxTotal.cac:TaxSubtotal.0.cbc:TaxableAmount._text', $scaledSubtotal);
-                data_set($line, 'cac:TaxTotal.cac:TaxSubtotal.0.cbc:TaxAmount._text', $scaledTax);
-                data_set($line, 'cac:TaxTotal.cac:TaxSubtotal.0.cac:TaxCategory.cbc:Percent._text', $taxPercentDisplay);
-                data_set($line, 'cac:PricingReference.cac:AlternativeConditionPrice.cbc:PriceAmount._text', $grossUnitPrice);
-                data_set($line, 'cac:Price.cbc:PriceAmount._text', $unitValue);
-            }
-            unset($line);
-
-            $documentBody['cac:InvoiceLine'] = $lines;
-        }
-
         $documentBody['cac:TaxTotal'] = [
             'cbc:TaxAmount' => [
                 '_attributes' => ['currencyID' => 'PEN'],
-                '_text' => $netTax,
+                '_text' => $grossTax,
             ],
-            'cac:TaxSubtotal' => [[
+            'cac:TaxSubtotal' => [
                 'cbc:TaxableAmount' => [
                     '_attributes' => ['currencyID' => 'PEN'],
-                    '_text' => $netSubtotal,
+                    '_text' => $grossSubtotal,
                 ],
                 'cbc:TaxAmount' => [
                     '_attributes' => ['currencyID' => 'PEN'],
-                    '_text' => $netTax,
+                    '_text' => $grossTax,
                 ],
                 'cac:TaxCategory' => [
                     'cbc:Percent' => ['_text' => $taxPercentDisplay],
@@ -1268,13 +1249,13 @@ class ApisunatService
                         'cbc:TaxTypeCode' => ['_text' => 'VAT'],
                     ],
                 ],
-            ]],
+            ],
         ];
 
         $documentBody['cac:LegalMonetaryTotal'] = [
             'cbc:LineExtensionAmount' => [
                 '_attributes' => ['currencyID' => 'PEN'],
-                '_text' => $netSubtotal,
+                '_text' => $grossSubtotal,
             ],
             'cbc:TaxInclusiveAmount' => [
                 '_attributes' => ['currencyID' => 'PEN'],
@@ -1286,13 +1267,128 @@ class ApisunatService
             ],
             'cbc:PrepaidAmount' => [
                 '_attributes' => ['currencyID' => 'PEN'],
-                '_text' => $prepaidValorVentaTotal,
+                '_text' => $prepaidInclusiveTotal,
             ],
             'cbc:PayableAmount' => [
                 '_attributes' => ['currencyID' => 'PEN'],
                 '_text' => $payableAmount,
             ],
         ];
+    }
+
+    private function resolveAdvanceFinalOperationTotal(float $linesTotal, float $prepaidInclusiveTotal): float
+    {
+        $linesTotal = round(max(0, $linesTotal), 2);
+        $prepaidInclusiveTotal = round(max(0, $prepaidInclusiveTotal), 2);
+
+        if ($linesTotal <= 0 || $prepaidInclusiveTotal <= 0) {
+            return $linesTotal;
+        }
+
+        if ($linesTotal <= $prepaidInclusiveTotal + 0.01) {
+            return round($linesTotal + $prepaidInclusiveTotal, 2);
+        }
+
+        return $linesTotal;
+    }
+
+    /**
+     * @param  array<string, mixed>  $documentBody
+     */
+    private function scaleInvoiceLinesToOperationTotal(array &$documentBody, float $operationTotal, float $defaultTaxPercent): void
+    {
+        $lines = $documentBody['cac:InvoiceLine'] ?? [];
+        if (! is_array($lines) || $lines === []) {
+            return;
+        }
+
+        $currentTotal = 0.0;
+        foreach ($lines as $line) {
+            $lineSubtotal = round((float) data_get($line, 'cbc:LineExtensionAmount._text', 0), 2);
+            $lineTax = round((float) data_get($line, 'cac:TaxTotal.cbc:TaxAmount._text', 0), 2);
+            $currentTotal += round($lineSubtotal + $lineTax, 2);
+        }
+
+        if ($currentTotal <= 0 || $operationTotal <= $currentTotal + 0.009) {
+            return;
+        }
+
+        $taxFactor = $defaultTaxPercent > 0 ? ($defaultTaxPercent / 100) : 0.18;
+        $taxPercentDisplay = round($taxFactor * 100, 2);
+        $targetSubtotal = round($operationTotal / (1 + $taxFactor), 2);
+        $targetTax = round($operationTotal - $targetSubtotal, 2);
+        $currentSubtotal = $this->sumInvoiceLineExtensionAmounts(['cac:InvoiceLine' => $lines]);
+        $lineCount = count($lines);
+        $remainingSubtotal = $targetSubtotal;
+        $remainingTax = $targetTax;
+
+        foreach ($lines as $index => &$line) {
+            $lineSubtotal = round((float) data_get($line, 'cbc:LineExtensionAmount._text', 0), 2);
+            $isLast = $index === $lineCount - 1;
+
+            if ($isLast) {
+                $scaledSubtotal = round($remainingSubtotal, 2);
+                $scaledTax = round($remainingTax, 2);
+            } else {
+                $ratio = $lineSubtotal / max(0.01, $currentSubtotal);
+                $scaledSubtotal = round($targetSubtotal * $ratio, 2);
+                $scaledTax = round($targetTax * $ratio, 2);
+                $remainingSubtotal = round($remainingSubtotal - $scaledSubtotal, 2);
+                $remainingTax = round($remainingTax - $scaledTax, 2);
+            }
+
+            $scaledGross = round($scaledSubtotal + $scaledTax, 2);
+            $qty = max(0.0001, (float) data_get($line, 'cbc:InvoicedQuantity._text', 1));
+            $grossUnitPrice = round($scaledGross / $qty, 2);
+            $unitValue = round($scaledSubtotal / $qty, 2);
+
+            data_set($line, 'cbc:LineExtensionAmount._text', $scaledSubtotal);
+            data_set($line, 'cac:TaxTotal.cbc:TaxAmount._text', $scaledTax);
+            data_set($line, 'cac:TaxTotal.cac:TaxSubtotal.0.cbc:TaxableAmount._text', $scaledSubtotal);
+            data_set($line, 'cac:TaxTotal.cac:TaxSubtotal.0.cbc:TaxAmount._text', $scaledTax);
+            data_set($line, 'cac:TaxTotal.cac:TaxSubtotal.0.cac:TaxCategory.cbc:Percent._text', $taxPercentDisplay);
+            data_set($line, 'cac:PricingReference.cac:AlternativeConditionPrice.cbc:PriceAmount._text', $grossUnitPrice);
+            data_set($line, 'cac:Price.cbc:PriceAmount._text', $unitValue);
+        }
+        unset($line);
+
+        $documentBody['cac:InvoiceLine'] = $lines;
+    }
+
+    /**
+     * @param  array<string, mixed>  $documentBody
+     */
+    private function sumInvoiceLineExtensionAmounts(array $documentBody): float
+    {
+        $lines = $documentBody['cac:InvoiceLine'] ?? [];
+        if (! is_array($lines)) {
+            return 0.0;
+        }
+
+        $sum = 0.0;
+        foreach ($lines as $line) {
+            $sum += round((float) data_get($line, 'cbc:LineExtensionAmount._text', 0), 2);
+        }
+
+        return round($sum, 2);
+    }
+
+    /**
+     * @param  array<string, mixed>  $documentBody
+     */
+    private function sumInvoiceLineTaxAmounts(array $documentBody): float
+    {
+        $lines = $documentBody['cac:InvoiceLine'] ?? [];
+        if (! is_array($lines)) {
+            return 0.0;
+        }
+
+        $sum = 0.0;
+        foreach ($lines as $line) {
+            $sum += round((float) data_get($line, 'cac:TaxTotal.cbc:TaxAmount._text', 0), 2);
+        }
+
+        return round($sum, 2);
     }
 
     private function normalizeElectronicInvoiceResponse(mixed $response): array
@@ -1429,6 +1525,35 @@ class ApisunatService
         }
         if ($operationTypeCode === '') {
             throw new \RuntimeException('No se puede emitir electrónicamente: falta ProfileID (tipo de operación SUNAT).');
+        }
+
+        $linesSubtotal = $this->sumInvoiceLineExtensionAmounts($documentBody);
+        $headerTaxable = round((float) data_get($documentBody, 'cac:TaxTotal.cac:TaxSubtotal.cbc:TaxableAmount._text', 0), 2);
+        if ($headerTaxable <= 0) {
+            $headerTaxable = round((float) data_get($documentBody, 'cac:TaxTotal.cac:TaxSubtotal.0.cbc:TaxableAmount._text', 0), 2);
+        }
+
+        if ($linesSubtotal > 0 && $headerTaxable > 0 && abs($linesSubtotal - $headerTaxable) > 0.009) {
+            throw new \RuntimeException(
+                'No se puede emitir electrónicamente: la suma de bases gravadas por línea (S/ '
+                .number_format($linesSubtotal, 2, '.', '')
+                .') no coincide con el total gravado del comprobante (S/ '
+                .number_format($headerTaxable, 2, '.', '')
+                .'). SUNAT rechazaría el comprobante (error 3277).'
+            );
+        }
+
+        $prepaidPayments = data_get($documentBody, 'cac:PrepaidPayment', []);
+        if (is_array($prepaidPayments) && $prepaidPayments !== []) {
+            $taxInclusive = round((float) data_get($documentBody, 'cac:LegalMonetaryTotal.cbc:TaxInclusiveAmount._text', 0), 2);
+            $prepaidInclusive = round((float) data_get($documentBody, 'cac:LegalMonetaryTotal.cbc:PrepaidAmount._text', 0), 2);
+            $payable = round((float) data_get($documentBody, 'cac:LegalMonetaryTotal.cbc:PayableAmount._text', 0), 2);
+
+            if ($taxInclusive > 0 && $prepaidInclusive > 0 && abs($taxInclusive - $prepaidInclusive - $payable) > 0.009) {
+                throw new \RuntimeException(
+                    'No se puede emitir electrónicamente: el saldo a pagar no cuadra con el total y el anticipo aplicado.'
+                );
+            }
         }
     }
 
