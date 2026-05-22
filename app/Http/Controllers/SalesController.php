@@ -100,14 +100,16 @@ class SalesController extends Controller
                     $selectedBoxId = $candidateBoxId;
                 }
             }
-            // Sin param "cash_register_id" en la URL (~primera entrada): sugiero caja de la sucursal.
+            // Sin param "cash_register_id" en la URL (~primera entrada): el usuario solicito que por defecto sea Todas (null).
             // Con param explicito vacio (Todas las cajas): no fuerza caja.
+            /*
             if (!$hasChosenBox && !$cashRegisterIdProvidedInQuery && $cashRegisters->isNotEmpty()) {
                 $selectedBoxId = $this->getBranchConfiguredCashRegisterId((int) $branchId, $cashRegisters, 'caja ventas');
                 if (!$selectedBoxId || !$cashRegisters->contains('id', (int) $selectedBoxId)) {
                     $selectedBoxId = null;
                 }
             }
+            */
         }
 
         $shiftRelations = collect();

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,7 +11,8 @@
             box-sizing: border-box;
         }
 
-        html, body {
+        html,
+        body {
             margin: 0;
             padding: 0;
             width: 100%;
@@ -53,23 +55,77 @@
             font-weight: bold;
         }
 
-        .bold { font-weight: bold; }
-        .without-top { margin-top: 0; }
-        .without-bottom { margin-bottom: 10px; font-size: 13.2px; margin-top: 15px; }
-        .without-tb, .without-bt { margin-top: 0; margin-bottom: 0; }
-        .xx-small { font-size: xx-small; }
-        .x-small { font-size: x-small; }
-        .small { font-size: small; }
-        .medium { font-size: medium; }
-        .large { font-size: large; }
-        .table-bordered { border: 1px solid black; }
-        .table-full-bordered tr td { border: 1px solid black; }
-        .gray { background-color: lightgray; }
-        .teal { background-color: #000000; }
-        .bg-primary { background-color: #000000; }
-        .primary-text { color: #000000; }
-        .white-text { color: white; }
-        .page-break { page-break-after: always; }
+        .bold {
+            font-weight: bold;
+        }
+
+        .without-top {
+            margin-top: 0;
+        }
+
+        .without-bottom {
+            margin-bottom: 10px;
+            font-size: 13.2px;
+            margin-top: 15px;
+        }
+
+        .without-tb,
+        .without-bt {
+            margin-top: 0;
+            margin-bottom: 0;
+        }
+
+        .xx-small {
+            font-size: xx-small;
+        }
+
+        .x-small {
+            font-size: x-small;
+        }
+
+        .small {
+            font-size: small;
+        }
+
+        .medium {
+            font-size: medium;
+        }
+
+        .large {
+            font-size: large;
+        }
+
+        .table-bordered {
+            border: 1px solid black;
+        }
+
+        .table-full-bordered tr td {
+            border: 1px solid black;
+        }
+
+        .gray {
+            background-color: lightgray;
+        }
+
+        .teal {
+            background-color: #000000;
+        }
+
+        .bg-primary {
+            background-color: #000000;
+        }
+
+        .primary-text {
+            color: #000000;
+        }
+
+        .white-text {
+            color: white;
+        }
+
+        .page-break {
+            page-break-after: always;
+        }
 
         header {
             position: fixed;
@@ -81,8 +137,13 @@
             line-height: 35px;
         }
 
-        header.left { text-align: left !important; }
-        header.right { text-align: right !important; }
+        header.left {
+            text-align: left !important;
+        }
+
+        header.right {
+            text-align: right !important;
+        }
 
         footer {
             position: fixed;
@@ -94,8 +155,13 @@
             line-height: 35px;
         }
 
-        footer.left { text-align: left !important; }
-        footer.right { text-align: right !important; }
+        footer.left {
+            text-align: left !important;
+        }
+
+        footer.right {
+            text-align: right !important;
+        }
 
         .table-soft-bordered {
             border: 1px solid rgba(0, 0, 0, .48);
@@ -119,12 +185,42 @@
             border-bottom: 1px solid rgba(0, 0, 0, .24);
         }
 
-        .center { text-align: center; }
-        .separator { border-top: 1px dashed #8aa0bc; margin: 8px 0; }
-        .meta-row { display: grid; grid-template-columns: 22mm 1fr; gap: 1mm; align-items: start; margin-bottom: 2px; }
-        .meta-label { font-weight: 700; font-size: 14px; line-height: 1.25; }
-        .meta-value { font-size: 14px; line-height: 1.25; word-break: break-word; }
-        .totals-row { display: flex; justify-content: space-between; margin: 3px 0; font-size: 16px; }
+        .center {
+            text-align: center;
+        }
+
+        .separator {
+            border-top: 1px dashed #8aa0bc;
+            margin: 8px 0;
+        }
+
+        .meta-row {
+            display: grid;
+            grid-template-columns: 22mm 1fr;
+            gap: 1mm;
+            align-items: start;
+            margin-bottom: 2px;
+        }
+
+        .meta-label {
+            font-weight: 700;
+            font-size: 14px;
+            line-height: 1.25;
+        }
+
+        .meta-value {
+            font-size: 14px;
+            line-height: 1.25;
+            word-break: break-word;
+        }
+
+        .totals-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 3px 0;
+            font-size: 16px;
+        }
+
         .grand-total {
             border-top: 1px solid #8aa0bc;
             margin-top: 6px;
@@ -134,8 +230,15 @@
             font-size: 22px;
             font-weight: bold;
         }
-        .grand-total .label { letter-spacing: .2px; }
-        .grand-total .value { white-space: nowrap; }
+
+        .grand-total .label {
+            letter-spacing: .2px;
+        }
+
+        .grand-total .value {
+            white-space: nowrap;
+        }
+
         .logo {
             display: block;
             max-width: 64mm;
@@ -143,6 +246,7 @@
             margin: 0 auto 8px;
             object-fit: contain;
         }
+
         .prod-col {
             width: 45%;
             font-size: 14px;
@@ -150,17 +254,20 @@
             padding-left: 0 !important;
             word-break: break-word;
         }
+
         .num-col {
             text-align: right;
             font-size: 14px;
             white-space: nowrap;
             padding-right: 0 !important;
         }
+
         .notes-wrap {
             font-size: 14px;
             line-height: 1.3;
             word-break: break-word;
         }
+
         .footer {
             font-size: 13px;
             line-height: 1.35;
@@ -168,86 +275,160 @@
         }
 
         @media print {
-            @page { size: 80mm 220mm; margin: 0; }
-            html, body { width: 100%; margin: 0; }
+            @page {
+                size: 80mm 220mm;
+                margin: 0;
+            }
+
+            html,
+            body {
+                width: 100%;
+                margin: 0;
+            }
         }
     </style>
 </head>
+
 <body>
-@php
-    $docName = strtoupper($sale->documentType?->name ?? 'TICKET DE VENTA');
-    $docCode = $sale->salesDocumentCode();
-@endphp
+    @php
+        $docName = strtoupper($sale->documentType?->name ?? 'TICKET DE VENTA');
+        $docCode = $sale->salesDocumentCode();
 
-<div class="ticket-wrapper">
-    <div class="center">
-        @if(!empty($logoFileUrl) || !empty($logoDataUri) || !empty($logoUrl))
-            <img src="{{ $logoFileUrl ?: ($logoDataUri ?: $logoUrl) }}" alt="Logo sucursal" class="logo">
-        @endif
-        <p class="without-tb bold large" style="font-size: 28px; line-height: 1.1;">{{ strtoupper($branchForLogo->legal_name ?? 'SUCURSAL') }}</p>
-        <p class="without-tb medium" style="font-size: 18px; line-height: 1.2;">RUC: {{ $branchForLogo->ruc ?? '-' }}</p>
-        <p class="without-tb medium" style="font-size: 18px; line-height: 1.2;">{{ $docName }}</p>
-        <p class="without-tb bold large" style="font-size: 24px; line-height: 1.15;">{{ $docCode }}</p>
-    </div>
+        $advances = \App\Models\SaleAdvance::where('final_movement_id', $sale->id)
+            ->with('advanceMovement.documentType', 'advanceMovement.salesMovement')
+            ->get()
+            ->map(function ($adv) {
+                return (object)[
+                    'document' => $adv->advanceMovement,
+                    'applied_amount' => (float) $adv->applied_amount
+                ];
+            });
 
-    <div class="separator"></div>
+        if ($advances->isEmpty() && $sale->parent_movement_id) {
+            $orderAdvances = \App\Models\Movement::where('parent_movement_id', $sale->parent_movement_id)
+                ->where('id', '!=', $sale->id)
+                ->whereHas('salesMovement', function ($q) {
+                    $q->where('is_advance', true);
+                })
+                ->with(['documentType', 'salesMovement'])
+                ->get();
+                
+            $advances = $orderAdvances->map(function ($advMovement) {
+                return (object)[
+                    'document' => $advMovement,
+                    'applied_amount' => (float) ($advMovement->salesMovement?->total ?? 0)
+                ];
+            });
+        }
+        $totalAdvances = $advances->sum('applied_amount');
+    @endphp
 
-    <div class="meta-row"><div class="meta-label">Fecha:</div><div class="meta-value">{{ optional($sale->moved_at)->format('d/m/Y H:i') ?? '-' }}</div></div>
-    <div class="meta-row"><div class="meta-label">Cliente:</div><div class="meta-value">{{ $sale->person_name ?? 'CLIENTES VARIOS' }}</div></div>
-    <div class="meta-row"><div class="meta-label">Dir.:</div><div class="meta-value">{{ $sale->person?->address ?? '-' }}</div></div>
-    <div class="meta-row"><div class="meta-label">RUC/DNI:</div><div class="meta-value">{{ $sale->person?->document_number ?? '-' }}</div></div>
-    <div class="meta-row"><div class="meta-label">Forma pago:</div><div class="meta-value">{{ $paymentLabel }}</div></div>
+    <div class="ticket-wrapper">
+        <div class="center">
+            @if(!empty($logoFileUrl) || !empty($logoDataUri) || !empty($logoUrl))
+                <img src="{{ $logoFileUrl ?: ($logoDataUri ?: $logoUrl) }}" alt="Logo sucursal" class="logo">
+            @endif
+            <p class="without-tb bold large" style="font-size: 28px; line-height: 1.1;">
+                {{ strtoupper($branchForLogo->legal_name ?? 'SUCURSAL') }}</p>
+            <p class="without-tb medium" style="font-size: 18px; line-height: 1.2;">RUC:
+                {{ $branchForLogo->ruc ?? '-' }}</p>
+            <p class="without-tb medium" style="font-size: 18px; line-height: 1.2;">{{ $docName }}</p>
+            <p class="without-tb bold large" style="font-size: 24px; line-height: 1.15;">{{ $docCode }}</p>
+        </div>
 
-    <div class="separator"></div>
-
-    <table>
-        <thead>
-        <tr>
-            <th>Prod.</th>
-            <th style="text-align:right;">Cant</th>
-            <th style="text-align:right;">P.Unit.</th>
-            <th style="text-align:right;">Subt.</th>
-        </tr>
-        </thead>
-        <tbody>
-        @foreach($details as $detail)
-            @php
-                $qty = (float) $detail->quantity;
-                $lineTotal = (float) $detail->amount;
-                $unitPrice = $qty > 0 ? ($lineTotal / $qty) : 0;
-            @endphp
-            <tr>
-                <td class="prod-col">{{ \Illuminate\Support\Str::limit($detail->description ?? $detail->product?->description ?? '-', 30) }}</td>
-                <td class="num-col">{{ number_format($qty, 2) }}</td>
-                <td class="num-col">{{ number_format($unitPrice, 2) }}</td>
-                <td class="num-col">{{ number_format($lineTotal, 2) }}</td>
-            </tr>
-        @endforeach
-        </tbody>
-    </table>
-
-    <div class="separator"></div>
-
-    <div class="totals-row"><span class="bold">Op. gravada:</span><span>S/ {{ number_format((float) ($sale->salesMovement?->subtotal ?? 0), 2) }}</span></div>
-    <div class="totals-row"><span class="bold">IGV:</span><span>S/ {{ number_format((float) ($sale->salesMovement?->tax ?? 0), 2) }}</span></div>
-    <div class="grand-total"><span class="label">TOTAL:</span><span class="value">S/ {{ number_format((float) ($sale->salesMovement?->total ?? 0), 2) }}</span></div>
-
-    @if($sale->comment)
         <div class="separator"></div>
-        <div class="notes-wrap"><span class="bold">Notas:</span> {{ $sale->comment }}</div>
-    @endif
 
-    <div class="separator"></div>
-    <div class="center footer">
-        Impreso: {{ $printedAt->format('d/m/Y H:i:s') }}<br>
-        Gracias por su preferencia
+        <div class="meta-row">
+            <div class="meta-label">Fecha:</div>
+            <div class="meta-value">{{ optional($sale->moved_at)->format('d/m/Y H:i') ?? '-' }}</div>
+        </div>
+        <div class="meta-row">
+            <div class="meta-label">Cliente:</div>
+            <div class="meta-value">{{ $sale->person_name ?? 'CLIENTES VARIOS' }}</div>
+        </div>
+        <div class="meta-row">
+            <div class="meta-label">Dir.:</div>
+            <div class="meta-value">{{ $sale->person?->address ?? '-' }}</div>
+        </div>
+        <div class="meta-row">
+            <div class="meta-label">RUC/DNI:</div>
+            <div class="meta-value">{{ $sale->person?->document_number ?? '-' }}</div>
+        </div>
+        <div class="meta-row">
+            <div class="meta-label">Forma pago:</div>
+            <div class="meta-value">{{ $paymentLabel }}</div>
+        </div>
+        @if($advances->count() > 0)
+            <div class="meta-row">
+                <div class="meta-label">Doc. Rel.:</div>
+                <div class="meta-value">
+                    @foreach($advances as $adv)
+                        {{ $adv->document?->salesDocumentCode() ?? 'Anticipo' }}@if(!$loop->last), @endif
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
+        <div class="separator"></div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Prod.</th>
+                    <th style="text-align:right;">Cant</th>
+                    <th style="text-align:right;">P.Unit.</th>
+                    <th style="text-align:right;">Subt.</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($details as $detail)
+                    @php
+                        $qty = (float) $detail->quantity;
+                        $lineTotal = (float) $detail->amount;
+                        $unitPrice = $qty > 0 ? ($lineTotal / $qty) : 0;
+                    @endphp
+                    <tr>
+                        <td class="prod-col">
+                            {{ \Illuminate\Support\Str::limit($detail->description ?? $detail->product?->description ?? '-', 30) }}
+                        </td>
+                        <td class="num-col">{{ number_format($qty, 2) }}</td>
+                        <td class="num-col">{{ number_format($unitPrice, 2) }}</td>
+                        <td class="num-col">{{ number_format($lineTotal, 2) }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+
+        <div class="separator"></div>
+
+        <div class="totals-row"><span class="bold">Op. gravada:</span><span>S/
+                {{ number_format((float) ($sale->salesMovement?->subtotal ?? 0), 2) }}</span></div>
+        <div class="totals-row"><span class="bold">IGV:</span><span>S/
+                {{ number_format((float) ($sale->salesMovement?->tax ?? 0), 2) }}</span></div>
+        @if($advances->count() > 0)
+            <div class="totals-row"><span class="bold">Anticipo:</span><span>-S/
+                    {{ number_format($totalAdvances, 2) }}</span></div>
+        @endif
+        <div class="grand-total"><span class="label">A PAGAR:</span><span class="value">S/
+                {{ number_format((float) ($sale->salesMovement?->total ?? 0), 2) }}</span></div>
+
+        @if($sale->comment)
+            <div class="separator"></div>
+            <div class="notes-wrap"><span class="bold">Notas:</span> {{ $sale->comment }}</div>
+        @endif
+
+        <div class="separator"></div>
+        <div class="center footer">
+            Impreso: {{ $printedAt->format('d/m/Y H:i:s') }}<br>
+            Gracias por su preferencia
+        </div>
     </div>
-</div>
 
-@if(($autoPrint ?? true) === true)
-<script>
-    window.addEventListener('load', function () { window.print(); });
-</script>
-@endif
+    @if(($autoPrint ?? true) === true)
+        <script>
+            window.addEventListener('load', function () { window.print(); });
+        </script>
+    @endif
 </body>
+
 </html>
