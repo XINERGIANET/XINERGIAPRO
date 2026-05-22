@@ -13,8 +13,8 @@ use Illuminate\Support\Str;
 
 class ApisunatService
 {
-    /** Catálogo 53: descuento global que afecta la base imponible del IGV (requerido con anticipos). */
-    private const SUNAT_ADVANCE_GLOBAL_DISCOUNT_CODE = '02';
+    /** Catálogo 53: descuento global por anticipos (formato validado por SUNAT/Apisunat). */
+    private const SUNAT_ADVANCE_GLOBAL_DISCOUNT_CODE = '04';
 
     /** Catálogo 51 (cbc:ProfileID): venta interna – anticipos. */
     private const SUNAT_OPERATION_ADVANCE_CODE = '0104';
@@ -1126,21 +1126,15 @@ class ApisunatService
                 $supplierRuc
             );
 
+            $paidInclusive = $totalIncl > 0 ? $totalIncl : round($valorVenta + $igv, 2);
+
             $prepaidPayments[] = [
                 'cbc:ID' => [
                     '_text' => $paymentIdentifier,
                 ],
                 'cbc:PaidAmount' => [
                     '_attributes' => ['currencyID' => 'PEN'],
-                    '_text' => $valorVenta,
-                ],
-                'cbc:InstructionID' => [
-                    '_attributes' => [
-                        'schemeID' => '6',
-                        'schemeName' => 'SUNAT:Identificador de Documento de Identidad',
-                        'schemeAgencyName' => 'PE:SUNAT',
-                    ],
-                    '_text' => $supplierRuc,
+                    '_text' => $paidInclusive,
                 ],
             ];
         }
@@ -1148,7 +1142,7 @@ class ApisunatService
         $prepaidValorVentaTotal = round($prepaidValorVentaTotal, 2);
         $prepaidTaxTotal = round($prepaidTaxTotal, 2);
         $prepaidInclusiveTotal = round($prepaidInclusiveTotal, 2);
-        $baseSubtotal = round(max(0, $headerSubtotal), 2);
+        $taxableAfterAdvance = round(max(0, $headerSubtotal - $prepaidValorVentaTotal), 2);
 
         $allowanceCharges = $prepaidValorVentaTotal > 0
             ? [[
@@ -1160,7 +1154,7 @@ class ApisunatService
                 ],
                 'cbc:BaseAmount' => [
                     '_attributes' => ['currencyID' => 'PEN'],
-                    '_text' => $baseSubtotal,
+                    '_text' => $taxableAfterAdvance,
                 ],
             ]]
             : [];
@@ -1264,10 +1258,6 @@ class ApisunatService
             'cbc:TaxInclusiveAmount' => [
                 '_attributes' => ['currencyID' => 'PEN'],
                 '_text' => $grossTotal,
-            ],
-            'cbc:AllowanceTotalAmount' => [
-                '_attributes' => ['currencyID' => 'PEN'],
-                '_text' => $prepaidValorVentaTotal,
             ],
             'cbc:PrepaidAmount' => [
                 '_attributes' => ['currencyID' => 'PEN'],
@@ -1537,16 +1527,14 @@ class ApisunatService
             $headerTaxable = round((float) data_get($documentBody, 'cac:TaxTotal.cac:TaxSubtotal.0.cbc:TaxableAmount._text', 0), 2);
         }
 
-        $allowanceTotal = round((float) data_get($documentBody, 'cac:LegalMonetaryTotal.cbc:AllowanceTotalAmount._text', 0), 2);
-        if ($allowanceTotal <= 0) {
-            $allowanceCharges = data_get($documentBody, 'cac:AllowanceCharge', []);
-            if (is_array($allowanceCharges)) {
-                foreach ($allowanceCharges as $charge) {
-                    $allowanceTotal += round((float) data_get($charge, 'cbc:Amount._text', 0), 2);
-                }
+        $allowanceTotal = 0.0;
+        $allowanceCharges = data_get($documentBody, 'cac:AllowanceCharge', []);
+        if (is_array($allowanceCharges)) {
+            foreach ($allowanceCharges as $charge) {
+                $allowanceTotal += round((float) data_get($charge, 'cbc:Amount._text', 0), 2);
             }
-            $allowanceTotal = round($allowanceTotal, 2);
         }
+        $allowanceTotal = round($allowanceTotal, 2);
 
         if ($linesSubtotal > 0 && $headerTaxable > 0 && $allowanceTotal > 0) {
             $expectedTaxable = round(max(0, $linesSubtotal - $allowanceTotal), 2);
@@ -1578,6 +1566,22 @@ class ApisunatService
             $taxInclusive = round((float) data_get($documentBody, 'cac:LegalMonetaryTotal.cbc:TaxInclusiveAmount._text', 0), 2);
             $prepaidInclusive = round((float) data_get($documentBody, 'cac:LegalMonetaryTotal.cbc:PrepaidAmount._text', 0), 2);
             $payable = round((float) data_get($documentBody, 'cac:LegalMonetaryTotal.cbc:PayableAmount._text', 0), 2);
+            $prepaidPaymentsSum = 0.0;
+
+            foreach ($prepaidPayments as $prepaidPayment) {
+                $prepaidPaymentsSum += round((float) data_get($prepaidPayment, 'cbc:PaidAmount._text', 0), 2);
+            }
+            $prepaidPaymentsSum = round($prepaidPaymentsSum, 2);
+
+            if ($prepaidInclusive > 0 && abs($prepaidPaymentsSum - $prepaidInclusive) > 0.009) {
+                throw new \RuntimeException(
+                    'No se puede emitir electrónicamente: PrepaidAmount (S/ '
+                    .number_format($prepaidInclusive, 2, '.', '')
+                    .') debe coincidir con la suma de PrepaidPayment (S/ '
+                    .number_format($prepaidPaymentsSum, 2, '.', '')
+                    .').'
+                );
+            }
 
             if ($taxInclusive > 0 && $prepaidInclusive > 0 && abs($taxInclusive - $prepaidInclusive - $payable) > 0.009) {
                 throw new \RuntimeException(
