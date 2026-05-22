@@ -754,18 +754,47 @@ class ApisunatService
             $documentBody['cac:PrepaidPayment'] = $advanceBlocks['prepaid_payments'];
 
             $prepaidValorVentaTotal = round((float) $advanceBlocks['prepaid_valor_venta_total'], 2);
+            $prepaidTaxTotal = round((float) $advanceBlocks['prepaid_tax_total'], 2);
             $prepaidInclusiveTotal = round((float) $advanceBlocks['prepaid_inclusive_total'], 2);
+
+            $adjustedSubtotal = round(max(0, $headerSubtotal - $prepaidValorVentaTotal), 2);
+            $adjustedTax = round(max(0, $headerTax - $prepaidTaxTotal), 2);
+            if ($adjustedTax <= 0 && $adjustedSubtotal > 0 && $headerSubtotal > 0) {
+                $taxFactor = $headerTax > 0 ? ($headerTax / $headerSubtotal) : 0.18;
+                $adjustedTax = round($adjustedSubtotal * $taxFactor, 2);
+            }
+
+            $this->applyAdvanceNetAmountsToInvoiceLines(
+                $documentBody,
+                $headerSubtotal,
+                $headerTax,
+                $adjustedSubtotal,
+                $adjustedTax
+            );
+
+            $documentBody['cac:TaxTotal']['cac:TaxSubtotal']['cbc:TaxableAmount']['_text'] = $adjustedSubtotal;
+            $documentBody['cac:TaxTotal']['cac:TaxSubtotal']['cbc:TaxAmount']['_text'] = $adjustedTax;
+            $documentBody['cac:TaxTotal']['cbc:TaxAmount']['_text'] = $adjustedTax;
+
+            $taxInclusiveAmount = round($adjustedSubtotal + $adjustedTax + $prepaidInclusiveTotal, 2);
+            if (abs($taxInclusiveAmount - $headerTotal) > 0.05) {
+                $taxInclusiveAmount = $headerTotal;
+            }
 
             $payableAmount = round(max(0, $headerTotal - $prepaidInclusiveTotal), 2);
 
-            $legalMonetaryTotal = [
+            $documentBody['cac:LegalMonetaryTotal'] = [
                 'cbc:LineExtensionAmount' => [
                     '_attributes' => ['currencyID' => 'PEN'],
-                    '_text' => $headerSubtotal,
+                    '_text' => $adjustedSubtotal,
                 ],
                 'cbc:TaxInclusiveAmount' => [
                     '_attributes' => ['currencyID' => 'PEN'],
-                    '_text' => $headerTotal,
+                    '_text' => $taxInclusiveAmount,
+                ],
+                'cbc:AllowanceTotalAmount' => [
+                    '_attributes' => ['currencyID' => 'PEN'],
+                    '_text' => $prepaidValorVentaTotal,
                 ],
                 'cbc:PrepaidAmount' => [
                     '_attributes' => ['currencyID' => 'PEN'],
@@ -776,8 +805,6 @@ class ApisunatService
                     '_text' => $payableAmount,
                 ],
             ];
-
-            $documentBody['cac:LegalMonetaryTotal'] = $legalMonetaryTotal;
 
             return $documentBody;
         }
@@ -1095,6 +1122,58 @@ class ApisunatService
             'igv' => $tax,
             'total' => $total > 0 ? $total : round($subtotal + $tax, 2),
         ];
+    }
+
+    private function applyAdvanceNetAmountsToInvoiceLines(
+        array &$documentBody,
+        float $grossSubtotal,
+        float $grossTax,
+        float $netSubtotal,
+        float $netTax
+    ): void {
+        $lines = $documentBody['cac:InvoiceLine'] ?? [];
+        if (! is_array($lines) || $lines === []) {
+            return;
+        }
+
+        $subtotalRatio = $grossSubtotal > 0 ? ($netSubtotal / $grossSubtotal) : 1.0;
+        $taxRatio = $grossTax > 0 ? ($netTax / $grossTax) : $subtotalRatio;
+        $scaledSubtotal = 0.0;
+        $scaledTax = 0.0;
+        $lastIndex = count($lines) - 1;
+
+        foreach ($lines as $index => &$line) {
+            $lineSubtotal = round((float) data_get($line, 'cbc:LineExtensionAmount._text', 0), 2);
+            $lineTax = round((float) data_get($line, 'cac:TaxTotal.cbc:TaxAmount._text', 0), 2);
+            $qty = (float) data_get($line, 'cbc:InvoicedQuantity._text', 1);
+            if ($qty <= 0) {
+                $qty = 1;
+            }
+
+            if ($index === $lastIndex) {
+                $lineSubtotal = round(max(0, $netSubtotal - $scaledSubtotal), 2);
+                $lineTax = round(max(0, $netTax - $scaledTax), 2);
+            } else {
+                $lineSubtotal = round($lineSubtotal * $subtotalRatio, 2);
+                $lineTax = round($lineTax * $taxRatio, 2);
+                $scaledSubtotal += $lineSubtotal;
+                $scaledTax += $lineTax;
+            }
+
+            $lineTotal = round($lineSubtotal + $lineTax, 2);
+            $unitValue = round($lineSubtotal / $qty, 2);
+            $grossUnitPrice = round($lineTotal / $qty, 2);
+
+            data_set($line, 'cbc:LineExtensionAmount._text', $lineSubtotal);
+            data_set($line, 'cac:TaxTotal.cbc:TaxAmount._text', $lineTax);
+            data_set($line, 'cac:TaxTotal.cac:TaxSubtotal.0.cbc:TaxableAmount._text', $lineSubtotal);
+            data_set($line, 'cac:TaxTotal.cac:TaxSubtotal.0.cbc:TaxAmount._text', $lineTax);
+            data_set($line, 'cac:PricingReference.cac:AlternativeConditionPrice.cbc:PriceAmount._text', $grossUnitPrice);
+            data_set($line, 'cac:Price.cbc:PriceAmount._text', $unitValue);
+        }
+        unset($line);
+
+        $documentBody['cac:InvoiceLine'] = $lines;
     }
 
     /**
