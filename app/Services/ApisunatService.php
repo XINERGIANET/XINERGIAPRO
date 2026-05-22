@@ -1177,7 +1177,7 @@ class ApisunatService
 
     /**
      * Factura final con anticipo (SUNAT): el detalle conserva el total de la operación (ej. 10),
-     * el resumen gravado (TaxSubtotal) debe igualar la suma de líneas gravadas (3277),
+     * TaxSubtotal gravado = suma líneas − AllowanceCharge anticipo (§23, evita error 3277),
      * y el anticipo se descuenta con AllowanceCharge + PrepaidAmount.
      *
      * @param  array<string, mixed>  $documentBody
@@ -1226,19 +1226,23 @@ class ApisunatService
         $taxFactor = $defaultTaxPercent > 0 ? ($defaultTaxPercent / 100) : 0.18;
         $taxPercentDisplay = round($taxFactor * 100, 2);
 
+        // SUNAT §23: operaciones gravadas = suma valor venta por línea − descuentos globales (anticipo).
+        $taxableAfterAdvance = round(max(0, $grossSubtotal - $prepaidValorVentaTotal), 2);
+        $taxAfterAdvance = round($taxableAfterAdvance * $taxFactor, 2);
+
         $documentBody['cac:TaxTotal'] = [
             'cbc:TaxAmount' => [
                 '_attributes' => ['currencyID' => 'PEN'],
-                '_text' => $grossTax,
+                '_text' => $taxAfterAdvance,
             ],
             'cac:TaxSubtotal' => [
                 'cbc:TaxableAmount' => [
                     '_attributes' => ['currencyID' => 'PEN'],
-                    '_text' => $grossSubtotal,
+                    '_text' => $taxableAfterAdvance,
                 ],
                 'cbc:TaxAmount' => [
                     '_attributes' => ['currencyID' => 'PEN'],
-                    '_text' => $grossTax,
+                    '_text' => $taxAfterAdvance,
                 ],
                 'cac:TaxCategory' => [
                     'cbc:Percent' => ['_text' => $taxPercentDisplay],
@@ -1533,7 +1537,33 @@ class ApisunatService
             $headerTaxable = round((float) data_get($documentBody, 'cac:TaxTotal.cac:TaxSubtotal.0.cbc:TaxableAmount._text', 0), 2);
         }
 
-        if ($linesSubtotal > 0 && $headerTaxable > 0 && abs($linesSubtotal - $headerTaxable) > 0.009) {
+        $allowanceTotal = round((float) data_get($documentBody, 'cac:LegalMonetaryTotal.cbc:AllowanceTotalAmount._text', 0), 2);
+        if ($allowanceTotal <= 0) {
+            $allowanceCharges = data_get($documentBody, 'cac:AllowanceCharge', []);
+            if (is_array($allowanceCharges)) {
+                foreach ($allowanceCharges as $charge) {
+                    $allowanceTotal += round((float) data_get($charge, 'cbc:Amount._text', 0), 2);
+                }
+            }
+            $allowanceTotal = round($allowanceTotal, 2);
+        }
+
+        if ($linesSubtotal > 0 && $headerTaxable > 0 && $allowanceTotal > 0) {
+            $expectedTaxable = round(max(0, $linesSubtotal - $allowanceTotal), 2);
+            if (abs($expectedTaxable - $headerTaxable) > 0.009) {
+                throw new \RuntimeException(
+                    'No se puede emitir electrónicamente: el total gravado (S/ '
+                    .number_format($headerTaxable, 2, '.', '')
+                    .') debe ser la suma de líneas (S/ '
+                    .number_format($linesSubtotal, 2, '.', '')
+                    .') menos el anticipo (S/ '
+                    .number_format($allowanceTotal, 2, '.', '')
+                    .'). Esperado S/ '
+                    .number_format($expectedTaxable, 2, '.', '')
+                    .'.'
+                );
+            }
+        } elseif ($linesSubtotal > 0 && $headerTaxable > 0 && abs($linesSubtotal - $headerTaxable) > 0.009) {
             throw new \RuntimeException(
                 'No se puede emitir electrónicamente: la suma de bases gravadas por línea (S/ '
                 .number_format($linesSubtotal, 2, '.', '')
