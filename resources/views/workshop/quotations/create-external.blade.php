@@ -132,7 +132,7 @@
                                         </template>
                                     </div>
                                 </div>
-                                <button type="button" @click="creatingClient = true" title="Nuevo cliente" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white hover:shadow-lg" style="background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff;">
+                                <button type="button" @click="creatingClient = true; document.body.classList.add('overflow-hidden')" title="Nuevo cliente" class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white hover:shadow-lg" style="background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff;">
                                     <i class="ri-add-line text-lg"></i>
                                 </button>
                             </div>
@@ -388,12 +388,14 @@
         </x-common.component-card>
 
     <!-- Modal Cliente -->
-    <div x-show="creatingClient" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-        <div class="max-h-[90vh] w-full max-w-6xl overflow-auto rounded-2xl bg-white shadow-2xl">
+    <template x-teleport="body">
+    <div x-show="creatingClient" x-cloak class="fixed inset-0 z-[100000] flex items-center justify-center overflow-hidden p-3 sm:p-6">
+        <div @click="closeQuickClientModal()" class="fixed inset-0 h-full w-full bg-gray-400/30 backdrop-blur-[32px]"></div>
+        <div class="relative max-h-[90vh] w-full max-w-6xl overflow-auto rounded-3xl bg-white shadow-2xl">
         <div class="p-6 sm:p-8">
             <div class="mb-6 flex items-center justify-between">
                 <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Registrar cliente</h3>
-                <button type="button" @click="creatingClient = false" class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
+                <button type="button" @click="closeQuickClientModal()" class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-700">
                     <i class="ri-close-line text-xl"></i>
                 </button>
             </div>
@@ -531,20 +533,23 @@
                     <x-ui.button type="submit" size="md" variant="primary" style="background-color:#00A389;color:#fff;">
                         <i class="ri-save-line"></i><span x-text="creatingClientLoading ? 'Guardando...' : 'Guardar cliente'"></span>
                     </x-ui.button>
-                    <x-ui.button type="button" size="md" variant="outline" @click="creatingClient = false"><i class="ri-close-line"></i><span>Cancelar</span></x-ui.button>
+                    <x-ui.button type="button" size="md" variant="outline" @click="closeQuickClientModal()"><i class="ri-close-line"></i><span>Cancelar</span></x-ui.button>
                 </div>
             </form>
         </div>
         </div>
     </div>
+    </template>
 
     <!-- Modal Vehículo -->
-    <div x-show="creatingVehicle" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-        <div class="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-2xl bg-white shadow-2xl">
+    <template x-teleport="body">
+    <div x-show="creatingVehicle" x-cloak class="fixed inset-0 z-[100000] flex items-center justify-center overflow-hidden p-3 sm:p-6">
+        <div @click="closeQuickVehicleModal()" class="fixed inset-0 h-full w-full bg-gray-400/30 backdrop-blur-[32px]"></div>
+        <div class="relative max-h-[90vh] w-full max-w-4xl overflow-auto rounded-3xl bg-white shadow-2xl">
             <div class="border-b border-slate-200 p-6">
                 <div class="flex items-center justify-between">
                     <h3 class="text-lg font-semibold text-slate-800">Registrar vehiculo rapido</h3>
-                    <button type="button" @click="creatingVehicle = false" class="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
+                    <button type="button" @click="closeQuickVehicleModal()" class="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
                         <i class="ri-close-line text-xl"></i>
                     </button>
                 </div>
@@ -642,6 +647,7 @@
             </div>
         </div>
     </div>
+    </template>
 
     </div>
 
@@ -681,6 +687,7 @@
                 externalQuotationClientDropdownOpen: false,
                 externalQuotationVehicleDropdownOpen: false,
                 vehicleTypes: {{ \Illuminate\Support\Js::from($vehicleTypes) }},
+                plateLookupUrl: @js(route('workshop.maintenance-board.vehicles.lookup-plate')),
                 // Modal states
                 creatingClient: false,
                 creatingVehicle: false,
@@ -791,11 +798,28 @@
                         this.externalQuotationSelectedVehicleId = '';
                     }
                 },
+                closeQuickClientModal() {
+                    this.creatingClient = false;
+                    document.body.classList.remove('overflow-hidden');
+                },
+                closeQuickVehicleModal() {
+                    this.creatingVehicle = false;
+                    document.body.classList.remove('overflow-hidden');
+                },
                 externalQuotationToggleCreatingVehicle() {
+                    const clientId = Number(this.externalQuotationSelectedClientId || 0);
+                    if (clientId <= 0) {
+                        this.quickVehicleError = 'Seleccione un cliente primero.';
+                        return;
+                    }
                     this.creatingVehicle = !this.creatingVehicle;
                     if (this.creatingVehicle) {
+                        this.quickVehicleError = '';
                         this.quickVehicle.client_person_id = this.externalQuotationSelectedClientId;
                         this.quickVehicle.vehicle_type_id = this.vehicleTypes.length > 0 ? this.vehicleTypes[0].id : '';
+                        document.body.classList.add('overflow-hidden');
+                    } else {
+                        document.body.classList.remove('overflow-hidden');
                     }
                 },
                 // Modal functions
@@ -822,7 +846,7 @@
                         this.allClients.unshift(payload);
                         this.externalQuotationSelectedClientId = String(payload.id);
                         this.externalQuotationClientSearch = `${payload.document_number || ''} - ${((payload.first_name || '') + ' ' + (payload.last_name || '')).trim()}`;
-                        this.creatingClient = false;
+                        this.closeQuickClientModal();
                         this.resetQuickClient();
                     } catch (error) {
                         this.quickClientError = error?.message || 'Error registrando cliente.';
@@ -872,7 +896,7 @@
                         this.allVehicles.unshift(payload);
                         this.externalQuotationSelectedVehicleId = String(payload.id);
                         this.externalQuotationVehicleSearch = payload.label || '';
-                        this.creatingVehicle = false;
+                        this.closeQuickVehicleModal();
                         this.resetQuickVehicle();
                     } catch (error) {
                         this.quickVehicleError = error?.message || 'Error registrando vehiculo.';
@@ -953,29 +977,41 @@
                     }
                 },
                 normalizePlateForLookup(value) {
-                    return String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+                    return String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').trim();
                 },
                 async lookupQuickVehicleByPlate() {
-                    const plate = String(this.quickVehicle.plate || '').trim().toUpperCase();
-                    if (!plate) return;
+                    this.quickVehicleError = '';
+                    const normalizedPlate = this.normalizePlateForLookup(this.quickVehicle.plate);
+                    this.quickVehicle.plate = normalizedPlate;
+                    if (normalizedPlate.length < 5) {
+                        this.quickVehicleError = 'Ingrese una placa valida para buscar.';
+                        return;
+                    }
 
                     this.lookingUpPlate = true;
                     try {
-                        const response = await fetch(`/api/vehicle_lookup/${plate}`);
-                        if (!response.ok) return;
-
-                        const data = await response.json();
-                        if (data && data.success && data.data) {
-                            const vehicle = data.data;
-                            this.quickVehicle.brand = vehicle.marca || '';
-                            this.quickVehicle.model = vehicle.modelo || '';
-                            this.quickVehicle.year = vehicle.anio || '';
-                            this.quickVehicle.color = vehicle.color || '';
-                            this.quickVehicle.vin = vehicle.vin || '';
-                            this.quickVehicle.engine_number = vehicle.motor || '';
+                        const response = await fetch(`${this.plateLookupUrl}?plate=${encodeURIComponent(normalizedPlate)}`, {
+                            method: 'GET',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                        });
+                        const payload = await response.json();
+                        if (!response.ok || !payload?.status) {
+                            throw new Error(payload?.message || 'No se encontraron datos para la placa ingresada.');
                         }
+
+                        this.quickVehicle.brand = String(payload.brand || this.quickVehicle.brand || '');
+                        this.quickVehicle.model = String(payload.model || this.quickVehicle.model || '');
+                        this.quickVehicle.year = String(payload.year || this.quickVehicle.year || '');
+                        this.quickVehicle.color = String(payload.color || this.quickVehicle.color || '');
+                        this.quickVehicle.vin = String(payload.vin || this.quickVehicle.vin || '');
+                        this.quickVehicle.engine_number = String(payload.engine_number || this.quickVehicle.engine_number || '');
+                        this.quickVehicle.chassis_number = String(payload.chassis_number || this.quickVehicle.chassis_number || '');
+                        this.quickVehicle.serial_number = String(payload.serial_number || this.quickVehicle.serial_number || '');
                     } catch (error) {
-                        console.error('Error looking up plate:', error);
+                        this.quickVehicleError = error?.message || 'No se pudo consultar la placa.';
                     } finally {
                         this.lookingUpPlate = false;
                     }
