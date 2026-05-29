@@ -2,7 +2,10 @@
 
 namespace App\Services\Workshop;
 
+use App\Models\AccountReceivablePayable;
+use App\Models\AccountReceivablePayableDetail;
 use App\Services\AccountReceivablePayableService;
+use App\Services\KardexSyncService;
 use App\Models\Appointment;
 use App\Models\Branch;
 use App\Models\Card;
@@ -1031,10 +1034,6 @@ class WorkshopFlowService
                 throw new \RuntimeException('No se puede eliminar: la OS tiene otra orden generada a partir de ella.');
             }
 
-            if ((float) $order->paid_total > 0.0001) {
-                throw new \RuntimeException('No se puede eliminar una OS con pagos registrados. Anule o devuelva los pagos primero.');
-            }
-
             $details = WorkshopMovementDetail::query()
                 ->where('workshop_movement_id', $order->id)
                 ->lockForUpdate()
@@ -1047,20 +1046,11 @@ class WorkshopFlowService
                 $this->releaseReservations($detail, 'released');
             }
 
+            $this->softDeleteWorkshopOrderFinancials($order);
+
             WorkshopMovementDetail::query()
                 ->where('workshop_movement_id', $order->id)
                 ->delete();
-
-            if ($order->sales_movement_id) {
-                $sale = SalesMovement::query()->find($order->sales_movement_id);
-                if ($sale) {
-                    $sale->update(['status' => 'C']);
-                    $sale->movement?->update([
-                        'status' => 'C',
-                        'comment' => trim((string) $sale->movement?->comment) . ' | ELIMINADA DESDE OS',
-                    ]);
-                }
-            }
 
             WorkshopMovementTechnician::query()->where('workshop_movement_id', $order->id)->delete();
             WorkshopWarranty::query()->where('workshop_movement_id', $order->id)->delete();
@@ -2984,6 +2974,166 @@ class WorkshopFlowService
         $profileName = strtoupper((string) ($user?->profile?->name ?? ''));
 
         return (int) ($user?->profile_id ?? 0) === 1 || str_contains($profileName, 'ADMIN');
+    }
+
+    private function softDeleteWorkshopOrderFinancials(WorkshopMovement $order): void
+    {
+        $saleIds = $this->collectWorkshopOrderSaleIds($order);
+        $this->softDeleteWorkshopOrderSales($saleIds);
+        $this->softDeleteWorkshopOrderCashMovements($order, $saleIds);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, int>
+     */
+    private function collectWorkshopOrderSaleIds(WorkshopMovement $order): \Illuminate\Support\Collection
+    {
+        $ids = collect([(int) $order->sales_movement_id])
+            ->merge(
+                WorkshopMovementDetail::query()
+                    ->where('workshop_movement_id', $order->id)
+                    ->whereNotNull('sales_movement_id')
+                    ->pluck('sales_movement_id')
+            );
+
+        if ((int) $order->movement_id > 0) {
+            $ids = $ids->merge(
+                SalesMovement::query()
+                    ->whereHas('movement', fn ($query) => $query->where('parent_movement_id', (int) $order->movement_id))
+                    ->pluck('id')
+            );
+        }
+
+        return $ids
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values();
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, int>
+     */
+    private function resolveWorkshopRelatedMovementIds(WorkshopMovement $order, \Illuminate\Support\Collection $saleIds): \Illuminate\Support\Collection
+    {
+        $anchorMovementIds = collect([(int) $order->movement_id])
+            ->merge(
+                $saleIds->map(fn (int $saleId) => (int) SalesMovement::withTrashed()->whereKey($saleId)->value('movement_id'))
+            )
+            ->filter(fn (int $id) => $id > 0)
+            ->unique()
+            ->values();
+
+        $all = $anchorMovementIds;
+        for ($depth = 0; $depth < 4; $depth++) {
+            $children = Movement::query()
+                ->whereIn('parent_movement_id', $all)
+                ->whereNotIn('id', $all)
+                ->pluck('id');
+            if ($children->isEmpty()) {
+                break;
+            }
+            $all = $all->merge($children)->unique()->values();
+        }
+
+        return $all;
+    }
+
+    private function softDeleteWorkshopOrderSales(\Illuminate\Support\Collection $saleIds): void
+    {
+        foreach ($saleIds as $saleId) {
+            $this->softDeleteSaleMovementRecord((int) $saleId);
+        }
+    }
+
+    private function softDeleteSaleMovementRecord(int $salesMovementId): void
+    {
+        $sale = SalesMovement::withTrashed()->with('movement')->find($salesMovementId);
+        if (!$sale) {
+            return;
+        }
+
+        $movementId = (int) $sale->movement_id;
+
+        SalesMovementDetail::query()->where('sales_movement_id', $sale->id)->delete();
+        $sale->update(['status' => 'C']);
+        $sale->delete();
+
+        if ($movementId <= 0) {
+            return;
+        }
+
+        app(KardexSyncService::class)->deleteMovement($movementId);
+
+        $movement = Movement::query()->find($movementId);
+        if (!$movement) {
+            return;
+        }
+
+        $movement->update([
+            'status' => 'C',
+            'comment' => trim((string) $movement->comment) . ' | ELIMINADA DESDE OS',
+        ]);
+        $movement->delete();
+    }
+
+    private function softDeleteWorkshopOrderCashMovements(WorkshopMovement $order, \Illuminate\Support\Collection $saleIds): void
+    {
+        $relatedMovementIds = $this->resolveWorkshopRelatedMovementIds($order, $saleIds);
+        $cashMovementIds = collect([(int) $order->cash_movement_id])->filter(fn (int $id) => $id > 0);
+
+        $cashMovements = CashMovements::query()
+            ->when(
+                $cashMovementIds->isNotEmpty() || $relatedMovementIds->isNotEmpty(),
+                function ($query) use ($cashMovementIds, $relatedMovementIds) {
+                    $query->where(function ($inner) use ($cashMovementIds, $relatedMovementIds) {
+                        if ($cashMovementIds->isNotEmpty()) {
+                            $inner->whereIn('id', $cashMovementIds->all());
+                        }
+                        if ($relatedMovementIds->isNotEmpty()) {
+                            $inner->orWhereIn('movement_id', $relatedMovementIds->all());
+                        }
+                    });
+                },
+                fn ($query) => $query->whereRaw('1 = 0')
+            )
+            ->get()
+            ->unique('id');
+
+        foreach ($cashMovements as $cashMovement) {
+            $this->softDeleteCashMovementRecord($cashMovement);
+        }
+    }
+
+    private function softDeleteCashMovementRecord(CashMovements $cashMovement): void
+    {
+        $account = $cashMovement->accountReceivablePayable()->first();
+        if ($account) {
+            AccountReceivablePayableDetail::query()
+                ->where('account_receivable_payable_id', $account->id)
+                ->delete();
+            $account->delete();
+        }
+
+        CashMovementDetail::query()->where('cash_movement_id', $cashMovement->id)->delete();
+
+        $movementId = (int) $cashMovement->movement_id;
+        $cashMovement->delete();
+
+        if ($movementId <= 0) {
+            return;
+        }
+
+        $movement = Movement::query()->find($movementId);
+        if (!$movement) {
+            return;
+        }
+
+        $movement->update([
+            'status' => 'C',
+            'comment' => trim((string) $movement->comment) . ' | ELIMINADA DESDE OS',
+        ]);
+        $movement->delete();
     }
 
     /** Comprueba que el id exista en movements (incluye soft delete) para la FK parent_movement_id. */
