@@ -59,7 +59,7 @@
             $mileageDefault = '';
         }
     @endphp
-    <div x-data="Object.assign(typeof formAutocompleteHelpers === 'function' ? formAutocompleteHelpers() : {}, {
+    <div @workshop-product-created.window="registerCreatedProduct($event.detail)" x-data="Object.assign(typeof formAutocompleteHelpers === 'function' ? formAutocompleteHelpers() : {}, {
         vehicles: @js($vehicles->map(function ($v) use ($clients) {
             $client = $clients->firstWhere('id', $v->client_person_id);
             $clientName = trim(((string) ($client->first_name ?? '')) . ' ' . ((string) ($client->last_name ?? '')));
@@ -107,6 +107,8 @@
         serviceKmFilterMode: 'all',
         serviceFilterKmLocal: '',
         serviceSearchQuery: '',
+        serviceCatalogPage: 1,
+        serviceCatalogPerPage: 20,
         historyBase: @js(route('workshop.vehicles.history', ['vehicle' => '__VEHICLE__'])),
         historyUrl: '',
         historyHtml: '',
@@ -123,6 +125,8 @@
         creatingVehicleLoading: false,
         lookingUpPlate: false,
         quickVehicleError: '',
+        quickVehicleSoatNotice: '',
+        quickVehicleSoatStatus: '',
         quickVehicleClientSearch: '',
         quickVehicleClientDropdownOpen: false,
         creatingClientLoading: false,
@@ -215,6 +219,9 @@
                     this.quickClient.genero = '';
                 }
             });
+            this.$watch('serviceSearchQuery', () => { this.serviceCatalogPage = 1; });
+            this.$watch('serviceTypeFilter', () => { this.serviceCatalogPage = 1; });
+            this.$watch('serviceFilterKmLocal', () => { this.serviceCatalogPage = 1; });
         },
         syncVehicle() {
             const selected = this.vehicles.find(v => String(v.id) === String(this.selectedVehicleId));
@@ -460,6 +467,32 @@
                 }
                 return true;
             });
+        },
+        serviceCatalogTotalPages() {
+            const total = this.filteredServicesCatalog().length;
+            return Math.max(1, Math.ceil(total / this.serviceCatalogPerPage));
+        },
+        paginatedServicesCatalog() {
+            const list = this.filteredServicesCatalog();
+            const page = Math.min(Math.max(1, this.serviceCatalogPage), this.serviceCatalogTotalPages());
+            const start = (page - 1) * this.serviceCatalogPerPage;
+            return list.slice(start, start + this.serviceCatalogPerPage);
+        },
+        serviceCatalogPageInfo() {
+            const total = this.filteredServicesCatalog().length;
+            if (total === 0) {
+                return '0 servicios';
+            }
+            const page = Math.min(Math.max(1, this.serviceCatalogPage), this.serviceCatalogTotalPages());
+            const start = (page - 1) * this.serviceCatalogPerPage + 1;
+            const end = Math.min(page * this.serviceCatalogPerPage, total);
+            return `${start}-${end} de ${total}`;
+        },
+        goServiceCatalogPage(delta) {
+            const next = this.serviceCatalogPage + delta;
+            if (next >= 1 && next <= this.serviceCatalogTotalPages()) {
+                this.serviceCatalogPage = next;
+            }
         },
         isServiceSelected(serviceId) {
             return this.selectedServiceIds.includes(String(serviceId));
@@ -855,6 +888,42 @@
         onProductLineProductChange(pline) {
             pline.unit_price = this.catalogPriceForProduct(pline.product_id);
         },
+        registerCreatedProduct(product) {
+            if (!product || !product.id) {
+                return;
+            }
+            const id = String(product.id);
+            const existing = this.productsCatalog.find(x => String(x.id) === id);
+            if (!existing) {
+                this.productsCatalog.push({
+                    id: product.id,
+                    code: product.code || '',
+                    marca: product.marca || '',
+                    description: product.description || '',
+                    price: Number(product.price || 0),
+                    stock: Number(product.stock || 0),
+                    tax_rate_id: product.tax_rate_id ?? null,
+                    label: product.label || String(product.description || product.id),
+                });
+                this.productsCatalog.sort((a, b) => String(a.label || '').localeCompare(String(b.label || ''), 'es'));
+            } else {
+                existing.price = Number(product.price ?? existing.price);
+                existing.label = product.label || existing.label;
+            }
+            this.addProductLineFromCatalog(id);
+        },
+        addProductLineFromCatalog(productId) {
+            const id = String(productId || '');
+            if (!id) {
+                return;
+            }
+            this.productLines.push({
+                detail_id: null,
+                product_id: id,
+                qty: 1,
+                unit_price: this.catalogPriceForProduct(id),
+            });
+        },
         addProductLine() {
             this.productLines.push({
                 detail_id: null,
@@ -942,6 +1011,8 @@
         },
         async lookupQuickVehicleByPlate() {
             this.quickVehicleError = '';
+            this.quickVehicleSoatNotice = '';
+            this.quickVehicleSoatStatus = '';
             const normalizedPlate = this.normalizePlateForLookup(this.quickVehicle.plate);
             this.quickVehicle.plate = normalizedPlate;
             if (normalizedPlate.length < 5) {
@@ -950,30 +1021,18 @@
             }
             this.lookingUpPlate = true;
             try {
-                const response = await fetch(`${this.plateLookupUrl}?plate=${encodeURIComponent(normalizedPlate)}`, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                });
-                const payload = await response.json();
-                if (!response.ok || !payload?.status) {
-                    throw new Error(payload?.message || 'No se encontraron datos para la placa ingresada.');
-                }
-                this.quickVehicle.brand = String(payload.brand || this.quickVehicle.brand || '');
-                this.quickVehicle.model = String(payload.model || this.quickVehicle.model || '');
-                this.quickVehicle.year = String(payload.year || this.quickVehicle.year || '');
-                this.quickVehicle.color = String(payload.color || this.quickVehicle.color || '');
-                this.quickVehicle.vin = String(payload.vin || this.quickVehicle.vin || '');
-                this.quickVehicle.engine_number = String(payload.engine_number || this.quickVehicle.engine_number || '');
-                this.quickVehicle.chassis_number = String(payload.chassis_number || this.quickVehicle.chassis_number || '');
-                this.quickVehicle.serial_number = String(payload.serial_number || this.quickVehicle.serial_number || '');
+                const payload = await window.WorkshopVehiclePlateLookup.fetch(this.plateLookupUrl, normalizedPlate);
+                window.WorkshopVehiclePlateLookup.applyQuickVehicle(this.quickVehicle, payload);
+                this.quickVehicleSoatNotice = String(payload.soat_message || '');
+                this.quickVehicleSoatStatus = String(payload.soat_status || '');
             } catch (error) {
                 this.quickVehicleError = error?.message || 'No se pudo consultar la placa.';
             } finally {
                 this.lookingUpPlate = false;
             }
+        },
+        quickVehicleSoatNoticeClass() {
+            return window.WorkshopVehiclePlateLookup?.noticeClass(this.quickVehicleSoatStatus) || 'border-slate-200 bg-slate-50 text-slate-700';
         },
         toggleQuickVehicle() {
             this.creatingVehicle = !this.creatingVehicle;
@@ -1451,6 +1510,7 @@
                         </div>
 
                         <div x-show="quickVehicleError" class="mb-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700" x-text="quickVehicleError"></div>
+                        <div x-show="quickVehicleSoatNotice" x-cloak class="mb-3 rounded-lg border px-3 py-2 text-xs" :class="quickVehicleSoatNoticeClass()" x-text="quickVehicleSoatNotice"></div>
 
                         <div class="grid grid-cols-1 gap-2 md:grid-cols-4">
                             <div class="md:col-span-2">
@@ -1873,9 +1933,14 @@
                             <h4 class="text-sm font-semibold uppercase tracking-wide text-gray-800">Repuestos / productos</h4>
                             <p class="text-xs text-gray-500">Se cargan a la OS con precio de lista; el cobro al cliente se hace despues en venta y cobro.</p>
                         </div>
-                        <button type="button" @click="addProductLine()" class="inline-flex items-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">
-                            <i class="ri-add-line"></i><span class="ml-1">Agregar producto</span>
-                        </button>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button" @click="$dispatch('open-product-type-selector')" class="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100">
+                                <i class="ri-add-box-line"></i><span class="ml-1">Nuevo producto</span>
+                            </button>
+                            <button type="button" @click="addProductLine()" class="inline-flex items-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">
+                                <i class="ri-add-line"></i><span class="ml-1">Agregar producto</span>
+                            </button>
+                        </div>
                     </div>
 
                     <template x-if="productLines.length === 0">
@@ -1960,7 +2025,7 @@
                     </template>
 
                     <div class="grid grid-cols-1 gap-x-6 gap-y-2 md:grid-cols-3">
-                        <template x-for="service in filteredServicesCatalog()" :key="`service-check-${service.id}`">
+                        <template x-for="service in paginatedServicesCatalog()" :key="`service-check-${service.id}`">
                             <div class="rounded-lg border border-gray-200 bg-white p-3 hover:border-indigo-300">
                                 <label class="flex items-center justify-between gap-3 text-sm text-gray-800 cursor-pointer">
                                     <div class="min-w-0 flex-1">
@@ -2025,6 +2090,19 @@
                                 </template>
                             </div>
                         </template>
+                    </div>
+
+                    <div class="mt-3 flex flex-wrap items-center justify-between gap-2" x-show="filteredServicesCatalog().length > serviceCatalogPerPage" x-cloak>
+                        <p class="text-xs text-gray-500" x-text="serviceCatalogPageInfo()"></p>
+                        <div class="flex items-center gap-2">
+                            <button type="button" @click="goServiceCatalogPage(-1)" :disabled="serviceCatalogPage <= 1" class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40">
+                                Anterior
+                            </button>
+                            <span class="text-xs text-gray-600" x-text="`Página ${serviceCatalogPage} de ${serviceCatalogTotalPages()}`"></span>
+                            <button type="button" @click="goServiceCatalogPage(1)" :disabled="serviceCatalogPage >= serviceCatalogTotalPages()" class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40">
+                                Siguiente
+                            </button>
+                        </div>
                     </div>
 
                     <div class="mt-4 rounded-lg border border-dashed border-indigo-200 bg-indigo-50/50 p-3 md:col-span-3">
@@ -2343,5 +2421,12 @@
                 </div>
             </div>
         </x-ui.modal>
+
+        @include('products._modals_quick_create', array_merge($productQuickCreate ?? [], ['ajaxWorkshopMaintenance' => true]))
     </div>
+
+@push('scripts')
+    @include('workshop.partials.vehicle-plate-lookup-script')
+    @include('workshop.partials.workshop-product-quick-create-script')
+@endpush
 @endsection

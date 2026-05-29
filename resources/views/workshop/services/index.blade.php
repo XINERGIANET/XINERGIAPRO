@@ -1,7 +1,47 @@
 @extends('layouts.app')
 
 @section('content')
-<div x-data="{}">
+<div x-data="{
+    selectedIds: [],
+    toggleAll(checked, ids) {
+        this.selectedIds = checked ? ids.slice() : [];
+    },
+    toggleOne(id, checked) {
+        const key = String(id);
+        if (checked) {
+            if (!this.selectedIds.includes(key)) {
+                this.selectedIds.push(key);
+            }
+        } else {
+            this.selectedIds = this.selectedIds.filter(x => x !== key);
+        }
+    },
+    submitBulkDelete() {
+        if (this.selectedIds.length === 0) {
+            return;
+        }
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                title: 'Eliminar servicios seleccionados?',
+                text: `Se eliminaran ${this.selectedIds.length} servicio(s). Esta accion no se puede deshacer.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Si, eliminar',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#6b7280',
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    this.$refs.bulkDeleteForm.submit();
+                }
+            });
+            return;
+        }
+        if (window.confirm(`Eliminar ${this.selectedIds.length} servicio(s)?`)) {
+            this.$refs.bulkDeleteForm.submit();
+        }
+    }
+}">
     <x-common.page-breadcrumb pageTitle="Servicios Taller" />
 
     <x-common.component-card title="Catalogo de servicios" desc="Gestiona servicios preventivos y correctivos del taller.">
@@ -51,6 +91,15 @@
 
             {{-- Botón Nuevo --}}
             <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
+                <x-ui.link-button
+                    size="md"
+                    variant="outline"
+                    href="{{ route('workshop.services.import-template', request('view_id') ? ['view_id' => request('view_id')] : []) }}"
+                    class="h-11 rounded-xl border-gray-200 px-4 text-gray-700 hover:bg-gray-50"
+                >
+                    <i class="ri-download-2-line text-lg"></i>
+                    <span>Descargar plantilla</span>
+                </x-ui.link-button>
                 <x-ui.button
                     size="md"
                     variant="outline"
@@ -61,6 +110,15 @@
                     <i class="ri-file-excel-2-line text-lg"></i>
                     <span>Importar Excel</span>
                 </x-ui.button>
+                <button
+                    type="button"
+                    class="inline-flex h-11 items-center gap-2 rounded-xl border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    x-bind:disabled="selectedIds.length === 0"
+                    @click="submitBulkDelete()"
+                >
+                    <i class="ri-delete-bin-line text-lg"></i>
+                    <span x-text="selectedIds.length > 0 ? `Eliminar (${selectedIds.length})` : 'Eliminar seleccionados'"></span>
+                </button>
                 <x-ui.button 
                     size="md" 
                     variant="primary" 
@@ -85,11 +143,33 @@
             <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first() }}</div>
         @endif
 
+        <form method="POST" action="{{ route('workshop.services.destroy-bulk') }}" x-ref="bulkDeleteForm" class="hidden">
+            @csrf
+            @if(request('view_id'))
+                <input type="hidden" name="view_id" value="{{ request('view_id') }}">
+            @endif
+            <template x-for="id in selectedIds" :key="'bulk-' + id">
+                <input type="hidden" name="ids[]" :value="id">
+            </template>
+        </form>
+
+        @php
+            $pageServiceIds = $services->getCollection()->pluck('id')->map(fn ($id) => (string) $id)->values()->all();
+        @endphp
+
         <div class="table-responsive lg:!overflow-visible mt-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
             <table class="w-full">
                 <thead style="background-color: #334155; color: #FFFFFF;">
                     <tr>
-                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider first:rounded-tl-xl text-white">Nombre</th>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider first:rounded-tl-xl text-white w-10">
+                            <input
+                                type="checkbox"
+                                class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                @change="toggleAll($event.target.checked, @js($pageServiceIds))"
+                                :checked="selectedIds.length > 0 && selectedIds.length === @js(count($pageServiceIds))"
+                            >
+                        </th>
+                        <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Nombre</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Tipo</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Tarifas</th>
                         <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-white">Tiempo Est.</th>
@@ -100,6 +180,14 @@
                 <tbody>
                     @forelse($services as $service)
                         <tr class="relative hover:z-[60] border-t border-gray-100 dark:border-gray-800 transition hover:bg-gray-50 dark:hover:bg-white/5">
+                            <td class="px-3 py-3 text-center align-middle">
+                                <input
+                                    type="checkbox"
+                                    class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                    :checked="selectedIds.includes('{{ $service->id }}')"
+                                    @change="toggleOne('{{ $service->id }}', $event.target.checked)"
+                                >
+                            </td>
                             <td class="px-3 py-3 text-sm text-center align-middle font-medium text-gray-800 dark:text-white/90">{{ $service->name }}</td>
                             <td class="px-3 py-3 text-sm text-center align-middle">
                                 <x-ui.badge variant="light" color="{{ $service->type === 'preventivo' ? 'success' : ($service->type === 'externo' ? 'warning' : 'info') }}">
@@ -184,7 +272,7 @@
                                             style="background-color: #0EA5E9; color: #FFFFFF;"
                                             aria-label="Detalle de servicio"
                                         >
-                                            <i class="ri-list-check-2-line"></i>
+                                            <i class="ri-list-check-2"></i>
                                         </x-ui.button>
                                         <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-3 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-[100] shadow-xl">
                                             Detalle de servicio
@@ -224,7 +312,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="px-4 py-4 text-sm text-gray-500 text-center">Sin servicios registrados.</td></tr>
+                        <tr><td colspan="7" class="px-4 py-4 text-sm text-gray-500 text-center">Sin servicios registrados.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -258,7 +346,7 @@
                             Importación masiva
                         </div>
                         <h3 class="mt-3 text-xl font-bold leading-tight sm:text-2xl">Lista de precios → servicios</h3>
-                        <p class="mt-2 max-w-md text-sm text-emerald-50/90">Sube un Excel con columnas <span class="font-bold">SERVICIO</span> y <span class="font-bold">PRECIO</span> (ej. S/ 15.00). Se crearán registros en esta sucursal.</p>
+                        <p class="mt-2 max-w-md text-sm text-emerald-50/90">Descarga la plantilla con columnas obligatorias y opcionales. Obligatorios: <span class="font-bold">SERVICIO</span> y <span class="font-bold">PRECIO</span>. Opcionales por fila: tipo, tiempo y activo.</p>
                     </div>
                     <button type="button" @click="open = false" class="flex h-11 w-11 flex-none items-center justify-center rounded-2xl bg-white/10 text-white transition hover:bg-white/20">
                         <i class="ri-close-line text-xl"></i>
@@ -296,15 +384,16 @@
 
                     <div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
-                            <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Tipo para todos</label>
-                            <select name="import_type" class="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-800 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100" required>
+                            <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Tipo por defecto (si la fila no lo trae)</label>
+                            <select name="import_type" class="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-800 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100">
                                 <option value="correctivo" selected>Correctivo</option>
                                 <option value="preventivo">Preventivo</option>
+                                <option value="externo">Externo</option>
                             </select>
                         </div>
                         <div>
-                            <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Tiempo estimado (min)</label>
-                            <input type="number" name="import_estimated_minutes" value="0" min="0" max="14400" required class="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-800 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100" placeholder="0">
+                            <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Tiempo por defecto (min)</label>
+                            <input type="number" name="import_estimated_minutes" value="0" min="0" max="14400" class="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-800 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100" placeholder="0">
                         </div>
                     </div>
 

@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div x-data="{}">
+<div x-data="{}" data-vehicle-plate-lookup-url="{{ route('workshop.maintenance-board.vehicles.lookup-plate') }}">
     <x-common.page-breadcrumb pageTitle="Vehiculos Taller" />
 
     <x-common.component-card title="Vehiculos" desc="Administra vehiculos asociados a clientes del taller.">
@@ -174,7 +174,7 @@
                 </button>
             </div>
 
-            <form method="POST" action="{{ route('workshop.vehicles.store') }}" class="grid grid-cols-1 gap-4 md:grid-cols-4">
+            <form method="POST" action="{{ route('workshop.vehicles.store') }}" class="grid grid-cols-1 gap-4 md:grid-cols-4" data-vehicle-plate-lookup="true">
                 @csrf
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">Cliente</label>
@@ -214,9 +214,16 @@
                     <label class="mb-1 block text-sm font-medium text-gray-700">Color</label>
                     <input name="color" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Color">
                 </div>
-                <div>
+                <div class="md:col-span-2">
                     <label class="mb-1 block text-sm font-medium text-gray-700">Placa</label>
-                    <input name="plate" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Placa">
+                    <div class="flex items-center gap-2">
+                        <input name="plate" data-vehicle-plate-input class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Placa">
+                        <button type="button" class="js-vehicle-plate-lookup inline-flex h-11 shrink-0 items-center rounded-lg border border-blue-300 bg-blue-50 px-3 text-xs font-semibold text-blue-700 hover:bg-blue-100">
+                            <i class="ri-search-line mr-1"></i>
+                            <span>Buscar placa</span>
+                        </button>
+                    </div>
+                    <div class="js-vehicle-plate-soat-notice hidden mt-2 rounded-lg border px-3 py-2 text-xs"></div>
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-gray-700">VIN</label>
@@ -268,7 +275,7 @@
                     </button>
                 </div>
 
-                <form method="POST" action="{{ route('workshop.vehicles.update', $vehicle) }}" class="grid grid-cols-1 gap-4 md:grid-cols-4">
+                <form method="POST" action="{{ route('workshop.vehicles.update', $vehicle) }}" class="grid grid-cols-1 gap-4 md:grid-cols-4" data-vehicle-plate-lookup="true">
                     @csrf
                     @method('PUT')
                     <div>
@@ -309,9 +316,16 @@
                         <label class="mb-1 block text-sm font-medium text-gray-700">Color</label>
                         <input name="color" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->color }}" placeholder="Color">
                     </div>
-                    <div>
+                    <div class="md:col-span-2">
                         <label class="mb-1 block text-sm font-medium text-gray-700">Placa</label>
-                        <input name="plate" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->plate }}" placeholder="Placa">
+                        <div class="flex items-center gap-2">
+                            <input name="plate" data-vehicle-plate-input class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" value="{{ $vehicle->plate }}" placeholder="Placa">
+                            <button type="button" class="js-vehicle-plate-lookup inline-flex h-11 shrink-0 items-center rounded-lg border border-blue-300 bg-blue-50 px-3 text-xs font-semibold text-blue-700 hover:bg-blue-100">
+                                <i class="ri-search-line mr-1"></i>
+                                <span>Buscar placa</span>
+                            </button>
+                        </div>
+                        <div class="js-vehicle-plate-soat-notice hidden mt-2 rounded-lg border px-3 py-2 text-xs"></div>
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-gray-700">VIN</label>
@@ -354,4 +368,8 @@
         </x-ui.modal>
     @endforeach
 </div>
+
+@push('scripts')
+    @include('workshop.partials.vehicle-plate-lookup-script')
+@endpush
 @endsection

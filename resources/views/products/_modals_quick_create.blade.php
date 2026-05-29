@@ -2,6 +2,7 @@
 @php
     $viewIdModal = $viewId ?? request('view_id');
     $afterCreate = $afterCreate ?? null;
+    $ajaxWorkshopMaintenance = (bool) ($ajaxWorkshopMaintenance ?? false);
 @endphp
 
 <x-ui.modal
@@ -119,12 +120,20 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('admin.products.store') }}" enctype="multipart/form-data" class="flex w-full flex-col min-h-0 space-y-6">
+        <form
+            method="POST"
+            action="{{ route('admin.products.store') }}"
+            enctype="multipart/form-data"
+            class="flex w-full flex-col min-h-0 space-y-6"
+            @if($ajaxWorkshopMaintenance) data-workshop-product-quick-form="true" @endif
+        >
             @csrf
             @if (!empty($viewIdModal))
                 <input type="hidden" name="view_id" value="{{ $viewIdModal }}">
             @endif
-            @if ($afterCreate === 'purchase_create')
+            @if ($ajaxWorkshopMaintenance)
+                <input type="hidden" name="after_create" value="workshop_maintenance_ajax">
+            @elseif ($afterCreate === 'purchase_create')
                 <input type="hidden" name="after_create" value="purchase_create">
             @endif
 

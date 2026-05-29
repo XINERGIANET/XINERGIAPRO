@@ -12,6 +12,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\File;
 use Illuminate\Validation\ValidationException;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class WorkshopServiceCatalogController extends Controller
 {
@@ -58,9 +62,12 @@ class WorkshopServiceCatalogController extends Controller
 
         $validated = $request->validate([
             'import_file' => ['required', File::types(['xlsx', 'xls', 'csv'])->max(12288)],
-            'import_type' => ['required', 'in:preventivo,correctivo'],
-            'import_estimated_minutes' => ['required', 'integer', 'min:0', 'max:14400'],
+            'import_type' => ['nullable', 'in:preventivo,correctivo,externo'],
+            'import_estimated_minutes' => ['nullable', 'integer', 'min:0', 'max:14400'],
         ]);
+
+        $defaultType = (string) ($validated['import_type'] ?? 'correctivo');
+        $defaultMinutes = (int) ($validated['import_estimated_minutes'] ?? 0);
 
         $branchId = (int) session('branch_id');
         $branch = \App\Models\Branch::query()->findOrFail($branchId);
@@ -79,7 +86,7 @@ class WorkshopServiceCatalogController extends Controller
         $imported = 0;
         $skippedDup = 0;
 
-        DB::transaction(function () use ($rows, $branch, $branchId, $validated, &$imported, &$skippedDup) {
+        DB::transaction(function () use ($rows, $branch, $branchId, $defaultType, $defaultMinutes, &$imported, &$skippedDup) {
             foreach ($rows as $row) {
                 $name = $row['name'];
                 $exists = WorkshopService::query()
@@ -92,16 +99,21 @@ class WorkshopServiceCatalogController extends Controller
                     continue;
                 }
 
+                $type = $row['type'] ?? $defaultType;
+                if (!in_array($type, ['preventivo', 'correctivo', 'externo'], true)) {
+                    $type = $defaultType;
+                }
+
                 WorkshopService::query()->create([
                     'company_id' => $branch->company_id,
                     'branch_id' => $branchId,
                     'name' => $name,
-                    'type' => $validated['import_type'],
+                    'type' => $type,
                     'base_price' => $row['price'],
-                    'estimated_minutes' => (int) $validated['import_estimated_minutes'],
+                    'estimated_minutes' => $row['estimated_minutes'] ?? $defaultMinutes,
                     'frequency_each_km' => null,
                     'frequency_enabled' => false,
-                    'active' => true,
+                    'active' => $row['active'] ?? true,
                 ]);
                 $imported++;
             }
@@ -113,6 +125,75 @@ class WorkshopServiceCatalogController extends Controller
         }
 
         return back()->with('status', implode(' ', $parts));
+    }
+
+    public function downloadImportTemplate()
+    {
+        if (!class_exists(Spreadsheet::class)) {
+            return back()->with('error', 'Ejecuta composer update (se requiere phpoffice/phpspreadsheet).');
+        }
+
+        $spreadsheet = new Spreadsheet();
+
+        $instructions = $spreadsheet->getActiveSheet();
+        $instructions->setTitle('Instrucciones');
+        $instructions->setCellValue('A1', 'Plantilla de importación de servicios');
+        $instructions->setCellValue('A3', 'Campos obligatorios (*):');
+        $instructions->setCellValue('A4', '• SERVICIO * — Nombre del servicio.');
+        $instructions->setCellValue('A5', '• PRECIO * — Precio base en soles (ej. 45.50 o S/ 45.50).');
+        $instructions->setCellValue('A7', 'Campos opcionales:');
+        $instructions->setCellValue('A8', '• TIPO (opcional) — preventivo, correctivo o externo. Si lo deja vacío, usa el valor del formulario de importación.');
+        $instructions->setCellValue('A9', '• TIEMPO ESTIMADO MIN (opcional) — Minutos del servicio. Si lo deja vacío, usa el valor del formulario.');
+        $instructions->setCellValue('A10', '• ACTIVO (opcional) — SI o NO. Por defecto SI.');
+        $instructions->setCellValue('A12', 'Instrucciones:');
+        $instructions->setCellValue('A13', '1. Complete la hoja "Servicios" a partir de la fila 2.');
+        $instructions->setCellValue('A14', '2. La fila 2 es un ejemplo; puede editarla o borrarla.');
+        $instructions->setCellValue('A15', '3. No modifique los encabezados de la fila 1.');
+        $instructions->setCellValue('A16', '4. Guarde el archivo y use "Importar Excel" en el catálogo de servicios.');
+        $instructions->getColumnDimension('A')->setWidth(95);
+        $instructions->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+
+        $sheet = $spreadsheet->createSheet();
+        $sheet->setTitle('Servicios');
+        $spreadsheet->setActiveSheetIndex(1);
+
+        $headers = [
+            'SERVICIO *',
+            'PRECIO *',
+            'TIPO (opcional)',
+            'TIEMPO ESTIMADO MIN (opcional)',
+            'ACTIVO (opcional)',
+        ];
+        $example = [
+            'CAMBIO DE ACEITE 15W40',
+            45.50,
+            'preventivo',
+            60,
+            'SI',
+        ];
+
+        foreach ($headers as $index => $header) {
+            $col = chr(65 + $index);
+            $sheet->setCellValue($col . '1', $header);
+            $sheet->setCellValue($col . '2', $example[$index]);
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $sheet->freezePane('A2');
+        $sheet->getStyle('A1:B1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:B1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFFEF3C7');
+        $sheet->getStyle('C1:E1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFEFF6FF');
+        $sheet->getStyle('A2:E2')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFF0FDF4');
+        $sheet->getStyle('A1:E2')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+
+        $filename = 'plantilla_importacion_servicios.xlsx';
+
+        return response()->streamDownload(function () use ($spreadsheet) {
+            $writer = new Xlsx($spreadsheet);
+            $writer->save('php://output');
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -183,6 +264,56 @@ class WorkshopServiceCatalogController extends Controller
         $service->delete();
 
         return back()->with('status', 'Servicio eliminado correctamente.');
+    }
+
+    public function destroyBulk(Request $request): RedirectResponse
+    {
+        WorkshopAuthorization::ensureAllowed('workshop.services.destroy');
+
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+        ]);
+
+        $deleted = 0;
+        $skipped = 0;
+
+        DB::transaction(function () use ($validated, &$deleted, &$skipped) {
+            foreach (array_values(array_unique(array_map('intval', $validated['ids'] ?? []))) as $id) {
+                if ($id <= 0) {
+                    $skipped++;
+
+                    continue;
+                }
+
+                $service = WorkshopService::query()->find($id);
+                if (!$service) {
+                    $skipped++;
+
+                    continue;
+                }
+
+                if (!$this->serviceMatchesSessionScope($service)) {
+                    $skipped++;
+
+                    continue;
+                }
+
+                $service->delete();
+                $deleted++;
+            }
+        });
+
+        if ($deleted === 0) {
+            return back()->with('error', 'No se eliminó ningún servicio. Verifica la selección.');
+        }
+
+        $message = "Eliminación masiva: {$deleted} servicio(s) eliminado(s).";
+        if ($skipped > 0) {
+            $message .= " {$skipped} registro(s) omitido(s).";
+        }
+
+        return back()->with('status', $message);
     }
 
     public function frequencyEdit(WorkshopService $service): \Illuminate\View\View
@@ -406,6 +537,23 @@ class WorkshopServiceCatalogController extends Controller
         if ($service->branch_id && $branchId > 0 && (int) $service->branch_id !== $branchId) {
             abort(404);
         }
+    }
+
+    private function serviceMatchesSessionScope(WorkshopService $service): bool
+    {
+        $branchId = (int) session('branch_id');
+        $branch = $branchId > 0 ? \App\Models\Branch::query()->find($branchId) : null;
+        $companyId = (int) ($branch?->company_id ?? 0);
+
+        if ($service->company_id && $companyId > 0 && (int) $service->company_id !== $companyId) {
+            return false;
+        }
+
+        if ($service->branch_id && $branchId > 0 && (int) $service->branch_id !== $branchId) {
+            return false;
+        }
+
+        return true;
     }
 
     private function validateServicePayload(Request $request): array

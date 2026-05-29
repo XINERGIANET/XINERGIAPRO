@@ -6,13 +6,25 @@ use Illuminate\Support\Facades\Log;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\RichText\RichText;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use Throwable;
 
 class ProductBranchExcelImport
 {
     /**
-     * @return list<array{category: string, description: string, marca: string, stock: float}>
+     * @return list<array{
+     *     category: string,
+     *     description: string,
+     *     code: string,
+     *     marca: string,
+     *     abbreviation: string,
+     *     stock: float,
+     *     price: float,
+     *     purchase_price: float,
+     *     stock_minimum: float,
+     *     stock_maximum: float
+     * }>
      */
     public static function extractRows(string $absolutePath): array
     {
@@ -53,48 +65,76 @@ class ProductBranchExcelImport
             throw new \InvalidArgumentException('No se pudo leer el archivo. Usa .xlsx, .xls o .csv válido.');
         }
 
-        $sheet = $spreadsheet->getActiveSheet();
+        $sheet = self::resolveDataSheet($spreadsheet, 'Productos');
         $detected = self::detectColumns($sheet);
         if ($detected === null) {
             throw new \InvalidArgumentException(
-                'No se encontraron las columnas requeridas (categoría, descripción, stock). Incluye encabezados como CATEGORÍA/CATERGORIA, DESCRIPCION y STOCK ACTUAL.'
+                'No se encontraron las columnas requeridas (categoría y descripción). Usa la plantilla descargable o incluye encabezados como CATEGORÍA y DESCRIPCIÓN.'
             );
         }
 
-        [$headerRow, $colCategory, $colDescription, $colMarca, $colStock] = $detected;
-
+        $headerRow = (int) $detected['header_row'];
         $out = [];
         $maxRow = (int) $sheet->getHighestDataRow();
         for ($row = $headerRow + 1; $row <= $maxRow; $row++) {
-            $desc = self::cellToString($sheet->getCell(Coordinate::stringFromColumnIndex($colDescription) . $row));
-            if ($desc === '') {
+            $desc = self::cellAt($sheet, $detected['description'], $row);
+            if ($desc === '' || self::isExampleRow($desc)) {
                 continue;
             }
 
-            $category = self::cellToString($sheet->getCell(Coordinate::stringFromColumnIndex($colCategory) . $row));
-            $marca = $colMarca !== null
-                ? self::cellToString($sheet->getCell(Coordinate::stringFromColumnIndex($colMarca) . $row))
-                : '';
-            $stockRaw = $sheet->getCell(Coordinate::stringFromColumnIndex($colStock) . $row)->getCalculatedValue();
-            $stock = self::parseStock($stockRaw);
+            $category = self::cellAt($sheet, $detected['category'], $row);
+            $marca = $detected['marca'] !== null ? self::cellAt($sheet, $detected['marca'], $row) : '';
+            $code = $detected['code'] !== null ? self::cellAt($sheet, $detected['code'], $row) : '';
+            $abbreviation = $detected['abbreviation'] !== null ? self::cellAt($sheet, $detected['abbreviation'], $row) : '';
+            $stockRaw = $detected['stock'] !== null
+                ? $sheet->getCell(Coordinate::stringFromColumnIndex($detected['stock']) . $row)->getCalculatedValue()
+                : null;
+            $priceRaw = $detected['price'] !== null
+                ? $sheet->getCell(Coordinate::stringFromColumnIndex($detected['price']) . $row)->getCalculatedValue()
+                : null;
+            $purchaseRaw = $detected['purchase_price'] !== null
+                ? $sheet->getCell(Coordinate::stringFromColumnIndex($detected['purchase_price']) . $row)->getCalculatedValue()
+                : null;
+            $stockMinRaw = $detected['stock_minimum'] !== null
+                ? $sheet->getCell(Coordinate::stringFromColumnIndex($detected['stock_minimum']) . $row)->getCalculatedValue()
+                : null;
+            $stockMaxRaw = $detected['stock_maximum'] !== null
+                ? $sheet->getCell(Coordinate::stringFromColumnIndex($detected['stock_maximum']) . $row)->getCalculatedValue()
+                : null;
 
             $out[] = [
                 'category' => mb_substr(trim($category), 0, 255),
                 'description' => mb_substr(trim($desc), 0, 255),
+                'code' => mb_substr(trim($code), 0, 50),
                 'marca' => mb_substr(trim($marca), 0, 255),
-                'stock' => max(0.0, $stock),
+                'abbreviation' => mb_substr(trim($abbreviation), 0, 255),
+                'stock' => max(0.0, self::parseNumber($stockRaw)),
+                'price' => max(0.0, self::parseNumber($priceRaw)),
+                'purchase_price' => max(0.0, self::parseNumber($purchaseRaw)),
+                'stock_minimum' => max(0.0, self::parseNumber($stockMinRaw)),
+                'stock_maximum' => max(0.0, self::parseNumber($stockMaxRaw)),
             ];
         }
 
         if ($out === []) {
-            throw new \InvalidArgumentException('No hay filas con descripción debajo del encabezado.');
+            throw new \InvalidArgumentException('No hay filas con descripción debajo del encabezado. Borra la fila de ejemplo o agrega tus productos.');
         }
 
         return $out;
     }
 
+    private static function resolveDataSheet(Spreadsheet $spreadsheet, string $preferredName): Worksheet
+    {
+        $named = $spreadsheet->getSheetByName($preferredName);
+        if ($named instanceof Worksheet) {
+            return $named;
+        }
+
+        return $spreadsheet->getActiveSheet();
+    }
+
     /**
-     * @return array{0:int,1:int,2:int,3:int|null,4:int}|null [headerRow, colCategory, colDescription, colMarca|null, colStock]
+     * @return array<string, int|null>|null
      */
     private static function detectColumns(Worksheet $sheet): ?array
     {
@@ -106,10 +146,18 @@ class ProductBranchExcelImport
         $highestColIdx = Coordinate::columnIndexFromString($highestColLetter);
 
         for ($r = 1; $r <= $maxScanRows; $r++) {
-            $colCategory = null;
-            $colDescription = null;
-            $colMarca = null;
-            $colStock = null;
+            $cols = [
+                'category' => null,
+                'description' => null,
+                'marca' => null,
+                'stock' => null,
+                'code' => null,
+                'abbreviation' => null,
+                'price' => null,
+                'purchase_price' => null,
+                'stock_minimum' => null,
+                'stock_maximum' => null,
+            ];
 
             for ($c = 1; $c <= $highestColIdx; $c++) {
                 $coord = Coordinate::stringFromColumnIndex($c) . $r;
@@ -119,22 +167,54 @@ class ProductBranchExcelImport
                 }
 
                 if (str_contains($norm, 'descrip')) {
-                    $colDescription = $c;
+                    $cols['description'] = $c;
                 } elseif (self::headerLooksLikeCategory($norm)) {
-                    $colCategory = $c;
+                    $cols['category'] = $c;
                 } elseif ($norm === 'marca' || str_starts_with($norm, 'marca ')) {
-                    $colMarca = $c;
+                    $cols['marca'] = $c;
+                } elseif (str_contains($norm, 'stock') && str_contains($norm, 'min')) {
+                    $cols['stock_minimum'] = $c;
+                } elseif (str_contains($norm, 'stock') && str_contains($norm, 'max')) {
+                    $cols['stock_maximum'] = $c;
                 } elseif (str_contains($norm, 'stock')) {
-                    $colStock = $c;
+                    $cols['stock'] = $c;
+                } elseif (str_contains($norm, 'codigo') || $norm === 'code') {
+                    $cols['code'] = $c;
+                } elseif (str_contains($norm, 'abrev')) {
+                    $cols['abbreviation'] = $c;
+                } elseif (str_contains($norm, 'precio') && str_contains($norm, 'compra')) {
+                    $cols['purchase_price'] = $c;
+                } elseif (str_contains($norm, 'precio')) {
+                    $cols['price'] = $c;
                 }
             }
 
-            if ($colCategory !== null && $colDescription !== null && $colStock !== null) {
-                return [$r, $colCategory, $colDescription, $colMarca, $colStock];
+            if ($cols['category'] !== null && $cols['description'] !== null) {
+                $cols['header_row'] = $r;
+
+                return $cols;
             }
         }
 
         return null;
+    }
+
+    private static function cellAt(Worksheet $sheet, ?int $col, int $row): string
+    {
+        if ($col === null) {
+            return '';
+        }
+
+        return self::cellToString($sheet->getCell(Coordinate::stringFromColumnIndex($col) . $row));
+    }
+
+    private static function isExampleRow(string $value): bool
+    {
+        $norm = mb_strtolower(trim($value), 'UTF-8');
+
+        return str_starts_with($norm, 'ejemplo:')
+            || str_starts_with($norm, 'ejemplo ')
+            || $norm === 'ejemplo';
     }
 
     private static function headerLooksLikeCategory(string $norm): bool
@@ -159,6 +239,8 @@ class ProductBranchExcelImport
             $s = \Normalizer::normalize($s, \Normalizer::FORM_D) ?: $s;
             $s = preg_replace('/\pM/u', '', $s) ?? $s;
         }
+        $s = str_replace('*', '', $s);
+        $s = preg_replace('/\(\s*opcional\s*\)/u', '', $s) ?? $s;
 
         return trim($s);
     }
@@ -177,7 +259,7 @@ class ProductBranchExcelImport
         return trim((string) $value);
     }
 
-    private static function parseStock(mixed $raw): float
+    private static function parseNumber(mixed $raw): float
     {
         if ($raw === null || $raw === '') {
             return 0.0;
@@ -186,6 +268,7 @@ class ProductBranchExcelImport
             return round((float) $raw, 4);
         }
         $s = (string) $raw;
+        $s = str_ireplace(['s/', 'sol ', 'soles ', 'pen ', 's./'], '', $s);
         $s = preg_replace('/[^\d,.\-]/', '', $s) ?? '';
         if ($s === '' || $s === '-') {
             return 0.0;

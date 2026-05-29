@@ -556,6 +556,7 @@
             </div>
 
             <div x-show="quickVehicleError" class="mx-6 mt-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700" x-text="quickVehicleError"></div>
+            <div x-show="quickVehicleSoatNotice" x-cloak class="mx-6 mt-3 rounded-lg border px-3 py-2 text-xs" :class="quickVehicleSoatNoticeClass()" x-text="quickVehicleSoatNotice"></div>
 
             <div class="p-6">
                 <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
@@ -695,6 +696,8 @@
                 creatingVehicleLoading: false,
                 quickClientError: '',
                 quickVehicleError: '',
+                quickVehicleSoatNotice: '',
+                quickVehicleSoatStatus: '',
                 // Quick client data
                 quickClient: {
                     person_type: 'DNI',
@@ -981,6 +984,8 @@
                 },
                 async lookupQuickVehicleByPlate() {
                     this.quickVehicleError = '';
+                    this.quickVehicleSoatNotice = '';
+                    this.quickVehicleSoatStatus = '';
                     const normalizedPlate = this.normalizePlateForLookup(this.quickVehicle.plate);
                     this.quickVehicle.plate = normalizedPlate;
                     if (normalizedPlate.length < 5) {
@@ -990,31 +995,18 @@
 
                     this.lookingUpPlate = true;
                     try {
-                        const response = await fetch(`${this.plateLookupUrl}?plate=${encodeURIComponent(normalizedPlate)}`, {
-                            method: 'GET',
-                            headers: {
-                                'Accept': 'application/json',
-                                'X-Requested-With': 'XMLHttpRequest',
-                            },
-                        });
-                        const payload = await response.json();
-                        if (!response.ok || !payload?.status) {
-                            throw new Error(payload?.message || 'No se encontraron datos para la placa ingresada.');
-                        }
-
-                        this.quickVehicle.brand = String(payload.brand || this.quickVehicle.brand || '');
-                        this.quickVehicle.model = String(payload.model || this.quickVehicle.model || '');
-                        this.quickVehicle.year = String(payload.year || this.quickVehicle.year || '');
-                        this.quickVehicle.color = String(payload.color || this.quickVehicle.color || '');
-                        this.quickVehicle.vin = String(payload.vin || this.quickVehicle.vin || '');
-                        this.quickVehicle.engine_number = String(payload.engine_number || this.quickVehicle.engine_number || '');
-                        this.quickVehicle.chassis_number = String(payload.chassis_number || this.quickVehicle.chassis_number || '');
-                        this.quickVehicle.serial_number = String(payload.serial_number || this.quickVehicle.serial_number || '');
+                        const payload = await window.WorkshopVehiclePlateLookup.fetch(this.plateLookupUrl, normalizedPlate);
+                        window.WorkshopVehiclePlateLookup.applyQuickVehicle(this.quickVehicle, payload);
+                        this.quickVehicleSoatNotice = String(payload.soat_message || '');
+                        this.quickVehicleSoatStatus = String(payload.soat_status || '');
                     } catch (error) {
                         this.quickVehicleError = error?.message || 'No se pudo consultar la placa.';
                     } finally {
                         this.lookingUpPlate = false;
                     }
+                },
+                quickVehicleSoatNoticeClass() {
+                    return window.WorkshopVehiclePlateLookup?.noticeClass(this.quickVehicleSoatStatus) || 'border-slate-200 bg-slate-50 text-slate-700';
                 },
                 canSubmitExternalQuotation() {
                     const clientId = parseInt(String(this.externalQuotationSelectedClientId || ''), 10);
@@ -1149,4 +1141,8 @@
             z-index: 9999 !important;
         }
     </style>
+
+@push('scripts')
+    @include('workshop.partials.vehicle-plate-lookup-script')
+@endpush
 @endsection

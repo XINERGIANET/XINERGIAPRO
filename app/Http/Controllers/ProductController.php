@@ -28,6 +28,8 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\File;
 use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class ProductController extends Controller
@@ -248,17 +250,38 @@ class ProductController extends Controller
         }
 
         $imported = 0;
+        $skippedDup = 0;
 
         try {
-            DB::transaction(function () use ($rows, $branchId, $productType, $baseUnitId, &$imported) {
+            DB::transaction(function () use ($rows, $branchId, $productType, $baseUnitId, &$imported, &$skippedDup) {
                 foreach ($rows as $row) {
                     $category = $this->findOrCreateCategoryForBranch($row['category'], $branchId);
-                    $code = $this->nextBranchProductCode($branchId);
+                    $code = trim((string) ($row['code'] ?? ''));
+                    if ($code !== '') {
+                        $codeExists = Product::query()
+                            ->join('product_branch', 'product_branch.product_id', '=', 'products.id')
+                            ->where('product_branch.branch_id', $branchId)
+                            ->whereNull('product_branch.deleted_at')
+                            ->where('products.code', $code)
+                            ->exists();
+                        if ($codeExists) {
+                            $skippedDup++;
+
+                            continue;
+                        }
+                    } else {
+                        $code = $this->nextBranchProductCode($branchId);
+                    }
+
+                    $abbreviation = trim((string) ($row['abbreviation'] ?? ''));
+                    if ($abbreviation === '') {
+                        $abbreviation = $row['description'];
+                    }
 
                     $product = Product::query()->create([
                         'code' => $code,
                         'description' => $row['description'],
-                        'abbreviation' => $row['description'],
+                        'abbreviation' => $abbreviation,
                         'marca' => $row['marca'] !== '' ? $row['marca'] : null,
                         'type' => $productType->behavior,
                         'product_type_id' => $productType->id,
@@ -277,10 +300,10 @@ class ProductController extends Controller
                         'branch_id' => $branchId,
                         'status' => 'A',
                         'stock' => $row['stock'],
-                        'price' => 0,
-                        'purchase_price' => 0,
-                        'stock_minimum' => 0,
-                        'stock_maximum' => 0,
+                        'price' => $row['price'],
+                        'purchase_price' => $row['purchase_price'],
+                        'stock_minimum' => $row['stock_minimum'],
+                        'stock_maximum' => $row['stock_maximum'],
                         'minimum_sell' => 0,
                         'minimum_purchase' => 0,
                         'favorite' => 'N',
@@ -305,30 +328,79 @@ class ProductController extends Controller
                 ->with('error', $err);
         }
 
+        $message = "Importación lista: {$imported} producto(s) creados en esta sucursal.";
+        if ($skippedDup > 0) {
+            $message .= " {$skippedDup} fila(s) omitidas (código ya existente).";
+        }
+
         return redirect()
             ->route('admin.products.index', $viewId ? ['view_id' => $viewId] : [])
-            ->with('status', "Importación lista: {$imported} producto(s) creados en esta sucursal.");
+            ->with('status', $message);
     }
 
     public function downloadImportTemplate()
     {
         $spreadsheet = new Spreadsheet();
-        $sheet = $spreadsheet->getActiveSheet();
+
+        $instructions = $spreadsheet->getActiveSheet();
+        $instructions->setTitle('Instrucciones');
+        $instructions->setCellValue('A1', 'Plantilla de importación de productos');
+        $instructions->setCellValue('A3', 'Campos obligatorios (*):');
+        $instructions->setCellValue('A4', '• CATEGORÍA * — Se crea automáticamente si no existe.');
+        $instructions->setCellValue('A5', '• DESCRIPCIÓN * — Nombre del producto.');
+        $instructions->setCellValue('A7', 'Campos opcionales (puede dejarlos vacíos):');
+        $instructions->setCellValue('A8', '• CÓDIGO — Si lo deja vacío, el sistema asigna uno automático.');
+        $instructions->setCellValue('A9', '• MARCA, ABREVIATURA, STOCK ACTUAL, PRECIO VENTA, PRECIO COMPRA, STOCK MÍNIMO, STOCK MÁXIMO.');
+        $instructions->setCellValue('A11', 'Instrucciones:');
+        $instructions->setCellValue('A12', '1. Complete la hoja "Productos" a partir de la fila 2.');
+        $instructions->setCellValue('A13', '2. La fila 2 es un ejemplo; puede editarla o borrarla.');
+        $instructions->setCellValue('A14', '3. No modifique los encabezados de la fila 1.');
+        $instructions->setCellValue('A15', '4. Guarde el archivo y use "Importar Excel" en el listado de productos.');
+        $instructions->getColumnDimension('A')->setWidth(90);
+        $instructions->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+
+        $sheet = $spreadsheet->createSheet();
         $sheet->setTitle('Productos');
+        $spreadsheet->setActiveSheetIndex(1);
 
-        $sheet->setCellValue('A1', 'CATEGORÍA');
-        $sheet->setCellValue('B1', 'DESCRIPCIÓN');
-        $sheet->setCellValue('C1', 'MARCA');
-        $sheet->setCellValue('D1', 'STOCK ACTUAL');
+        $headers = [
+            'CATEGORÍA *',
+            'DESCRIPCIÓN *',
+            'CÓDIGO (opcional)',
+            'MARCA (opcional)',
+            'ABREVIATURA (opcional)',
+            'STOCK ACTUAL (opcional)',
+            'PRECIO VENTA (opcional)',
+            'PRECIO COMPRA (opcional)',
+            'STOCK MÍNIMO (opcional)',
+            'STOCK MÁXIMO (opcional)',
+        ];
+        $example = [
+            'REPUESTOS VARIOS',
+            'FILTRO DE ACEITE 15W40',
+            'PROD-001',
+            'MOBIL',
+            'FIL ACEITE',
+            10,
+            45.50,
+            30.00,
+            2,
+            50,
+        ];
 
-        $sheet->setCellValue('A2', 'REPUESTOS VARIOS');
-        $sheet->setCellValue('B2', 'EJEMPLO: descripción del producto');
-        $sheet->setCellValue('C2', 'MARCA EJEMPLO');
-        $sheet->setCellValue('D2', 0);
-
-        foreach (['A', 'B', 'C', 'D'] as $col) {
+        foreach ($headers as $index => $header) {
+            $col = chr(65 + $index);
+            $sheet->setCellValue($col . '1', $header);
+            $sheet->setCellValue($col . '2', $example[$index]);
             $sheet->getColumnDimension($col)->setAutoSize(true);
         }
+
+        $sheet->freezePane('A2');
+        $sheet->getStyle('A1:J1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:B1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFFEF3C7');
+        $sheet->getStyle('C1:J1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFEFF6FF');
+        $sheet->getStyle('A2:J2')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFF0FDF4');
+        $sheet->getStyle('A1:J2')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
 
         $filename = 'plantilla_importacion_productos.xlsx';
 
@@ -398,6 +470,19 @@ class ProductController extends Controller
         }
         
         $viewId = $request->input('view_id');
+
+        if ($request->input('after_create') === 'workshop_maintenance_ajax') {
+            $branchRow = ProductBranch::query()
+                ->where('product_id', $product->id)
+                ->where('branch_id', (int) $branchId)
+                ->first();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Producto creado correctamente.',
+                'product' => $this->formatProductForWorkshopCatalog($product, $branchRow),
+            ]);
+        }
 
         if ($request->input('after_create') === 'purchase_create') {
             return redirect()
@@ -836,6 +921,26 @@ class ProductController extends Controller
         ]);
 
         return $category;
+    }
+
+    private function formatProductForWorkshopCatalog(Product $product, ?ProductBranch $branchRow): array
+    {
+        $code = (string) ($product->code ?? '');
+        $marca = (string) ($product->marca ?? '');
+        $desc = (string) ($product->description ?? '');
+        $mid = $marca !== '' ? $marca . ' - ' : '';
+        $label = trim($code !== '' ? $code . ' - ' . $mid . $desc : ($mid . $desc));
+
+        return [
+            'id' => (int) $product->id,
+            'code' => $code,
+            'marca' => $marca,
+            'description' => $desc,
+            'price' => (float) ($branchRow->price ?? 0),
+            'stock' => (float) ($branchRow->stock ?? 0),
+            'tax_rate_id' => $branchRow?->tax_rate_id ? (int) $branchRow->tax_rate_id : null,
+            'label' => $label,
+        ];
     }
 
     private function nextBranchProductCode(int $branchId): string

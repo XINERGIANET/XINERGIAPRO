@@ -9,4 +9,6 @@ return [
     'body_plate_key' => env('VEHICLE_PLATE_LOOKUP_BODY_PLATE_KEY', 'placa'),
     'query_plate_key' => env('VEHICLE_PLATE_LOOKUP_QUERY_PLATE_KEY', 'numero'),
     'query_token_key' => env('VEHICLE_PLATE_LOOKUP_QUERY_TOKEN_KEY', 'token'),
+    'soat_url' => env('VEHICLE_SOAT_LOOKUP_URL', 'https://api.json.pe/api/soat'),
+    'soat_enabled' => env('VEHICLE_SOAT_LOOKUP_ENABLED', true),
 ];
