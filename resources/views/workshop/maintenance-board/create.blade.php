@@ -1703,7 +1703,7 @@
                         </div>
                     </div>
 
-                    <div x-show="driverInfoEnabled" x-cloak class="md:col-span-3 grid grid-cols-1 gap-3 md:grid-cols-3 bg-gray-50/50 p-3 rounded-xl border border-gray-100">
+                    <div x-show="driverInfoEnabled" x-cloak class="md:col-span-3 grid grid-cols-1 gap-3 md:grid-cols-3">
                         <div class="md:col-span-1">
                             <label class="mb-1 block text-sm font-medium text-gray-700">Nombre Chofer</label>
                             <div class="relative">
