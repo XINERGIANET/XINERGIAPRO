@@ -106,6 +106,7 @@
         serviceTypeFilter: '',
         serviceKmFilterMode: 'all',
         serviceFilterKmLocal: '',
+        serviceSearchQuery: '',
         historyBase: @js(route('workshop.vehicles.history', ['vehicle' => '__VEHICLE__'])),
         historyUrl: '',
         historyHtml: '',
@@ -408,12 +409,25 @@
             }
             return t;
         },
+        serviceMatchesSearch(service) {
+            const q = String(this.serviceSearchQuery || '').trim().toLowerCase();
+            if (q === '') {
+                return true;
+            }
+            const name = String(service?.name || '').toLowerCase();
+            const type = String(service?.type || '').toLowerCase();
+            const typeLabel = type === 'preventivo' ? 'preventivo' : (type === 'correctivo' ? 'correctivo' : type);
+            return name.includes(q) || typeLabel.includes(q);
+        },
         filteredServicesCatalog() {
             const km = this.resolveServiceFilterKm();
             const tf = this.normalizeWorkshopServiceType(this.serviceTypeFilter);
             const kmMode = this.serviceKmFilterMode || 'all';
             const list = Array.isArray(this.servicesCatalog) ? this.servicesCatalog : [];
             return list.filter((s) => {
+                if (!this.serviceMatchesSearch(s)) {
+                    return false;
+                }
                 const t = this.normalizeWorkshopServiceType(s.type);
                 if (tf === 'preventivo' && t !== 'preventivo') {
                     return false;
@@ -1907,6 +1921,19 @@
                     </div>
 
                     <div class="mb-3 flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-3 sm:flex-row sm:flex-wrap sm:items-end">
+                        <div class="min-w-0 flex-1 sm:min-w-[220px]">
+                            <label class="mb-1 block text-xs font-semibold text-gray-600">Buscar servicio</label>
+                            <div class="relative">
+                                <i class="ri-search-line pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                <input
+                                    type="search"
+                                    x-model="serviceSearchQuery"
+                                    placeholder="Escriba para filtrar por nombre..."
+                                    autocomplete="off"
+                                    class="h-10 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-sm text-gray-800 shadow-sm transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200/80 outline-none"
+                                >
+                            </div>
+                        </div>
                         <div class="min-w-0 flex-1 sm:max-w-[200px]">
                             <label class="mb-1 block text-xs font-semibold text-gray-600">Tipo</label>
                             <select x-model="serviceTypeFilter" class="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm">
@@ -1926,10 +1953,10 @@
                         </div>
 
                     </div>
-                    <p class="mb-3 text-[11px] text-gray-500">Elija un KM del listado o deje <span class="font-medium">KM de ingreso del vehículo</span> para usar el kilometraje del formulario. Con el filtro por intervalo, los <span class="font-medium">correctivos</span> siempre se muestran.</p>
+                    <p class="mb-3 text-[11px] text-gray-500">Use el buscador para filtrar por nombre. Elija un KM del listado o deje <span class="font-medium">KM de ingreso del vehículo</span> para usar el kilometraje del formulario. Con el filtro por intervalo, los <span class="font-medium">correctivos</span> siempre se muestran.</p>
 
                     <template x-if="filteredServicesCatalog().length === 0">
-                        <p class="mb-3 text-sm text-gray-500">No hay servicios que coincidan con los filtros. Cambie tipo o kilometraje.</p>
+                        <p class="mb-3 text-sm text-gray-500">No hay servicios que coincidan con los filtros. Cambie la búsqueda, el tipo o el kilometraje.</p>
                     </template>
 
                     <div class="grid grid-cols-1 gap-x-6 gap-y-2 md:grid-cols-3">
