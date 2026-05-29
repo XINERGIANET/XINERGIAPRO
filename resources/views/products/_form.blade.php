@@ -1,9 +1,53 @@
-<div x-data="{
-        productTypes: {{ Illuminate\Support\Js::from(collect($productTypes ?? [])->map(fn($type) => ['id' => $type->id, 'name' => $type->name, 'behavior' => $type->behavior])->values()) }},
-        selectedProductTypeId: {{ Illuminate\Support\Js::from((string) old('product_type_id', $product->product_type_id ?? '')) }},
+<div
+@php
+    $categoriesList = collect($categories ?? []);
+    $unitsList = collect($units ?? []);
+    $productTypesList = collect($productTypes ?? []);
+    $taxRatesList = collect($taxRates ?? []);
+    $isNewProduct = empty($product);
+
+    $defaultProductTypeId = old('product_type_id', $product?->product_type_id ?? (
+        $productTypesList->first(function ($type) {
+            $name = mb_strtolower((string) ($type->name ?? ''), 'UTF-8');
+            $behavior = mb_strtoupper((string) ($type->behavior ?? ''), 'UTF-8');
+            return str_contains($name, 'producto final')
+                || in_array($behavior, ['SELLABLE', 'VENDIBLE'], true);
+        })?->id ?? $productTypesList->first()?->id ?? ''
+    ));
+
+    $defaultCategoryId = old('category_id', $product?->category_id ?? ($categoriesList->first()?->id ?? ''));
+    $defaultUnitId = old('base_unit_id', $product?->base_unit_id ?? (
+        $unitsList->first(function ($unit) {
+            return str_contains(mb_strtolower((string) ($unit->description ?? ''), 'UTF-8'), 'unidad');
+        })?->id ?? $unitsList->first()?->id ?? ''
+    ));
+    $defaultKardex = old('kardex', $product?->kardex ?? 'S');
+    $defaultTaxRateId = old('tax_rate_id', $productBranch?->tax_rate_id ?? ($taxRatesList->first()?->id ?? ''));
+    $defaultUnitSale = old('unit_sale', $productBranch?->unit_sale ?? ($isNewProduct ? 'S' : 'N'));
+    $defaultBranchNumeric = function (string $field, $fallback = '0') use ($isNewProduct, $productBranch) {
+        if ($isNewProduct) {
+            return old($field, $fallback);
+        }
+
+        return old($field, $productBranch?->{$field} ?? $fallback);
+    };
+@endphp
+ x-data="{
+        productTypes: {{ Illuminate\Support\Js::from($productTypesList->map(fn($type) => ['id' => $type->id, 'name' => $type->name, 'behavior' => $type->behavior])->values()) }},
+        selectedProductTypeId: {{ Illuminate\Support\Js::from((string) $defaultProductTypeId) }},
         showBranchDetail: true,
 
         init() {
+            if (!String(this.selectedProductTypeId || '').trim() && this.productTypes.length) {
+                const preferred = this.productTypes.find((type) => {
+                    const name = String(type.name || '').toLowerCase();
+                    const behavior = String(type.behavior || '').toUpperCase();
+                    return name.includes('producto final') || behavior === 'SELLABLE' || behavior === 'VENDIBLE';
+                }) || this.productTypes[0];
+                if (preferred) {
+                    this.selectedProductTypeId = String(preferred.id);
+                }
+            }
             this.syncProductTypeBehavior(this.selectedProductTypeId);
         },
         selectedProductTypeLabel() {
@@ -80,8 +124,7 @@
             type="text"
             name="abbreviation"
             value="{{ old('abbreviation', $product->abbreviation ?? '') }}"
-            required
-            placeholder="Ingrese la abreviatura"
+            placeholder="Opcional (si vacío, usa el nombre)"
             class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
         />
     </div>
@@ -109,30 +152,29 @@
                         tabindex="-1"
                         aria-hidden="true"
                     >
-                        @foreach (($productTypes ?? collect()) as $productType)
-                            <option value="{{ $productType->id }}">
+                        @foreach ($productTypesList as $productType)
+                            <option value="{{ $productType->id }}" @selected((string) $defaultProductTypeId === (string) $productType->id)>
                                 {{ $productType->name }}
                             </option>
                         @endforeach
                     </select>
-                    <select
+                    <input
+                        type="text"
+                        readonly
+                        tabindex="-1"
                         x-bind:value="selectedProductTypeLabel()"
-                        disabled
                         class="dark:bg-dark-900 h-11 w-full cursor-not-allowed rounded-lg border border-gray-200 bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-700 opacity-100 dark:border-gray-700 dark:bg-gray-800 dark:text-white/90"
-                    >
-                        <option x-text="selectedProductTypeLabel()"></option>
-                    </select>
+                    />
                 @else
                     <select
                         id="product-type-select"
                         name="product_type_id"
-                        required
+                        x-model="selectedProductTypeId"
                         @change="handleTypeChange($event)"
                         class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                     >
-                        <option value="">Seleccione tipo</option>
-                        @foreach (($productTypes ?? collect()) as $productType)
-                            <option value="{{ $productType->id }}" @selected(old('product_type_id', $product->product_type_id ?? '') == $productType->id)>
+                        @foreach ($productTypesList as $productType)
+                            <option value="{{ $productType->id }}" @selected((string) $defaultProductTypeId === (string) $productType->id)>
                                 {{ $productType->name }}
                             </option>
                         @endforeach
@@ -147,12 +189,15 @@
                     required
                     class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                 >
-                    <option value="">Seleccione categoría</option>
-                    @foreach ($categories as $category)
-                        <option value="{{ $category->id }}" @selected(old('category_id', $product->category_id ?? '') == $category->id)>
-                            {{ $category->description }}
-                        </option>
-                    @endforeach
+                    @if ($categoriesList->isEmpty())
+                        <option value="">Sin categorías</option>
+                    @else
+                        @foreach ($categoriesList as $category)
+                            <option value="{{ $category->id }}" @selected((string) $defaultCategoryId === (string) $category->id)>
+                                {{ $category->description }}
+                            </option>
+                        @endforeach
+                    @endif
                 </select>
             </div>
 
@@ -163,12 +208,15 @@
                     required
                     class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                 >
-                    <option value="">Seleccione unidad</option>
-                    @foreach ($units as $unit)
-                        <option value="{{ $unit->id }}" @selected(old('base_unit_id', $product->base_unit_id ?? '') == $unit->id)>
-                            {{ $unit->description }}
-                        </option>
-                    @endforeach
+                    @if ($unitsList->isEmpty())
+                        <option value="">Sin unidades</option>
+                    @else
+                        @foreach ($unitsList as $unit)
+                            <option value="{{ $unit->id }}" @selected((string) $defaultUnitId === (string) $unit->id)>
+                                {{ $unit->description }}
+                            </option>
+                        @endforeach
+                    @endif
                 </select>
             </div>
 
@@ -179,8 +227,8 @@
                     required
                     class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                 >
-                    <option value="N" @selected(old('kardex', $product->kardex ?? 'N') === 'N')>No</option>
-                    <option value="S" @selected(old('kardex', $product->kardex ?? 'N') === 'S')>Si</option>
+                    <option value="N" @selected($defaultKardex === 'N')>No</option>
+                    <option value="S" @selected($defaultKardex === 'S')>Si</option>
                 </select>
             </div>
 
@@ -191,8 +239,8 @@
                     required
                     class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                 >
-                    <option value="N" @selected(old('favorite', $productBranch->favorite ?? 'N') === 'N')>No</option>
-                    <option value="S" @selected(old('favorite', $productBranch->favorite ?? 'N') === 'S')>Si</option>
+                    <option value="N" @selected(old('favorite', $productBranch?->favorite ?? 'N') === 'N')>No</option>
+                    <option value="S" @selected(old('favorite', $productBranch?->favorite ?? 'N') === 'S')>Si</option>
                 </select>
             </div>
         </div>
@@ -223,7 +271,7 @@
                     type="number"
                     name="price"
                     step="0.01"
-                    value="{{ old('price', $productBranch->price ?? '') }}"
+                    value="{{ $defaultBranchNumeric('price') }}"
                     required
                     class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                     placeholder="0.00"
@@ -236,7 +284,7 @@
                     type="number"
                     name="purchase_price"
                     step="0.01"
-                    value="{{ old('purchase_price', $productBranch->purchase_price ?? '') }}"
+                    value="{{ $defaultBranchNumeric('purchase_price') }}"
                     required
                     class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                     placeholder="0.00"
@@ -249,7 +297,7 @@
                     type="number"
                     name="stock"
                     step="0.01"
-                    value="{{ old('stock', $productBranch->stock ?? '') }}"
+                    value="{{ $defaultBranchNumeric('stock') }}"
                     required
                     class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                     placeholder="0.00"
@@ -262,7 +310,7 @@
                     type="number"
                     name="stock_minimum"
                     step="0.01"
-                    value="{{ old('stock_minimum', $productBranch->stock_minimum ?? '') }}"
+                    value="{{ $defaultBranchNumeric('stock_minimum') }}"
                     required
                     class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                     placeholder="0.00"
@@ -275,7 +323,7 @@
                     type="number"
                     name="stock_maximum"
                     step="0.01"
-                    value="{{ old('stock_maximum', $productBranch->stock_maximum ?? '') }}"
+                    value="{{ $defaultBranchNumeric('stock_maximum') }}"
                     required
                     class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                     placeholder="0.00"
@@ -288,7 +336,7 @@
                     type="number"
                     name="minimum_sell"
                     step="0.01"
-                    value="{{ old('minimum_sell', $productBranch->minimum_sell ?? '') }}"
+                    value="{{ $defaultBranchNumeric('minimum_sell') }}"
                     required
                     class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                     placeholder="0.00"
@@ -301,7 +349,7 @@
                     type="number"
                     name="minimum_purchase"
                     step="0.01"
-                    value="{{ old('minimum_purchase', $productBranch->minimum_purchase ?? '') }}"
+                    value="{{ $defaultBranchNumeric('minimum_purchase') }}"
                     required
                     class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30"
                     placeholder="0.00"
@@ -317,7 +365,7 @@
                         type="checkbox"
                         name="unit_sale"
                         value="S"
-                        @checked(old('unit_sale', $productBranch->unit_sale ?? 'N') === 'S')
+                        @checked($defaultUnitSale === 'S')
                         class="h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
                     />
                     <label for="unit_sale" class="text-sm text-gray-700 dark:text-gray-300">Permitir venta unitaria</label>
@@ -329,7 +377,7 @@
                 <input
                     type="date"
                     name="expiration_date"
-                    value="{{ old('expiration_date', $productBranch->expiration_date ?? '') }}"
+                    value="{{ old('expiration_date', $productBranch?->expiration_date ?? '') }}"
                     class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                 />
             </div>
@@ -339,13 +387,14 @@
                     name="tax_rate_id"
                     class="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:ring-3 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                 >
-                    <option value="">Seleccione tasa impositiva</option>
-                    @if(isset($taxRates))
-                        @foreach ($taxRates as $rate)
-                            <option value="{{ $rate->id }}" @selected(old('tax_rate_id', $productBranch->tax_rate_id ?? '') == $rate->id)>
+                    @if($taxRatesList->isNotEmpty())
+                        @foreach ($taxRatesList as $rate)
+                            <option value="{{ $rate->id }}" @selected((string) $defaultTaxRateId === (string) $rate->id)>
                                 {{ $rate->description }}
                             </option>
                         @endforeach
+                    @else
+                        <option value="">Sin tasas</option>
                     @endif
                 </select>
             </div>
@@ -365,7 +414,7 @@
                                     $supplierLabel = $supplier->document_number ?? ('#' . $supplier->id);
                                 }
                             @endphp
-                            <option value="{{ $supplier->id }}" @selected(old('supplier_id', $productBranch->supplier_id ?? '') == $supplier->id)>
+                            <option value="{{ $supplier->id }}" @selected(old('supplier_id', $productBranch?->supplier_id ?? '') == $supplier->id)>
                                 {{ $supplierLabel }}
                             </option>
                         @endforeach

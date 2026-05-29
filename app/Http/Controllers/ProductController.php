@@ -764,6 +764,8 @@ class ProductController extends Controller
 
     private function validateProduct(Request $request): array
     {
+        $this->applyProductFormDefaults($request);
+
         $branchId = (int) $request->session()->get('branch_id');
         $selectedProductType = ProductType::query()
             ->where('id', (int) $request->input('product_type_id'))
@@ -772,15 +774,13 @@ class ProductController extends Controller
             ->first();
         $isSupplyType = $selectedProductType
             && in_array(strtoupper((string) $selectedProductType->behavior), ['SUPPLY', 'SUMINISTRO'], true);
-        $detailNumericRules = $isSupplyType
-            ? ['nullable', 'numeric', 'min:0']
-            : ['required', 'numeric', 'min:0'];
+        $detailNumericRules = ['nullable', 'numeric', 'min:0'];
 
         $validated = $request->validate([
             // Datos del Producto
             'code' => ['required', 'string', 'max:50'],
             'description' => ['required', 'string', 'max:255'],
-            'abbreviation' => ['required', 'string', 'max:255'],
+            'abbreviation' => ['nullable', 'string', 'max:255'],
             'marca' => ['nullable', 'string', 'max:120'],
             'product_type_id' => ['required', 'integer', 'exists:product_types,id'],
             'category_id' => ['required', 'integer', 'exists:categories,id'],
@@ -839,9 +839,109 @@ class ProductController extends Controller
         $validated['complement'] = 'NO';
         $validated['complement_mode'] = '';
         $validated['classification'] = 'GOOD';
-        $validated['unit_sale'] = $validated['unit_sale'] ?? 'N';
+        $validated['unit_sale'] = $validated['unit_sale'] ?? 'S';
+
+        $abbreviation = trim((string) ($validated['abbreviation'] ?? ''));
+        if ($abbreviation === '') {
+            $abbreviation = (string) $validated['description'];
+        }
+        $validated['abbreviation'] = mb_substr($abbreviation, 0, 255);
+
+        foreach (['price', 'purchase_price', 'stock', 'stock_minimum', 'stock_maximum', 'minimum_sell', 'minimum_purchase'] as $numericField) {
+            if (!isset($validated[$numericField]) || $validated[$numericField] === '') {
+                $validated[$numericField] = 0;
+            }
+        }
         
         return $validated;
+    }
+
+    private function applyProductFormDefaults(Request $request): void
+    {
+        $branchId = (int) $request->session()->get('branch_id');
+
+        if (!$request->filled('product_type_id')) {
+            $typeId = $this->resolveDefaultProductTypeId($branchId);
+            if ($typeId) {
+                $request->merge(['product_type_id' => $typeId]);
+            }
+        }
+
+        if (!$request->filled('category_id')) {
+            $categoryId = Category::query()
+                ->forBranch($branchId)
+                ->orderBy('description')
+                ->value('id');
+            if ($categoryId) {
+                $request->merge(['category_id' => $categoryId]);
+            }
+        }
+
+        if (!$request->filled('base_unit_id')) {
+            $unitId = Unit::query()
+                ->whereRaw('LOWER(description) LIKE ?', ['%unidad%'])
+                ->orderBy('id')
+                ->value('id') ?? Unit::query()->orderBy('id')->value('id');
+            if ($unitId) {
+                $request->merge(['base_unit_id' => $unitId]);
+            }
+        }
+
+        if (!$request->filled('kardex')) {
+            $request->merge(['kardex' => 'S']);
+        }
+
+        if (!$request->filled('tax_rate_id')) {
+            $taxRateId = TaxRate::query()
+                ->where('status', true)
+                ->orderBy('order_num')
+                ->value('id');
+            if ($taxRateId) {
+                $request->merge(['tax_rate_id' => $taxRateId]);
+            }
+        }
+
+        foreach (['price', 'purchase_price', 'stock', 'stock_minimum', 'stock_maximum', 'minimum_sell', 'minimum_purchase'] as $field) {
+            if ($request->input($field, null) === null || $request->input($field) === '') {
+                $request->merge([$field => 0]);
+            }
+        }
+
+        if (!$request->has('unit_sale')) {
+            $request->merge(['unit_sale' => 'S']);
+        }
+    }
+
+    private function resolveDefaultProductTypeId(int $branchId): ?int
+    {
+        if ($branchId <= 0) {
+            return null;
+        }
+
+        ProductType::ensureDefaultsForBranch($branchId);
+
+        $typeId = ProductType::query()
+            ->where('branch_id', $branchId)
+            ->where('status', true)
+            ->where(function ($query) {
+                $query->whereRaw('LOWER(name) LIKE ?', ['%producto final%'])
+                    ->orWhereIn('behavior', ['SELLABLE', 'VENDIBLE']);
+            })
+            ->orderByRaw("CASE UPPER(behavior) WHEN 'SELLABLE' THEN 0 WHEN 'VENDIBLE' THEN 1 ELSE 2 END")
+            ->orderBy('id')
+            ->value('id');
+
+        if ($typeId) {
+            return (int) $typeId;
+        }
+
+        $fallbackId = ProductType::query()
+            ->where('branch_id', $branchId)
+            ->where('status', true)
+            ->orderBy('id')
+            ->value('id');
+
+        return $fallbackId ? (int) $fallbackId : null;
     }
 
     private function prepareProductData(array $validated): array
@@ -879,7 +979,7 @@ class ProductController extends Controller
             'minimum_purchase' => $validated['minimum_purchase'],
             'favorite' => $validated['favorite'],
             'tax_rate_id' => $validated['tax_rate_id'] ?? null,
-            'unit_sale' => $validated['unit_sale'] ?? 'N',
+            'unit_sale' => $validated['unit_sale'] ?? 'S',
             'duration_minutes' => $validated['duration_minutes'] ?? null,
             'supplier_id' => $validated['supplier_id'] ?? null,
             'stock' => $validated['stock'],

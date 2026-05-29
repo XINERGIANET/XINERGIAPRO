@@ -79,14 +79,21 @@
     @open-product-modal.window="
         open = true;
         $nextTick(() => {
-            const field = $el.querySelector(`#product-type-select`);
+            const field = $el.querySelector('#product-type-select');
             if (!field) return;
 
+            const formRoot = field.closest('[x-data]');
             const targetValue = $event.detail?.productTypeId ? String($event.detail.productTypeId) : '';
-            if (!targetValue) return;
 
-            field.value = targetValue;
-            field.dispatchEvent(new Event('change', { bubbles: true }));
+            if (targetValue !== '' && formRoot && window.Alpine) {
+                const data = Alpine.$data(formRoot);
+                if (data && typeof data.handleTypeChange === 'function') {
+                    data.selectedProductTypeId = targetValue;
+                    data.handleTypeChange({ target: { value: targetValue } });
+                }
+                field.value = targetValue;
+                field.dispatchEvent(new Event('change', { bubbles: true }));
+            }
         });
     "
     @close-product-modal.window="open = false"
