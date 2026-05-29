@@ -109,29 +109,24 @@ class WorkshopOrderController extends Controller
         $deleted = 0;
         $skipped = 0;
 
-        DB::transaction(function () use ($idList, &$deleted, &$skipped) {
-            foreach (array_chunk($idList, 150) as $chunk) {
-                $orders = WorkshopMovement::query()->whereIn('id', $chunk)->get();
-                foreach ($orders as $order) {
-                    if (!$this->orderMatchesSessionScope($order)) {
-                        $skipped++;
+        $userId = (int) (auth()->id() ?? 0);
 
-                        continue;
-                    }
-                    if ($order->sales_movement_id || $order->cash_movement_id) {
-                        $skipped++;
+        foreach (array_chunk($idList, 150) as $chunk) {
+            $orders = WorkshopMovement::query()->whereIn('id', $chunk)->get();
+            foreach ($orders as $order) {
+                if (!$this->orderMatchesSessionScope($order)) {
+                    $skipped++;
 
-                        continue;
-                    }
-                    $movement = Movement::query()->find($order->movement_id);
-                    $order->delete();
-                    if ($movement) {
-                        $movement->delete();
-                    }
+                    continue;
+                }
+                try {
+                    $this->flowService->deleteWorkshopOrder($order, $userId);
                     $deleted++;
+                } catch (\Throwable $e) {
+                    $skipped++;
                 }
             }
-        });
+        }
 
         $q = array_filter(['view_id' => $request->input('view_id')]);
         $msg = "Se eliminaron {$deleted} orden(es) de servicio.";
@@ -1117,14 +1112,11 @@ class WorkshopOrderController extends Controller
     public function destroy(WorkshopMovement $order): RedirectResponse
     {
         $this->assertOrderScope($order);
-        if ($order->sales_movement_id || $order->cash_movement_id) {
-            return back()->withErrors(['error' => 'No se puede eliminar una OS con venta o pagos relacionados.']);
-        }
 
-        $movement = Movement::query()->find($order->movement_id);
-        $order->delete();
-        if ($movement) {
-            $movement->delete();
+        try {
+            $this->flowService->deleteWorkshopOrder($order, (int) (auth()->id() ?? 0));
+        } catch (\Throwable $e) {
+            return back()->with('error', $e->getMessage());
         }
 
         return redirect()->route('workshop.orders.index')->with('status', 'Orden eliminada.');

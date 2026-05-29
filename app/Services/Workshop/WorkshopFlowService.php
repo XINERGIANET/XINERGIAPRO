@@ -30,9 +30,12 @@ use App\Models\WorkshopChecklist;
 use App\Models\WorkshopChecklistItem;
 use App\Models\WorkshopAudit;
 use App\Models\WorkshopIntakeInventory;
+use App\Models\WorkshopMaintenanceReminder;
 use App\Models\WorkshopMovement;
 use App\Models\WorkshopMovementDetail;
+use App\Models\WorkshopMovementTechnician;
 use App\Models\WorkshopPreexistingDamage;
+use App\Models\WorkshopPreexistingDamagePhoto;
 use App\Models\WorkshopStatusHistory;
 use App\Models\WorkshopMovementStatusLog;
 use App\Models\WorkshopVehicleIntakeInventoryItem;
@@ -1009,6 +1012,97 @@ class WorkshopFlowService
 
             $movement = $quotation->movement;
             $quotation->delete();
+            if ($movement) {
+                $movement->delete();
+            }
+        });
+    }
+
+    public function deleteWorkshopOrder(WorkshopMovement $order, int $userId = 0): void
+    {
+        DB::transaction(function () use ($order, $userId) {
+            $order = WorkshopMovement::query()->lockForUpdate()->findOrFail($order->id);
+            $this->assertWorkshopInCurrentBranch($order);
+
+            if (WorkshopMovement::query()
+                ->where('previous_workshop_movement_id', $order->id)
+                ->where('id', '!=', $order->id)
+                ->exists()) {
+                throw new \RuntimeException('No se puede eliminar: la OS tiene otra orden generada a partir de ella.');
+            }
+
+            if ((float) $order->paid_total > 0.0001) {
+                throw new \RuntimeException('No se puede eliminar una OS con pagos registrados. Anule o devuelva los pagos primero.');
+            }
+
+            $details = WorkshopMovementDetail::query()
+                ->where('workshop_movement_id', $order->id)
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($details as $detail) {
+                if ((bool) $detail->stock_consumed) {
+                    $this->revertConsumedDetail($detail);
+                }
+                $this->releaseReservations($detail, 'released');
+            }
+
+            WorkshopMovementDetail::query()
+                ->where('workshop_movement_id', $order->id)
+                ->delete();
+
+            if ($order->sales_movement_id) {
+                $sale = SalesMovement::query()->find($order->sales_movement_id);
+                if ($sale) {
+                    $sale->update(['status' => 'C']);
+                    $sale->movement?->update([
+                        'status' => 'C',
+                        'comment' => trim((string) $sale->movement?->comment) . ' | ELIMINADA DESDE OS',
+                    ]);
+                }
+            }
+
+            WorkshopMovementTechnician::query()->where('workshop_movement_id', $order->id)->delete();
+            WorkshopWarranty::query()->where('workshop_movement_id', $order->id)->delete();
+            WorkshopAudit::query()->where('workshop_movement_id', $order->id)->delete();
+            WorkshopStatusHistory::query()->where('workshop_movement_id', $order->id)->delete();
+            WorkshopMovementStatusLog::query()->where('workshop_movement_id', $order->id)->delete();
+            WorkshopVehicleLog::query()->where('workshop_movement_id', $order->id)->delete();
+
+            $checklistIds = WorkshopChecklist::query()
+                ->where('workshop_movement_id', $order->id)
+                ->pluck('id');
+            if ($checklistIds->isNotEmpty()) {
+                WorkshopChecklistItem::query()->whereIn('checklist_id', $checklistIds)->delete();
+                WorkshopChecklist::query()->whereIn('id', $checklistIds)->delete();
+            }
+
+            WorkshopIntakeInventory::query()->where('workshop_movement_id', $order->id)->delete();
+
+            $damageIds = WorkshopPreexistingDamage::query()
+                ->where('workshop_movement_id', $order->id)
+                ->pluck('id');
+            if ($damageIds->isNotEmpty()) {
+                WorkshopPreexistingDamagePhoto::query()
+                    ->whereIn('workshop_preexisting_damage_id', $damageIds)
+                    ->delete();
+                WorkshopPreexistingDamage::query()->whereIn('id', $damageIds)->delete();
+            }
+
+            if ($order->appointment_id) {
+                Appointment::query()
+                    ->where('id', $order->appointment_id)
+                    ->update(['status' => 'cancelled']);
+            }
+
+            WorkshopMaintenanceReminder::query()
+                ->where('last_workshop_movement_id', $order->id)
+                ->update(['last_workshop_movement_id' => null]);
+
+            $this->audit((int) $order->id, $userId > 0 ? $userId : (int) (Auth::id() ?? 0), 'OS_DELETED', []);
+
+            $movement = $order->movement;
+            $order->delete();
             if ($movement) {
                 $movement->delete();
             }
