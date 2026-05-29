@@ -39,6 +39,7 @@ class WorkshopParameterSeeder extends Seeder
             ['description' => 'Mostrar inventario', 'value' => 'Si'],
             ['description' => 'Permitir editar precios en cotizacion de taller', 'value' => 'No'],
             ['description' => 'Mostrar daños preexistentes', 'value' => 'Si'],
+            ['description' => 'Mostrar firma del cliente', 'value' => 'Si'],
             ['description' => 'Meses para notificar próximo servicio', 'value' => '2'],
             ['description' => 'Días para notificar próximo servicio', 'value' => '0'],
         ];

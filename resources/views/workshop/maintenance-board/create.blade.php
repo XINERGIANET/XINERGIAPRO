@@ -187,6 +187,7 @@
         selectedVehicleTypeId: '',
         showInventory: @js($showInventoryDefault ?? true),
         showDamagesPreexisting: @js($showDamagesPreexistingDefault ?? true),
+        showClientSignature: @js($showClientSignatureDefault ?? true),
         diagnosisText: @js($diagnosisDefault),
         serviceType: @js($serviceType ?? 'preventivo'),
         driverName: @js($editingDriverName ?? ''),
@@ -1726,7 +1727,8 @@
                     <div
                         x-data="{
                             showInventory: @js($showInventoryDefault ?? true),
-                            showDamagesPreexisting: @js($showDamagesPreexistingDefault ?? true)
+                            showDamagesPreexisting: @js($showDamagesPreexistingDefault ?? true),
+                            showClientSignature: @js($showClientSignatureDefault ?? true)
                         }"
                         class="rounded-xl border border-gray-200 bg-white p-4 md:col-span-3"
                         x-show="serviceType !== 'correctivo'"
@@ -1814,7 +1816,14 @@
                             </div>
                         </div>
 
-                        <div class="mt-4 rounded-lg border border-gray-200 bg-white p-3">
+                        <div class="mb-3 mt-4">
+                            <label class="inline-flex items-center gap-2 text-sm font-semibold text-gray-700">
+                                <input type="checkbox" x-model="showClientSignature" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                <span>Mostrar firma del cliente en ingreso</span>
+                            </label>
+                        </div>
+
+                        <div class="mt-4 rounded-lg border border-gray-200 bg-white p-3" x-show="showClientSignature" x-cloak>
                             <template x-if="editingMode && editingSignatureUrl">
                                 <div class="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
                                     <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">Firma registrada</p>

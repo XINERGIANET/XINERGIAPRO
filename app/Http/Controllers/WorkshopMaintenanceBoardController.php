@@ -337,6 +337,9 @@ class WorkshopMaintenanceBoardController extends Controller
         if ($order->damages->isNotEmpty()) {
             $formData['showDamagesPreexistingDefault'] = true;
         }
+        if (trim((string) ($order->intake_client_signature_path ?? '')) !== '') {
+            $formData['showClientSignatureDefault'] = true;
+        }
 
         $initialServiceLines = $order->details
             ->where('line_type', 'SERVICE')
@@ -601,6 +604,10 @@ class WorkshopMaintenanceBoardController extends Controller
             'Mostrar daños preexistentes',
             'Mostrar daños preexistentes',
         ], true);
+        $showClientSignatureDefault = $this->branchBooleanParameter($branchId, [
+            'Mostrar firma del cliente',
+            'Mostrar firma de cliente',
+        ], true);
 
         $editableServicePricesEnabled = $this->isCatalogServicePriceEditingEnabled($branchId);
 
@@ -630,6 +637,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'inventoryItemsByVehicleType',
             'showInventoryDefault',
             'showDamagesPreexistingDefault',
+            'showClientSignatureDefault',
             'editableServicePricesEnabled',
             'isSunatActive',
             'isAnticipoEnabled'
