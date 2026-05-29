@@ -1677,7 +1677,6 @@
                                     <span class="hidden sm:inline">Ahora</span>
                                 </button>
                             </div>
-                            <p class="mt-1 text-[10px] leading-tight text-gray-500">Puede registrar ingresos con fecha y hora anteriores.</p>
                         </div>
 
                         <div class="shrink-0" style="width: 96px; min-width: 96px; max-width: 96px; flex: 0 0 96px;">
