@@ -8,7 +8,7 @@
         return [
             'id' => $detail->id,
             'methodId' => (string)$detail->payment_method_id,
-            'methodName' => $detail->payment_method_name,
+            'methodName' => $detail->payment_method,
             'amount' => number_format($detail->amount, 2, '.', ''),
             'card_id' => $detail->card_id,
             'payment_gateway_id' => $detail->payment_gateway_id,
@@ -22,6 +22,8 @@
     $initialConcepts = $isIngreso ? $conceptsIngreso : $conceptsEgreso;
 
     $savedConceptId = old('payment_concept_id', $movement->cashMovement->payment_concept_id);
+    $lockConceptFields = (bool) ($isOpeningMovement ?? false) || (bool) ($isClosingMovement ?? false);
+    $defaultComment = old('comment', $movement->comment ?: ($movement->cashMovement?->paymentConcept?->description ?? ''));
 @endphp
 
 <x-common.page-breadcrumb pageTitle="Editar Movimiento" />
@@ -29,9 +31,10 @@
 <x-ui.modal
     x-data="{ 
         open: true,
-        formConcept: '{{ old('comment', $movement->comment) }}', 
+        formConcept: @js($defaultComment),
         formConceptId: '{{ $savedConceptId }}',
         formDocId: '{{ $movement->document_type_id }}',
+        lockConceptFields: @json($lockConceptFields),
         currentConcepts: {{ Js::from($initialConcepts) }},
 
         rows: {{ $existingPayments->count() > 0 ? Js::from($existingPayments) : '[{ id: Date.now(), methodId: \'\', methodName: \'\', amount: \'\' }]' }},
@@ -107,9 +110,12 @@
                     <div class="col-span-full">
                         <label class="mb-1.5 block text-sm font-medium text-gray-600 dark:text-gray-400">Nota / Descripción</label>
                         <input type="text" name="comment" x-model="formConcept"
-                            :readonly="formConcept.includes('Apertura') || formConcept.includes('Cierre')"
-                            :class="formConcept.includes('Apertura') || formConcept.includes('Cierre') ? 'bg-gray-100 text-gray-400' : 'bg-white dark:bg-dark-900'"
+                            :readonly="lockConceptFields"
+                            :class="lockConceptFields ? 'bg-gray-100 text-gray-400' : 'bg-white dark:bg-dark-900'"
                             class="h-11 w-full rounded-lg border-gray-200 px-4 py-2.5 text-sm transition-all" />
+                        <template x-if="lockConceptFields">
+                            <p class="mt-1 text-xs text-gray-500">El concepto de apertura no se modifica; puede ajustar turno y montos.</p>
+                        </template>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -126,11 +132,17 @@
 
                         <div>
                             <label class="mb-1.5 block text-sm font-medium text-gray-600 dark:text-gray-400">Concepto</label>
-                            <select name="payment_concept_id" required x-model="formConceptId" class="h-11 w-full rounded-lg border-gray-200 dark:bg-dark-900 dark:text-white/90">
+                            <select name="payment_concept_id" required x-model="formConceptId"
+                                :disabled="lockConceptFields"
+                                :class="lockConceptFields ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white dark:bg-dark-900 dark:text-white/90'"
+                                class="h-11 w-full rounded-lg border-gray-200">
                                 <template x-for="item in currentConcepts" :key="item.id">
                                     <option :value="item.id" x-text="item.description" :selected="item.id == formConceptId"></option>
                                 </template>
                             </select>
+                            <template x-if="lockConceptFields">
+                                <input type="hidden" name="payment_concept_id" :value="formConceptId">
+                            </template>
                         </div>
                     </div>
                 </div>

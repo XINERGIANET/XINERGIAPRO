@@ -213,6 +213,7 @@ class PettyCashController extends Controller
                 'cashMovement.details',
                 'cashMovement.paymentConcept',
                 'cashMovement.shift',
+                'salesMovement',
             ])
             ->whereHas('cashMovement', function ($query) use ($selectedBoxId) {
                 $query->where('cash_register_id', $selectedBoxId);
@@ -691,12 +692,25 @@ class PettyCashController extends Controller
 
     public function edit(Request $request, $cash_register_id, $id)
     {
-        $movement = Movement::with(['cashMovement.details', 'cashMovement'])->findOrFail($id);
+        $movement = Movement::with(['cashMovement.details', 'cashMovement.paymentConcept', 'salesMovement'])->findOrFail($id);
+
+        if (!$this->movementAllowsManualEdit($movement)) {
+            $params = ['cash_register_id' => $cash_register_id];
+            if ($request->filled('view_id')) {
+                $params['view_id'] = $request->input('view_id');
+            }
+
+            return redirect()
+                ->route('admin.petty-cash.index', $params)
+                ->with('error', 'Este movimiento no se puede editar manualmente.');
+        }
 
         $currentConceptId = $movement->cashMovement->payment_concept_id;
         $currentConcept   = PaymentConcept::find($currentConceptId);
         $desc = $currentConcept ? strtolower($currentConcept->description) : '';
-        $isSpecialEvent = str_contains($desc, 'apertura') || str_contains($desc, 'cierre');
+        $isOpeningMovement = str_contains($desc, 'apertura');
+        $isClosingMovement = str_contains($desc, 'cierre');
+        $isSpecialEvent = $isOpeningMovement || $isClosingMovement;
 
         if ($isSpecialEvent) {
             if ($currentConcept->type == 'I') {
@@ -742,12 +756,27 @@ class PettyCashController extends Controller
             'banks',
             'digitalWallets',
             'paymentGateways',
-            'viewId'
+            'viewId',
+            'isOpeningMovement',
+            'isClosingMovement',
         ));
     }
 
     public function update(Request $request, $cash_register_id, $id)
     {
+        $movement = Movement::with(['cashMovement.paymentConcept', 'salesMovement'])->findOrFail($id);
+
+        if (!$this->movementAllowsManualEdit($movement)) {
+            $params = ['cash_register_id' => $cash_register_id];
+            if ($request->filled('view_id')) {
+                $params['view_id'] = $request->input('view_id');
+            }
+
+            return redirect()
+                ->route('admin.petty-cash.index', $params)
+                ->with('error', 'Este movimiento no se puede editar manualmente.');
+        }
+
         $validated = $request->validate([
             'comment'            => 'nullable|string|max:255',
             'shift_id'           => 'required|exists:shifts,id',
@@ -763,6 +792,13 @@ class PettyCashController extends Controller
 
                 $movement = Movement::findOrFail($id);
                 $cashMovement = CashMovements::where('movement_id', $movement->id)->firstOrFail();
+
+                $currentConcept = PaymentConcept::find($cashMovement->payment_concept_id);
+                $currentConceptName = mb_strtolower((string) ($currentConcept?->description ?? ''), 'UTF-8');
+                if (str_contains($currentConceptName, 'apertura')) {
+                    $validated['payment_concept_id'] = (int) $cashMovement->payment_concept_id;
+                    $validated['comment'] = $currentConcept?->description ?? $validated['comment'] ?? null;
+                }
 
                 $selectedShift = Shift::findOrFail($request->shift_id);
                 $shiftSnapshotJson = json_encode([
@@ -854,6 +890,19 @@ class PettyCashController extends Controller
 
     public function destroy(Request $request, $cash_register_id, $id)
     {
+        $movement = Movement::with(['cashMovement.paymentConcept', 'salesMovement'])->findOrFail($id);
+
+        if (!$this->movementAllowsManualEdit($movement)) {
+            $params = ['cash_register_id' => $cash_register_id];
+            if ($request->filled('view_id')) {
+                $params['view_id'] = $request->input('view_id');
+            }
+
+            return redirect()
+                ->route('admin.petty-cash.index', $params)
+                ->with('error', 'Este movimiento no se puede eliminar manualmente.');
+        }
+
         try {
             DB::transaction(function () use ($id) {
                 $movement = Movement::with('cashMovement.details')->findOrFail($id);
@@ -1194,6 +1243,27 @@ class PettyCashController extends Controller
         $value = mb_strtolower(trim((string) $method), 'UTF-8');
 
         return str_contains($value, 'efectivo') || str_contains($value, 'cash');
+    }
+
+    private function movementAllowsManualEdit(Movement $movement): bool
+    {
+        $movement->loadMissing(['cashMovement.paymentConcept', 'salesMovement']);
+
+        $conceptName = mb_strtolower((string) ($movement->cashMovement?->paymentConcept?->description ?? ''), 'UTF-8');
+
+        if (str_contains($conceptName, 'pago de cliente')) {
+            return false;
+        }
+
+        if ($movement->salesMovement !== null) {
+            return false;
+        }
+
+        if (str_contains($conceptName, 'cierre')) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

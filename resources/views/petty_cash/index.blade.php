@@ -506,6 +506,10 @@
                                         ->map(fn($items, $label) => trim(($label ?: 'Metodo') . ': ' . number_format($items->sum('amount'), 2)))
                                         ->values()
                                         ->implode(' | ');
+                                    $conceptNameLower = mb_strtolower($conceptName, 'UTF-8');
+                                    $canManualEdit = !str_contains($conceptNameLower, 'pago de cliente')
+                                        && $movement->salesMovement === null
+                                        && !str_contains($conceptNameLower, 'cierre');
                                 @endphp
                                 <tbody>
                                  <tr class="border-b border-gray-100 transition hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5">
@@ -556,6 +560,10 @@
                                                     @php
                                                         $action = $operation->action ?? '';
                                                         $isDelete = str_contains($action, 'destroy');
+                                                        $isEdit = str_contains($action, 'edit');
+                                                        if (($isDelete || $isEdit) && !$canManualEdit) {
+                                                            continue;
+                                                        }
                                                         $actionUrl = $resolveActionUrl($action, $movement, $operation);
                                                         $textColor = $resolveTextColor($operation);
                                                         $buttonColor = $operation->color ?: '#3B82F6';
