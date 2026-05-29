@@ -1667,7 +1667,7 @@
                                         class="h-11 w-full min-w-0 rounded-xl border border-gray-300 bg-gradient-to-b from-white to-gray-50/80 px-3 text-sm text-gray-800 shadow-sm transition focus:border-indigo-500 focus:from-white focus:ring-2 focus:ring-indigo-200/80 outline-none dark:border-gray-600 dark:from-gray-900 dark:to-gray-900/60 dark:text-gray-100"
                                     >
                                 </div>
-                                <button
+                                {{-- <button
                                     type="button"
                                     @click="intakeDateTime = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)"
                                     class="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50 px-3 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100"
@@ -1675,7 +1675,7 @@
                                 >
                                     <i class="ri-time-line text-base"></i>
                                     <span class="hidden sm:inline">Ahora</span>
-                                </button>
+                                </button> --}}
                             </div>
                         </div>
 
@@ -1718,11 +1718,7 @@
                                 <input name="driver_phone" x-model="driverPhone" class="h-11 w-full rounded-lg border border-gray-300 pl-10 pr-3 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition" placeholder="Número de contacto">
                             </div>
                         </div>
-                        <div class="md:col-span-1 flex items-end">
-                            <p class="text-[11px] text-gray-500 leading-tight italic">
-                                <i class="ri-information-line"></i> Datos del conductor que trae el vehículo al taller.
-                            </p>
-                        </div>
+                     
                     </div>
 
                     <textarea name="observations" rows="3" class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-3" placeholder="Observaciones">{{ old('observations', optional($editingOrder)->observations ?? '') }}</textarea>
