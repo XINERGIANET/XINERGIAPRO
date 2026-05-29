@@ -22,6 +22,8 @@ use App\Models\Vehicle;
 use App\Models\VehicleType;
 use App\Models\WorkshopMovement;
 use App\Models\WorkshopMovementTechnician;
+use App\Models\WorkshopPartReplacementPair;
+use App\Models\WorkshopPartReplacementPhoto;
 use App\Models\WorkshopPreexistingDamage;
 use App\Models\WorkshopService;
 use App\Models\WorkshopVehicleIntakeInventoryItem;
@@ -3090,6 +3092,296 @@ class WorkshopMaintenanceBoardController extends Controller
         $order->save();
 
         return back()->with('status', 'Fase de servicio correctivo actualizada exitosamente.');
+    }
+
+    public function partsReplacementStatus(WorkshopMovement $order)
+    {
+        $this->assertOrderScope($order);
+
+        if (!in_array((string) $order->status, ['in_progress', 'paused'], true)) {
+            return redirect()
+                ->route('workshop.maintenance-board.index', request()->only('view_id'))
+                ->with('status', 'El estado de repuestos solo está disponible para vehículos en reparación.');
+        }
+
+        $order->load([
+            'movement',
+            'vehicle',
+            'client',
+            'details.product',
+            'partReplacementPairs.photos',
+        ]);
+
+        $pairsPayload = $this->buildPartsReplacementPairsPayload($order);
+
+        return view('workshop.maintenance-board.parts-replacement-status', [
+            'order' => $order,
+            'pairsPayload' => $pairsPayload,
+            'viewId' => request('view_id'),
+        ]);
+    }
+
+    public function storePartsReplacementStatus(Request $request, WorkshopMovement $order)
+    {
+        $this->assertOrderScope($order);
+
+        if (!in_array((string) $order->status, ['in_progress', 'paused'], true)) {
+            return redirect()
+                ->route('workshop.maintenance-board.index', $request->only('view_id'))
+                ->with('status', 'El estado de repuestos solo está disponible para vehículos en reparación.');
+        }
+
+        $validated = $request->validate([
+            'report_notes' => ['nullable', 'string', 'max:5000'],
+            'pairs' => ['nullable', 'array'],
+            'pairs.*.id' => ['nullable', 'integer'],
+            'pairs.*.old_part_name' => ['nullable', 'string', 'max:255'],
+            'pairs.*.new_part_name' => ['nullable', 'string', 'max:255'],
+            'pairs.*.old_part_notes' => ['nullable', 'string', 'max:2000'],
+            'pairs.*.new_part_notes' => ['nullable', 'string', 'max:2000'],
+            'pairs.*.old_photos' => ['nullable', 'array'],
+            'pairs.*.old_photos.*' => ['nullable', 'image', 'max:10240'],
+            'pairs.*.new_photos' => ['nullable', 'array'],
+            'pairs.*.new_photos.*' => ['nullable', 'image', 'max:10240'],
+            'delete_photo_ids' => ['nullable', 'array'],
+            'delete_photo_ids.*' => ['integer'],
+        ]);
+
+        $branchId = (int) session('branch_id');
+        $pairsInput = collect($validated['pairs'] ?? []);
+        $deletePhotoIds = collect($validated['delete_photo_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->values();
+
+        DB::transaction(function () use ($order, $validated, $pairsInput, $deletePhotoIds, $request, $branchId) {
+            $order->parts_replacement_report_notes = trim((string) ($validated['report_notes'] ?? '')) ?: null;
+            $order->save();
+
+            if ($deletePhotoIds->isNotEmpty()) {
+                $photosToDelete = WorkshopPartReplacementPhoto::query()
+                    ->whereIn('id', $deletePhotoIds->all())
+                    ->whereHas('pair', fn ($query) => $query->where('workshop_movement_id', $order->id))
+                    ->get();
+
+                foreach ($photosToDelete as $photo) {
+                    if ($photo->photo_path && Storage::disk('public')->exists($photo->photo_path)) {
+                        Storage::disk('public')->delete($photo->photo_path);
+                    }
+                    $photo->delete();
+                }
+            }
+
+            $submittedPairIds = $pairsInput
+                ->pluck('id')
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->values();
+
+            $existingPairIds = $order->partReplacementPairs()->pluck('id')->map(fn ($id) => (int) $id);
+            $pairIdsToDelete = $existingPairIds->diff($submittedPairIds);
+            if ($pairIdsToDelete->isNotEmpty()) {
+                $pairsToRemove = $order->partReplacementPairs()
+                    ->whereIn('id', $pairIdsToDelete->all())
+                    ->with('photos')
+                    ->get();
+
+                foreach ($pairsToRemove as $pairToRemove) {
+                    foreach ($pairToRemove->photos as $photo) {
+                        if ($photo->photo_path && Storage::disk('public')->exists($photo->photo_path)) {
+                            Storage::disk('public')->delete($photo->photo_path);
+                        }
+                        $photo->delete();
+                    }
+                    $pairToRemove->delete();
+                }
+            }
+
+            foreach ($pairsInput->values() as $sortOrder => $pairData) {
+                $oldName = trim((string) ($pairData['old_part_name'] ?? ''));
+                $newName = trim((string) ($pairData['new_part_name'] ?? ''));
+                $oldNotes = trim((string) ($pairData['old_part_notes'] ?? ''));
+                $newNotes = trim((string) ($pairData['new_part_notes'] ?? ''));
+
+                $pairId = !empty($pairData['id']) ? (int) $pairData['id'] : null;
+                $existingPair = $pairId
+                    ? $order->partReplacementPairs()->where('id', $pairId)->first()
+                    : null;
+
+                $hasNewOldPhotos = !empty($request->file("pairs.{$sortOrder}.old_photos"));
+                $hasNewNewPhotos = !empty($request->file("pairs.{$sortOrder}.new_photos"));
+                $existingPhotosCount = $existingPair
+                    ? $existingPair->photos()->whereNotIn('id', $deletePhotoIds->all())->count()
+                    : 0;
+
+                if (
+                    $oldName === ''
+                    && $newName === ''
+                    && $oldNotes === ''
+                    && $newNotes === ''
+                    && !$hasNewOldPhotos
+                    && !$hasNewNewPhotos
+                    && $existingPhotosCount === 0
+                ) {
+                    if ($existingPair) {
+                        $existingPair->delete();
+                    }
+                    continue;
+                }
+
+                if ($existingPair) {
+                    $pair = $existingPair;
+                    $pair->update([
+                        'old_part_name' => $oldName !== '' ? $oldName : null,
+                        'new_part_name' => $newName !== '' ? $newName : null,
+                        'old_part_notes' => $oldNotes !== '' ? $oldNotes : null,
+                        'new_part_notes' => $newNotes !== '' ? $newNotes : null,
+                        'sort_order' => $sortOrder,
+                    ]);
+                } else {
+                    $pair = $order->partReplacementPairs()->create([
+                        'old_part_name' => $oldName !== '' ? $oldName : null,
+                        'new_part_name' => $newName !== '' ? $newName : null,
+                        'old_part_notes' => $oldNotes !== '' ? $oldNotes : null,
+                        'new_part_notes' => $newNotes !== '' ? $newNotes : null,
+                        'sort_order' => $sortOrder,
+                    ]);
+                }
+
+                $this->storePartReplacementPhotos($request, $pair, $sortOrder, 'old', $branchId);
+                $this->storePartReplacementPhotos($request, $pair, $sortOrder, 'new', $branchId);
+            }
+        });
+
+        return redirect()
+            ->route('workshop.maintenance-board.parts-replacement-status', array_filter([
+                'order' => $order->id,
+                'view_id' => $request->input('view_id'),
+            ]))
+            ->with('status', 'Estado de repuestos guardado correctamente.');
+    }
+
+    public function destroyPartsReplacementPhoto(Request $request, WorkshopMovement $order, WorkshopPartReplacementPhoto $photo)
+    {
+        $this->assertOrderScope($order);
+
+        $pair = $photo->pair;
+        if (!$pair || (int) $pair->workshop_movement_id !== (int) $order->id) {
+            abort(404);
+        }
+
+        if ($photo->photo_path && Storage::disk('public')->exists($photo->photo_path)) {
+            Storage::disk('public')->delete($photo->photo_path);
+        }
+
+        $photo->delete();
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true]);
+        }
+
+        return back()->with('status', 'Fotografía eliminada.');
+    }
+
+    private function buildPartsReplacementPairsPayload(WorkshopMovement $order): array
+    {
+        $existing = $order->partReplacementPairs
+            ->map(function (WorkshopPartReplacementPair $pair) {
+                return [
+                    'id' => (int) $pair->id,
+                    'old_part_name' => (string) ($pair->old_part_name ?? ''),
+                    'new_part_name' => (string) ($pair->new_part_name ?? ''),
+                    'old_part_notes' => (string) ($pair->old_part_notes ?? ''),
+                    'new_part_notes' => (string) ($pair->new_part_notes ?? ''),
+                    'old_photos' => $pair->photos
+                        ->where('photo_type', 'old')
+                        ->values()
+                        ->map(fn (WorkshopPartReplacementPhoto $photo) => [
+                            'id' => (int) $photo->id,
+                            'url' => Storage::disk('public')->url($photo->photo_path),
+                        ])
+                        ->all(),
+                    'new_photos' => $pair->photos
+                        ->where('photo_type', 'new')
+                        ->values()
+                        ->map(fn (WorkshopPartReplacementPhoto $photo) => [
+                            'id' => (int) $photo->id,
+                            'url' => Storage::disk('public')->url($photo->photo_path),
+                        ])
+                        ->all(),
+                ];
+            })
+            ->values();
+
+        if ($existing->isNotEmpty()) {
+            return $existing->all();
+        }
+
+        $fromParts = $order->details
+            ->filter(fn ($detail) => strtoupper((string) $detail->line_type) === 'PART')
+            ->values()
+            ->map(function ($detail) {
+                $label = trim((string) ($detail->description ?? ''));
+                if ($label === '' && $detail->product) {
+                    $code = trim((string) ($detail->product->code ?? ''));
+                    $name = trim((string) ($detail->product->description ?? ''));
+                    $label = $code !== '' ? ($code . ($name !== '' ? ' - ' . $name : '')) : $name;
+                }
+
+                return [
+                    'id' => null,
+                    'old_part_name' => $label,
+                    'new_part_name' => '',
+                    'old_part_notes' => '',
+                    'new_part_notes' => '',
+                    'old_photos' => [],
+                    'new_photos' => [],
+                ];
+            });
+
+        if ($fromParts->isNotEmpty()) {
+            return $fromParts->all();
+        }
+
+        return [[
+            'id' => null,
+            'old_part_name' => '',
+            'new_part_name' => '',
+            'old_part_notes' => '',
+            'new_part_notes' => '',
+            'old_photos' => [],
+            'new_photos' => [],
+        ]];
+    }
+
+    private function storePartReplacementPhotos(
+        Request $request,
+        WorkshopPartReplacementPair $pair,
+        int $pairIndex,
+        string $photoType,
+        int $branchId
+    ): void {
+        $files = $request->file("pairs.{$pairIndex}.{$photoType}_photos", []);
+        if (!is_array($files) || empty($files)) {
+            return;
+        }
+
+        $currentMaxSort = (int) $pair->photos()->where('photo_type', $photoType)->max('sort_order');
+        $sort = $currentMaxSort;
+
+        foreach ($files as $file) {
+            if (!$file) {
+                continue;
+            }
+
+            $sort++;
+            $path = $file->store("workshop/parts-replacement/{$branchId}/{$pair->id}", 'public');
+            $pair->photos()->create([
+                'photo_type' => $photoType,
+                'photo_path' => $path,
+                'sort_order' => $sort,
+            ]);
+        }
     }
 
     public function partsRequest(WorkshopMovement $order)

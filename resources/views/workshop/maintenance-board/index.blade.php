@@ -295,6 +295,10 @@
                                         })">
                                     <i class="ri-pause-circle-line"></i> Pausar
                                 </button>
+                                <a href="{{ route('workshop.maintenance-board.parts-replacement-status', array_filter(['order' => $card, 'view_id' => request('view_id')])) }}"
+                                   class="inline-flex items-center rounded-xl bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-teal-800">
+                                    <i class="ri-image-add-line mr-1"></i> Estado de repuestos
+                                </a>
                                 <form method="POST" action="{{ route('workshop.maintenance-board.finish', $card) }}">
                                     @csrf
                                     <button type="submit" class="rounded-xl bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-800">
@@ -309,6 +313,10 @@
                                         <i class="ri-play-circle-line"></i> Reanudar
                                     </button>
                                 </form>
+                                <a href="{{ route('workshop.maintenance-board.parts-replacement-status', array_filter(['order' => $card, 'view_id' => request('view_id')])) }}"
+                                   class="inline-flex items-center rounded-xl bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-teal-800">
+                                    <i class="ri-image-add-line mr-1"></i> Estado de repuestos
+                                </a>
                             @endif
                             @if($canQuoteCard)
                                 <button type="button"

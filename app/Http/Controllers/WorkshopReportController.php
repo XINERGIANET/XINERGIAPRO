@@ -476,6 +476,145 @@ class WorkshopReportController extends Controller
         ]);
     }
 
+    public function partsReplacementStatusPdf(WorkshopMovement $order)
+    {
+        $this->assertOrderScope($order);
+        $order->loadMissing([
+            'movement',
+            'vehicle',
+            'client',
+            'branch.company',
+            'branch.location.parent',
+            'technicians.technician',
+            'partReplacementPairs.photos',
+        ]);
+
+        $branch = $order->branch instanceof \App\Models\Branch
+            ? $order->branch
+            : \App\Models\Branch::query()->with('company', 'location.parent')->find($order->branch_id);
+        $terms = is_array($order->quotation_commercial_terms ?? null) ? $order->quotation_commercial_terms : [];
+
+        $logoPath = \App\Support\WorkshopQuotationExcelExport::resolveBranchLogoPath($branch);
+        $logoFileUri = null;
+        if ($logoPath) {
+            $normalized = str_replace('\\', '/', $logoPath);
+            if (preg_match('/^[A-Za-z]:\//', $normalized)) {
+                $logoFileUri = 'file:///' . $normalized;
+            } else {
+                $logoFileUri = 'file://' . $normalized;
+            }
+        }
+
+        $cityName = trim((string) data_get($branch, 'location.parent.name', ''));
+        if ($cityName === '') {
+            $cityName = trim((string) ($branch?->location?->name ?? ''));
+        }
+        if ($cityName === '') {
+            $cityName = 'Lima';
+        }
+
+        $dateLine = $cityName . ', ' . now()->locale('es')->translatedFormat('d \d\e F \d\e\l Y');
+        $docNumber = 'N°' . (string) ($order->movement?->number ?? str_pad((string) $order->id, 5, '0', STR_PAD_LEFT));
+
+        $branchDireccion = trim((string) data_get($branch, 'direccion', ''));
+        $branchAddress = trim((string) data_get($branch, 'address', ''));
+        $address = $branchDireccion !== '' ? $branchDireccion : $branchAddress;
+
+        $branchPhone = '';
+        foreach (['branch_phone', 'phone', 'telefono', 'tel'] as $key) {
+            if (array_key_exists($key, $terms) && trim((string) $terms[$key]) !== '') {
+                $branchPhone = trim((string) $terms[$key]);
+                break;
+            }
+        }
+        $branchEmail = '';
+        foreach (['branch_email', 'email', 'correo'] as $key) {
+            if (array_key_exists($key, $terms) && trim((string) $terms[$key]) !== '') {
+                $branchEmail = trim((string) $terms[$key]);
+                break;
+            }
+        }
+
+        $companyName = $branch?->company?->legal_name ?? $branch?->legal_name ?? 'Empresa';
+
+        $technicianNames = $order->technicians
+            ->map(fn ($row) => trim(($row->technician?->first_name ?? '') . ' ' . ($row->technician?->last_name ?? '')))
+            ->filter()
+            ->values();
+        $technicianLine = $technicianNames->isNotEmpty() ? $technicianNames->implode(', ') : '';
+
+        $resolvePhotoUri = function (?string $path): ?string {
+            $path = trim((string) $path);
+            if ($path === '') {
+                return null;
+            }
+
+            $publicStoragePath = public_path('storage/' . ltrim($path, '/'));
+            if (is_file($publicStoragePath)) {
+                return 'file:///' . str_replace('\\', '/', $publicStoragePath);
+            }
+
+            return asset('storage/' . ltrim($path, '/'));
+        };
+
+        $replacementPairs = $order->partReplacementPairs->map(function ($pair) use ($resolvePhotoUri) {
+            $mapPhotos = fn ($photos) => $photos
+                ->map(fn ($photo) => $resolvePhotoUri($photo->photo_path))
+                ->filter()
+                ->values();
+
+            return [
+                'old_part_name' => (string) ($pair->old_part_name ?? ''),
+                'new_part_name' => (string) ($pair->new_part_name ?? ''),
+                'old_part_notes' => (string) ($pair->old_part_notes ?? ''),
+                'new_part_notes' => (string) ($pair->new_part_notes ?? ''),
+                'old_photos' => $mapPhotos($pair->photos->where('photo_type', 'old')),
+                'new_photos' => $mapPhotos($pair->photos->where('photo_type', 'new')),
+            ];
+        })->filter(function ($pair) {
+            return trim($pair['old_part_name']) !== ''
+                || trim($pair['new_part_name']) !== ''
+                || trim($pair['old_part_notes']) !== ''
+                || trim($pair['new_part_notes']) !== ''
+                || $pair['old_photos']->isNotEmpty()
+                || $pair['new_photos']->isNotEmpty();
+        })->values();
+
+        $viewData = compact(
+            'order',
+            'branch',
+            'logoFileUri',
+            'dateLine',
+            'docNumber',
+            'address',
+            'branchPhone',
+            'branchEmail',
+            'companyName',
+            'technicianLine',
+            'replacementPairs'
+        );
+
+        $html = view('workshop.pdf.parts_replacement_status', $viewData)->render();
+        $pdfBinary = $this->renderPdfWithWkhtmltopdf($html, 'A4', [
+            '--orientation', 'Portrait',
+            '--margin-top', '8',
+            '--margin-right', '8',
+            '--margin-bottom', '8',
+            '--margin-left', '8',
+        ]);
+
+        if ($pdfBinary === null) {
+            return view('workshop.pdf.parts_replacement_status', $viewData);
+        }
+
+        $safe = preg_replace('/[^A-Za-z0-9_-]+/', '_', (string) ($order->movement?->number ?: $order->id)) ?? 'estado-repuestos';
+
+        return response($pdfBinary, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="informe-estado-repuestos-' . $safe . '.pdf"',
+        ]);
+    }
+
     public function internalSalePdf(WorkshopMovement $order)
     {
         $this->assertOrderScope($order);

@@ -480,6 +480,9 @@ Route::middleware('auth')->group(function () {
         Route::put('/tablero-mantenimiento/{order}', [WorkshopMaintenanceBoardController::class, 'update'])->name('maintenance-board.update');
         Route::get('/tablero-mantenimiento/{order}/solicitud-repuestos', [WorkshopMaintenanceBoardController::class, 'partsRequest'])->name('maintenance-board.parts-request');
         Route::post('/tablero-mantenimiento/{order}/solicitud-repuestos', [WorkshopMaintenanceBoardController::class, 'storePartsRequest'])->name('maintenance-board.parts-request.store');
+        Route::get('/tablero-mantenimiento/{order}/estado-repuestos', [WorkshopMaintenanceBoardController::class, 'partsReplacementStatus'])->name('maintenance-board.parts-replacement-status');
+        Route::post('/tablero-mantenimiento/{order}/estado-repuestos', [WorkshopMaintenanceBoardController::class, 'storePartsReplacementStatus'])->name('maintenance-board.parts-replacement-status.store');
+        Route::delete('/tablero-mantenimiento/{order}/estado-repuestos/fotos/{photo}', [WorkshopMaintenanceBoardController::class, 'destroyPartsReplacementPhoto'])->name('maintenance-board.parts-replacement-status.photo.destroy');
         Route::post('/tablero-mantenimiento/vehiculos', [WorkshopMaintenanceBoardController::class, 'storeVehicleQuick'])->name('maintenance-board.vehicles.store');
         Route::get('/tablero-mantenimiento/vehiculos/consulta-placa', [WorkshopMaintenanceBoardController::class, 'lookupVehicleByPlate'])->name('maintenance-board.vehicles.lookup-plate');
         Route::post('/tablero-mantenimiento/clientes', [WorkshopMaintenanceBoardController::class, 'storeClientQuick'])->name('maintenance-board.clients.store');
@@ -591,6 +594,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/ordenes/{order}/pdf/pdi', [WorkshopReportController::class, 'pdiPdf'])->name('pdf.pdi');
         Route::get('/ordenes/{order}/pdf/mantenimiento', [WorkshopReportController::class, 'maintenancePdf'])->name('pdf.maintenance');
         Route::get('/ordenes/{order}/pdf/repuestos', [WorkshopReportController::class, 'partsSummaryPdf'])->name('pdf.parts');
+        Route::get('/ordenes/{order}/pdf/estado-repuestos', [WorkshopReportController::class, 'partsReplacementStatusPdf'])->name('pdf.parts-replacement-status');
         Route::get('/ordenes/{order}/pdf/venta-interna', [WorkshopReportController::class, 'internalSalePdf'])->name('pdf.internal-sale');
         Route::get('/ordenes/{order}/pdf/orden-compra', [WorkshopReportController::class, 'purchaseOrderPdf'])->name('maintenance-board.purchase-order.pdf');
         Route::post('/ordenes/{order}/pdf/os/guardar', [WorkshopReportController::class, 'saveOrderPdfSnapshot'])->name('pdf.order.save');

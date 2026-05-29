@@ -67,6 +67,7 @@ class WorkshopMovement extends Model
         'corrective_repair_started_at',
         'corrective_repair_finished_at',
         'corrective_observations',
+        'parts_replacement_report_notes',
     ];
 
     protected $casts = [
@@ -199,6 +200,11 @@ class WorkshopMovement extends Model
     public function audits()
     {
         return $this->hasMany(WorkshopAudit::class);
+    }
+
+    public function partReplacementPairs()
+    {
+        return $this->hasMany(WorkshopPartReplacementPair::class)->orderBy('sort_order')->orderBy('id');
     }
 
     public function getDebtAttribute(): float
