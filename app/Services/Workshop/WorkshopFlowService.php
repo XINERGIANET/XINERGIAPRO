@@ -245,6 +245,12 @@ class WorkshopFlowService
             $order->update($updateData);
             $this->audit((int) $order->id, $userId, 'OS_UPDATED', ['data' => $updateData]);
 
+            if (array_key_exists('intake_date', $data) && !empty($data['intake_date']) && $order->movement_id) {
+                Movement::query()
+                    ->whereKey((int) $order->movement_id)
+                    ->update(['moved_at' => \Carbon\Carbon::parse($data['intake_date'])]);
+            }
+
             if (array_key_exists('mileage_in', $data) && $data['mileage_in'] !== null) {
                 $this->logVehicleMileage((int) $order->vehicle_id, (int) $order->id, (int) $data['mileage_in'], 'INTAKE', $userId, 'Actualizacion de km ingreso');
                 $order->vehicle?->update(['current_mileage' => (int) $data['mileage_in']]);

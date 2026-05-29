@@ -830,6 +830,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'driver_name' => ['nullable', 'string', 'max:255'],
             'driver_phone' => ['nullable', 'string', 'max:50'],
             'tow_in' => ['nullable', 'boolean'],
+            'intake_date' => ['nullable', 'date'],
             'diagnosis_text' => ['nullable', 'string'],
             'observations' => ['nullable', 'string'],
             'inventory' => ['nullable', 'array'],
@@ -887,6 +888,7 @@ class WorkshopMaintenanceBoardController extends Controller
             return back()->withErrors($e->errors());
         }
         $editableCatalogServicePrices = $this->isCatalogServicePriceEditingEnabled($branchId);
+        $intakeDate = $this->normalizeMaintenanceBoardIntakeDate($validated['intake_date'] ?? null);
 
         $user = auth()->user();
         try {
@@ -908,7 +910,7 @@ class WorkshopMaintenanceBoardController extends Controller
                 'client_person_id' => $clientPersonId,
                 'appointment_id' => !empty($validated['appointment_id']) ? (int) $validated['appointment_id'] : null,
                 'previous_workshop_movement_id' => !empty($validated['quotation_id']) ? (int) $validated['quotation_id'] : null,
-                'intake_date' => now()->format('Y-m-d H:i:s'),
+                'intake_date' => $intakeDate,
                 'mileage_in' => $validated['mileage_in'] ?? null,
                 'tow_in' => (bool) ($validated['tow_in'] ?? false),
                 'diagnosis_text' => $validated['diagnosis_text'] ?? null,
@@ -920,7 +922,7 @@ class WorkshopMaintenanceBoardController extends Controller
 
             if (($validated['service_type'] ?? 'preventivo') === 'correctivo') {
                 $data['corrective_phase'] = 'recepcion';
-                $data['corrective_reception_at'] = now();
+                $data['corrective_reception_at'] = Carbon::parse($intakeDate);
             }
 
             $workshop = $this->flowService->createOrder(
@@ -1076,6 +1078,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'client_person_id' => ['nullable', 'integer', 'exists:people,id'],
             'mileage_in' => ['nullable', 'integer', 'min:0'],
             'tow_in' => ['nullable', 'boolean'],
+            'intake_date' => ['nullable', 'date'],
             'diagnosis_text' => ['nullable', 'string'],
             'observations' => ['nullable', 'string'],
             'inventory' => ['nullable', 'array'],
@@ -1135,11 +1138,12 @@ class WorkshopMaintenanceBoardController extends Controller
             return back()->withErrors($e->errors());
         }
         $editableCatalogServicePrices = $this->isCatalogServicePriceEditingEnabled($branchId);
+        $intakeDate = $this->normalizeMaintenanceBoardIntakeDate($validated['intake_date'] ?? null);
 
         $user = auth()->user();
 
         try {
-            DB::transaction(function () use ($order, $request, $validated, $branchId, $companyId, $vehicle, $clientPersonId, $parsedServiceLines, $user, $editableCatalogServicePrices) {
+            DB::transaction(function () use ($order, $request, $validated, $branchId, $companyId, $vehicle, $clientPersonId, $parsedServiceLines, $user, $editableCatalogServicePrices, $intakeDate) {
                 $lockedOrder = WorkshopMovement::query()
                     ->where('id', $order->id)
                     ->lockForUpdate()
@@ -1148,6 +1152,7 @@ class WorkshopMaintenanceBoardController extends Controller
                 $this->flowService->updateOrder($lockedOrder, [
                     'vehicle_id' => (int) $validated['vehicle_id'],
                     'client_person_id' => $clientPersonId,
+                    'intake_date' => $intakeDate,
                     'mileage_in' => $validated['mileage_in'] ?? null,
                     'tow_in' => (bool) ($validated['tow_in'] ?? false),
                     'diagnosis_text' => $validated['diagnosis_text'] ?? null,
@@ -2888,6 +2893,19 @@ class WorkshopMaintenanceBoardController extends Controller
                     'service_lines' => 'Hay servicios de catalogo no permitidos para esta sucursal o empresa.',
                 ]);
             }
+        }
+    }
+
+    private function normalizeMaintenanceBoardIntakeDate(?string $value): string
+    {
+        if ($value === null || trim($value) === '') {
+            return now()->format('Y-m-d H:i:s');
+        }
+
+        try {
+            return Carbon::parse($value)->format('Y-m-d H:i:s');
+        } catch (\Throwable $e) {
+            return now()->format('Y-m-d H:i:s');
         }
     }
 

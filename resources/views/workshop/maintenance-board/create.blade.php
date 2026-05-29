@@ -1641,6 +1641,45 @@
                             </div>
                         </div>
 
+                        @php
+                            $defaultIntakeDateTime = old(
+                                'intake_date',
+                                optional($editingOrder)->intake_date
+                                    ? optional($editingOrder)->intake_date->format('Y-m-d\TH:i')
+                                    : now()->format('Y-m-d\TH:i')
+                            );
+                        @endphp
+                        <div
+                            class="shrink-0 w-full sm:w-auto sm:min-w-[248px]"
+                            x-data="{ intakeDateTime: @js($defaultIntakeDateTime) }"
+                        >
+                            <label class="mb-1 flex items-center gap-1.5 text-sm font-medium text-gray-700">
+                                <i class="ri-calendar-event-line text-indigo-600"></i>
+                                Fecha y hora de ingreso
+                            </label>
+                            <div class="flex items-center gap-2">
+                                <div class="relative min-w-0 flex-1">
+                                    <input
+                                        type="datetime-local"
+                                        name="intake_date"
+                                        x-model="intakeDateTime"
+                                        required
+                                        class="h-11 w-full min-w-0 rounded-xl border border-gray-300 bg-gradient-to-b from-white to-gray-50/80 px-3 text-sm text-gray-800 shadow-sm transition focus:border-indigo-500 focus:from-white focus:ring-2 focus:ring-indigo-200/80 outline-none dark:border-gray-600 dark:from-gray-900 dark:to-gray-900/60 dark:text-gray-100"
+                                    >
+                                </div>
+                                <button
+                                    type="button"
+                                    @click="intakeDateTime = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)"
+                                    class="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50 px-3 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100"
+                                    title="Usar fecha y hora actual del sistema"
+                                >
+                                    <i class="ri-time-line text-base"></i>
+                                    <span class="hidden sm:inline">Ahora</span>
+                                </button>
+                            </div>
+                            <p class="mt-1 text-[10px] leading-tight text-gray-500">Puede registrar ingresos con fecha y hora anteriores.</p>
+                        </div>
+
                         <div class="shrink-0" style="width: 96px; min-width: 96px; max-width: 96px; flex: 0 0 96px;">
                             <label class="mb-1 block text-sm font-medium text-gray-700">KM ing.</label>
                             <input
