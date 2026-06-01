@@ -29,6 +29,7 @@ use App\Models\Vehicle;
 use App\Models\VehicleType;
 use App\Services\AccountReceivablePayableService;
 use App\Services\KardexSyncService;
+use App\Services\Sales\SaleSunatPrintService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -2561,17 +2562,17 @@ class SalesController extends Controller
         ]);
     }
 
-    public function printPdf(Request $request, Movement $sale)
+    public function printPdf(Request $request, Movement $sale, SaleSunatPrintService $saleSunatPrintService)
     {
         $sale = $this->resolvePrintableSale($sale);
-        $printData = $this->buildSalePrintData($sale, $request);
-        $printData['autoPrint'] = false;
+        $printData = $saleSunatPrintService->build($sale, 'a4');
+        $viewName = 'workshop.maintenance-board.print.sunat-comprobante';
 
-        $html = view('sales.print.pdf', $printData)->render();
+        $html = view($viewName, $printData)->render();
         $pdfBinary = $this->renderPdfWithWkhtmltopdf($html, 'A4');
 
         if ($pdfBinary === null) {
-            return view('sales.print.pdf', $printData);
+            return view($viewName, $printData);
         }
 
         $docName = $sale->salesDocumentCode();
@@ -2581,13 +2582,13 @@ class SalesController extends Controller
         ]);
     }
 
-    public function printTicket(Request $request, Movement $sale)
+    public function printTicket(Request $request, Movement $sale, SaleSunatPrintService $saleSunatPrintService)
     {
         $sale = $this->resolvePrintableSale($sale);
-        $printData = $this->buildSalePrintData($sale, $request);
-        $printData['autoPrint'] = false;
+        $printData = $saleSunatPrintService->build($sale, 'ticket');
+        $viewName = 'workshop.maintenance-board.print.sunat-comprobante';
 
-        $html = view('sales.print.ticket', $printData)->render();
+        $html = view($viewName, $printData)->render();
         $pdfBinary = $this->renderPdfWithWkhtmltopdf($html, null, [
             '--page-width', '80mm',
             '--page-height', '220mm',
@@ -2602,8 +2603,7 @@ class SalesController extends Controller
         ]);
 
         if ($pdfBinary === null) {
-            $printData['autoPrint'] = true;
-            return view('sales.print.ticket', $printData);
+            return view($viewName, $printData);
         }
 
         $docName = $sale->salesDocumentCode();
