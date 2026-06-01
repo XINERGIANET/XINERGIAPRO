@@ -493,6 +493,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/tablero-mantenimiento/{order}/finalizar', [WorkshopMaintenanceBoardController::class, 'finish'])->name('maintenance-board.finish');
         Route::post('/tablero-mantenimiento/{order}/cotizacion', [WorkshopMaintenanceBoardController::class, 'quotation'])->name('maintenance-board.quotation');
         Route::get('/tablero-mantenimiento/{order}/venta-cobro', [WorkshopMaintenanceBoardController::class, 'checkoutPage'])->name('maintenance-board.checkout.page');
+        Route::post('/tablero-mantenimiento/{order}/venta-cobro/vista-previa', [WorkshopMaintenanceBoardController::class, 'previewCheckoutDocument'])->name('maintenance-board.checkout.preview');
         Route::post('/tablero-mantenimiento/{order}/venta-cobro', [WorkshopMaintenanceBoardController::class, 'checkout'])->name('maintenance-board.checkout');
         Route::get('/tablero-mantenimiento/{order}/seguimiento', [WorkshopMaintenanceBoardController::class, 'tracking'])->name('maintenance-board.tracking');
         Route::post('/tablero-mantenimiento/{order}/avanzar-fase', [WorkshopMaintenanceBoardController::class, 'advancePhase'])->name('maintenance-board.advance-phase');

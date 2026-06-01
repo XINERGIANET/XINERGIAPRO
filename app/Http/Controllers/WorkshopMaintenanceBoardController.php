@@ -29,7 +29,10 @@ use App\Models\WorkshopStatusHistory;
 use App\Models\WorkshopService;
 use App\Models\WorkshopVehicleIntakeInventoryItem;
 use App\Services\VehiclePlateLookupService;
+use App\Services\Workshop\WorkshopCheckoutDocumentPreviewService;
 use App\Services\Workshop\WorkshopFlowService;
+use Illuminate\Support\Facades\Log;
+use Symfony\Component\Process\Process;
 use App\Support\WorkshopAuthorization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -42,7 +45,10 @@ use Illuminate\Validation\ValidationException;
 
 class WorkshopMaintenanceBoardController extends Controller
 {
-    public function __construct(private readonly WorkshopFlowService $flowService)
+    public function __construct(
+        private readonly WorkshopFlowService $flowService,
+        private readonly WorkshopCheckoutDocumentPreviewService $checkoutPreviewService
+    )
     {
         $this->middleware(function ($request, $next) {
             $routeName = (string) optional($request->route())->getName();
@@ -2185,8 +2191,43 @@ class WorkshopMaintenanceBoardController extends Controller
             'isSunatActive' => $apisunatService->isConfiguredForBranch($order->branch ?? null),
             'defaultCreditDays' => max(0, (int) ($order->client?->credit_days ?? 0)),
             'vehiclePlate' => trim((string) ($order->vehicle?->plate ?? '')),
+            'serviceOrderNumber' => trim((string) ($order->movement?->number ?? '')) ?: ('#' . $order->id),
             'sunatDetraccionTypes' => $this->sunatDetraccionCatalogOptions(),
         ]));
+    }
+
+    public function previewCheckoutDocument(Request $request, WorkshopMovement $order): \Illuminate\Http\Response|\Illuminate\View\View
+    {
+        $this->assertOrderScope($order);
+
+        if (!in_array((string) $order->status, ['approved', 'in_progress', 'paused', 'finished'], true)) {
+            abort(422, 'La vista previa solo está disponible para OS aprobadas, en reparación, pausadas o terminadas.');
+        }
+
+        [$branchId] = $this->branchScope();
+        $format = $request->input('format') === 'ticket' ? 'ticket' : 'a4';
+
+        $printData = $this->checkoutPreviewService->build($request, $order, $branchId);
+        $printData['format'] = $format;
+
+        $viewName = 'workshop.maintenance-board.print.sunat-comprobante';
+        $html = view($viewName, $printData)->render();
+
+        if ($request->boolean('html')) {
+            return response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8']);
+        }
+
+        $pdfBinary = $this->renderCheckoutPreviewPdf($html, $format);
+        if ($pdfBinary === null) {
+            return view($viewName, $printData);
+        }
+
+        $filename = 'vista-previa-' . preg_replace('/[^A-Za-z0-9_-]+/', '_', (string) ($printData['documentCode'] ?? 'comprobante')) . '.pdf';
+
+        return response($pdfBinary, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+        ]);
     }
 
     public function checkout(Request $request, WorkshopMovement $order): RedirectResponse
@@ -2223,6 +2264,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'sunat_detraccion_bank_account' => ['nullable', 'string', 'max:50'],
             'sunat_apply_retencion' => ['nullable', 'boolean'],
             'sunat_retencion_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'purchase_order_number' => ['nullable', 'string', 'max:50'],
         ]);
 
         $paymentType = strtoupper((string) ($validated['payment_type'] ?? 'CONTADO'));
@@ -2347,15 +2389,16 @@ class WorkshopMaintenanceBoardController extends Controller
         }
 
         $checkoutDebtDueAt = $this->resolveCheckoutDebtDueAt($validated, $isDebtCheckout);
-        $checkoutSunatBillingMeta = $this->buildCheckoutSunatBillingMeta(
+        $checkoutDocumentMeta = $this->buildCheckoutDocumentMeta(
             $request,
+            $order,
             $isDebtCheckout,
             $isCheckoutSunatActive,
             $isCheckoutInvoiceDocument
         );
 
         try {
-            DB::transaction(function () use ($order, $validated, $branchId, $user, $paymentType, $isDebtCheckout, $isAnticipo, $checkoutPreviousAdvances, $checkoutDebtDueAt, $checkoutSunatBillingMeta, &$movementForApisunat) {
+            DB::transaction(function () use ($order, $validated, $branchId, $user, $paymentType, $isDebtCheckout, $isAnticipo, $checkoutPreviousAdvances, $checkoutDebtDueAt, $checkoutDocumentMeta, &$movementForApisunat) {
                 $lockedOrder = WorkshopMovement::query()
                     ->where('id', $order->id)
                     ->lockForUpdate()
@@ -2563,9 +2606,7 @@ class WorkshopMaintenanceBoardController extends Controller
                         $salesUpdate = [
                             'payment_type' => $isDebtCheckout ? 'CREDITO' : 'CONTADO',
                         ];
-                        if ($checkoutSunatBillingMeta !== null) {
-                            $salesUpdate['sunat_billing_meta'] = $checkoutSunatBillingMeta;
-                        }
+                        $salesUpdate['sunat_billing_meta'] = $checkoutDocumentMeta;
                         $movementForApisunat->salesMovement->update($salesUpdate);
                     }
 
@@ -3782,30 +3823,35 @@ class WorkshopMaintenanceBoardController extends Controller
             ->endOfDay();
     }
 
-    private function buildCheckoutSunatBillingMeta(
+    private function buildCheckoutDocumentMeta(
         Request $request,
+        WorkshopMovement $order,
         bool $isDebtCheckout,
         bool $isSunatActive,
         bool $isInvoiceDocument
-    ): ?array {
-        if (!$isDebtCheckout) {
-            return null;
+    ): array {
+        $serviceOrderNumber = trim((string) ($order->movement?->number ?? ''));
+        if ($serviceOrderNumber === '') {
+            $serviceOrderNumber = '#' . $order->id;
         }
 
         $creditDays = max(0, (int) $request->input('credit_days', 0));
         $dueDateStr = trim((string) $request->input('debt_due_date', ''));
-        if ($dueDateStr === '' && $creditDays > 0) {
+        if ($isDebtCheckout && $dueDateStr === '' && $creditDays > 0) {
             $dueDateStr = now()->startOfDay()->addDays($creditDays)->format('Y-m-d');
         }
 
         $meta = [
+            'service_order_number' => $serviceOrderNumber,
+            'purchase_order_number' => trim((string) $request->input('purchase_order_number', '')),
+            'vehicle_plate' => trim((string) ($order->vehicle?->plate ?? '')),
             'credit_days' => $creditDays,
             'credit_due_date' => $dueDateStr,
             'apply_detraccion' => false,
             'apply_retencion' => false,
         ];
 
-        if ($isSunatActive && $isInvoiceDocument) {
+        if ($isDebtCheckout && $isSunatActive && $isInvoiceDocument) {
             $meta['apply_detraccion'] = $request->boolean('sunat_apply_detraccion');
             $meta['apply_retencion'] = $request->boolean('sunat_apply_retencion');
             if ($meta['apply_detraccion']) {
@@ -3832,6 +3878,102 @@ class WorkshopMaintenanceBoardController extends Controller
             ['code' => '037', 'label' => '037 - Servicios de transporte de carga'],
             ['code' => '030', 'label' => '030 - Mantenimiento y reparación de bienes muebles (alterno)'],
         ];
+    }
+
+    private function renderCheckoutPreviewPdf(string $html, string $format): ?string
+    {
+        $binary = $this->resolveWkhtmltopdfBinary();
+        if (!$binary) {
+            return null;
+        }
+
+        $tmpDir = storage_path('app/tmp');
+        if (!is_dir($tmpDir)) {
+            @mkdir($tmpDir, 0775, true);
+        }
+
+        $htmlFile = tempnam($tmpDir, 'checkout_preview_html_');
+        $pdfFile = tempnam($tmpDir, 'checkout_preview_pdf_');
+        if ($htmlFile === false || $pdfFile === false) {
+            return null;
+        }
+
+        $htmlPath = $htmlFile . '.html';
+        $pdfPath = $pdfFile . '.pdf';
+        @rename($htmlFile, $htmlPath);
+        @rename($pdfFile, $pdfPath);
+        file_put_contents($htmlPath, $html);
+
+        $extraArgs = $format === 'ticket'
+            ? ['--page-width', '80mm', '--page-height', '297mm', '--margin-top', '2', '--margin-right', '2', '--margin-bottom', '2', '--margin-left', '2', '--disable-smart-shrinking']
+            : [];
+
+        $args = array_merge([
+            $binary,
+            '--enable-local-file-access',
+            '--disable-javascript',
+            '--load-error-handling', 'ignore',
+            '--load-media-error-handling', 'ignore',
+            '--encoding', 'utf-8',
+            '--margin-top', '8',
+            '--margin-right', '8',
+            '--margin-bottom', '8',
+            '--margin-left', '8',
+        ], $extraArgs);
+
+        if ($format !== 'ticket') {
+            $args[] = '--page-size';
+            $args[] = 'A4';
+        }
+
+        $args[] = $htmlPath;
+        $args[] = $pdfPath;
+
+        $process = new Process($args);
+
+        try {
+            $process->setTimeout(120);
+            $process->run();
+            if (!file_exists($pdfPath) || filesize($pdfPath) <= 0) {
+                Log::warning('wkhtmltopdf fallo al generar vista previa de cobro', [
+                    'error' => $process->getErrorOutput(),
+                ]);
+
+                return null;
+            }
+
+            $content = file_get_contents($pdfPath);
+
+            return $content === false ? null : $content;
+        } catch (\Throwable $e) {
+            Log::warning('Error wkhtmltopdf vista previa cobro: ' . $e->getMessage());
+
+            return null;
+        } finally {
+            @unlink($htmlPath);
+            @unlink($pdfPath);
+        }
+    }
+
+    private function resolveWkhtmltopdfBinary(): ?string
+    {
+        $candidates = array_filter([
+            env('WKHTML_PDF_BINARY'),
+            env('WKHTMLTOPDF_BINARY'),
+            '/usr/bin/wkhtmltopdf',
+            '/usr/local/bin/wkhtmltopdf',
+            base_path('wkhtmltopdf/bin/wkhtmltopdf.exe'),
+            'C:\\Program Files\\wkhtmltopdf\\bin\\wkhtmltopdf.exe',
+            'C:\\Snappy\\wkhtmltopdf.exe',
+        ]);
+
+        foreach ($candidates as $candidate) {
+            if (is_string($candidate) && file_exists($candidate) && is_executable($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     private function syncElectronicInvoiceForSale(\App\Models\Movement $movement, \App\Services\ApisunatService $apisunatService): array

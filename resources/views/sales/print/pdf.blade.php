@@ -400,6 +400,23 @@
         </div>
 
         <div class="notes">
+            @php
+                $billingMeta = is_array($sale->salesMovement?->sunat_billing_meta ?? null)
+                    ? $sale->salesMovement->sunat_billing_meta
+                    : [];
+                $metaServiceOrder = trim((string) ($billingMeta['service_order_number'] ?? ''));
+                $metaPurchaseOrder = trim((string) ($billingMeta['purchase_order_number'] ?? ''));
+                $metaPlate = trim((string) ($billingMeta['vehicle_plate'] ?? ''));
+            @endphp
+            @if($metaServiceOrder !== '')
+                <p class="notes-text"><strong>Orden de Servicio:</strong> {{ $metaServiceOrder }}</p>
+            @endif
+            @if($metaPurchaseOrder !== '')
+                <p class="notes-text"><strong>Orden de Compra:</strong> {{ $metaPurchaseOrder }}</p>
+            @endif
+            @if($metaPlate !== '')
+                <p class="notes-text">Combustible y/o gastos mantenimiento-Placa Vehicular: {{ $metaPlate }}</p>
+            @endif
             <p class="notes-title">Observacion:</p>
             <p class="notes-text">{{ $sale->comment ?: '-' }}</p>
             <p class="printed-at">Impreso el {{ $printedAt->format('d/m/Y H:i:s') }}</p>

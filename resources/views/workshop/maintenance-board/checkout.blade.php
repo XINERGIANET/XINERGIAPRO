@@ -31,6 +31,9 @@
             digitalWalletOptions: @js(($digitalWalletOptions ?? collect())->values()->all()),
             paymentGatewayOptionsByMethod: @js($paymentGatewayOptionsByMethod ?? []),
             paymentRows: @js(array_values(old('payment_methods', []))),
+            previewLoading: false,
+            previewModalOpen: false,
+            previewFrameUrl: '',
             pendingOs: Number(@json($pendingOs)),
             nothingToCollect() {
                 return this.chargeTotal() <= 0.000009;
@@ -195,6 +198,50 @@
             },
             chargeTotal() {
                 return this.pendingLinesTotal() + this.productLinesTotal();
+            },
+            async openCheckoutPreview(format = 'a4') {
+                const form = this.$refs.checkoutForm;
+                if (!form) return;
+                this.previewLoading = true;
+                try {
+                    const formData = new FormData(form);
+                    formData.set('format', format === 'ticket' ? 'ticket' : 'a4');
+                    const res = await fetch(@js(route('workshop.maintenance-board.checkout.preview', $order)), {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/pdf, text/html',
+                        },
+                    });
+                    if (!res.ok) {
+                        const text = await res.text();
+                        alert(text || 'No se pudo generar la vista previa.');
+                        return;
+                    }
+                    const contentType = (res.headers.get('content-type') || '').toLowerCase();
+                    const blob = await res.blob();
+                    if (this.previewFrameUrl) {
+                        URL.revokeObjectURL(this.previewFrameUrl);
+                    }
+                    this.previewFrameUrl = URL.createObjectURL(blob);
+                    if (contentType.includes('pdf')) {
+                        this.previewModalOpen = true;
+                    } else {
+                        window.open(this.previewFrameUrl, '_blank');
+                    }
+                } catch (e) {
+                    alert('Error al generar la vista previa.');
+                } finally {
+                    this.previewLoading = false;
+                }
+            },
+            closePreviewModal() {
+                this.previewModalOpen = false;
+                if (this.previewFrameUrl) {
+                    URL.revokeObjectURL(this.previewFrameUrl);
+                    this.previewFrameUrl = '';
+                }
             },
             addProductLine() {
                 const first = this.productsCatalog[0] || null;
@@ -365,7 +412,7 @@
                 </p>
             </div>
 
-            <form method="POST"
+            <form method="POST" x-ref="checkoutForm"
                 action="{{ route('workshop.maintenance-board.checkout', $order) }}{{ $isAnticipo ? '?anticipo=1' : '' }}"
                 class="space-y-5">
                 @csrf
@@ -814,6 +861,28 @@
                     </div>
                 </div>
 
+                <div class="rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+                    <p class="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-slate-600">Referencias en el comprobante</p>
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Orden de servicio</label>
+                            <input type="text" readonly
+                                value="{{ old('service_order_number', $serviceOrderNumber ?? '') }}"
+                                class="h-11 w-full cursor-not-allowed rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
+                            <input type="hidden" name="service_order_number" value="{{ old('service_order_number', $serviceOrderNumber ?? '') }}">
+                            <p class="mt-1 text-[11px] text-slate-500">Se imprime automáticamente en factura, boleta y vista previa.</p>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Orden de compra (opcional)</label>
+                            <input type="text" name="purchase_order_number" maxlength="50"
+                                value="{{ old('purchase_order_number', '') }}"
+                                placeholder="Ej: 4500521677"
+                                class="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm">
+                            <p class="mt-1 text-[11px] text-slate-500">Número de OC del cliente para el comprobante SUNAT.</p>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <div>
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Comentario
@@ -838,6 +907,16 @@
                 </div>
 
                 <div class="flex flex-wrap gap-2 pt-1">
+                    <button type="button" @click="openCheckoutPreview('a4')" :disabled="previewLoading"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-800 transition hover:bg-indigo-100 disabled:opacity-60">
+                        <i class="ri-file-pdf-line text-lg"></i>
+                        <span x-text="previewLoading ? 'Generando...' : 'Vista previa A4'"></span>
+                    </button>
+                    <button type="button" @click="openCheckoutPreview('ticket')" :disabled="previewLoading"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60">
+                        <i class="ri-receipt-line text-lg"></i>
+                        <span>Vista previa ticket</span>
+                    </button>
                     <x-ui.button type="submit" size="md" variant="primary"
                         style="background:linear-gradient(90deg,#16a34a,#059669);color:#fff">
                         <i class="ri-money-dollar-circle-line"></i>
@@ -848,6 +927,23 @@
                     </x-ui.link-button>
                 </div>
             </form>
+
+            <div x-show="previewModalOpen" x-cloak class="fixed inset-0 z-[100010] flex items-center justify-center p-3 sm:p-6" style="display:none;">
+                <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" @click="closePreviewModal()"></div>
+                <div class="relative flex h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" @click.stop>
+                    <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                        <div>
+                            <p class="text-sm font-bold text-slate-800">Vista previa del comprobante</p>
+                            <p class="text-xs text-slate-500">Revise el formato A4 antes de confirmar la venta y cobro.</p>
+                        </div>
+                        <button type="button" @click="closePreviewModal()"
+                            class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200">
+                            <i class="ri-close-line text-xl"></i>
+                        </button>
+                    </div>
+                    <iframe :src="previewFrameUrl" class="min-h-0 flex-1 w-full border-0 bg-slate-100" title="Vista previa PDF"></iframe>
+                </div>
+            </div>
         </x-common.component-card>
     </div>
 @endsection

@@ -797,6 +797,8 @@ class ApisunatService
             $this->appendSunatRetencionToDocument($documentBody, $sunatBillingMeta, $payableAmount);
         }
 
+        $this->appendSunatDocumentReferenceNotes($documentBody, $sunatBillingMeta);
+
         return $documentBody;
     }
 
@@ -1568,6 +1570,45 @@ class ApisunatService
         ];
 
         $documentBody['cac:PaymentTerms'] = $paymentTerms;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private function appendSunatDocumentReferenceNotes(array &$documentBody, array $meta): void
+    {
+        $textNotes = [];
+        $purchaseOrder = trim((string) ($meta['purchase_order_number'] ?? ''));
+        if ($purchaseOrder !== '') {
+            $textNotes[] = 'Orden de Compra: ' . $purchaseOrder;
+        }
+
+        $serviceOrder = trim((string) ($meta['service_order_number'] ?? ''));
+        if ($serviceOrder !== '') {
+            $textNotes[] = 'Orden de Servicio: ' . $serviceOrder;
+        }
+
+        $plate = trim((string) ($meta['vehicle_plate'] ?? ''));
+        if ($plate !== '') {
+            $textNotes[] = 'Combustible y/o gastos mantenimiento-Placa Vehicular: ' . $plate;
+        }
+
+        if ($textNotes === []) {
+            return;
+        }
+
+        $notes = $documentBody['cbc:Note'] ?? [];
+        if (! is_array($notes)) {
+            $notes = $notes === [] ? [] : [$notes];
+        } elseif ($notes !== [] && ! array_is_list($notes)) {
+            $notes = [$notes];
+        }
+
+        foreach ($textNotes as $text) {
+            $notes[] = ['_text' => $text];
+        }
+
+        $documentBody['cbc:Note'] = $notes;
     }
 
     /**
