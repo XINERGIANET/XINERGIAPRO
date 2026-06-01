@@ -37,26 +37,7 @@
             </span>
         </div>
 
-        @if ($sale->electronic_invoice_xml_url)
-            <div class="relative group">
-                <x-ui.link-button
-                    size="icon"
-                    variant="primary"
-                    href="{{ route('admin.sales.electronic.xml', $sale->id) }}"
-                    target="_blank"
-                    className="rounded-xl border-0 shadow-none"
-                    style="background-color: #64748b; color: #ffffff;"
-                    onmouseover="this.style.backgroundColor='#475569'"
-                    onmouseout="this.style.backgroundColor='#64748b'"
-                    aria-label="Ver XML en linea"
-                >
-                    <i class="ri-external-link-line"></i>
-                </x-ui.link-button>
-                <span class="pointer-events-none absolute bottom-full left-1/2 z-[100] mb-3 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 shadow-xl transition group-hover:opacity-100">
-                    Ver XML en linea
-                    <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
-                </span>
-            </div>
+       
         @endif
     @endif
 
@@ -80,27 +61,7 @@
             </span>
         </div>
 
-        @if ($sale->electronic_invoice_cdr_url || $sale->electronic_invoice_external_id)
-            <div class="relative group">
-                <x-ui.link-button
-                    size="icon"
-                    variant="primary"
-                    href="{{ route('admin.sales.electronic.cdr', $sale->id) }}"
-                    target="_blank"
-                    className="rounded-xl border-0 shadow-none"
-                    style="background-color: #0d9488; color: #ffffff;"
-                    onmouseover="this.style.backgroundColor='#0f766e'"
-                    onmouseout="this.style.backgroundColor='#0d9488'"
-                    aria-label="Ver CDR en linea"
-                >
-                    <i class="ri-shield-check-line"></i>
-                </x-ui.link-button>
-                <span class="pointer-events-none absolute bottom-full left-1/2 z-[100] mb-3 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 shadow-xl transition group-hover:opacity-100">
-                    Ver CDR en linea
-                    <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
-                </span>
-            </div>
-        @endif
+        
     @endif
 @elseif ($sale->electronic_invoice_status === 'ERROR')
     <div class="relative group">
