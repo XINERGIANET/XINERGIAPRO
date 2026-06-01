@@ -221,6 +221,7 @@ class ApisunatService
         }
 
         $sale->refresh();
+        $this->refreshElectronicDocumentUrlsFromApisunat($sale);
         $this->archiveXmlForMovement($sale);
         $this->archiveCdrForMovement($sale);
     }
@@ -268,22 +269,7 @@ class ApisunatService
             return $existingPath;
         }
 
-        $xmlUrl = trim((string) ($sale->electronic_invoice_xml_url ?? ''));
-        if ($xmlUrl === '' && trim((string) ($sale->electronic_invoice_external_id ?? '')) !== '') {
-            try {
-                $documentData = $this->getDocumentById((string) $sale->electronic_invoice_external_id, $sale->branch);
-                $urls = $this->extractDocumentUrls($documentData);
-                $xmlUrl = trim((string) ($urls['xml_url'] ?? ''));
-                if ($xmlUrl !== '' && $xmlUrl !== $sale->electronic_invoice_xml_url) {
-                    $sale->update(['electronic_invoice_xml_url' => $xmlUrl]);
-                }
-            } catch (\Throwable $e) {
-                Log::warning('No se pudo resolver URL XML en Apisunat: '.$e->getMessage(), [
-                    'movement_id' => (int) $sale->id,
-                ]);
-            }
-        }
-
+        $xmlUrl = $this->resolveXmlDownloadUrlForMovement($sale);
         if ($xmlUrl === '') {
             return null;
         }
@@ -304,7 +290,7 @@ class ApisunatService
                 return null;
             }
 
-            $filename = $this->resolveXmlFileName($sale);
+            $filename = $this->resolveDownloadFilenameFromUrl($xmlUrl, $this->resolveXmlFileName($sale));
             $relativePath = 'electronic-invoices/'.(int) ($sale->branch_id ?: 0).'/'.$filename;
             Storage::disk('local')->put($relativePath, $body);
             $this->persistLocalXmlPathOnMovement($sale, $relativePath);
@@ -406,27 +392,9 @@ class ApisunatService
             return $existingPath;
         }
 
-        $cdrUrl = trim((string) ($sale->electronic_invoice_cdr_url ?? ''));
-        if ($cdrUrl === '' && trim((string) ($sale->electronic_invoice_external_id ?? '')) !== '') {
-            try {
-                $documentData = $this->getDocumentById((string) $sale->electronic_invoice_external_id, $sale->branch);
-                $urls = $this->extractDocumentUrls($documentData);
-                $cdrUrl = trim((string) ($urls['cdr_url'] ?? ''));
-                if ($cdrUrl !== '' && $cdrUrl !== $sale->electronic_invoice_cdr_url) {
-                    $sale->update(['electronic_invoice_cdr_url' => $cdrUrl]);
-                }
-            } catch (\Throwable $e) {
-                Log::warning('No se pudo resolver URL CDR en Apisunat: '.$e->getMessage(), [
-                    'movement_id' => (int) $sale->id,
-                ]);
-            }
-        }
-
+        $cdrUrl = $this->resolveCdrDownloadUrlForMovement($sale);
         if ($cdrUrl === '') {
-            $cdrUrl = trim((string) ($this->resolveApisunatCdrDownloadUrl($sale) ?? ''));
-            if ($cdrUrl !== '') {
-                $sale->update(['electronic_invoice_cdr_url' => $cdrUrl]);
-            }
+            return null;
         }
 
         try {
@@ -445,7 +413,7 @@ class ApisunatService
                 return null;
             }
 
-            $filename = $this->resolveCdrFileName($sale);
+            $filename = $this->resolveDownloadFilenameFromUrl($cdrUrl, $this->resolveCdrFileName($sale));
             $relativePath = 'electronic-invoices/'.(int) ($sale->branch_id ?: 0).'/cdr/'.$filename;
             Storage::disk('local')->put($relativePath, $body);
             $this->persistLocalCdrPathOnMovement($sale, $relativePath);
@@ -669,8 +637,10 @@ class ApisunatService
             'file_name' => $fileName.'.pdf',
             'pdf_ticket_80mm' => $apiUrl.'/documents/'.$documentId.'/getPDF/ticket80mm/'.$fileName.'.pdf',
             'pdf_a4' => $apiUrl.'/documents/'.$documentId.'/getPDF/A4/'.$fileName.'.pdf',
-            'xml_url' => $urls['xml_url'] ?? $this->buildApisunatXmlDownloadUrl($apiUrl, $documentId, $fileName),
-            'cdr_url' => $urls['cdr_url'] ?? $this->buildApisunatCdrDownloadUrl($apiUrl, $documentId, $fileName),
+            'xml_url' => $urls['xml_url']
+                ?? $this->buildApisunatXmlDownloadUrl($apiUrl, $documentId, $fileName),
+            'cdr_url' => $urls['cdr_url']
+                ?? $this->buildApisunatCdrDownloadUrl($apiUrl, $documentId, $fileName),
             'response' => [
                 'send' => $sendResp->json(),
                 'document' => $extraDocumentData,
@@ -729,12 +699,109 @@ class ApisunatService
 
     public function extractDocumentUrls(array $payload): array
     {
+        $xmlUrl = $this->extractApisunatGetByIdUrl($payload, 'xml') ?? $this->findXmlUrl($payload);
+        $cdrUrl = $this->extractApisunatGetByIdUrl($payload, 'cdr') ?? $this->findCdrUrl($payload);
+
         return [
-            'xml_url' => $this->findXmlUrl($payload),
-            'cdr_url' => $this->findCdrUrl($payload),
+            'xml_url' => $xmlUrl,
+            'cdr_url' => $cdrUrl,
             'pdf_a4_url' => $this->findUrlByKeyword($payload, ['pdf', 'a4']),
             'pdf_ticket_url' => $this->findUrlByKeyword($payload, ['pdf', 'ticket']),
+            'sunat_status' => trim((string) data_get($payload, 'status', data_get($payload, 'data.status', ''))),
+            'file_name' => trim((string) data_get($payload, 'fileName', data_get($payload, 'data.fileName', ''))),
         ];
+    }
+
+    /**
+     * Consulta GET /documents/:documentId/getById y persiste xml/cdr según documentación Apisunat.
+     *
+     * @return array{xml_url: ?string, cdr_url: ?string, sunat_status: ?string, file_name: ?string}
+     */
+    public function refreshElectronicDocumentUrlsFromApisunat(Movement $sale): array
+    {
+        $documentId = trim((string) ($sale->electronic_invoice_external_id ?? ''));
+        if ($documentId === '') {
+            return ['xml_url' => null, 'cdr_url' => null, 'sunat_status' => null, 'file_name' => null];
+        }
+
+        $sale->loadMissing('branch');
+
+        try {
+            $documentData = $this->getDocumentById($documentId, $sale->branch);
+        } catch (\Throwable $e) {
+            Log::warning('No se pudo consultar getById en Apisunat: '.$e->getMessage(), [
+                'movement_id' => (int) $sale->id,
+                'document_id' => $documentId,
+            ]);
+
+            return ['xml_url' => null, 'cdr_url' => null, 'sunat_status' => null, 'file_name' => null];
+        }
+
+        $urls = $this->extractDocumentUrls($documentData);
+        $xmlUrl = trim((string) ($urls['xml_url'] ?? ''));
+        $cdrUrl = trim((string) ($urls['cdr_url'] ?? ''));
+        $sunatStatus = trim((string) ($urls['sunat_status'] ?? ''));
+        $fileName = trim((string) ($urls['file_name'] ?? ''));
+
+        $update = [];
+        if ($xmlUrl !== '') {
+            $update['electronic_invoice_xml_url'] = $xmlUrl;
+        }
+        if ($cdrUrl !== '') {
+            $update['electronic_invoice_cdr_url'] = $cdrUrl;
+        }
+        if ($fileName !== '' && trim((string) ($sale->electronic_invoice_file_name ?? '')) === '') {
+            $update['electronic_invoice_file_name'] = str_ends_with(strtolower($fileName), '.pdf')
+                ? $fileName
+                : $fileName.'.pdf';
+        }
+
+        if ($update !== [] || $sunatStatus !== '') {
+            $responsePayload = is_array($sale->electronic_invoice_response)
+                ? $sale->electronic_invoice_response
+                : [];
+            if ($sunatStatus !== '') {
+                $responsePayload['apisunat_status'] = $sunatStatus;
+            }
+            $update['electronic_invoice_response'] = $responsePayload;
+            $sale->update($update);
+            $sale->refresh();
+        }
+
+        return [
+            'xml_url' => $xmlUrl !== '' ? $xmlUrl : null,
+            'cdr_url' => $cdrUrl !== '' ? $cdrUrl : null,
+            'sunat_status' => $sunatStatus !== '' ? $sunatStatus : null,
+            'file_name' => $fileName !== '' ? $fileName : null,
+        ];
+    }
+
+    private function resolveXmlDownloadUrlForMovement(Movement $sale): string
+    {
+        $stored = trim((string) ($sale->electronic_invoice_xml_url ?? ''));
+        if ($stored !== '') {
+            return $stored;
+        }
+
+        $refreshed = $this->refreshElectronicDocumentUrlsFromApisunat($sale);
+
+        return trim((string) ($refreshed['xml_url'] ?? ''));
+    }
+
+    private function resolveCdrDownloadUrlForMovement(Movement $sale): string
+    {
+        $stored = trim((string) ($sale->electronic_invoice_cdr_url ?? ''));
+        if ($stored !== '') {
+            return $stored;
+        }
+
+        $refreshed = $this->refreshElectronicDocumentUrlsFromApisunat($sale);
+        $cdrUrl = trim((string) ($refreshed['cdr_url'] ?? ''));
+        if ($cdrUrl !== '') {
+            return $cdrUrl;
+        }
+
+        return trim((string) ($this->resolveApisunatCdrDownloadUrlFallback($sale) ?? ''));
     }
 
     public function buildApisunatCdrDownloadUrl(string $apiUrl, string $documentId, string $fileNameBase): string
@@ -755,14 +822,16 @@ class ApisunatService
 
     public function resolveApisunatCdrDownloadUrl(Movement $sale): ?string
     {
+        $url = $this->resolveCdrDownloadUrlForMovement($sale);
+
+        return $url !== '' ? $url : null;
+    }
+
+    private function resolveApisunatCdrDownloadUrlFallback(Movement $sale): ?string
+    {
         $documentId = trim((string) ($sale->electronic_invoice_external_id ?? ''));
         if ($documentId === '') {
             return null;
-        }
-
-        $stored = trim((string) ($sale->electronic_invoice_cdr_url ?? ''));
-        if ($stored !== '') {
-            return $stored;
         }
 
         $config = $this->resolveConfigForBranch($sale->branch);
@@ -773,6 +842,32 @@ class ApisunatService
         $fileNameBase = $this->resolveApisunatFileNameBase($sale);
 
         return $this->buildApisunatCdrDownloadUrl($this->resolveApiUrl($config), $documentId, $fileNameBase);
+    }
+
+    private function extractApisunatGetByIdUrl(array $payload, string $field): ?string
+    {
+        $candidates = [
+            data_get($payload, $field),
+            data_get($payload, 'data.'.$field),
+            data_get($payload, 'document.'.$field),
+        ];
+
+        foreach ($candidates as $url) {
+            $url = trim((string) $url);
+            if ($url !== '' && Str::startsWith($url, ['http://', 'https://'])) {
+                return $url;
+            }
+        }
+
+        return null;
+    }
+
+    private function resolveDownloadFilenameFromUrl(string $url, string $fallback): string
+    {
+        $path = parse_url($url, PHP_URL_PATH);
+        $basename = is_string($path) ? trim(basename($path)) : '';
+
+        return $basename !== '' ? $basename : $fallback;
     }
 
     private function resolveApisunatFileNameBase(Movement $sale): string

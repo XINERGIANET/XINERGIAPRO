@@ -2637,7 +2637,9 @@ class SalesController extends Controller
 
     public function downloadElectronicXml(Movement $sale)
     {
+        $sale->loadMissing(['branch', 'documentType', 'salesMovement']);
         $apisunatService = app(\App\Services\ApisunatService::class);
+        $apisunatService->refreshElectronicDocumentUrlsFromApisunat($sale);
         $file = $apisunatService->resolveXmlFileForDownload($sale);
         if ($file === null) {
             abort(404, 'No se pudo obtener el XML del comprobante electrónico.');
@@ -2650,6 +2652,7 @@ class SalesController extends Controller
     {
         $sale->loadMissing(['branch', 'documentType', 'salesMovement']);
         $apisunatService = app(\App\Services\ApisunatService::class);
+        $apisunatService->refreshElectronicDocumentUrlsFromApisunat($sale);
         $file = $apisunatService->resolveCdrFileForDownload($sale);
         if ($file === null) {
             abort(404, 'No se pudo obtener el CDR del comprobante electrónico. Verifique que SUNAT haya aceptado el comprobante.');
@@ -2682,21 +2685,15 @@ class SalesController extends Controller
         if (!$sale->electronic_invoice_external_id) {
             abort(404, 'No hay comprobante electrónico registrado para esta venta.');
         }
+        $sale->loadMissing(['branch', 'documentType', 'salesMovement']);
         $apisunatService = app(\App\Services\ApisunatService::class);
-        try {
-            $data = $apisunatService->getDocumentById($sale->electronic_invoice_external_id, $sale->branch);
-            $urls = $apisunatService->extractDocumentUrls($data);
-            $url = $urls['xml_url'] ?? $sale->electronic_invoice_xml_url;
-            if (!$url) {
-                abort(404, 'La URL del XML no está disponible.');
-            }
-            return redirect()->away($url);
-        } catch (\Exception $e) {
-            if (!$sale->electronic_invoice_xml_url) {
-                abort(404, 'La URL del XML no está disponible: ' . $e->getMessage());
-            }
-            return redirect()->away($sale->electronic_invoice_xml_url);
+        $refreshed = $apisunatService->refreshElectronicDocumentUrlsFromApisunat($sale);
+        $url = $refreshed['xml_url'] ?? $sale->electronic_invoice_xml_url;
+        if (!$url) {
+            abort(404, 'La URL del XML no está disponible. Verifique que el comprobante exista en Apisunat (getById).');
         }
+
+        return redirect()->away($url);
     }
 
     public function redirectElectronicCdr(Movement $sale)
@@ -2706,24 +2703,16 @@ class SalesController extends Controller
         }
         $sale->loadMissing(['branch', 'documentType', 'salesMovement']);
         $apisunatService = app(\App\Services\ApisunatService::class);
-        try {
-            $data = $apisunatService->getDocumentById($sale->electronic_invoice_external_id, $sale->branch);
-            $urls = $apisunatService->extractDocumentUrls($data);
-            $url = $urls['cdr_url'] ?? $sale->electronic_invoice_cdr_url;
-            if (!$url) {
-                $url = $apisunatService->resolveApisunatCdrDownloadUrl($sale);
-            }
-            if (!$url) {
-                abort(404, 'La URL del CDR no está disponible.');
-            }
-            return redirect()->away($url);
-        } catch (\Exception $e) {
-            $fallback = $apisunatService->resolveApisunatCdrDownloadUrl($sale) ?: $sale->electronic_invoice_cdr_url;
-            if (!$fallback) {
-                abort(404, 'La URL del CDR no está disponible: ' . $e->getMessage());
-            }
-            return redirect()->away($fallback);
+        $refreshed = $apisunatService->refreshElectronicDocumentUrlsFromApisunat($sale);
+        $url = $refreshed['cdr_url'] ?? $sale->electronic_invoice_cdr_url;
+        if (!$url) {
+            $url = $apisunatService->resolveApisunatCdrDownloadUrl($sale);
         }
+        if (!$url) {
+            abort(404, 'La URL del CDR no está disponible. Verifique que SUNAT haya aceptado el comprobante (getById).');
+        }
+
+        return redirect()->away($url);
     }
 
     /**
