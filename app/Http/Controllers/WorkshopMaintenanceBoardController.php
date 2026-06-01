@@ -2183,6 +2183,9 @@ class WorkshopMaintenanceBoardController extends Controller
             'deliversOnConfirm' => (string) $order->status === 'finished',
             'blockedAdvances' => $blockedAdvances ?? [],
             'isSunatActive' => $apisunatService->isConfiguredForBranch($order->branch ?? null),
+            'defaultCreditDays' => max(0, (int) ($order->client?->credit_days ?? 0)),
+            'vehiclePlate' => trim((string) ($order->vehicle?->plate ?? '')),
+            'sunatDetraccionTypes' => $this->sunatDetraccionCatalogOptions(),
         ]));
     }
 
@@ -2212,6 +2215,14 @@ class WorkshopMaintenanceBoardController extends Controller
             'product_lines.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
             'product_lines.*.qty' => ['nullable', 'numeric', 'gte:0'],
             'product_lines.*.unit_price' => ['nullable', 'numeric', 'gte:0'],
+            'credit_days' => ['nullable', 'integer', 'min:0', 'max:3650'],
+            'debt_due_date' => ['nullable', 'date_format:Y-m-d'],
+            'sunat_apply_detraccion' => ['nullable', 'boolean'],
+            'sunat_detraccion_type' => ['nullable', 'string', 'max:3'],
+            'sunat_detraccion_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'sunat_detraccion_bank_account' => ['nullable', 'string', 'max:50'],
+            'sunat_apply_retencion' => ['nullable', 'boolean'],
+            'sunat_retencion_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ]);
 
         $paymentType = strtoupper((string) ($validated['payment_type'] ?? 'CONTADO'));
@@ -2228,6 +2239,24 @@ class WorkshopMaintenanceBoardController extends Controller
             throw ValidationException::withMessages([
                 'payment_methods' => 'Debes registrar al menos un metodo de pago cuando el cobro es al contado.',
             ]);
+        }
+
+        $checkoutDocumentType = !empty($validated['document_type_id'])
+            ? DocumentType::query()->find((int) $validated['document_type_id'])
+            : null;
+        $isCheckoutInvoiceDocument = $checkoutDocumentType
+            && str_contains(mb_strtolower((string) ($checkoutDocumentType->name ?? '')), 'factura');
+        $apisunatForCheckout = app(\App\Services\ApisunatService::class);
+        $isCheckoutSunatActive = $apisunatForCheckout->isConfiguredForBranch(
+            WorkshopMovement::query()->with('branch')->find($order->id)?->branch
+        );
+
+        if ($isDebtCheckout && $isCheckoutSunatActive && $isCheckoutInvoiceDocument && $request->boolean('sunat_apply_detraccion')) {
+            if (trim((string) ($validated['sunat_detraccion_bank_account'] ?? '')) === '') {
+                throw ValidationException::withMessages([
+                    'sunat_detraccion_bank_account' => 'Indique la cuenta del Banco de la Nación para la detracción.',
+                ]);
+            }
         }
 
         $methodIds = collect($validated['payment_methods'] ?? [])
@@ -2317,8 +2346,16 @@ class WorkshopMaintenanceBoardController extends Controller
                 ->all();
         }
 
+        $checkoutDebtDueAt = $this->resolveCheckoutDebtDueAt($validated, $isDebtCheckout);
+        $checkoutSunatBillingMeta = $this->buildCheckoutSunatBillingMeta(
+            $request,
+            $isDebtCheckout,
+            $isCheckoutSunatActive,
+            $isCheckoutInvoiceDocument
+        );
+
         try {
-            DB::transaction(function () use ($order, $validated, $branchId, $user, $paymentType, $isDebtCheckout, $isAnticipo, $checkoutPreviousAdvances, &$movementForApisunat) {
+            DB::transaction(function () use ($order, $validated, $branchId, $user, $paymentType, $isDebtCheckout, $isAnticipo, $checkoutPreviousAdvances, $checkoutDebtDueAt, $checkoutSunatBillingMeta, &$movementForApisunat) {
                 $lockedOrder = WorkshopMovement::query()
                     ->where('id', $order->id)
                     ->lockForUpdate()
@@ -2523,9 +2560,13 @@ class WorkshopMaintenanceBoardController extends Controller
                 if (!$isAnticipo && $movementForApisunat) {
                     $movementForApisunat->loadMissing('salesMovement');
                     if ($movementForApisunat->salesMovement) {
-                        $movementForApisunat->salesMovement->update([
+                        $salesUpdate = [
                             'payment_type' => $isDebtCheckout ? 'CREDITO' : 'CONTADO',
-                        ]);
+                        ];
+                        if ($checkoutSunatBillingMeta !== null) {
+                            $salesUpdate['sunat_billing_meta'] = $checkoutSunatBillingMeta;
+                        }
+                        $movementForApisunat->salesMovement->update($salesUpdate);
                     }
 
                     if (count($checkoutPreviousAdvances) > 0) {
@@ -2544,7 +2585,8 @@ class WorkshopMaintenanceBoardController extends Controller
                     (int) $user?->id,
                     (string) ($user?->name ?? 'Sistema'),
                     $validated['payment_comment'] ?? ($validated['sale_comment'] ?? null),
-                    $paymentType
+                    $paymentType,
+                    $checkoutDebtDueAt
                 );
 
                 if (!$isAnticipo && $deliversOnConfirm) {
@@ -3718,6 +3760,78 @@ class WorkshopMaintenanceBoardController extends Controller
         }
 
         return $redirect;
+    }
+
+    private function resolveCheckoutDebtDueAt(array $validated, bool $isDebtCheckout): ?Carbon
+    {
+        if (!$isDebtCheckout) {
+            return null;
+        }
+
+        $dueDateStr = trim((string) ($validated['debt_due_date'] ?? ''));
+        if ($dueDateStr !== '') {
+            try {
+                return Carbon::createFromFormat('Y-m-d', $dueDateStr)->endOfDay();
+            } catch (\Throwable $e) {
+                // fallback a días de crédito
+            }
+        }
+
+        return now()->startOfDay()
+            ->addDays(max(0, (int) ($validated['credit_days'] ?? 0)))
+            ->endOfDay();
+    }
+
+    private function buildCheckoutSunatBillingMeta(
+        Request $request,
+        bool $isDebtCheckout,
+        bool $isSunatActive,
+        bool $isInvoiceDocument
+    ): ?array {
+        if (!$isDebtCheckout) {
+            return null;
+        }
+
+        $creditDays = max(0, (int) $request->input('credit_days', 0));
+        $dueDateStr = trim((string) $request->input('debt_due_date', ''));
+        if ($dueDateStr === '' && $creditDays > 0) {
+            $dueDateStr = now()->startOfDay()->addDays($creditDays)->format('Y-m-d');
+        }
+
+        $meta = [
+            'credit_days' => $creditDays,
+            'credit_due_date' => $dueDateStr,
+            'apply_detraccion' => false,
+            'apply_retencion' => false,
+        ];
+
+        if ($isSunatActive && $isInvoiceDocument) {
+            $meta['apply_detraccion'] = $request->boolean('sunat_apply_detraccion');
+            $meta['apply_retencion'] = $request->boolean('sunat_apply_retencion');
+            if ($meta['apply_detraccion']) {
+                $meta['detraccion_type'] = trim((string) $request->input('sunat_detraccion_type', '020')) ?: '020';
+                $meta['detraccion_percent'] = round((float) $request->input('sunat_detraccion_percent', 12), 2);
+                $meta['detraccion_bank_account'] = trim((string) $request->input('sunat_detraccion_bank_account', ''));
+            }
+            if ($meta['apply_retencion']) {
+                $meta['retencion_percent'] = round((float) $request->input('sunat_retencion_percent', 3), 2);
+            }
+        }
+
+        return $meta;
+    }
+
+    /**
+     * @return array<int, array{code: string, label: string}>
+     */
+    private function sunatDetraccionCatalogOptions(): array
+    {
+        return [
+            ['code' => '020', 'label' => '020 - Mantenimiento y reparación de bienes muebles'],
+            ['code' => '022', 'label' => '022 - Otros servicios empresariales'],
+            ['code' => '037', 'label' => '037 - Servicios de transporte de carga'],
+            ['code' => '030', 'label' => '030 - Mantenimiento y reparación de bienes muebles (alterno)'],
+        ];
     }
 
     private function syncElectronicInvoiceForSale(\App\Models\Movement $movement, \App\Services\ApisunatService $apisunatService): array

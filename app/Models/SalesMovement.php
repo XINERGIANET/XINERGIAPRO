@@ -19,6 +19,7 @@ class SalesMovement extends Model
         'detail_type',
         'consumption',
         'payment_type',
+        'sunat_billing_meta',
         'status',
         'sale_type',
         'currency',
@@ -33,6 +34,7 @@ class SalesMovement extends Model
 
     protected $casts = [
         'branch_snapshot' => 'array',
+        'sunat_billing_meta' => 'array',
         'exchange_rate' => 'decimal:3',
         'subtotal' => 'decimal:2',
         'tax' => 'decimal:2',

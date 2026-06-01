@@ -22,6 +22,9 @@ class ApisunatService
     /** Catálogo 51 (cbc:ProfileID): venta interna. */
     private const SUNAT_OPERATION_STANDARD_CODE = '0101';
 
+    /** Catálogo 51: operación sujeta a detracción. */
+    private const SUNAT_OPERATION_DETRACTION_CODE = '1001';
+
     public function isEligibleDocument(Movement $sale): bool
     {
         $docName = mb_strtolower(trim((string) ($sale->documentType?->name ?? '')), 'UTF-8');
@@ -552,9 +555,11 @@ class ApisunatService
         $defaultTaxPercent = $this->resolveDefaultTaxPercentForBranch($branch);
         $sale->loadMissing('salesMovement');
         $isAdvanceInvoice = (bool) ($sale->salesMovement?->is_advance ?? false);
+        $sunatBillingMeta = $this->resolveSunatBillingMeta($sale);
+        $applyDetraccion = ! $isAdvanceInvoice && (bool) ($sunatBillingMeta['apply_detraccion'] ?? false);
         $operationTypeCode = $isAdvanceInvoice
             ? self::SUNAT_OPERATION_ADVANCE_CODE
-            : self::SUNAT_OPERATION_STANDARD_CODE;
+            : ($applyDetraccion ? self::SUNAT_OPERATION_DETRACTION_CODE : self::SUNAT_OPERATION_STANDARD_CODE);
 
         $documentBody = [
             'cbc:UBLVersionID' => ['_text' => '2.1'],
@@ -565,7 +570,7 @@ class ApisunatService
             'cbc:IssueTime' => ['_text' => now()->format('H:i:s')],
             'cbc:InvoiceTypeCode' => $this->sunatInvoiceTypeCodeNode(
                 $catalog['type'],
-                $this->resolveSunatInvoiceTypeListId($catalog['type'], $isAdvanceInvoice)
+                $this->resolveSunatInvoiceTypeListId($catalog['type'], $isAdvanceInvoice, $applyDetraccion)
             ),
             'cbc:Note' => [],
             'cbc:DocumentCurrencyCode' => ['_text' => 'PEN'],
@@ -605,13 +610,6 @@ class ApisunatService
             ],
             'cac:InvoiceLine' => [],
         ];
-
-        if ($catalog['type'] === '01') {
-            $documentBody['cac:PaymentTerms'] = [[
-                'cbc:ID' => ['_text' => 'FormaPago'],
-                'cbc:PaymentMeansID' => ['_text' => 'Contado'],
-            ]];
-        }
 
         $lineIndex = 1;
         $headerSubtotal = 0.0;
@@ -787,6 +785,17 @@ class ApisunatService
         ];
 
         $documentBody['cac:LegalMonetaryTotal'] = $legalMonetaryTotal;
+
+        if ($catalog['type'] === '01') {
+            $isCreditSale = $this->isCreditSalesMovement($sale);
+            $documentBody['cac:PaymentTerms'] = $this->buildSunatInvoicePaymentTerms(
+                $isCreditSale,
+                $payableAmount,
+                $sunatBillingMeta
+            );
+            $this->appendSunatDetraccionToDocument($documentBody, $sunatBillingMeta, $payableAmount, $applyDetraccion);
+            $this->appendSunatRetencionToDocument($documentBody, $sunatBillingMeta, $payableAmount);
+        }
 
         return $documentBody;
     }
@@ -1428,13 +1437,179 @@ class ApisunatService
      * Factura de anticipo: ProfileID=0104 y listID=0101 (evita error SUNAT 3206).
      * Boleta de anticipo: ProfileID=0104 y listID=0104.
      */
-    private function resolveSunatInvoiceTypeListId(string $documentTypeCode, bool $isAdvanceInvoice): string
+    private function resolveSunatInvoiceTypeListId(string $documentTypeCode, bool $isAdvanceInvoice, bool $applyDetraccion = false): string
     {
         if ($isAdvanceInvoice && $documentTypeCode === '03') {
             return self::SUNAT_OPERATION_ADVANCE_CODE;
         }
 
+        if ($applyDetraccion) {
+            return self::SUNAT_OPERATION_DETRACTION_CODE;
+        }
+
         return self::SUNAT_OPERATION_STANDARD_CODE;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function resolveSunatBillingMeta(Movement $sale): array
+    {
+        $sale->loadMissing('salesMovement');
+        $meta = $sale->salesMovement?->sunat_billing_meta;
+
+        return is_array($meta) ? $meta : [];
+    }
+
+    private function isCreditSalesMovement(Movement $sale): bool
+    {
+        $paymentType = strtoupper(trim((string) ($sale->salesMovement?->payment_type ?? '')));
+
+        return in_array($paymentType, ['CREDITO', 'CREDIT', 'DEUDA'], true);
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildSunatInvoicePaymentTerms(bool $isCreditSale, float $payableAmount, array $meta): array
+    {
+        $amount = round(max(0, $payableAmount), 2);
+
+        if ($isCreditSale) {
+            $dueDate = trim((string) ($meta['credit_due_date'] ?? ''));
+            if ($dueDate === '') {
+                $dueDate = now()->format('Y-m-d');
+            }
+
+            return [
+                [
+                    'cbc:ID' => ['_text' => 'FormaPago'],
+                    'cbc:PaymentMeansID' => ['_text' => 'Credito'],
+                    'cbc:Amount' => [
+                        '_attributes' => ['currencyID' => 'PEN'],
+                        '_text' => $amount,
+                    ],
+                ],
+                [
+                    'cbc:ID' => ['_text' => 'FormaPago'],
+                    'cbc:PaymentMeansID' => ['_text' => 'Cuota001'],
+                    'cbc:Amount' => [
+                        '_attributes' => ['currencyID' => 'PEN'],
+                        '_text' => $amount,
+                    ],
+                    'cbc:PaymentDueDate' => ['_text' => $dueDate],
+                ],
+            ];
+        }
+
+        return [[
+            'cbc:ID' => ['_text' => 'FormaPago'],
+            'cbc:PaymentMeansID' => ['_text' => 'Contado'],
+        ]];
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private function appendSunatDetraccionToDocument(array &$documentBody, array $meta, float $payableAmount, bool $applyDetraccion): void
+    {
+        if (! $applyDetraccion) {
+            return;
+        }
+
+        $detraccionType = trim((string) ($meta['detraccion_type'] ?? '020'));
+        if ($detraccionType === '') {
+            $detraccionType = '020';
+        }
+
+        $percent = round((float) ($meta['detraccion_percent'] ?? 12), 2);
+        if ($percent <= 0) {
+            $percent = 12;
+        }
+
+        $baseAmount = round(max(0, $payableAmount), 2);
+        $detraccionAmount = round($baseAmount * ($percent / 100), 2);
+        $bankAccount = trim((string) ($meta['detraccion_bank_account'] ?? ''));
+
+        $notes = $documentBody['cbc:Note'] ?? [];
+        if (! is_array($notes) || array_is_list($notes) === false) {
+            $notes = $notes === [] ? [] : [$notes];
+        }
+        $notes[] = [
+            '_attributes' => ['languageLocaleID' => '2006'],
+            '_text' => 'Operación sujeta a detracción',
+        ];
+        $documentBody['cbc:Note'] = $notes;
+
+        if ($bankAccount !== '') {
+            $documentBody['cac:PaymentMeans'] = [[
+                'cbc:ID' => ['_text' => 'Detraccion'],
+                'cbc:PaymentMeansCode' => ['_text' => '001'],
+                'cac:PayeeFinancialAccount' => [
+                    'cbc:ID' => ['_text' => $bankAccount],
+                ],
+            ]];
+        }
+
+        $paymentTerms = $documentBody['cac:PaymentTerms'] ?? [];
+        if (! is_array($paymentTerms)) {
+            $paymentTerms = [];
+        }
+
+        $paymentTerms[] = [
+            'cbc:ID' => ['_text' => 'Detraccion'],
+            'cbc:PaymentMeansID' => ['_text' => $detraccionType],
+            'cbc:PaymentPercent' => ['_text' => $percent],
+            'cbc:Amount' => [
+                '_attributes' => ['currencyID' => 'PEN'],
+                '_text' => $detraccionAmount,
+            ],
+        ];
+
+        $documentBody['cac:PaymentTerms'] = $paymentTerms;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private function appendSunatRetencionToDocument(array &$documentBody, array $meta, float $payableAmount): void
+    {
+        if (! (bool) ($meta['apply_retencion'] ?? false)) {
+            return;
+        }
+
+        $percent = round((float) ($meta['retencion_percent'] ?? 3), 2);
+        if ($percent <= 0) {
+            $percent = 3;
+        }
+
+        $baseAmount = round(max(0, $payableAmount), 2);
+        $retencionAmount = round($baseAmount * ($percent / 100), 2);
+        if ($retencionAmount <= 0) {
+            return;
+        }
+
+        $allowanceCharges = $documentBody['cac:AllowanceCharge'] ?? [];
+        if (! is_array($allowanceCharges)) {
+            $allowanceCharges = [];
+        }
+
+        $allowanceCharges[] = [
+            'cbc:ChargeIndicator' => ['_text' => 'false'],
+            'cbc:AllowanceChargeReasonCode' => ['_text' => '02'],
+            'cbc:MultiplierFactorNumeric' => ['_text' => round($percent / 100, 5)],
+            'cbc:Amount' => [
+                '_attributes' => ['currencyID' => 'PEN'],
+                '_text' => $retencionAmount,
+            ],
+            'cbc:BaseAmount' => [
+                '_attributes' => ['currencyID' => 'PEN'],
+                '_text' => $baseAmount,
+            ],
+        ];
+
+        $documentBody['cac:AllowanceCharge'] = $allowanceCharges;
     }
 
     private function sunatInvoiceTypeCodeNode(string $documentTypeCode, string $operationListId): array

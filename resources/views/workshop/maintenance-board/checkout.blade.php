@@ -16,6 +16,16 @@
             invoiceSeries: @js((string) old('invoice_series', '001')),
             invoiceNumber: @js((string) old('invoice_number', '')),
             paymentType: @js((string) old('payment_type', 'CONTADO')),
+            isSunatActive: @js((bool) ($isSunatActive ?? false)),
+            creditDays: @js((int) old('credit_days', $defaultCreditDays ?? 0)),
+            debtDueDate: @js((string) old('debt_due_date', '')),
+            sunatApplyDetraccion: @js((bool) old('sunat_apply_detraccion', false)),
+            sunatDetraccionType: @js((string) old('sunat_detraccion_type', '020')),
+            sunatDetraccionPercent: @js((string) old('sunat_detraccion_percent', '12')),
+            sunatDetraccionBankAccount: @js((string) old('sunat_detraccion_bank_account', '')),
+            sunatApplyRetencion: @js((bool) old('sunat_apply_retencion', false)),
+            sunatRetencionPercent: @js((string) old('sunat_retencion_percent', '3')),
+            sunatDetraccionTypes: @js($sunatDetraccionTypes ?? []),
             paymentMethodOptions: @js(($paymentMethodOptions ?? collect())->values()->all()),
             cardOptions: @js(($cardOptions ?? collect())->values()->all()),
             digitalWalletOptions: @js(($digitalWalletOptions ?? collect())->values()->all()),
@@ -27,6 +37,11 @@
             },
             init() {
                 this.paymentType = String(this.paymentType || 'CONTADO').toUpperCase() === 'DEUDA' ? 'DEUDA' : 'CONTADO';
+                this.creditDays = Math.max(0, parseInt(this.creditDays, 10) || 0);
+                this.debtDueDate = String(this.debtDueDate || '').trim();
+                if (this.isDebtPaymentSelected() && !this.debtDueDate) {
+                    this.syncDebtDueFromCreditDays();
+                }
                 if (this.chargeTotal() <= 0.000009) {
                     this.paymentType = 'CONTADO';
                 }
@@ -53,6 +68,43 @@
             },
             isDebtPaymentSelected() {
                 return String(this.paymentType || 'CONTADO').toUpperCase() === 'DEUDA';
+            },
+            showSunatCreditOptions() {
+                return this.isSunatActive && this.isDebtPaymentSelected() && this.isInvoiceDocumentSelected();
+            },
+            parseBaseDebtDate() {
+                return new Date();
+            },
+            formatDebtIsoDate(d) {
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            },
+            syncDebtDueFromCreditDays() {
+                if (!this.isDebtPaymentSelected()) return;
+                const base = this.parseBaseDebtDate();
+                const next = new Date(base.getTime());
+                next.setDate(next.getDate() + Math.max(0, parseInt(this.creditDays, 10) || 0));
+                this.debtDueDate = this.formatDebtIsoDate(next);
+            },
+            onCreditDaysChange() {
+                this.creditDays = Math.max(0, parseInt(this.creditDays, 10) || 0);
+                this.syncDebtDueFromCreditDays();
+            },
+            onDebtDueDateChange() {
+                const iso = String(this.debtDueDate || '').trim();
+                if (!iso) {
+                    this.syncDebtDueFromCreditDays();
+                    return;
+                }
+                const due = new Date(`${iso}T12:00:00`);
+                if (Number.isNaN(due.getTime())) return;
+                const base = this.parseBaseDebtDate();
+                const baseDay = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+                const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+                const diffMs = dueDay.getTime() - baseDay.getTime();
+                this.creditDays = Math.max(0, Math.round(diffMs / 86400000));
             },
             isInvoiceDocumentTypeId(docId) {
                 const resolvedId = docId != null ? docId : this.selectedDocumentTypeId;
@@ -202,6 +254,9 @@
                 this.paymentType = this.isDebtPaymentSelected() ? 'DEUDA' : 'CONTADO';
                 if (this.isDebtPaymentSelected()) {
                     this.paymentRows = [];
+                    if (!this.debtDueDate) {
+                        this.syncDebtDueFromCreditDays();
+                    }
                 } else if (this.nothingToCollect()) {
                     this.paymentRows = [];
                 } else if (this.paymentRows.length === 0) {
@@ -300,6 +355,11 @@
                 <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Orden de servicio</p>
                 <p class="text-lg font-bold text-slate-800">OS {{ $order->movement?->number ?? ('#' . $order->id) }} -
                     {{ trim(($order->vehicle?->brand ?? '') . ' ' . ($order->vehicle?->model ?? '')) }}</p>
+                @if(trim((string) ($vehiclePlate ?? $order->vehicle?->plate ?? '')) !== '')
+                    <p class="mt-1 text-sm font-semibold text-slate-700">
+                        Placa: <span class="font-bold tracking-wide text-slate-900">{{ trim((string) ($vehiclePlate ?? $order->vehicle?->plate ?? '')) }}</span>
+                    </p>
+                @endif
                 <p class="text-sm text-slate-500">Cliente:
                     {{ trim(($order->client?->first_name ?? '') . ' ' . ($order->client?->last_name ?? '')) ?: 'Sin cliente' }}
                 </p>
@@ -504,8 +564,62 @@
                 </div>
 
                 <div x-show="isDebtPaymentSelected()" x-cloak
-                    class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-                    Esta venta se registrará como deuda y se enviará a cuentas por cobrar.
+                    class="rounded-2xl border border-rose-200 bg-rose-50/80 p-5 shadow-inner">
+                    <div class="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-rose-200 text-rose-600">
+                        <i class="ri-file-list-3-fill text-2xl"></i>
+                    </div>
+                    <h4 class="text-center text-sm font-bold text-rose-800">Venta al crédito</h4>
+                    <p class="mt-1 text-center text-xs text-rose-600">Se registrará en cuentas por cobrar sin ingreso a caja. La fecha de vencimiento se usará en SUNAT si emite factura electrónica.</p>
+                    <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                        <div>
+                            <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-rose-800">Días de crédito</label>
+                            <input type="number" min="0" step="1" x-model="creditDays" @input="onCreditDaysChange()" name="credit_days" class="h-11 w-full rounded-xl border border-rose-200 bg-white px-3 text-sm font-bold text-slate-700 focus:border-rose-400 focus:ring-2 focus:ring-rose-200">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-rose-800">Fecha de vencimiento</label>
+                            <input type="date" x-model="debtDueDate" @input="onDebtDueDateChange()" name="debt_due_date" class="h-11 w-full rounded-xl border border-rose-200 bg-white px-3 text-sm font-bold text-slate-700 focus:border-rose-400 focus:ring-2 focus:ring-rose-200">
+                        </div>
+                    </div>
+                    <p class="mt-3 text-center text-lg font-black text-rose-900" x-text="`S/ ${chargeTotal().toFixed(2)}`"></p>
+
+                    <div x-show="showSunatCreditOptions()" x-cloak class="mt-5 rounded-xl border border-indigo-200 bg-white p-4">
+                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-indigo-800">Opciones SUNAT (factura electrónica)</p>
+                        <p class="mt-1 text-xs text-slate-500">Marque detracción y/o retención si corresponde según el portal de Apisunat/SUNAT.</p>
+                        <div class="mt-3 space-y-4">
+                            <label class="flex items-start gap-2 text-sm text-slate-700">
+                                <input type="hidden" name="sunat_apply_detraccion" value="0">
+                                <input type="checkbox" name="sunat_apply_detraccion" value="1" x-model="sunatApplyDetraccion" class="mt-1 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                <span><span class="font-semibold">Aplicar detracción</span> (operación 1001)</span>
+                            </label>
+                            <div x-show="sunatApplyDetraccion" x-cloak class="grid gap-3 sm:grid-cols-3">
+                                <div class="sm:col-span-1">
+                                    <label class="mb-1 block text-[10px] font-bold uppercase text-slate-500">Tipo (cat. 54)</label>
+                                    <select name="sunat_detraccion_type" x-model="sunatDetraccionType" class="h-10 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm">
+                                        <template x-for="item in sunatDetraccionTypes" :key="`det-${item.code}`">
+                                            <option :value="item.code" x-text="item.label"></option>
+                                        </template>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-[10px] font-bold uppercase text-slate-500">% detracción</label>
+                                    <input type="number" step="0.01" min="0" max="100" name="sunat_detraccion_percent" x-model="sunatDetraccionPercent" class="h-10 w-full rounded-lg border border-slate-300 px-2 text-sm">
+                                </div>
+                                <div class="sm:col-span-1">
+                                    <label class="mb-1 block text-[10px] font-bold uppercase text-slate-500">Cuenta Banco de la Nación</label>
+                                    <input type="text" name="sunat_detraccion_bank_account" x-model="sunatDetraccionBankAccount" placeholder="0000-0000000000" class="h-10 w-full rounded-lg border border-slate-300 px-2 text-sm" :required="sunatApplyDetraccion">
+                                </div>
+                            </div>
+                            <label class="flex items-start gap-2 text-sm text-slate-700">
+                                <input type="hidden" name="sunat_apply_retencion" value="0">
+                                <input type="checkbox" name="sunat_apply_retencion" value="1" x-model="sunatApplyRetencion" class="mt-1 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                <span><span class="font-semibold">Aplicar retención</span> (cat. 53, código 02)</span>
+                            </label>
+                            <div x-show="sunatApplyRetencion" x-cloak>
+                                <label class="mb-1 block text-[10px] font-bold uppercase text-slate-500">% retención</label>
+                                <input type="number" step="0.01" min="0" max="100" name="sunat_retencion_percent" x-model="sunatRetencionPercent" class="h-10 w-full max-w-xs rounded-lg border border-slate-300 px-2 text-sm">
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div x-show="isInvoiceDocumentSelected()" x-cloak

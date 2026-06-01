@@ -1805,9 +1805,10 @@ class WorkshopFlowService
         int $userId,
         string $userName,
         ?string $comment = null,
-        string $paymentType = 'CONTADO'
+        string $paymentType = 'CONTADO',
+        ?\DateTimeInterface $debtDueAt = null
     ): CashMovements {
-        return DB::transaction(function () use ($order, $cashRegisterId, $paymentMethods, $branchId, $userId, $userName, $comment, $paymentType) {
+        return DB::transaction(function () use ($order, $cashRegisterId, $paymentMethods, $branchId, $userId, $userName, $comment, $paymentType, $debtDueAt) {
             $order = WorkshopMovement::query()->lockForUpdate()->findOrFail($order->id);
             if ($order->branch_id !== $branchId) {
                 throw new \RuntimeException('La OS no pertenece a la sucursal actual.');
@@ -1907,10 +1908,14 @@ class WorkshopFlowService
 
             if ($isDebtPayment) {
                 $method = $this->resolveDebtPaymentMethod();
+                $resolvedDueAt = $debtDueAt
+                    ? \Illuminate\Support\Carbon::instance($debtDueAt)->endOfDay()
+                    : now();
+
                 CashMovementDetail::query()->create([
                     'cash_movement_id' => $cashMovement->id,
                     'type' => 'DEUDA',
-                    'due_at' => now(),
+                    'due_at' => $resolvedDueAt,
                     'paid_at' => null,
                     'payment_method_id' => $method->id,
                     'payment_method' => $method->description ?? '',
