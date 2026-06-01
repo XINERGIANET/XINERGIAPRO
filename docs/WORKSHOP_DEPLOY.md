@@ -24,7 +24,23 @@ Revisar y ajustar por entorno:
   - `WS_DEFAULT_IGV`
   - `WS_CURRENCY`
 
-## 3. Storage y permisos
+## 3. Límite de subida (nginx / PHP) — fotos desde móvil
+Si al subir fotos desde la cámara del celular aparece **413 Request Entity Too Large**, aumentar el límite en el servidor (la app también comprime imágenes en el navegador y al guardar).
+
+**nginx** (dentro del `server` o del `location` de la app):
+```nginx
+client_max_body_size 32M;
+```
+
+**PHP** (`php.ini` o pool FPM):
+```ini
+upload_max_filesize = 32M
+post_max_size = 32M
+```
+
+Reiniciar nginx y PHP-FPM tras el cambio.
+
+## 4. Storage y permisos
 1. Crear enlace público:
 ```bash
 php artisan storage:link
@@ -39,11 +55,11 @@ php artisan storage:link
 2. Validar exportes `.xlsx` (si hay `ZipArchive`).
 3. Si no hay `ZipArchive`, validar fallback `.csv`.
 
-## 5. Backup de base de datos (pre y post deploy)
+## 6. Backup de base de datos (pre y post deploy)
 1. Backup previo obligatorio.
 2. Backup posterior tras smoke test exitoso.
 
-## 6. Smoke test productivo
+## 7. Smoke test productivo
 1. Cita -> OS -> aprobación -> consumo -> venta -> pago -> entrega.
 2. Exportes compras/ventas/armados.
 3. Permisos por perfil en sucursal.

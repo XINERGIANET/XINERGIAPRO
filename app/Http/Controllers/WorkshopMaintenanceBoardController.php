@@ -3504,7 +3504,11 @@ class WorkshopMaintenanceBoardController extends Controller
             }
 
             $sort++;
-            $path = $file->store("workshop/parts-replacement/{$branchId}/{$pair->id}", 'public');
+            $path = \App\Support\WorkshopPhotoOptimizer::storeOptimized(
+                $file,
+                "workshop/parts-replacement/{$branchId}/{$pair->id}",
+                'public'
+            );
             $pair->photos()->create([
                 'photo_type' => $photoType,
                 'photo_path' => $path,

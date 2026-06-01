@@ -23,7 +23,7 @@
                     — Placa {{ $order->vehicle?->plate ?: 'S/PLACA' }}
                 </p>
                 <p class="mt-2 text-sm text-gray-600">
-                    Relaciona cada repuesto retirado con su repuesto nuevo. Sube todas las fotos que necesites desde cámara o archivos.
+                    Relaciona cada repuesto retirado con su repuesto nuevo. Sube fotos desde cámara o archivos; las imágenes del celular se optimizan automáticamente antes de enviar.
                 </p>
             </div>
             <div class="flex flex-wrap gap-2">
@@ -49,12 +49,22 @@
             <div class="mt-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first() }}</div>
         @endif
 
+        <div
+            x-show="compressing"
+            x-cloak
+            class="mt-4 flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-800"
+        >
+            <i class="ri-loader-4-line animate-spin"></i>
+            Optimizando fotos para envío…
+        </div>
+
         <form
             method="POST"
             action="{{ route('workshop.maintenance-board.parts-replacement-status.store', $order) }}"
             enctype="multipart/form-data"
             class="mt-6 space-y-6"
             data-turbo="false"
+            @submit="handleSubmit($event)"
         >
             @csrf
             @if (!empty($viewId))
@@ -112,10 +122,10 @@
 
                                 <div class="mb-2 flex flex-wrap gap-2">
                                     <input type="file" class="hidden" :id="`old-file-${pair.uid}`" :name="`pairs[${pindex}][old_photos][]`" accept="image/*" multiple @change="accumulateFiles(pindex, 'old', $event)">
-                                    <button type="button" @click="openFilePicker('old', true, pair.uid)" class="inline-flex items-center gap-1 rounded-lg bg-rose-700 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-800">
+                                    <button type="button" @click="openFilePicker('old', true, pair.uid)" :disabled="compressing" class="inline-flex items-center gap-1 rounded-lg bg-rose-700 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-800 disabled:opacity-50">
                                         <i class="ri-camera-line"></i> Cámara
                                     </button>
-                                    <button type="button" @click="openFilePicker('old', false, pair.uid)" class="inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs font-semibold text-rose-800 hover:bg-rose-50">
+                                    <button type="button" @click="openFilePicker('old', false, pair.uid)" :disabled="compressing" class="inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-white px-3 py-2 text-xs font-semibold text-rose-800 hover:bg-rose-50 disabled:opacity-50">
                                         <i class="ri-folder-image-line"></i> Archivos
                                     </button>
                                 </div>
@@ -149,10 +159,10 @@
 
                                 <div class="mb-2 flex flex-wrap gap-2">
                                     <input type="file" class="hidden" :id="`new-file-${pair.uid}`" :name="`pairs[${pindex}][new_photos][]`" accept="image/*" multiple @change="accumulateFiles(pindex, 'new', $event)">
-                                    <button type="button" @click="openFilePicker('new', true, pair.uid)" class="inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-800">
+                                    <button type="button" @click="openFilePicker('new', true, pair.uid)" :disabled="compressing" class="inline-flex items-center gap-1 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">
                                         <i class="ri-camera-line"></i> Cámara
                                     </button>
-                                    <button type="button" @click="openFilePicker('new', false, pair.uid)" class="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50">
+                                    <button type="button" @click="openFilePicker('new', false, pair.uid)" :disabled="compressing" class="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50">
                                         <i class="ri-folder-image-line"></i> Archivos
                                     </button>
                                 </div>
@@ -182,9 +192,9 @@
             </div>
 
             <div class="flex flex-wrap gap-3 border-t border-gray-200 pt-5">
-                <x-ui.button type="submit" size="md" variant="primary">
+                <x-ui.button type="submit" size="md" variant="primary" x-bind:disabled="compressing || submitting">
                     <i class="ri-save-line"></i>
-                    <span>Guardar y continuar editando</span>
+                    <span x-text="submitting ? 'Guardando…' : 'Guardar y continuar editando'">Guardar y continuar editando</span>
                 </x-ui.button>
                 <a href="{{ route('workshop.pdf.parts-replacement-status', $order) }}"
                    target="_blank"
@@ -224,6 +234,8 @@ function partsReplacementStatusData(initialPairs, initialReportNotes) {
         pairs: (Array.isArray(initialPairs) && initialPairs.length ? initialPairs : [{}]).map(normalizePair),
         reportNotes: initialReportNotes || '',
         deletePhotoIds: [],
+        compressing: false,
+        submitting: false,
         addPair() {
             this.pairs.push(normalizePair({}));
         },
@@ -248,7 +260,66 @@ function partsReplacementStatusData(initialPairs, initialReportNotes) {
             }
             inputEl.click();
         },
-        accumulateFiles(pairIndex, side, event) {
+        async compressImageForUpload(file) {
+            if (!(file instanceof File) || !String(file.type || '').startsWith('image/')) {
+                return file;
+            }
+
+            const maxDimension = 1600;
+            const quality = 0.76;
+
+            const imageUrl = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+
+            const image = await new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = imageUrl;
+            });
+
+            let width = image.width || 0;
+            let height = image.height || 0;
+
+            if (width <= 0 || height <= 0) {
+                return file;
+            }
+
+            if (width > maxDimension || height > maxDimension) {
+                const ratio = Math.min(maxDimension / width, maxDimension / height);
+                width = Math.max(1, Math.round(width * ratio));
+                height = Math.max(1, Math.round(height * ratio));
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                return file;
+            }
+
+            ctx.drawImage(image, 0, 0, width, height);
+
+            const blob = await new Promise((resolve) => {
+                canvas.toBlob(resolve, 'image/jpeg', quality);
+            });
+
+            if (!blob || blob.size >= file.size) {
+                return file;
+            }
+
+            const nextName = String(file.name || 'foto.jpg').replace(/\.(png|webp|heic|heif|jpeg|jpg)$/i, '') + '.jpg';
+            return new File([blob], nextName, {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+            });
+        },
+        async accumulateFiles(pairIndex, side, event) {
             const inputEl = event.target;
             const files = Array.from(inputEl.files || []);
 
@@ -264,17 +335,52 @@ function partsReplacementStatusData(initialPairs, initialReportNotes) {
                 this.pairs[pairIndex][previewKey] = [];
             }
 
-            files.forEach((file) => {
-                this.pairs[pairIndex][pendingKey].push(file);
-                this.pairs[pairIndex][previewKey].push({
-                    name: file.name,
-                    url: URL.createObjectURL(file),
+            this.compressing = true;
+            try {
+                for (const file of files) {
+                    let processed = file;
+                    try {
+                        processed = await this.compressImageForUpload(file);
+                    } catch (error) {
+                        processed = file;
+                    }
+                    this.pairs[pairIndex][pendingKey].push(processed);
+                    this.pairs[pairIndex][previewKey].push({
+                        name: processed.name,
+                        url: URL.createObjectURL(processed),
+                    });
+                }
+
+                const dt = new DataTransfer();
+                this.pairs[pairIndex][pendingKey].forEach((pendingFile) => dt.items.add(pendingFile));
+                inputEl.files = dt.files;
+            } finally {
+                this.compressing = false;
+                inputEl.value = '';
+            }
+        },
+        handleSubmit(event) {
+            if (this.compressing) {
+                event.preventDefault();
+                alert('Espere a que terminen de optimizarse las fotos.');
+                return;
+            }
+
+            const form = event.target;
+            let totalBytes = 0;
+            form.querySelectorAll('input[type="file"]').forEach((input) => {
+                Array.from(input.files || []).forEach((file) => {
+                    totalBytes += file.size || 0;
                 });
             });
 
-            const dt = new DataTransfer();
-            this.pairs[pairIndex][pendingKey].forEach((file) => dt.items.add(file));
-            inputEl.files = dt.files;
+            if (totalBytes > 14 * 1024 * 1024) {
+                event.preventDefault();
+                alert('Hay demasiadas fotos en un solo envío. Guarde primero con menos imágenes y luego agregue el resto.');
+                return;
+            }
+
+            this.submitting = true;
         },
     };
 }
