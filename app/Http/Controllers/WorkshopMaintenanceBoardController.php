@@ -25,6 +25,7 @@ use App\Models\WorkshopMovementTechnician;
 use App\Models\WorkshopPartReplacementPair;
 use App\Models\WorkshopPartReplacementPhoto;
 use App\Models\WorkshopPreexistingDamage;
+use App\Models\WorkshopStatusHistory;
 use App\Models\WorkshopService;
 use App\Models\WorkshopVehicleIntakeInventoryItem;
 use App\Services\VehiclePlateLookupService;
@@ -933,7 +934,10 @@ class WorkshopMaintenanceBoardController extends Controller
             'product_lines.*.product_id' => ['nullable', 'integer', 'exists:products,id'],
             'product_lines.*.qty' => ['nullable', 'numeric', 'gte:0'],
             'product_lines.*.unit_price' => ['nullable', 'numeric', 'gte:0'],
+            'save_mode' => ['nullable', 'string', 'in:partial,full'],
         ]);
+
+        $isPartialSave = $request->input('save_mode', 'full') === 'partial';
 
         $vehicle = Vehicle::query()
             ->where('id', (int) $validated['vehicle_id'])
@@ -953,15 +957,18 @@ class WorkshopMaintenanceBoardController extends Controller
             return back()->withErrors(['error' => 'El vehiculo no pertenece al cliente seleccionado.']);
         }
 
-        try {
-            $parsedServiceLines = $this->parseMaintenanceBoardServiceLines((array) ($validated['service_lines'] ?? []));
-        } catch (ValidationException $e) {
-            return back()->withErrors($e->errors());
-        }
-        try {
-            $this->assertCatalogServiceLinesAllowed($parsedServiceLines, $branchId, $companyId);
-        } catch (ValidationException $e) {
-            return back()->withErrors($e->errors());
+        $parsedServiceLines = [];
+        if (!$isPartialSave) {
+            try {
+                $parsedServiceLines = $this->parseMaintenanceBoardServiceLines((array) ($validated['service_lines'] ?? []));
+            } catch (ValidationException $e) {
+                return back()->withErrors($e->errors());
+            }
+            try {
+                $this->assertCatalogServiceLinesAllowed($parsedServiceLines, $branchId, $companyId);
+            } catch (ValidationException $e) {
+                return back()->withErrors($e->errors());
+            }
         }
         $editableCatalogServicePrices = $this->isCatalogServicePriceEditingEnabled($branchId);
         $intakeDate = $this->normalizeMaintenanceBoardIntakeDate($validated['intake_date'] ?? null);
@@ -971,10 +978,16 @@ class WorkshopMaintenanceBoardController extends Controller
             $damagesWithPhotos = $this->uploadDamagePhotos($request, (array) ($validated['damages'] ?? []), $branchId);
             $signaturePath = $this->storeSignatureFromDataUri((string) ($validated['client_signature_data'] ?? ''), $branchId);
 
-            $status = ($validated['service_type'] ?? 'preventivo') === 'correctivo' ? 'draft' : 'awaiting_approval';
-            $comment = ($validated['service_type'] ?? 'preventivo') === 'correctivo'
-                ? 'Inicio de flujo correctivo - Fase Recepción'
-                : 'OS creada desde tablero y enviada a espera de aprobación';
+            if ($isPartialSave) {
+                $status = 'draft';
+                $comment = 'Recepción parcial guardada — pendiente de servicios y/o repuestos';
+            } elseif (($validated['service_type'] ?? 'preventivo') === 'correctivo') {
+                $status = 'draft';
+                $comment = 'Inicio de flujo correctivo - Fase Recepción';
+            } else {
+                $status = 'awaiting_approval';
+                $comment = 'OS creada desde tablero y enviada a espera de aprobación';
+            }
 
             if (!empty($validated['quotation_id'])) {
                 $status = 'in_progress';
@@ -1036,87 +1049,91 @@ class WorkshopMaintenanceBoardController extends Controller
 
             $mileageForFrequency = (int) ($validated['mileage_in'] ?? $vehicle->current_mileage ?? 0);
 
-            foreach ($parsedServiceLines as $line) {
-                if ($line['kind'] === 'glosa') {
-                    $serviceId = $this->createServiceFromGlosa($companyId, $branchId, $line['description'], (float) $line['unit_price'], (bool) ($line['is_terciarizado'] ?? false));
+            if (!$isPartialSave) {
+                foreach ($parsedServiceLines as $line) {
+                    if ($line['kind'] === 'glosa') {
+                        $serviceId = $this->createServiceFromGlosa($companyId, $branchId, $line['description'], (float) $line['unit_price'], (bool) ($line['is_terciarizado'] ?? false));
+
+                        $this->flowService->addDetail($workshop, [
+                            'line_type' => 'SERVICE',
+                            'service_id' => $serviceId,
+                            'description' => $line['description'],
+                            'qty' => $line['qty'],
+                            'unit_price' => $line['unit_price'],
+                            'is_terciarizado' => (bool) ($line['is_terciarizado'] ?? false),
+                        ]);
+                        continue;
+                    }
+
+                    $serviceId = (int) $line['service_id'];
+                    $qty = $line['qty'];
+                    $service = $serviceCatalog->get($serviceId);
+                    if (!$service || $qty <= 0) {
+                        continue;
+                    }
+
+                    $resolvedPrice = $this->resolveMaintenanceBoardServiceUnitPrice(
+                        $service,
+                        $vehicle,
+                        $mileageForFrequency,
+                        (string) ($line['price_cc_override'] ?? 'auto')
+                    );
+                    $unitPrice = $editableCatalogServicePrices
+                        ? round((float) ($line['unit_price'] ?? $resolvedPrice), 6)
+                        : round((float) $resolvedPrice, 6);
+                    if ($unitPrice < 0) {
+                        $unitPrice = 0;
+                    }
 
                     $this->flowService->addDetail($workshop, [
                         'line_type' => 'SERVICE',
                         'service_id' => $serviceId,
-                        'description' => $line['description'],
-                        'qty' => $line['qty'],
-                        'unit_price' => $line['unit_price'],
-                        'is_terciarizado' => (bool) ($line['is_terciarizado'] ?? false),
+                        'description' => (string) $service->name,
+                        'qty' => $qty,
+                        'unit_price' => $unitPrice,
+                        'validity_months' => $line['validity_months'] ?? null,
+                        'is_terciarizado' => (bool) ($line['is_terciarizado'] ?? $service->is_terciarizado ?? false),
                     ]);
-                    continue;
                 }
 
-                $serviceId = (int) $line['service_id'];
-                $qty = $line['qty'];
-                $service = $serviceCatalog->get($serviceId);
-                if (!$service || $qty <= 0) {
-                    continue;
+                $productLines = collect($validated['product_lines'] ?? [])
+                    ->filter(fn($line) => !empty($line['product_id']))
+                    ->values();
+
+                foreach ($productLines as $line) {
+                    $productId = (int) $line['product_id'];
+                    $row = $this->productBranchRowForMaintenance($branchId, $productId);
+                    if (!$row) {
+                        throw new \RuntimeException('Hay productos no disponibles en la sucursal.');
+                    }
+
+                    $qty = round((float) ($line['qty'] ?? 0), 6);
+                    if ($qty <= 0) {
+                        continue;
+                    }
+
+                    $unitPrice = round((float) ($line['unit_price'] ?? (float) $row->price), 6);
+                    if ($unitPrice < 0) {
+                        $unitPrice = 0;
+                    }
+
+                    $this->flowService->addDetail($workshop, [
+                        'line_type' => 'PART',
+                        'product_id' => $productId,
+                        'description' => $this->formatWorkshopProductPartDescription($row),
+                        'qty' => $qty,
+                        'unit_price' => $unitPrice,
+                        'tax_rate_id' => $row->tax_rate_id ? (int) $row->tax_rate_id : null,
+                    ]);
                 }
-
-                $resolvedPrice = $this->resolveMaintenanceBoardServiceUnitPrice(
-                    $service,
-                    $vehicle,
-                    $mileageForFrequency,
-                    (string) ($line['price_cc_override'] ?? 'auto')
-                );
-                $unitPrice = $editableCatalogServicePrices
-                    ? round((float) ($line['unit_price'] ?? $resolvedPrice), 6)
-                    : round((float) $resolvedPrice, 6);
-                if ($unitPrice < 0) {
-                    $unitPrice = 0;
-                }
-
-                $this->flowService->addDetail($workshop, [
-                    'line_type' => 'SERVICE',
-                    'service_id' => $serviceId,
-                    'description' => (string) $service->name,
-                    'qty' => $qty,
-                    'unit_price' => $unitPrice,
-                    'validity_months' => $line['validity_months'] ?? null,
-                    'is_terciarizado' => (bool) ($line['is_terciarizado'] ?? $service->is_terciarizado ?? false),
-                ]);
-            }
-
-            $productLines = collect($validated['product_lines'] ?? [])
-                ->filter(fn($line) => !empty($line['product_id']))
-                ->values();
-
-            foreach ($productLines as $line) {
-                $productId = (int) $line['product_id'];
-                $row = $this->productBranchRowForMaintenance($branchId, $productId);
-                if (!$row) {
-                    throw new \RuntimeException('Hay productos no disponibles en la sucursal.');
-                }
-
-                $qty = round((float) ($line['qty'] ?? 0), 6);
-                if ($qty <= 0) {
-                    continue;
-                }
-
-                $unitPrice = round((float) ($line['unit_price'] ?? (float) $row->price), 6);
-                if ($unitPrice < 0) {
-                    $unitPrice = 0;
-                }
-
-                $this->flowService->addDetail($workshop, [
-                    'line_type' => 'PART',
-                    'product_id' => $productId,
-                    'description' => $this->formatWorkshopProductPartDescription($row),
-                    'qty' => $qty,
-                    'unit_price' => $unitPrice,
-                    'tax_rate_id' => $row->tax_rate_id ? (int) $row->tax_rate_id : null,
-                ]);
             }
         } catch (\Throwable $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
         }
 
-        session()->flash('status', 'Servicio registrado correctamente.');
+        session()->flash('status', $isPartialSave
+            ? 'Recepción parcial guardada. Otro usuario puede completar servicios y repuestos después.'
+            : 'Servicio registrado correctamente.');
 
         $redirectUrl = route('workshop.maintenance-board.index', array_filter([
             'view_id' => $request->query('view_id'),
@@ -1127,6 +1144,10 @@ class WorkshopMaintenanceBoardController extends Controller
             $redirectUrl = route('workshop.maintenance-board.corrective', array_filter([
                 'view_id' => $request->query('view_id'),
             ]));
+        }
+
+        if ($isPartialSave) {
+            return redirect($redirectUrl);
         }
 
         return response()->view('workshop.maintenance-board.store_redirect', [
@@ -1183,7 +1204,10 @@ class WorkshopMaintenanceBoardController extends Controller
             'product_lines.*.unit_price' => ['nullable', 'numeric', 'gte:0'],
             'driver_name' => ['nullable', 'string', 'max:255'],
             'driver_phone' => ['nullable', 'string', 'max:50'],
+            'save_mode' => ['nullable', 'string', 'in:partial,full'],
         ]);
+
+        $isPartialSave = $request->input('save_mode', 'full') === 'partial';
 
         $vehicle = Vehicle::query()
             ->where('id', (int) $validated['vehicle_id'])
@@ -1203,15 +1227,18 @@ class WorkshopMaintenanceBoardController extends Controller
             return back()->withErrors(['error' => 'El vehiculo no pertenece al cliente seleccionado.']);
         }
 
-        try {
-            $parsedServiceLines = $this->parseMaintenanceBoardServiceLines((array) ($validated['service_lines'] ?? []));
-        } catch (ValidationException $e) {
-            return back()->withErrors($e->errors());
-        }
-        try {
-            $this->assertCatalogServiceLinesAllowed($parsedServiceLines, $branchId, $companyId);
-        } catch (ValidationException $e) {
-            return back()->withErrors($e->errors());
+        $parsedServiceLines = [];
+        if (!$isPartialSave) {
+            try {
+                $parsedServiceLines = $this->parseMaintenanceBoardServiceLines((array) ($validated['service_lines'] ?? []));
+            } catch (ValidationException $e) {
+                return back()->withErrors($e->errors());
+            }
+            try {
+                $this->assertCatalogServiceLinesAllowed($parsedServiceLines, $branchId, $companyId);
+            } catch (ValidationException $e) {
+                return back()->withErrors($e->errors());
+            }
         }
         $editableCatalogServicePrices = $this->isCatalogServicePriceEditingEnabled($branchId);
         $intakeDate = $this->normalizeMaintenanceBoardIntakeDate($validated['intake_date'] ?? null);
@@ -1219,7 +1246,7 @@ class WorkshopMaintenanceBoardController extends Controller
         $user = auth()->user();
 
         try {
-            DB::transaction(function () use ($order, $request, $validated, $branchId, $companyId, $vehicle, $clientPersonId, $parsedServiceLines, $user, $editableCatalogServicePrices, $intakeDate) {
+            DB::transaction(function () use ($order, $request, $validated, $branchId, $companyId, $vehicle, $clientPersonId, $parsedServiceLines, $user, $editableCatalogServicePrices, $intakeDate, $isPartialSave) {
                 $lockedOrder = WorkshopMovement::query()
                     ->where('id', $order->id)
                     ->lockForUpdate()
@@ -1255,6 +1282,7 @@ class WorkshopMaintenanceBoardController extends Controller
 
                 $lockedOrder->refresh();
 
+                if (!$isPartialSave) {
                 $catalogIds = collect($parsedServiceLines)
                     ->where('kind', 'catalog')
                     ->pluck('service_id')
@@ -1463,6 +1491,20 @@ class WorkshopMaintenanceBoardController extends Controller
                         ]);
                     }
                 }
+                }
+
+                if (
+                    !$isPartialSave
+                    && (string) $lockedOrder->status === 'draft'
+                    && (string) ($validated['service_type'] ?? $lockedOrder->service_type ?? 'preventivo') === 'preventivo'
+                ) {
+                    $this->recordWorkshopBoardStatusChange(
+                        $lockedOrder,
+                        'awaiting_approval',
+                        'OS completada y enviada a espera de aprobación',
+                        (int) ($user?->id ?? 0)
+                    );
+                }
             });
         } catch (\Throwable $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
@@ -1480,7 +1522,9 @@ class WorkshopMaintenanceBoardController extends Controller
 
         return $this->redirectToBoardWithStatus(
             (string) $order->fresh()->status,
-            'Orden de servicio actualizada.'
+            $isPartialSave
+                ? 'Recepción parcial actualizada. Puede completar servicios y repuestos después.'
+                : 'Orden de servicio actualizada.'
         );
     }
 
@@ -3632,6 +3676,28 @@ class WorkshopMaintenanceBoardController extends Controller
             'in_progress_external' => 'in_progress_external',
             default => $status,
         };
+    }
+
+    private function recordWorkshopBoardStatusChange(
+        WorkshopMovement $order,
+        string $newStatus,
+        string $note,
+        int $userId
+    ): void {
+        $fromStatus = (string) $order->status;
+        if ($fromStatus === $newStatus) {
+            return;
+        }
+
+        $order->update(['status' => $newStatus]);
+
+        WorkshopStatusHistory::query()->create([
+            'workshop_movement_id' => $order->id,
+            'from_status' => $fromStatus,
+            'to_status' => $newStatus,
+            'user_id' => $userId > 0 ? $userId : null,
+            'note' => $note,
+        ]);
     }
 
     private function redirectToBoardWithStatus(string $orderStatus, ?string $message = null, array $flash = []): RedirectResponse

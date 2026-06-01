@@ -1487,7 +1487,8 @@
 
 
 
-            <form method="POST" action="{{ $editingOrder ? route('workshop.maintenance-board.update', $editingOrder) : route('workshop.maintenance-board.store') }}" enctype="multipart/form-data" data-turbo="false" @submit="syncSignature()" class="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <form method="POST" action="{{ $editingOrder ? route('workshop.maintenance-board.update', $editingOrder) : route('workshop.maintenance-board.store') }}" enctype="multipart/form-data" data-turbo="false" @submit="syncSignature(); if ($refs.saveModeInput) { $refs.saveModeInput.value = 'full'; }" class="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <input type="hidden" name="save_mode" value="full" x-ref="saveModeInput">
                 @csrf
                 @if($editingOrder)
                     @method('PUT')
@@ -2171,18 +2172,34 @@
                     </div>
                 </div>
 
-                <div class="md:col-span-3 mt-2 flex gap-2">
+                <div class="md:col-span-3 mt-2 flex flex-wrap gap-2">
+                    @if (!request('advance_corrective') && ($serviceType ?? 'preventivo') !== 'correctivo' && (empty($editingOrder) || ($editingOrder->status ?? '') === 'draft'))
+                        <button
+                            type="submit"
+                            formnovalidate
+                            @click="if ($refs.saveModeInput) { $refs.saveModeInput.value = 'partial'; }"
+                            class="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                        >
+                            <i class="ri-save-3-line"></i>
+                            <span>{{ !empty($editingOrder) ? 'Solo actualizar recepción' : 'Guardar parcialmente' }}</span>
+                        </button>
+                    @endif
                     <x-ui.button type="submit" size="md" variant="primary" style="background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff">
                         <i class="{{ request('advance_corrective') ? 'ri-file-list-3-line' : '' }}" :class="!{{ request('advance_corrective') ? 1 : 0 }} ? (serviceType === 'correctivo' ? 'ri-arrow-right-circle-line' : 'ri-play-circle-line') : ''"></i>
                         <span>{{ request('advance_corrective') ? 'Guardar y Entregar Cotización' : '' }}</span>
                         <template x-if="!{{ request('advance_corrective') ? 1 : 0 }}">
-                            <span x-text="editingMode ? 'Guardar cambios' : (serviceType === 'correctivo' ? 'Guardar Recepción' : 'Enviar a aprobación')"></span>
+                            <span x-text="editingMode ? (@js(($editingOrder->status ?? '') === 'draft') ? 'Enviar a aprobación' : 'Guardar cambios') : (serviceType === 'correctivo' ? 'Guardar Recepción' : 'Enviar a aprobación')"></span>
                         </template>
                     </x-ui.button>
                     <x-ui.link-button size="md" variant="outline" href="{{ route('workshop.maintenance-board.index') }}">
                         <i class="ri-close-line"></i><span>Cancelar</span>
                     </x-ui.link-button>
                 </div>
+                @if (!request('advance_corrective') && ($serviceType ?? 'preventivo') !== 'correctivo')
+                    <p class="md:col-span-3 -mt-1 text-xs text-gray-500">
+                        <strong>Guardar parcialmente</strong> registra vehículo, cliente e inventario sin servicios ni repuestos (borrador). Otro usuario puede completar la OS después desde el tablero.
+                    </p>
+                @endif
             </form>
         </x-common.component-card>
         <x-ui.modal x-data="{ open: false }" x-on:open-client-modal.window="open = true; $nextTick(() => initQuickClientLocationDefaults())" x-on:close-client-modal.window="open = false" :isOpen="false" :showCloseButton="false" class="max-w-6xl">
