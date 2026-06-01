@@ -457,8 +457,7 @@
                                     ];
                                 @endphp
                                 <td class="px-5 py-4 sm:px-6 text-center">
-                                    <div class="mx-auto flex max-w-[240px] flex-col items-center gap-2">
-                                    <div class="flex items-center justify-center gap-2 flex-wrap">
+                                    <div class="flex flex-wrap items-center justify-center gap-2">
                                         @if ($rowOperations->isNotEmpty())
                                             @foreach ($rowOperations as $operation)
                                                 @php
@@ -731,7 +730,6 @@
                                         </form>
 
                                         @include('sales.partials.electronic-invoice-actions', ['sale' => $sale])
-                                    </div>
                                     </div>
                                 </td>
                             </tr>
