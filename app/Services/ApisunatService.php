@@ -2143,4 +2143,33 @@ class ApisunatService
 
         return null;
     }
+
+    /**
+     * Falla el flujo de venta si Apisunat está activo y el comprobante es elegible
+     * pero la emisión no terminó en SENT (p. ej. ERROR de SUNAT).
+     */
+    public function assertSaleElectronicEmissionSucceeded(Movement $movement, array $result): void
+    {
+        $status = strtoupper(trim((string) ($result['status'] ?? '')));
+
+        if ($status === 'ERROR') {
+            throw new \RuntimeException((string) ($result['message'] ?? 'No se pudo emitir el comprobante electrónico a SUNAT.'));
+        }
+
+        $movement->loadMissing(['branch', 'documentType']);
+
+        if (! $this->isEligibleDocument($movement)) {
+            return;
+        }
+
+        if (! $this->isConfiguredForBranch($movement->branch)) {
+            return;
+        }
+
+        if ($status !== 'SENT') {
+            $suffix = $status !== '' ? ' Estado: ' . $status . '.' : '';
+
+            throw new \RuntimeException('La emisión electrónica no fue aceptada por SUNAT.' . $suffix);
+        }
+    }
 }

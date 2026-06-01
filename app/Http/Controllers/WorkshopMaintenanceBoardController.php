@@ -2397,8 +2397,10 @@ class WorkshopMaintenanceBoardController extends Controller
             $isCheckoutInvoiceDocument
         );
 
+        $electronicResult = ['status' => 'NOT_CONFIGURED'];
+
         try {
-            DB::transaction(function () use ($order, $validated, $branchId, $user, $paymentType, $isDebtCheckout, $isAnticipo, $checkoutPreviousAdvances, $checkoutDebtDueAt, $checkoutDocumentMeta, &$movementForApisunat) {
+            DB::transaction(function () use ($order, $validated, $branchId, $user, $paymentType, $isDebtCheckout, $isAnticipo, $checkoutPreviousAdvances, $checkoutDebtDueAt, $checkoutDocumentMeta, &$movementForApisunat, &$electronicResult) {
                 $lockedOrder = WorkshopMovement::query()
                     ->where('id', $order->id)
                     ->lockForUpdate()
@@ -2638,6 +2640,17 @@ class WorkshopMaintenanceBoardController extends Controller
                         'comment' => 'Entrega automatica al registrar venta y cobro desde tablero',
                     ]);
                 }
+
+                if ($movementForApisunat) {
+                    $apisunatService = app(\App\Services\ApisunatService::class);
+                    $orderForElectronic = WorkshopMovement::query()->findOrFail($lockedOrder->id);
+                    $electronicResult = $this->syncCheckoutElectronicInvoices(
+                        $orderForElectronic,
+                        $movementForApisunat,
+                        $apisunatService,
+                        (bool) $isAnticipo
+                    );
+                }
             });
         } catch (ValidationException $e) {
             return back()
@@ -2645,21 +2658,6 @@ class WorkshopMaintenanceBoardController extends Controller
                 ->withInput();
         } catch (\Throwable $e) {
             return back()->withErrors(['error' => $e->getMessage()]);
-        }
-
-        if ($movementForApisunat) {
-            $apisunatService = app(\App\Services\ApisunatService::class);
-            $electronicResult = $this->syncCheckoutElectronicInvoices(
-                $order,
-                $movementForApisunat,
-                $apisunatService,
-                (bool) $isAnticipo
-            );
-            if (($electronicResult['status'] ?? '') === 'ERROR') {
-                return back()->withErrors([
-                    'error' => (string) ($electronicResult['message'] ?? 'No se pudo emitir el comprobante electrónico.'),
-                ]);
-            }
         }
 
         $order->refresh();
@@ -3693,13 +3691,14 @@ class WorkshopMaintenanceBoardController extends Controller
                 }
 
                 $advanceResult = $this->syncElectronicInvoiceForSale($advanceMovement, $apisunatService);
-                if (($advanceResult['status'] ?? '') === 'ERROR') {
-                    return $advanceResult;
-                }
+                $apisunatService->assertSaleElectronicEmissionSucceeded($advanceMovement, $advanceResult);
             }
         }
 
-        return $this->syncElectronicInvoiceForSale($movementForApisunat, $apisunatService);
+        $finalResult = $this->syncElectronicInvoiceForSale($movementForApisunat, $apisunatService);
+        $apisunatService->assertSaleElectronicEmissionSucceeded($movementForApisunat, $finalResult);
+
+        return $finalResult;
     }
 
     private function resolveWorkshopAdvanceDocuments(WorkshopMovement $order, bool $onlySunatReady = true): array

@@ -1683,11 +1683,12 @@ class SalesController extends Controller
                 }
             }
 
-            DB::commit();
-
-            // Facturación electrónica Apisunat
+            // Facturación electrónica Apisunat (dentro de la transacción: si falla, no se registra la venta)
             $apisunatService = app(\App\Services\ApisunatService::class);
             $apisunatResult = $this->syncElectronicInvoiceForSale($movement, $apisunatService);
+            $apisunatService->assertSaleElectronicEmissionSucceeded($movement, $apisunatResult);
+
+            DB::commit();
 
             // Si se emitió un comprobante con éxito, actualizamos los valores de respuesta para el frontend
             if (($apisunatResult['status'] ?? '') === 'SENT') {
