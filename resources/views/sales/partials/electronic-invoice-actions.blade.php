@@ -38,7 +38,7 @@
         </div>
 
        
-        @endif
+      
     @endif
 
     @if ($sale->electronic_invoice_external_id || $sale->electronic_invoice_cdr_url)
