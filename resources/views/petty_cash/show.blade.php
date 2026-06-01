@@ -13,10 +13,12 @@
         open: true,
         redirectToIndex() {
             window.location.href = '{{ route('admin.petty-cash.index', array_merge(['cash_register_id' => $cash_register_id], !empty($viewId) ? ['view_id' => $viewId] : [])) }}';
+        },
+        close() {
+            this.redirectToIndex();
         }
     }"
-    x-init="$watch('open', value => { if (!value) redirectToIndex(); })"
-    @keydown.escape.window="redirectToIndex()"
+    @keydown.escape.window="close()"
     :isOpen="true"
     :showCloseButton="false"
     class="max-w-4xl"

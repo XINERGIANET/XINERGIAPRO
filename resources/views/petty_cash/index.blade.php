@@ -42,10 +42,20 @@
             if (!str_starts_with($action, 'admin.')) {
                 $routeCandidates[] = 'admin.' . $action;
             }
-            $routeCandidates = array_merge(
-                $routeCandidates,
-                array_map(fn($name) => $name . '.index', $routeCandidates)
-            );
+            $actionEndsWithRouteSuffix = (bool) preg_match('/\.(index|edit|show|create|store|update|destroy|close)$/', $action);
+            if (! $actionEndsWithRouteSuffix) {
+                foreach ($routeCandidates as $baseName) {
+                    $routeCandidates[] = $baseName . '.edit';
+                    $routeCandidates[] = $baseName . '.show';
+                }
+                $routeCandidates = array_merge(
+                    $routeCandidates,
+                    array_map(fn($name) => $name . '.index', array_unique([
+                        $action,
+                        str_starts_with($action, 'admin.') ? $action : 'admin.' . $action,
+                    ]))
+                );
+            }
 
             $routeName = null;
             foreach ($routeCandidates as $candidate) {
@@ -585,6 +595,22 @@
                                                                 <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
                                                             </span>
                                                         </form>
+                                                    @elseif ($isEdit && $selectedBoxId)
+                                                        @php
+                                                            $editUrl = route('admin.petty-cash.edit', ['cash_register_id' => $selectedBoxId, 'movement' => $movement->id]);
+                                                            if ($viewId) {
+                                                                $editUrl .= (str_contains($editUrl, '?') ? '&' : '?') . 'view_id=' . urlencode($viewId);
+                                                            }
+                                                        @endphp
+                                                        <div class="relative group">
+                                                            <x-ui.link-button size="icon" variant="{{ $variant }}" href="{{ $editUrl }}" className="rounded-xl" style="{{ $buttonStyle }}" aria-label="{{ $operation->name }}">
+                                                                <i class="{{ $operation->icon }}"></i>
+                                                            </x-ui.link-button>
+                                                            <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 transition group-hover:opacity-100 z-50 shadow-xl">
+                                                                {{ $operation->name }}
+                                                                <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
+                                                            </span>
+                                                        </div>
                                                     @else
                                                         <div class="relative group">
                                                             <x-ui.link-button size="icon" variant="{{ $variant }}" href="{{ $actionUrl }}" className="rounded-xl" style="{{ $buttonStyle }}" aria-label="{{ $operation->name }}">
@@ -687,7 +713,7 @@
 
         </x-common.component-card>
 
-        <x-ui.modal x-data="{}" x-show="open" x-cloak class="max-w-2xl z-[9999]" :showCloseButton="true">
+        <x-ui.modal :isolate="false" x-show="open" x-cloak class="max-w-2xl z-[9999]" :showCloseButton="true">
             <div class="p-5 sm:p-6">
                 <div class="mb-4 flex items-center justify-between">
                     <div>
