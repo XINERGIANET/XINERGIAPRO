@@ -64,15 +64,18 @@
         .side-title.new { color: #14532d; }
         .side-name { font-weight: 700; margin: 0 0 4px; }
         .side-notes { font-size: 9.5pt; margin: 0 0 8px; color: #333; white-space: pre-wrap; }
-        .photo-grid { font-size: 0; }
+        .photo-grid { width: 100%; margin-top: 4px; }
         .photo-grid img {
-            display: inline-block;
-            width: 112px;
-            height: 84px;
-            margin: 0 6px 6px 0;
+            display: block;
+            width: 100%;
+            max-width: 100%;
+            height: 220px;
+            margin: 0 0 10px 0;
             border: 1px solid #666;
-            object-fit: cover;
+            object-fit: contain;
+            background: #f8fafc;
         }
+        .photo-grid img:last-child { margin-bottom: 0; }
         .no-photo { font-size: 9pt; color: #666; font-style: italic; }
         .notes-box { margin-top: 12px; border: 1px solid #000; padding: 8px; }
         .notes-box strong { display: block; margin-bottom: 4px; }
