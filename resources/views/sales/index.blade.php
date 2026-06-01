@@ -193,6 +193,18 @@
                     {{ session('status') }}
                 </div>
             @endif
+            @if (session('auto_download_xml_movement_id'))
+                <script>
+                    window.addEventListener('load', function () {
+                        const url = @json(route('admin.sales.electronic.xml.download', (int) session('auto_download_xml_movement_id')));
+                        const iframe = document.createElement('iframe');
+                        iframe.style.display = 'none';
+                        iframe.src = url;
+                        document.body.appendChild(iframe);
+                        setTimeout(function () { iframe.remove(); }, 60000);
+                    });
+                </script>
+            @endif
             @if ($errors->has('error'))
                 <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
                     {{ $errors->first('error') }}
@@ -782,10 +794,15 @@
                                                                 <i class="ri-printer-line"></i> PDF Ticket
                                                             </a>
                                                         @endif
-                                                        @if ($sale->electronic_invoice_xml_url)
-                                                            <a href="{{ route('admin.sales.electronic.xml', $sale->id) }}" target="_blank" class="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline">
-                                                                <i class="ri-file-code-line"></i> XML
+                                                        @if ($sale->electronic_invoice_external_id || $sale->electronic_invoice_xml_url)
+                                                            <a href="{{ route('admin.sales.electronic.xml.download', $sale->id) }}" class="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline" title="Descargar XML SUNAT">
+                                                                <i class="ri-download-2-line"></i> Descargar XML
                                                             </a>
+                                                            @if ($sale->electronic_invoice_xml_url)
+                                                                <a href="{{ route('admin.sales.electronic.xml', $sale->id) }}" target="_blank" class="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-700 hover:underline" title="Abrir XML en Apisunat">
+                                                                    <i class="ri-external-link-line"></i> Ver en línea
+                                                                </a>
+                                                            @endif
                                                         @endif
                                                         @if ($sale->electronic_invoice_cdr_url)
                                                             <a href="{{ route('admin.sales.electronic.cdr', $sale->id) }}" target="_blank" class="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline">

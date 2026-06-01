@@ -1694,6 +1694,11 @@ class SalesController extends Controller
                 $number = $apisunatResult['data']['full_number'] ?? $number;
             }
 
+            $xmlDownloadUrl = null;
+            if (($apisunatResult['status'] ?? '') === 'SENT' && (int) $movement->id > 0) {
+                $xmlDownloadUrl = route('admin.sales.electronic.xml.download', (int) $movement->id);
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Venta procesada correctamente',
@@ -1703,6 +1708,7 @@ class SalesController extends Controller
                     'number' => $number,
                     'total' => $total,
                     'apisunat' => $apisunatResult,
+                    'xml_download_url' => $xmlDownloadUrl,
                 ]
             ]);
             
@@ -2216,9 +2222,15 @@ class SalesController extends Controller
             $result = $apisunatService->reemitSale($sale);
             $apisunatService->persistEmittedElectronicData($sale, $result);
 
-            return redirect()
+            $redirect = redirect()
                 ->route('admin.sales.index', $request->filled('view_id') ? ['view_id' => $request->input('view_id')] : [])
                 ->with('status', (string) ($result['message'] ?? 'Comprobante reenviado.'));
+
+            if (($result['status'] ?? '') === 'SENT') {
+                $redirect->with('auto_download_xml_movement_id', (int) $sale->id);
+            }
+
+            return $redirect;
         } catch (\Throwable $e) {
             $sale->update([
                 'electronic_invoice_provider' => 'apisunat',
@@ -2615,6 +2627,23 @@ class SalesController extends Controller
             }
             return redirect()->away($sale->electronic_invoice_pdf_a4_url);
         }
+    }
+
+    public function downloadElectronicXml(Movement $sale)
+    {
+        $apisunatService = app(\App\Services\ApisunatService::class);
+        $file = $apisunatService->resolveXmlFileForDownload($sale);
+        if ($file === null) {
+            abort(404, 'No se pudo obtener el XML del comprobante electrónico.');
+        }
+
+        $filename = (string) ($file['filename'] ?? 'comprobante.xml');
+
+        return response((string) $file['content'], 200, [
+            'Content-Type' => 'application/xml; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate',
+        ]);
     }
 
     public function redirectElectronicXml(Movement $sale)

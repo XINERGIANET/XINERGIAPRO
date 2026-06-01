@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('content')
     <div x-data="{
@@ -888,7 +888,7 @@
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">Comentario
                             venta (opcional)</label>
                         <input type="text" name="sale_comment"
-                            value="{{ old('sale_comment', 'Venta generada desde tablero de mantenimiento') }}"
+                            value="{{ old('sale_comment', '') }}"
                             class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm">
                     </div>
                     <div>

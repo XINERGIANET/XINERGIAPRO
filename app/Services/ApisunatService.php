@@ -9,6 +9,8 @@ use App\Models\TaxRate;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class ApisunatService
@@ -214,6 +216,147 @@ class ApisunatService
                 'series' => $data['series'] ?? $sale->salesMovement->series,
             ]);
         }
+
+        $sale->refresh();
+        $this->archiveXmlForMovement($sale);
+    }
+
+    /**
+     * @return array{content: string, filename: string}|null
+     */
+    public function resolveXmlFileForDownload(Movement $sale): ?array
+    {
+        if (strtoupper(trim((string) ($sale->electronic_invoice_status ?? ''))) !== 'SENT') {
+            return null;
+        }
+
+        $localPath = $this->resolveStoredLocalXmlPath($sale);
+        if ($localPath !== null && Storage::disk('local')->exists($localPath)) {
+            $content = Storage::disk('local')->get($localPath);
+
+            return $content === '' ? null : [
+                'content' => $content,
+                'filename' => basename($localPath),
+            ];
+        }
+
+        $archivedPath = $this->archiveXmlForMovement($sale);
+        if ($archivedPath !== null && Storage::disk('local')->exists($archivedPath)) {
+            $content = Storage::disk('local')->get($archivedPath);
+
+            return $content === '' ? null : [
+                'content' => $content,
+                'filename' => basename($archivedPath),
+            ];
+        }
+
+        return null;
+    }
+
+    public function archiveXmlForMovement(Movement $sale): ?string
+    {
+        if (strtoupper(trim((string) ($sale->electronic_invoice_status ?? ''))) !== 'SENT') {
+            return null;
+        }
+
+        $existingPath = $this->resolveStoredLocalXmlPath($sale);
+        if ($existingPath !== null && Storage::disk('local')->exists($existingPath)) {
+            return $existingPath;
+        }
+
+        $xmlUrl = trim((string) ($sale->electronic_invoice_xml_url ?? ''));
+        if ($xmlUrl === '' && trim((string) ($sale->electronic_invoice_external_id ?? '')) !== '') {
+            try {
+                $documentData = $this->getDocumentById((string) $sale->electronic_invoice_external_id, $sale->branch);
+                $urls = $this->extractDocumentUrls($documentData);
+                $xmlUrl = trim((string) ($urls['xml_url'] ?? ''));
+                if ($xmlUrl !== '' && $xmlUrl !== $sale->electronic_invoice_xml_url) {
+                    $sale->update(['electronic_invoice_xml_url' => $xmlUrl]);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo resolver URL XML en Apisunat: '.$e->getMessage(), [
+                    'movement_id' => (int) $sale->id,
+                ]);
+            }
+        }
+
+        if ($xmlUrl === '') {
+            return null;
+        }
+
+        try {
+            $response = Http::timeout(45)->get($xmlUrl);
+            if ($response->failed()) {
+                Log::warning('Descarga XML SUNAT fallida', [
+                    'movement_id' => (int) $sale->id,
+                    'status' => $response->status(),
+                ]);
+
+                return null;
+            }
+
+            $body = (string) $response->body();
+            if ($body === '') {
+                return null;
+            }
+
+            $filename = $this->resolveXmlFileName($sale);
+            $relativePath = 'electronic-invoices/'.(int) ($sale->branch_id ?: 0).'/'.$filename;
+            Storage::disk('local')->put($relativePath, $body);
+            $this->persistLocalXmlPathOnMovement($sale, $relativePath);
+
+            return $relativePath;
+        } catch (\Throwable $e) {
+            Log::warning('Error archivando XML electrónico: '.$e->getMessage(), [
+                'movement_id' => (int) $sale->id,
+            ]);
+
+            return null;
+        }
+    }
+
+    private function resolveStoredLocalXmlPath(Movement $sale): ?string
+    {
+        $response = $sale->electronic_invoice_response;
+        if (! is_array($response)) {
+            return null;
+        }
+
+        $path = trim((string) ($response['local_xml_path'] ?? ''));
+
+        return $path !== '' ? $path : null;
+    }
+
+    private function persistLocalXmlPathOnMovement(Movement $sale, string $relativePath): void
+    {
+        $responsePayload = $sale->electronic_invoice_response;
+        if (! is_array($responsePayload)) {
+            $responsePayload = [];
+        }
+
+        $responsePayload['local_xml_path'] = $relativePath;
+        $sale->update(['electronic_invoice_response' => $responsePayload]);
+    }
+
+    private function resolveXmlFileName(Movement $sale): string
+    {
+        $stored = trim((string) ($sale->electronic_invoice_file_name ?? ''));
+        if ($stored !== '') {
+            $xmlName = preg_replace('/\.pdf$/i', '.xml', $stored);
+
+            return $xmlName !== '' ? $xmlName : ($stored.'.xml');
+        }
+
+        $serie = trim((string) ($sale->electronic_invoice_series ?? 'DOC'));
+        $number = trim((string) ($sale->electronic_invoice_number ?? (string) $sale->id));
+        $ruc = trim((string) ($sale->branch?->ruc ?? '0'));
+        $docType = '01';
+        $docName = mb_strtolower(trim((string) ($sale->documentType?->name ?? '')), 'UTF-8');
+        if (str_contains($docName, 'boleta')) {
+            $docType = '03';
+        }
+
+        return preg_replace('/\W+/', '-', $ruc.'-'.$docType.'-'.$serie.'-'.$number).'.xml';
     }
 
     /**

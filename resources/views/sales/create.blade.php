@@ -2737,9 +2737,16 @@ return [
                         }
                         syncPaymentTypeUI();
                         showNotification('Venta procesada correctamente');
+                        const xmlDownloadUrl = data?.data?.xml_download_url || null;
+                        if (xmlDownloadUrl) {
+                            const xmlFrame = document.createElement('iframe');
+                            xmlFrame.style.display = 'none';
+                            xmlFrame.src = xmlDownloadUrl;
+                            document.body.appendChild(xmlFrame);
+                        }
                         setTimeout(() => {
                             window.location.href = @json($salesIndexUrl);
-                        }, 500);
+                        }, xmlDownloadUrl ? 1200 : 500);
                     })
                     .catch((error) => {
                         showNotice(error.message || 'No se pudo procesar la venta.');
