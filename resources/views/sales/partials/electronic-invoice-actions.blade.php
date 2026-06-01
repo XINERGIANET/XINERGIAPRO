@@ -13,49 +13,9 @@
         </span>
     </div>
 
-    @if ($sale->electronic_invoice_pdf_a4_url || $sale->electronic_invoice_external_id)
-        <div class="relative group">
-            <x-ui.link-button
-                size="icon"
-                variant="primary"
-                href="{{ route('admin.sales.electronic.pdf-a4', $sale->id) }}"
-                target="_blank"
-                className="rounded-xl border-0 shadow-none"
-                style="background-color: #ef4444; color: #ffffff;"
-                onmouseover="this.style.backgroundColor='#dc2626'"
-                onmouseout="this.style.backgroundColor='#ef4444'"
-                aria-label="PDF A4 SUNAT"
-            >
-                <i class="ri-file-pdf-2-line"></i>
-            </x-ui.link-button>
-            <span class="pointer-events-none absolute bottom-full left-1/2 z-[100] mb-3 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 shadow-xl transition group-hover:opacity-100">
-                PDF A4 SUNAT
-                <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
-            </span>
-        </div>
-    @endif
 
-    @if ($sale->electronic_invoice_pdf_ticket_url)
-        <div class="relative group">
-            <x-ui.link-button
-                size="icon"
-                variant="primary"
-                href="{{ $sale->electronic_invoice_pdf_ticket_url }}"
-                target="_blank"
-                className="rounded-xl border-0 shadow-none"
-                style="background-color: #8b5cf6; color: #ffffff;"
-                onmouseover="this.style.backgroundColor='#7c3aed'"
-                onmouseout="this.style.backgroundColor='#8b5cf6'"
-                aria-label="PDF Ticket SUNAT"
-            >
-                <i class="ri-printer-line"></i>
-            </x-ui.link-button>
-            <span class="pointer-events-none absolute bottom-full left-1/2 z-[100] mb-3 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1 text-xs text-white opacity-0 shadow-xl transition group-hover:opacity-100">
-                PDF Ticket SUNAT
-                <span class="absolute top-full left-1/2 -ml-1 border-4 border-transparent border-t-gray-900"></span>
-            </span>
-        </div>
-    @endif
+
+
 
     @if ($sale->electronic_invoice_external_id || $sale->electronic_invoice_xml_url)
         <div class="relative group">
