@@ -18,6 +18,9 @@ class ApisunatService
     /** Catálogo 53: descuento global por anticipos (formato validado por SUNAT/Apisunat). */
     private const SUNAT_ADVANCE_GLOBAL_DISCOUNT_CODE = '04';
 
+    /** Catálogo 53: retención de tercera categoría (no reduce base gravada del IGV). */
+    private const SUNAT_RETENCION_ALLOWANCE_CODE = '02';
+
     /** Catálogo 51 (cbc:ProfileID): venta interna – anticipos. */
     private const SUNAT_OPERATION_ADVANCE_CODE = '0104';
 
@@ -1909,7 +1912,7 @@ class ApisunatService
 
         $allowanceCharges[] = [
             'cbc:ChargeIndicator' => ['_text' => 'false'],
-            'cbc:AllowanceChargeReasonCode' => ['_text' => '02'],
+            'cbc:AllowanceChargeReasonCode' => ['_text' => self::SUNAT_RETENCION_ALLOWANCE_CODE],
             'cbc:MultiplierFactorNumeric' => ['_text' => round($percent / 100, 5)],
             'cbc:Amount' => [
                 '_attributes' => ['currencyID' => 'PEN'],
@@ -1955,6 +1958,30 @@ class ApisunatService
                 ],
             ],
         ];
+    }
+
+    /**
+     * Suma solo descuentos globales por anticipo (cat. 53 código 04).
+     * La retención (código 02) no reduce la base gravada del IGV.
+     */
+    private function sumSunatAdvanceAllowanceFromDocument(array $documentBody): float
+    {
+        $total = 0.0;
+        $allowanceCharges = data_get($documentBody, 'cac:AllowanceCharge', []);
+        if (! is_array($allowanceCharges)) {
+            return 0.0;
+        }
+
+        foreach ($allowanceCharges as $charge) {
+            $reasonCode = trim((string) data_get($charge, 'cbc:AllowanceChargeReasonCode._text', ''));
+            if ($reasonCode !== self::SUNAT_ADVANCE_GLOBAL_DISCOUNT_CODE) {
+                continue;
+            }
+
+            $total += round((float) data_get($charge, 'cbc:Amount._text', 0), 2);
+        }
+
+        return round($total, 2);
     }
 
     private function validateDocumentBodyForSunat(array $documentBody): void
@@ -2014,17 +2041,10 @@ class ApisunatService
             $headerTaxable = round((float) data_get($documentBody, 'cac:TaxTotal.cac:TaxSubtotal.0.cbc:TaxableAmount._text', 0), 2);
         }
 
-        $allowanceTotal = 0.0;
-        $allowanceCharges = data_get($documentBody, 'cac:AllowanceCharge', []);
-        if (is_array($allowanceCharges)) {
-            foreach ($allowanceCharges as $charge) {
-                $allowanceTotal += round((float) data_get($charge, 'cbc:Amount._text', 0), 2);
-            }
-        }
-        $allowanceTotal = round($allowanceTotal, 2);
+        $advanceAllowanceTotal = $this->sumSunatAdvanceAllowanceFromDocument($documentBody);
 
-        if ($linesSubtotal > 0 && $headerTaxable > 0 && $allowanceTotal > 0) {
-            $expectedTaxable = round(max(0, $linesSubtotal - $allowanceTotal), 2);
+        if ($linesSubtotal > 0 && $headerTaxable > 0 && $advanceAllowanceTotal > 0) {
+            $expectedTaxable = round(max(0, $linesSubtotal - $advanceAllowanceTotal), 2);
             if (abs($expectedTaxable - $headerTaxable) > 0.009) {
                 throw new \RuntimeException(
                     'No se puede emitir electrónicamente: el total gravado (S/ '
@@ -2032,7 +2052,7 @@ class ApisunatService
                     .') debe ser la suma de líneas (S/ '
                     .number_format($linesSubtotal, 2, '.', '')
                     .') menos el anticipo (S/ '
-                    .number_format($allowanceTotal, 2, '.', '')
+                    .number_format($advanceAllowanceTotal, 2, '.', '')
                     .'). Esperado S/ '
                     .number_format($expectedTaxable, 2, '.', '')
                     .'.'
