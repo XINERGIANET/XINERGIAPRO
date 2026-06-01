@@ -457,7 +457,8 @@
                                     ];
                                 @endphp
                                 <td class="px-5 py-4 sm:px-6 text-center">
-                                    <div class="flex items-center justify-center gap-2">
+                                    <div class="mx-auto flex max-w-[240px] flex-col items-center gap-2">
+                                    <div class="flex items-center justify-center gap-2 flex-wrap">
                                         @if ($rowOperations->isNotEmpty())
                                             @foreach ($rowOperations as $operation)
                                                 @php
@@ -728,6 +729,9 @@
                                                 Reenviar SUNAT
                                             </span>
                                         </form>
+
+                                        @include('sales.partials.electronic-invoice-actions', ['sale' => $sale])
+                                    </div>
                                     </div>
                                 </td>
                             </tr>
@@ -786,60 +790,10 @@
                                             <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Origen</p>
                                             <p class="mt-0.5 text-sm font-medium text-gray-800 dark:text-gray-200">{{ $sale->movementType?->description ?? 'Venta' }} - {{ $sale->salesDocumentCode() }}</p>
                                         </div>
-                                        @if ($sale->electronic_invoice_status)
-                                            <div class="rounded-lg border border-gray-200 bg-white px-4 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-900/50 sm:col-span-2">
-                                                <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Comprobante Electrónico (Apisunat)</p>
-                                                <div class="mt-1 flex flex-wrap items-center gap-3">
-                                                    @if ($sale->electronic_invoice_status === 'SENT')
-                                                        <span class="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
-                                                            <i class="ri-checkbox-circle-fill"></i> Enviado
-                                                        </span>
-                                                        @if ($sale->electronic_invoice_pdf_a4_url)
-                                                            <a href="{{ route('admin.sales.electronic.pdf-a4', $sale->id) }}" target="_blank" class="inline-flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700 hover:underline">
-                                                                <i class="ri-file-pdf-2-line"></i> PDF A4
-                                                            </a>
-                                                        @endif
-                                                        @if ($sale->electronic_invoice_pdf_ticket_url)
-                                                            <a href="{{ $sale->electronic_invoice_pdf_ticket_url }}" target="_blank" class="inline-flex items-center gap-1 text-xs font-bold text-purple-600 hover:text-purple-700 hover:underline">
-                                                                <i class="ri-printer-line"></i> PDF Ticket
-                                                            </a>
-                                                        @endif
-                                                        @if ($sale->electronic_invoice_external_id || $sale->electronic_invoice_xml_url)
-                                                            <a href="{{ route('admin.sales.electronic.xml.download', $sale->id) }}" class="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline" title="Descargar XML SUNAT">
-                                                                <i class="ri-download-2-line"></i> Descargar XML
-                                                            </a>
-                                                            @if ($sale->electronic_invoice_xml_url)
-                                                                <a href="{{ route('admin.sales.electronic.xml', $sale->id) }}" target="_blank" class="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-700 hover:underline" title="Abrir XML en Apisunat">
-                                                                    <i class="ri-external-link-line"></i> Ver en línea
-                                                                </a>
-                                                            @endif
-                                                        @endif
-                                                        @if ($sale->electronic_invoice_external_id || $sale->electronic_invoice_cdr_url)
-                                                            <a href="{{ route('admin.sales.electronic.cdr.download', $sale->id) }}" class="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline" title="Descargar CDR SUNAT">
-                                                                <i class="ri-download-2-line"></i> Descargar CDR
-                                                            </a>
-                                                            @if ($sale->electronic_invoice_cdr_url)
-                                                                <a href="{{ route('admin.sales.electronic.cdr', $sale->id) }}" target="_blank" class="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-700 hover:underline" title="Abrir CDR en Apisunat">
-                                                                    <i class="ri-external-link-line"></i> Ver CDR en línea
-                                                                </a>
-                                                            @endif
-                                                        @endif
-                                                    @elseif ($sale->electronic_invoice_status === 'ERROR')
-                                                        <div class="flex w-full flex-col gap-2">
-                                                            <span class="inline-flex w-fit items-center gap-1 rounded bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 dark:bg-rose-950/30 dark:text-rose-400">
-                                                                <i class="ri-close-circle-fill"></i> Error
-                                                            </span>
-                                                            <div class="rounded-md border border-rose-200 bg-rose-50/80 px-3 py-2 dark:border-rose-900/50 dark:bg-rose-950/40">
-                                                                <p class="text-xs font-semibold uppercase tracking-wide text-rose-800 dark:text-rose-300">Detalle del error</p>
-                                                                <p class="mt-1 text-xs leading-relaxed text-rose-700 break-words whitespace-pre-wrap dark:text-rose-400">{{ $sale->electronicInvoiceErrorMessage() ?: 'Error desconocido al emitir el comprobante electrónico.' }}</p>
-                                                            </div>
-                                                        </div>
-                                                    @else
-                                                        <span class="inline-flex items-center gap-1 rounded bg-gray-50 px-2 py-1 text-xs font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-400">
-                                                            <i class="ri-time-line"></i> {{ $sale->electronic_invoice_status }}
-                                                        </span>
-                                                    @endif
-                                                </div>
+                                        @if ($sale->electronic_invoice_status === 'ERROR')
+                                            <div class="rounded-lg border border-rose-200 bg-rose-50/80 px-4 py-2 shadow-sm dark:border-rose-900/50 dark:bg-rose-950/40 sm:col-span-2">
+                                                <p class="text-xs font-semibold uppercase tracking-wide text-rose-800 dark:text-rose-300">Error comprobante electrónico</p>
+                                                <p class="mt-1 text-xs leading-relaxed text-rose-700 break-words whitespace-pre-wrap dark:text-rose-400">{{ $sale->electronicInvoiceErrorMessage() ?: 'Error desconocido al emitir el comprobante electrónico.' }}</p>
                                             </div>
                                         @endif
                                     </div>

@@ -2648,13 +2648,19 @@ class SalesController extends Controller
 
     public function downloadElectronicCdr(Movement $sale)
     {
+        $sale->loadMissing(['branch', 'documentType', 'salesMovement']);
         $apisunatService = app(\App\Services\ApisunatService::class);
         $file = $apisunatService->resolveCdrFileForDownload($sale);
         if ($file === null) {
-            abort(404, 'No se pudo obtener el CDR del comprobante electrónico.');
+            abort(404, 'No se pudo obtener el CDR del comprobante electrónico. Verifique que SUNAT haya aceptado el comprobante.');
         }
 
-        return $this->electronicFileDownloadResponse($file, 'application/xml; charset=UTF-8');
+        $filename = (string) ($file['filename'] ?? 'cdr.zip');
+        $contentType = str_ends_with(strtolower($filename), '.zip')
+            ? 'application/zip'
+            : 'application/xml; charset=UTF-8';
+
+        return $this->electronicFileDownloadResponse($file, $contentType);
     }
 
     /**
@@ -2698,20 +2704,25 @@ class SalesController extends Controller
         if (!$sale->electronic_invoice_external_id) {
             abort(404, 'No hay comprobante electrónico registrado para esta venta.');
         }
+        $sale->loadMissing(['branch', 'documentType', 'salesMovement']);
         $apisunatService = app(\App\Services\ApisunatService::class);
         try {
             $data = $apisunatService->getDocumentById($sale->electronic_invoice_external_id, $sale->branch);
             $urls = $apisunatService->extractDocumentUrls($data);
             $url = $urls['cdr_url'] ?? $sale->electronic_invoice_cdr_url;
             if (!$url) {
+                $url = $apisunatService->resolveApisunatCdrDownloadUrl($sale);
+            }
+            if (!$url) {
                 abort(404, 'La URL del CDR no está disponible.');
             }
             return redirect()->away($url);
         } catch (\Exception $e) {
-            if (!$sale->electronic_invoice_cdr_url) {
+            $fallback = $apisunatService->resolveApisunatCdrDownloadUrl($sale) ?: $sale->electronic_invoice_cdr_url;
+            if (!$fallback) {
                 abort(404, 'La URL del CDR no está disponible: ' . $e->getMessage());
             }
-            return redirect()->away($sale->electronic_invoice_cdr_url);
+            return redirect()->away($fallback);
         }
     }
 

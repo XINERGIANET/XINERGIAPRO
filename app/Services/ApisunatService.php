@@ -423,7 +423,10 @@ class ApisunatService
         }
 
         if ($cdrUrl === '') {
-            return null;
+            $cdrUrl = trim((string) ($this->resolveApisunatCdrDownloadUrl($sale) ?? ''));
+            if ($cdrUrl !== '') {
+                $sale->update(['electronic_invoice_cdr_url' => $cdrUrl]);
+            }
         }
 
         try {
@@ -482,12 +485,9 @@ class ApisunatService
 
     private function resolveCdrFileName(Movement $sale): string
     {
-        $xmlName = $this->resolveXmlFileName($sale);
-        if (preg_match('/^R-/i', $xmlName)) {
-            return $xmlName;
-        }
+        $base = $this->resolveApisunatFileNameBase($sale);
 
-        return 'R-'.$xmlName;
+        return 'R-'.$base.'.zip';
     }
 
     /**
@@ -669,8 +669,8 @@ class ApisunatService
             'file_name' => $fileName.'.pdf',
             'pdf_ticket_80mm' => $apiUrl.'/documents/'.$documentId.'/getPDF/ticket80mm/'.$fileName.'.pdf',
             'pdf_a4' => $apiUrl.'/documents/'.$documentId.'/getPDF/A4/'.$fileName.'.pdf',
-            'xml_url' => $urls['xml_url'] ?? null,
-            'cdr_url' => $urls['cdr_url'] ?? null,
+            'xml_url' => $urls['xml_url'] ?? $this->buildApisunatXmlDownloadUrl($apiUrl, $documentId, $fileName),
+            'cdr_url' => $urls['cdr_url'] ?? $this->buildApisunatCdrDownloadUrl($apiUrl, $documentId, $fileName),
             'response' => [
                 'send' => $sendResp->json(),
                 'document' => $extraDocumentData,
@@ -730,11 +730,118 @@ class ApisunatService
     public function extractDocumentUrls(array $payload): array
     {
         return [
-            'xml_url' => $this->findUrlByKeyword($payload, ['xml']),
-            'cdr_url' => $this->findUrlByKeyword($payload, ['cdr']),
+            'xml_url' => $this->findXmlUrl($payload),
+            'cdr_url' => $this->findCdrUrl($payload),
             'pdf_a4_url' => $this->findUrlByKeyword($payload, ['pdf', 'a4']),
             'pdf_ticket_url' => $this->findUrlByKeyword($payload, ['pdf', 'ticket']),
         ];
+    }
+
+    public function buildApisunatCdrDownloadUrl(string $apiUrl, string $documentId, string $fileNameBase): string
+    {
+        $documentId = trim($documentId);
+        $fileNameBase = trim($fileNameBase);
+
+        return rtrim($apiUrl, '/').'/documents/'.$documentId.'/getCDR/R-'.$fileNameBase.'.zip';
+    }
+
+    public function buildApisunatXmlDownloadUrl(string $apiUrl, string $documentId, string $fileNameBase): string
+    {
+        $documentId = trim($documentId);
+        $fileNameBase = trim($fileNameBase);
+
+        return rtrim($apiUrl, '/').'/documents/'.$documentId.'/getXML/'.$fileNameBase.'.xml';
+    }
+
+    public function resolveApisunatCdrDownloadUrl(Movement $sale): ?string
+    {
+        $documentId = trim((string) ($sale->electronic_invoice_external_id ?? ''));
+        if ($documentId === '') {
+            return null;
+        }
+
+        $stored = trim((string) ($sale->electronic_invoice_cdr_url ?? ''));
+        if ($stored !== '') {
+            return $stored;
+        }
+
+        $config = $this->resolveConfigForBranch($sale->branch);
+        if (! $config) {
+            return null;
+        }
+
+        $fileNameBase = $this->resolveApisunatFileNameBase($sale);
+
+        return $this->buildApisunatCdrDownloadUrl($this->resolveApiUrl($config), $documentId, $fileNameBase);
+    }
+
+    private function resolveApisunatFileNameBase(Movement $sale): string
+    {
+        $stored = trim((string) ($sale->electronic_invoice_file_name ?? ''));
+        if ($stored !== '') {
+            return preg_replace('/\.(pdf|xml|zip)$/i', '', $stored) ?: $stored;
+        }
+
+        $ruc = trim((string) ($sale->branch?->ruc ?? '0'));
+        $serie = trim((string) ($sale->electronic_invoice_series ?? $sale->salesMovement?->series ?? 'DOC'));
+        $number = trim((string) ($sale->electronic_invoice_number ?? $sale->salesMovement?->billing_number ?? (string) $sale->id));
+        $docType = '01';
+        $docName = mb_strtolower(trim((string) ($sale->documentType?->name ?? '')), 'UTF-8');
+        if (str_contains($docName, 'boleta')) {
+            $docType = '03';
+        }
+
+        return preg_replace('/\W+/', '-', $ruc.'-'.$docType.'-'.$serie.'-'.$number);
+    }
+
+    private function findXmlUrl(array $payload): ?string
+    {
+        $url = $this->findUrlByKeyword($payload, ['getxml']);
+        if ($url) {
+            return $url;
+        }
+
+        $url = $this->findUrlByKeyword($payload, ['xml']);
+        if ($url && ! str_contains(strtolower($url), 'cdr')) {
+            return $url;
+        }
+
+        return null;
+    }
+
+    private function findCdrUrl(array $payload): ?string
+    {
+        $url = $this->findUrlByKeyword($payload, ['getcdr']);
+        if ($url) {
+            return $url;
+        }
+
+        $url = $this->findUrlByKeyword($payload, ['cdr']);
+        if ($url) {
+            return $url;
+        }
+
+        $url = $this->findUrlByKeyword($payload, ['constancia']);
+        if ($url) {
+            return $url;
+        }
+
+        $urls = [];
+        array_walk_recursive($payload, function ($value) use (&$urls) {
+            if (is_string($value) && Str::startsWith($value, ['http://', 'https://'])) {
+                $urls[] = $value;
+            }
+        });
+
+        foreach ($urls as $candidate) {
+            $normalized = Str::lower($candidate);
+            if (str_contains($normalized, '/getcdr/')
+                || (str_contains($normalized, 'r-') && str_contains($normalized, '.zip'))) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     private function movementElectronicData(Movement $sale): array
