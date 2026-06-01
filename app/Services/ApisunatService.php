@@ -219,6 +219,7 @@ class ApisunatService
 
         $sale->refresh();
         $this->archiveXmlForMovement($sale);
+        $this->archiveCdrForMovement($sale);
     }
 
     /**
@@ -357,6 +358,133 @@ class ApisunatService
         }
 
         return preg_replace('/\W+/', '-', $ruc.'-'.$docType.'-'.$serie.'-'.$number).'.xml';
+    }
+
+    /**
+     * @return array{content: string, filename: string}|null
+     */
+    public function resolveCdrFileForDownload(Movement $sale): ?array
+    {
+        if (strtoupper(trim((string) ($sale->electronic_invoice_status ?? ''))) !== 'SENT') {
+            return null;
+        }
+
+        $localPath = $this->resolveStoredLocalCdrPath($sale);
+        if ($localPath !== null && Storage::disk('local')->exists($localPath)) {
+            $content = Storage::disk('local')->get($localPath);
+
+            return $content === '' ? null : [
+                'content' => $content,
+                'filename' => basename($localPath),
+            ];
+        }
+
+        $archivedPath = $this->archiveCdrForMovement($sale);
+        if ($archivedPath !== null && Storage::disk('local')->exists($archivedPath)) {
+            $content = Storage::disk('local')->get($archivedPath);
+
+            return $content === '' ? null : [
+                'content' => $content,
+                'filename' => basename($archivedPath),
+            ];
+        }
+
+        return null;
+    }
+
+    public function archiveCdrForMovement(Movement $sale): ?string
+    {
+        if (strtoupper(trim((string) ($sale->electronic_invoice_status ?? ''))) !== 'SENT') {
+            return null;
+        }
+
+        $existingPath = $this->resolveStoredLocalCdrPath($sale);
+        if ($existingPath !== null && Storage::disk('local')->exists($existingPath)) {
+            return $existingPath;
+        }
+
+        $cdrUrl = trim((string) ($sale->electronic_invoice_cdr_url ?? ''));
+        if ($cdrUrl === '' && trim((string) ($sale->electronic_invoice_external_id ?? '')) !== '') {
+            try {
+                $documentData = $this->getDocumentById((string) $sale->electronic_invoice_external_id, $sale->branch);
+                $urls = $this->extractDocumentUrls($documentData);
+                $cdrUrl = trim((string) ($urls['cdr_url'] ?? ''));
+                if ($cdrUrl !== '' && $cdrUrl !== $sale->electronic_invoice_cdr_url) {
+                    $sale->update(['electronic_invoice_cdr_url' => $cdrUrl]);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo resolver URL CDR en Apisunat: '.$e->getMessage(), [
+                    'movement_id' => (int) $sale->id,
+                ]);
+            }
+        }
+
+        if ($cdrUrl === '') {
+            return null;
+        }
+
+        try {
+            $response = Http::timeout(45)->get($cdrUrl);
+            if ($response->failed()) {
+                Log::warning('Descarga CDR SUNAT fallida', [
+                    'movement_id' => (int) $sale->id,
+                    'status' => $response->status(),
+                ]);
+
+                return null;
+            }
+
+            $body = (string) $response->body();
+            if ($body === '') {
+                return null;
+            }
+
+            $filename = $this->resolveCdrFileName($sale);
+            $relativePath = 'electronic-invoices/'.(int) ($sale->branch_id ?: 0).'/cdr/'.$filename;
+            Storage::disk('local')->put($relativePath, $body);
+            $this->persistLocalCdrPathOnMovement($sale, $relativePath);
+
+            return $relativePath;
+        } catch (\Throwable $e) {
+            Log::warning('Error archivando CDR electrónico: '.$e->getMessage(), [
+                'movement_id' => (int) $sale->id,
+            ]);
+
+            return null;
+        }
+    }
+
+    private function resolveStoredLocalCdrPath(Movement $sale): ?string
+    {
+        $response = $sale->electronic_invoice_response;
+        if (! is_array($response)) {
+            return null;
+        }
+
+        $path = trim((string) ($response['local_cdr_path'] ?? ''));
+
+        return $path !== '' ? $path : null;
+    }
+
+    private function persistLocalCdrPathOnMovement(Movement $sale, string $relativePath): void
+    {
+        $responsePayload = $sale->electronic_invoice_response;
+        if (! is_array($responsePayload)) {
+            $responsePayload = [];
+        }
+
+        $responsePayload['local_cdr_path'] = $relativePath;
+        $sale->update(['electronic_invoice_response' => $responsePayload]);
+    }
+
+    private function resolveCdrFileName(Movement $sale): string
+    {
+        $xmlName = $this->resolveXmlFileName($sale);
+        if (preg_match('/^R-/i', $xmlName)) {
+            return $xmlName;
+        }
+
+        return 'R-'.$xmlName;
     }
 
     /**

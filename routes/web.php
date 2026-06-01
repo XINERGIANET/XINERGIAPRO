@@ -158,6 +158,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/admin/ventas/{sale}/electronico/xml', [SalesController::class, 'redirectElectronicXml'])->name('admin.sales.electronic.xml');
     Route::get('/admin/ventas/{sale}/electronico/xml/descargar', [SalesController::class, 'downloadElectronicXml'])->name('admin.sales.electronic.xml.download');
     Route::get('/admin/ventas/{sale}/electronico/cdr', [SalesController::class, 'redirectElectronicCdr'])->name('admin.sales.electronic.cdr');
+    Route::get('/admin/ventas/{sale}/electronico/cdr/descargar', [SalesController::class, 'downloadElectronicCdr'])->name('admin.sales.electronic.cdr.download');
 
     // Gestión de Cotizaciones (Taller)
     Route::get('/admin/ventas/cotizaciones', [WorkshopQuotationController::class, 'index'])->name('admin.sales.quotations.index');

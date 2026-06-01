@@ -2737,16 +2737,21 @@ return [
                         }
                         syncPaymentTypeUI();
                         showNotification('Venta procesada correctamente');
-                        const xmlDownloadUrl = data?.data?.xml_download_url || null;
-                        if (xmlDownloadUrl) {
-                            const xmlFrame = document.createElement('iframe');
-                            xmlFrame.style.display = 'none';
-                            xmlFrame.src = xmlDownloadUrl;
-                            document.body.appendChild(xmlFrame);
-                        }
+                        const electronicDownloadUrls = [
+                            data?.data?.xml_download_url || null,
+                            data?.data?.cdr_download_url || null,
+                        ].filter(Boolean);
+                        electronicDownloadUrls.forEach(function (url, index) {
+                            setTimeout(function () {
+                                const frame = document.createElement('iframe');
+                                frame.style.display = 'none';
+                                frame.src = url;
+                                document.body.appendChild(frame);
+                            }, index * 900);
+                        });
                         setTimeout(() => {
                             window.location.href = @json($salesIndexUrl);
-                        }, xmlDownloadUrl ? 1200 : 500);
+                        }, electronicDownloadUrls.length > 0 ? 2000 : 500);
                     })
                     .catch((error) => {
                         showNotice(error.message || 'No se pudo procesar la venta.');

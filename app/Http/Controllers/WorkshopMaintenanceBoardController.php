@@ -2667,8 +2667,9 @@ class WorkshopMaintenanceBoardController extends Controller
         $successMessage = 'Venta y cobro registrados correctamente.';
         $flash = [];
         if ($movementForApisunat && (($electronicResult['status'] ?? '') === 'SENT')) {
-            $successMessage .= ' Comprobante electrónico enviado a SUNAT. Se descargará el XML automáticamente.';
+            $successMessage .= ' Comprobante electrónico enviado a SUNAT. Se descargarán el XML y el CDR automáticamente.';
             $flash['auto_download_xml_movement_id'] = (int) $movementForApisunat->id;
+            $flash['auto_download_cdr_movement_id'] = (int) $movementForApisunat->id;
         }
 
         return $this->redirectToBoardWithStatus(

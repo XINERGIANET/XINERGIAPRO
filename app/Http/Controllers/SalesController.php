@@ -1695,8 +1695,10 @@ class SalesController extends Controller
             }
 
             $xmlDownloadUrl = null;
+            $cdrDownloadUrl = null;
             if (($apisunatResult['status'] ?? '') === 'SENT' && (int) $movement->id > 0) {
                 $xmlDownloadUrl = route('admin.sales.electronic.xml.download', (int) $movement->id);
+                $cdrDownloadUrl = route('admin.sales.electronic.cdr.download', (int) $movement->id);
             }
 
             return response()->json([
@@ -1709,6 +1711,7 @@ class SalesController extends Controller
                     'total' => $total,
                     'apisunat' => $apisunatResult,
                     'xml_download_url' => $xmlDownloadUrl,
+                    'cdr_download_url' => $cdrDownloadUrl,
                 ]
             ]);
             
@@ -2227,7 +2230,9 @@ class SalesController extends Controller
                 ->with('status', (string) ($result['message'] ?? 'Comprobante reenviado.'));
 
             if (($result['status'] ?? '') === 'SENT') {
-                $redirect->with('auto_download_xml_movement_id', (int) $sale->id);
+                $redirect
+                    ->with('auto_download_xml_movement_id', (int) $sale->id)
+                    ->with('auto_download_cdr_movement_id', (int) $sale->id);
             }
 
             return $redirect;
@@ -2637,10 +2642,29 @@ class SalesController extends Controller
             abort(404, 'No se pudo obtener el XML del comprobante electrónico.');
         }
 
+        return $this->electronicFileDownloadResponse($file, 'application/xml; charset=UTF-8');
+    }
+
+    public function downloadElectronicCdr(Movement $sale)
+    {
+        $apisunatService = app(\App\Services\ApisunatService::class);
+        $file = $apisunatService->resolveCdrFileForDownload($sale);
+        if ($file === null) {
+            abort(404, 'No se pudo obtener el CDR del comprobante electrónico.');
+        }
+
+        return $this->electronicFileDownloadResponse($file, 'application/xml; charset=UTF-8');
+    }
+
+    /**
+     * @param  array{content: string, filename: string}  $file
+     */
+    private function electronicFileDownloadResponse(array $file, string $contentType)
+    {
         $filename = (string) ($file['filename'] ?? 'comprobante.xml');
 
         return response((string) $file['content'], 200, [
-            'Content-Type' => 'application/xml; charset=UTF-8',
+            'Content-Type' => $contentType,
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
             'Cache-Control' => 'no-store, no-cache, must-revalidate',
         ]);

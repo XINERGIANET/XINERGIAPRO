@@ -193,15 +193,25 @@
                     {{ session('status') }}
                 </div>
             @endif
-            @if (session('auto_download_xml_movement_id'))
+            @if (session('auto_download_xml_movement_id') || session('auto_download_cdr_movement_id'))
                 <script>
                     window.addEventListener('load', function () {
-                        const url = @json(route('admin.sales.electronic.xml.download', (int) session('auto_download_xml_movement_id')));
-                        const iframe = document.createElement('iframe');
-                        iframe.style.display = 'none';
-                        iframe.src = url;
-                        document.body.appendChild(iframe);
-                        setTimeout(function () { iframe.remove(); }, 60000);
+                        const downloadUrls = [];
+                        @if (session('auto_download_xml_movement_id'))
+                            downloadUrls.push(@json(route('admin.sales.electronic.xml.download', (int) session('auto_download_xml_movement_id'))));
+                        @endif
+                        @if (session('auto_download_cdr_movement_id'))
+                            downloadUrls.push(@json(route('admin.sales.electronic.cdr.download', (int) session('auto_download_cdr_movement_id'))));
+                        @endif
+                        downloadUrls.forEach(function (url, index) {
+                            setTimeout(function () {
+                                const iframe = document.createElement('iframe');
+                                iframe.style.display = 'none';
+                                iframe.src = url;
+                                document.body.appendChild(iframe);
+                                setTimeout(function () { iframe.remove(); }, 60000);
+                            }, index * 900);
+                        });
                     });
                 </script>
             @endif
@@ -804,10 +814,15 @@
                                                                 </a>
                                                             @endif
                                                         @endif
-                                                        @if ($sale->electronic_invoice_cdr_url)
-                                                            <a href="{{ route('admin.sales.electronic.cdr', $sale->id) }}" target="_blank" class="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline">
-                                                                <i class="ri-checkbox-circle-line"></i> CDR
+                                                        @if ($sale->electronic_invoice_external_id || $sale->electronic_invoice_cdr_url)
+                                                            <a href="{{ route('admin.sales.electronic.cdr.download', $sale->id) }}" class="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline" title="Descargar CDR SUNAT">
+                                                                <i class="ri-download-2-line"></i> Descargar CDR
                                                             </a>
+                                                            @if ($sale->electronic_invoice_cdr_url)
+                                                                <a href="{{ route('admin.sales.electronic.cdr', $sale->id) }}" target="_blank" class="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-700 hover:underline" title="Abrir CDR en Apisunat">
+                                                                    <i class="ri-external-link-line"></i> Ver CDR en línea
+                                                                </a>
+                                                            @endif
                                                         @endif
                                                     @elseif ($sale->electronic_invoice_status === 'ERROR')
                                                         <div class="flex w-full flex-col gap-2">
