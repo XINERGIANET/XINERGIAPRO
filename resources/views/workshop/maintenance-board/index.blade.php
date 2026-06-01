@@ -73,6 +73,7 @@
                     class="h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 focus:border-orange-400 focus:outline-none sm:w-[250px]"
                 >
                     <option value="all" @selected(($selectedStatus ?? 'in_progress') === 'all')>Todos</option>
+                    <option value="draft" @selected(($selectedStatus ?? 'in_progress') === 'draft')>Borrador / recepción parcial</option>
                     <option value="awaiting_approval" @selected(($selectedStatus ?? 'in_progress') === 'awaiting_approval')>Esperando aprobación</option>
                     <option value="approved" @selected(($selectedStatus ?? 'in_progress') === 'approved')>Aprobado</option>
                     <option value="in_progress" @selected(($selectedStatus ?? 'in_progress') === 'in_progress')>En reparación / Pausa</option>
@@ -137,7 +138,7 @@
                             ->all(),
                     ];
                     $statusMap = [
-                        'draft' => ['Borrador', 'bg-slate-100 text-slate-700 border-slate-200'],
+                        'draft' => ['Borrador / recepción', 'bg-slate-100 text-slate-700 border-slate-200'],
                         'diagnosis' => ['Diagnóstico', 'bg-indigo-100 text-indigo-700 border-indigo-200'],
                         'awaiting_approval' => ['Esperando aprobación', 'bg-amber-100 text-amber-700 border-amber-200'],
                         'approved' => ['Aprobado', 'bg-emerald-100 text-emerald-700 border-emerald-200'],
