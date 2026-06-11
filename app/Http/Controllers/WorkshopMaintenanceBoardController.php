@@ -3792,12 +3792,17 @@ class WorkshopMaintenanceBoardController extends Controller
 
     private function redirectToBoardWithStatus(string $orderStatus, ?string $message = null, array $flash = []): RedirectResponse
     {
-        $params = array_filter([
-            'status' => $this->boardIndexFilterForStatus($orderStatus),
-            'view_id' => request()->query('view_id'),
-        ]);
+        $autoRedirect = $this->branchBooleanParameter((int) session('branch_id'), 'Redirigir a pestaña de nuevo estado automáticamente', true);
 
-        $redirect = redirect()->route('workshop.maintenance-board.index', $params);
+        if (!$autoRedirect && request()->headers->get('referer')) {
+            $redirect = redirect()->back();
+        } else {
+            $params = array_filter([
+                'status' => $this->boardIndexFilterForStatus($orderStatus),
+                'view_id' => request()->query('view_id'),
+            ]);
+            $redirect = redirect()->route('workshop.maintenance-board.index', $params);
+        }
 
         if ($message !== null && $message !== '') {
             $redirect->with('status', $message);
