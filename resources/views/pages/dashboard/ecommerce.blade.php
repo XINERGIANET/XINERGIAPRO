@@ -34,7 +34,7 @@
         $statusBreakdown = collect($d['statusBreakdown'] ?? []);
         $totalStatus = (int) $statusBreakdown->sum();
         $recentOrders = collect($d['recentOrders'] ?? []);
-        $topServices = collect($d['topServices'] ?? []);
+        $topServices = collect($d['topServices'] ?? [])->filter(fn($s) => (float)$s->amount > 0)->values();
         $birthdays = collect($d['birthdays'] ?? []);
         $frequentClients = collect($d['frequentClients'] ?? []);
         $techProductivity = collect($d['techProductivity'] ?? []);

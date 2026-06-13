@@ -381,7 +381,7 @@ class DashboardController extends Controller
             ];
         }
 
-        $monthCursor = now()->copy()->subMonths(13)->startOfMonth();
+        $monthCursor = now()->copy()->startOfYear();
         $monthEnd = now()->copy()->endOfMonth();
         $monthKeys = [];
         $monthLabels = [];
@@ -400,7 +400,7 @@ class DashboardController extends Controller
         $salesAgg = SalesMovement::query()
             ->join('movements as m', 'm.id', '=', 'sales_movements.movement_id')
             ->where('sales_movements.branch_id', $branchId)
-            ->whereBetween('m.moved_at', [now()->subMonths(13)->startOfMonth(), now()->endOfMonth()])
+            ->whereBetween('m.moved_at', [now()->startOfYear(), now()->endOfMonth()])
             ->select(['sales_movements.total', 'sales_movements.billing_status', 'm.moved_at'])
             ->get();
 
