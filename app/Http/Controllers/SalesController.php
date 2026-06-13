@@ -49,6 +49,8 @@ class SalesController extends Controller
         if (!in_array($billingStatus, ['all', 'pending', 'invoiced'], true)) {
             $billingStatus = 'all';
         }
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
         $documentTypeId = (string) $request->input('document_type_id', 'all');
         $branchId = $request->session()->get('branch_id');
         $profileId = $request->session()->get('profile_id') ?? $request->user()?->profile_id;
@@ -182,6 +184,8 @@ class SalesController extends Controller
                 }
             })
             ->when($selectedDocumentTypeId !== 'all', fn ($query) => $query->where('document_type_id', (int) $selectedDocumentTypeId))
+            ->when($dateFrom, fn ($query) => $query->whereDate('moved_at', '>=', $dateFrom))
+            ->when($dateTo, fn ($query) => $query->whereDate('moved_at', '<=', $dateTo))
             ->when($search, function ($query) use ($search) {
                 $query->where(function ($inner) use ($search) {
                     $inner->where('number', 'ILIKE', "%{$search}%")
@@ -225,6 +229,8 @@ class SalesController extends Controller
             'shiftRelations' => $shiftRelations,
             'selectedShiftId' => $selectedShiftId,
             'currentShiftRelationId' => $currentShiftRelationId,
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
         ] + $this->getFormData());
     }
 

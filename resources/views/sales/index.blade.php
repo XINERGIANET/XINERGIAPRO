@@ -227,7 +227,14 @@
             @endif
 
             <div class="flex flex-col gap-4 xl:flex-row xl:flex-wrap xl:items-center xl:justify-between">
-                <form method="GET" class="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center xl:min-w-full">
+                <style>
+                    .align-calendar-right .flatpickr-calendar.static {
+                        right: 0 !important;
+                        left: auto !important;
+                        transform: none !important;
+                    }
+                </style>
+                <form method="GET" class="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end xl:min-w-full">
                     @if ($viewId)
                         <input type="hidden" name="view_id" value="{{ $viewId }}">
                     @endif
@@ -271,6 +278,32 @@
                             placeholder="Todas"
                             :submit-on-change="true"
                             inputClass="dark:bg-dark-900 shadow-theme-xs focus:border-brand-300 focus:ring-brand-500/10 dark:focus:border-brand-800 h-11 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                        />
+                    </div>
+                    <div class="flex-none min-w-[160px] w-full sm:w-auto" @date-change="$el.closest('form').submit()">
+                        <x-form.date-picker
+                            id="sale-date-from"
+                            name="date_from"
+                            label="Inicio"
+                            :defaultDate="$dateFrom ?? null"
+                            dateFormat="Y-m-d"
+                            :altInput="true"
+                            altFormat="d/m/Y"
+                            locale="es"
+                            placeholder="dd/mm/yyyy"
+                        />
+                    </div>
+                    <div class="flex-none min-w-[160px] w-full sm:w-auto align-calendar-right" @date-change="$el.closest('form').submit()">
+                        <x-form.date-picker
+                            id="sale-date-to"
+                            name="date_to"
+                            label="Fin"
+                            :defaultDate="$dateTo ?? null"
+                            dateFormat="Y-m-d"
+                            :altInput="true"
+                            altFormat="d/m/Y"
+                            locale="es"
+                            placeholder="dd/mm/yyyy"
                         />
                     </div>
                     <div class="w-full sm:w-40 sm:flex-none">
