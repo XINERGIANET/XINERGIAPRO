@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('content')
     <div x-data="{
@@ -393,7 +393,7 @@
             @endif
 
             <div class="mb-4">
-                <x-ui.link-button size="sm" variant="outline" href="{{ route('workshop.maintenance-board.index') }}">
+                <x-ui.link-button size="sm" variant="outline" href="{{ !empty($returnUrl) ? $returnUrl : route('workshop.maintenance-board.index') }}">
                     <i class="ri-arrow-left-line"></i><span>Volver al tablero</span>
                 </x-ui.link-button>
             </div>
@@ -417,6 +417,9 @@
                 class="space-y-5">
                 @csrf
                 <input type="hidden" name="generate_sale" value="1">
+                @if(!empty($returnUrl))
+                    <input type="hidden" name="return_url" value="{{ $returnUrl }}">
+                @endif
 
                 <div class="grid grid-cols-1 gap-3 lg:grid-cols-3">
                     <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">

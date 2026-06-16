@@ -2015,7 +2015,7 @@ class WorkshopMaintenanceBoardController extends Controller
         return $this->redirectToBoardWithStatus('in_progress', 'Servicio reanudado.');
     }
 
-    public function checkoutPage(WorkshopMovement $order): \Illuminate\View\View|RedirectResponse
+    public function checkoutPage(Request $request, WorkshopMovement $order): \Illuminate\View\View|RedirectResponse
     {
         $this->assertOrderScope($order);
 
@@ -2172,6 +2172,7 @@ class WorkshopMaintenanceBoardController extends Controller
 
         return view('workshop.maintenance-board.checkout', array_merge($formData, [
             'order' => $order,
+            'returnUrl' => $request->query('return_url'),
             'pendingLines' => $pendingLines,
             'previousAdvances' => $previousAdvances,
             'isAnticipo' => $isAnticipo ?? false,
@@ -2668,6 +2669,14 @@ class WorkshopMaintenanceBoardController extends Controller
             $successMessage .= ' Comprobante electrónico enviado a SUNAT. Se descargarán el XML y el CDR automáticamente.';
             $flash['auto_download_xml_movement_id'] = (int) $movementForApisunat->id;
             $flash['auto_download_cdr_movement_id'] = (int) $movementForApisunat->id;
+        }
+
+        if ($request->filled('return_url')) {
+            $redirect = redirect($request->input('return_url'))->with('status', $successMessage);
+            foreach ($flash as $key => $value) {
+                $redirect->with($key, $value);
+            }
+            return $redirect;
         }
 
         return $this->redirectToBoardWithStatus(

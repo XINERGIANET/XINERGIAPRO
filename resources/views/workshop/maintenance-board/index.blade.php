@@ -349,7 +349,7 @@
                                 </button>
                             @endif
                             @if($canCheckoutCard)
-                                <a href="{{ route('workshop.maintenance-board.checkout.page', $card) }}"
+                                <a href="{{ route('workshop.maintenance-board.checkout.page', ['order' => $card, 'return_url' => request()->fullUrl()]) }}"
                                    class="inline-flex items-center rounded-xl bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-800">
                                     <i class="ri-file-list-3-line mr-1"></i> Venta
                                 </a>
