@@ -58,8 +58,8 @@
             <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first() }}</div>
         @endif
 
-        <div class="mb-6 flex flex-col gap-3 xl:flex-row xl:items-center">
-            <div class="flex flex-wrap items-center gap-2 whitespace-nowrap xl:shrink-0">
+        <div class="mb-6 flex flex-col gap-3 min-[1440px]:flex-row min-[1440px]:items-center">
+            <div class="flex flex-wrap items-center gap-2 whitespace-nowrap min-[1440px]:shrink-0">
                 @if($correctiveServicesEnabled)
                     <x-ui.button size="md" variant="primary" @click="$dispatch('open-service-type-modal')" style="background:linear-gradient(90deg,#ff7a00,#ff4d00);color:#fff">
                         <i class="ri-add-circle-line"></i><span>Agregar Vehículo</span>
