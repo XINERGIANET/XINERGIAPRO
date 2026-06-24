@@ -138,6 +138,8 @@ Route::middleware('auth')->group(function () {
         ->names('admin.sales')
         ->parameters(['ventas' => 'sale'])
         ->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
+    Route::post('/admin/ventas/import-excel', [SalesController::class, 'importExcel'])
+        ->name('admin.sales.import-excel');
     Route::post('/admin/ventas/clientes', [SalesController::class, 'storeClientQuick'])
         ->name('admin.sales.clients.store');
     Route::post('/admin/ventas/vehiculos', [SalesController::class, 'storeVehicleQuick'])
@@ -150,6 +152,8 @@ Route::middleware('auth')->group(function () {
         ->names('admin.purchases')
         ->parameters(['compras' => 'purchase'])
         ->only(['index', 'create', 'store', 'edit', 'update', 'destroy']);
+    Route::post('/admin/compras/import-excel', [PurchaseController::class, 'importExcel'])
+        ->name('admin.purchases.import-excel');
     Route::post('/admin/compras/proveedores', [PurchaseController::class, 'storeProviderQuick'])
         ->name('admin.purchases.providers.store');
     Route::get('/admin/ventas/{sale}/imprimir/pdf', [SalesController::class, 'printPdf'])->name('admin.sales.print.pdf');

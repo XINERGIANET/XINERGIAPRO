@@ -23,11 +23,13 @@ class CashMovements extends Model
         'counting_snapshot',
         'movement_id',
         'branch_id',
+        'is_historical_import',
     ];
 
     protected $casts = [
         'shift_snapshot' => 'array',
         'counting_snapshot' => 'array',
+        'is_historical_import' => 'boolean',
     ];
 
     public function paymentConcept()

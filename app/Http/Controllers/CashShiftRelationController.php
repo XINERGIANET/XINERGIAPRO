@@ -120,6 +120,7 @@ class CashShiftRelationController extends Controller
                 ])
                 ->where('branch_id', $branchId)
                 ->where('cash_register_id', $start->cash_register_id)
+                ->where('is_historical_import', false)
                 ->whereHas('movement', function ($q) use ($from, $to) {
                     $q->whereBetween('moved_at', [$from, $to]);
                 })
