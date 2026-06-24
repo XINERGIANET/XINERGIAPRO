@@ -76,12 +76,7 @@
             });
         },
         syncProductTypeBehavior(productTypeId) {
-            const selected = this.productTypes.find(type => String(type.id) === String(productTypeId));
-            const isSupply = ['SUPPLY', 'SUMINISTRO'].includes(String(selected?.behavior || '').toUpperCase());
-            this.showBranchDetail = !isSupply;
-            if (isSupply) {
-                this.applySupplyBranchDefaults();
-            }
+            this.showBranchDetail = true;
         },
         handleTypeChange(e) {
             this.selectedProductTypeId = e.target.value;
