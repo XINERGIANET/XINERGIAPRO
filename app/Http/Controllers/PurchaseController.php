@@ -363,6 +363,7 @@ class PurchaseController extends Controller
                 $importCashMvtTypeId, $importCashDocTypeId, $importPaymentConcept,
                 $importAperturaConcept, $importCierreConcept,
                 $importIngresoDocTypeId, $importEfectivoMethod, $importMonthGroups,
+                $currentYearMonth,
                 &$imported, &$skipped, &$rowErrors, &$duplicates, &$seenKeys
             ) {
                 $responsibleName = $user?->person
