@@ -1736,8 +1736,8 @@
                         </div>
                     </div>
                     <div class="md:col-span-3 grid gap-3 lg:grid-cols-[minmax(520px,2fr)_minmax(360px,1fr)]">
-                        <div class="grid gap-3">
-                            <div class="w-full min-w-0 md:flex-[2.4_1_0%]">
+                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 content-start">
+                            <div class="sm:col-span-6 min-w-0">
                                 <div class="relative flex w-full items-end gap-2">
                                     <input type="hidden" name="vehicle_id" x-model="selectedVehicleId" required>
                                     <input type="hidden" name="appointment_id" value="{{ $appointmentIdDefault }}">
@@ -1808,42 +1808,59 @@
                                     </button>
                                 </div>
                             </div>
-                            <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_96px]">
-                                @php
-                                    $defaultIntakeDateTime = old(
-                                        'intake_date',
-                                        optional($editingOrder)->intake_date
-                                            ? optional($editingOrder)->intake_date->format('Y-m-d\TH:i')
-                                            : now()->format('Y-m-d\TH:i')
-                                    );
-                                @endphp
-                                <div class="min-w-0"
-                                    x-data="{ intakeDateTime: @js($defaultIntakeDateTime) }"
+                            @php
+                                $defaultIntakeDateTime = old(
+                                    'intake_date',
+                                    optional($editingOrder)->intake_date
+                                        ? optional($editingOrder)->intake_date->format('Y-m-d\TH:i')
+                                        : now()->format('Y-m-d\TH:i')
+                                );
+                            @endphp
+                            <div class="sm:col-span-4 min-w-0"
+                                x-data="{ intakeDateTime: @js($defaultIntakeDateTime) }"
+                            >
+                                <label class="mb-1 flex items-center gap-1.5 text-sm font-medium text-gray-700">
+                                    <i class="ri-calendar-event-line text-indigo-600"></i>
+                                    Fecha y hora de ingreso
+                                </label>
+                                <input
+                                    type="datetime-local"
+                                    name="intake_date"
+                                    x-model="intakeDateTime"
+                                    required
+                                    class="h-11 w-full min-w-0 rounded-xl border border-gray-300 bg-gradient-to-b from-white to-gray-50/80 px-3 text-sm text-gray-800 shadow-sm transition focus:border-indigo-500 focus:from-white focus:ring-2 focus:ring-indigo-200/80 outline-none dark:border-gray-600 dark:from-gray-900 dark:to-gray-900/60 dark:text-gray-100"
                                 >
-                                    <label class="mb-1 flex items-center gap-1.5 text-sm font-medium text-gray-700">
-                                        <i class="ri-calendar-event-line text-indigo-600"></i>
-                                        Fecha y hora de ingreso
-                                    </label>
-                                    <input
-                                        type="datetime-local"
-                                        name="intake_date"
-                                        x-model="intakeDateTime"
-                                        required
-                                        class="h-11 w-full min-w-0 rounded-xl border border-gray-300 bg-gradient-to-b from-white to-gray-50/80 px-3 text-sm text-gray-800 shadow-sm transition focus:border-indigo-500 focus:from-white focus:ring-2 focus:ring-indigo-200/80 outline-none dark:border-gray-600 dark:from-gray-900 dark:to-gray-900/60 dark:text-gray-100"
-                                    >
+                            </div>
+                            <div class="sm:col-span-2 min-w-0">
+                                <label class="mb-1 block text-sm font-medium text-gray-700">KM ing.</label>
+                                <input
+                                    name="mileage_in"
+                                    type="number"
+                                    min="0"
+                                    x-model="mileageIn"
+                                    class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                                    placeholder="KM ingreso"
+                                >
+                            </div>
+
+                            <div x-show="driverInfoEnabled" x-cloak class="sm:col-span-12 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <div>
+                                    <label class="mb-1 block text-sm font-medium text-gray-700">Nombre Chofer</label>
+                                    <div class="relative">
+                                        <i class="ri-user-received-2-line absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                        <input name="driver_name" x-model="driverName" class="h-11 w-full rounded-lg border border-gray-300 pl-10 pr-3 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition" placeholder="Nombre completo del chofer">
+                                    </div>
                                 </div>
-                                <div class="min-w-0">
-                                    <label class="mb-1 block text-sm font-medium text-gray-700">KM ing.</label>
-                                    <input
-                                        name="mileage_in"
-                                        type="number"
-                                        min="0"
-                                        x-model="mileageIn"
-                                        class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
-                                        placeholder="KM ingreso"
-                                    >
+                                <div>
+                                    <label class="mb-1 block text-sm font-medium text-gray-700">Celular Chofer</label>
+                                    <div class="relative">
+                                        <i class="ri-phone-line absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                        <input name="driver_phone" x-model="driverPhone" class="h-11 w-full rounded-lg border border-gray-300 pl-10 pr-3 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition" placeholder="Número de contacto">
+                                    </div>
                                 </div>
                             </div>
+
+                            <textarea name="observations" rows="3" class="sm:col-span-12 rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="Observaciones">{{ old('observations', optional($editingOrder)->observations ?? '') }}</textarea>
                         </div>
                         <div class="grid gap-3">
                             <div class="w-full"
@@ -1956,25 +1973,7 @@
                         </div>
                     </div>
 
-                    <div x-show="driverInfoEnabled" x-cloak class="md:col-span-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-                        <div class="md:col-span-1">
-                            <label class="mb-1 block text-sm font-medium text-gray-700">Nombre Chofer</label>
-                            <div class="relative">
-                                <i class="ri-user-received-2-line absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                                <input name="driver_name" x-model="driverName" class="h-11 w-full rounded-lg border border-gray-300 pl-10 pr-3 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition" placeholder="Nombre completo del chofer">
-                            </div>
-                        </div>
-                        <div class="md:col-span-1">
-                            <label class="mb-1 block text-sm font-medium text-gray-700">Celular Chofer</label>
-                            <div class="relative">
-                                <i class="ri-phone-line absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                                <input name="driver_phone" x-model="driverPhone" class="h-11 w-full rounded-lg border border-gray-300 pl-10 pr-3 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition" placeholder="Número de contacto">
-                            </div>
-                        </div>
-                     
-                    </div>
 
-                    <textarea name="observations" rows="3" class="rounded-lg border border-gray-300 px-3 py-2 text-sm md:col-span-3" placeholder="Observaciones">{{ old('observations', optional($editingOrder)->observations ?? '') }}</textarea>
 
                     <div
                         x-data="{
