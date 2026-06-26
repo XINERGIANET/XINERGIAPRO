@@ -1428,9 +1428,12 @@
             };
         },
         startSignature(evt) {
-            if (!this.signatureCtx) return;
+            if (!this.signatureCtx || !this.signatureCanvas) return;
             evt.preventDefault();
             this.isSigning = true;
+            if (evt.pointerId && this.signatureCanvas.setPointerCapture) {
+                this.signatureCanvas.setPointerCapture(evt.pointerId);
+            }
             const point = this.signaturePoint(evt);
             this.signatureCtx.beginPath();
             this.signatureCtx.moveTo(point.x, point.y);
@@ -1442,9 +1445,16 @@
             this.signatureCtx.lineTo(point.x, point.y);
             this.signatureCtx.stroke();
         },
-        stopSignature() {
-            if (!this.signatureCtx) return;
+        stopSignature(evt) {
+            if (!this.signatureCtx || !this.signatureCanvas) return;
             this.isSigning = false;
+            if (evt?.pointerId && this.signatureCanvas.releasePointerCapture) {
+                try {
+                    this.signatureCanvas.releasePointerCapture(evt.pointerId);
+                } catch (error) {
+                    // ignore release errors for missing capture
+                }
+            }
             this.signatureCtx.closePath();
             this.syncSignature();
         },
@@ -1729,94 +1739,91 @@
                         <div class="grid gap-3">
                             <div class="w-full min-w-0 md:flex-[2.4_1_0%]">
                                 <div class="relative flex w-full items-end gap-2">
-                                <input type="hidden" name="vehicle_id" x-model="selectedVehicleId" required>
-                                <input type="hidden" name="appointment_id" value="{{ $appointmentIdDefault }}">
-                                <input type="hidden" name="service_type" x-model="serviceType">
-                                <div class="relative min-w-0 flex-1" @click.outside="closeVehicleDropdown()">
-                                    <label class="mb-1 block text-sm font-medium text-gray-700">Vehiculo</label>
-                                    <input
-                                        x-model="vehicleSearch"
-                                        @focus="vehicleDropdownOpen = true; refreshVehicleFilter()"
-                                        @click="vehicleDropdownOpen = true; refreshVehicleFilter()"
-                                        @input="onVehicleSearchInput()"
-                                        class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
-                                        placeholder="Buscar vehiculo o cliente"
-                                        autocomplete="off"
-                                        required
-                                    >
-                                    <div class="mt-2 flex flex-wrap gap-2" x-show="selectedVehicleId && vehicleDocumentAlertsEnabled" x-cloak>
-                                        <template x-if="vehicles.find(v => String(v.id) === String(selectedVehicleId))">
-                                            <div class="flex flex-wrap gap-2">
-                                                <div class="flex items-center gap-1 overflow-hidden rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider shadow-sm"
-                                                    :class="getDocumentStatus(vehicles.find(v => String(v.id) === String(selectedVehicleId)).soat_vencimiento).color">
-                                                    <i :class="getDocumentStatus(vehicles.find(v => String(v.id) === String(selectedVehicleId)).soat_vencimiento).icon"></i>
-                                                    <span>SOAT:</span>
-                                                    <span x-text="getDocumentStatus(vehicles.find(v => String(v.id) === String(selectedVehicleId)).soat_vencimiento).label"></span>
-                                                    <span class="opacity-75" x-text="vehicles.find(v => String(v.id) === String(selectedVehicleId)).soat_vencimiento || '-'"></span>
+                                    <input type="hidden" name="vehicle_id" x-model="selectedVehicleId" required>
+                                    <input type="hidden" name="appointment_id" value="{{ $appointmentIdDefault }}">
+                                    <input type="hidden" name="service_type" x-model="serviceType">
+                                    <div class="relative min-w-0 flex-1" @click.outside="closeVehicleDropdown()">
+                                        <label class="mb-1 block text-sm font-medium text-gray-700">Vehiculo</label>
+                                        <input
+                                            x-model="vehicleSearch"
+                                            @focus="vehicleDropdownOpen = true; refreshVehicleFilter()"
+                                            @click="vehicleDropdownOpen = true; refreshVehicleFilter()"
+                                            @input="onVehicleSearchInput()"
+                                            class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                                            placeholder="Buscar vehiculo o cliente"
+                                            autocomplete="off"
+                                            required
+                                        >
+                                        <div class="mt-2 flex flex-wrap gap-2" x-show="selectedVehicleId && vehicleDocumentAlertsEnabled" x-cloak>
+                                            <template x-if="vehicles.find(v => String(v.id) === String(selectedVehicleId))">
+                                                <div class="flex flex-wrap gap-2">
+                                                    <div class="flex items-center gap-1 overflow-hidden rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider shadow-sm"
+                                                        :class="getDocumentStatus(vehicles.find(v => String(v.id) === String(selectedVehicleId)).soat_vencimiento).color">
+                                                        <i :class="getDocumentStatus(vehicles.find(v => String(v.id) === String(selectedVehicleId)).soat_vencimiento).icon"></i>
+                                                        <span>SOAT:</span>
+                                                        <span x-text="getDocumentStatus(vehicles.find(v => String(v.id) === String(selectedVehicleId)).soat_vencimiento).label"></span>
+                                                        <span class="opacity-75" x-text="vehicles.find(v => String(v.id) === String(selectedVehicleId)).soat_vencimiento || '-'"></span>
+                                                    </div>
+                                                    <div class="flex items-center gap-1 overflow-hidden rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider shadow-sm"
+                                                        :class="getDocumentStatus(vehicles.find(v => String(v.id) === String(selectedVehicleId)).revision_tecnica_vencimiento).color">
+                                                        <i :class="getDocumentStatus(vehicles.find(v => String(v.id) === String(selectedVehicleId)).revision_tecnica_vencimiento).icon"></i>
+                                                        <span>REV. TÉCNICA:</span>
+                                                        <span x-text="getDocumentStatus(vehicles.find(v => String(v.id) === String(selectedVehicleId)).revision_tecnica_vencimiento).label"></span>
+                                                        <span class="opacity-75" x-text="vehicles.find(v => String(v.id) === String(selectedVehicleId)).revision_tecnica_vencimiento || '-'"></span>
+                                                    </div>
                                                 </div>
-                                                <div class="flex items-center gap-1 overflow-hidden rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider shadow-sm"
-                                                    :class="getDocumentStatus(vehicles.find(v => String(v.id) === String(selectedVehicleId)).revision_tecnica_vencimiento).color">
-                                                    <i :class="getDocumentStatus(vehicles.find(v => String(v.id) === String(selectedVehicleId)).revision_tecnica_vencimiento).icon"></i>
-                                                    <span>REV. TÉCNICA:</span>
-                                                    <span x-text="getDocumentStatus(vehicles.find(v => String(v.id) === String(selectedVehicleId)).revision_tecnica_vencimiento).label"></span>
-                                                    <span class="opacity-75" x-text="vehicles.find(v => String(v.id) === String(selectedVehicleId)).revision_tecnica_vencimiento || '-'"></span>
-                                                </div>
-                                            </div>
-                                        </template>
-                                    </div>
-                                    <div
-                                        x-show="vehicleDropdownOpen"
-                                        x-cloak
-                                        class="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg"
-                                    >
-                                        <div class="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-3 py-2">
-                                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-600">Vehiculos</p>
-                                            <button type="button" @click="closeVehicleDropdown()" class="text-xs font-semibold text-gray-500 hover:text-gray-700">
-                                                Cerrar
-                                            </button>
+                                            </template>
                                         </div>
-                                        <template x-if="filteredVehicleList.length === 0">
-                                            <p class="px-3 py-2 text-sm text-gray-500">Sin resultados.</p>
-                                        </template>
-                                        <template x-for="vehicle in filteredVehicleList" :key="`vehicle-search-${vehicle.id}`">
-                                            <button
-                                                type="button"
-                                                @click="selectVehicle(vehicle)"
-                                                class="flex w-full items-start justify-between border-b border-gray-100 px-3 py-2 text-left text-sm hover:bg-indigo-50"
-                                            >
-                                                <span class="font-medium text-gray-800" x-text="vehicle.label || `Vehiculo #${vehicle.id}`"></span>
-                                                <span class="ml-3 text-xs text-gray-500" x-text="vehicle.client_name ? `(${vehicle.client_name})` : ''"></span>
-                                            </button>
-                                        </template>
+                                        <div
+                                            x-show="vehicleDropdownOpen"
+                                            x-cloak
+                                            class="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg"
+                                        >
+                                            <div class="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-3 py-2">
+                                                <p class="text-xs font-semibold uppercase tracking-wide text-gray-600">Vehiculos</p>
+                                                <button type="button" @click="closeVehicleDropdown()" class="text-xs font-semibold text-gray-500 hover:text-gray-700">
+                                                    Cerrar
+                                                </button>
+                                            </div>
+                                            <template x-if="filteredVehicleList.length === 0">
+                                                <p class="px-3 py-2 text-sm text-gray-500">Sin resultados.</p>
+                                            </template>
+                                            <template x-for="vehicle in filteredVehicleList" :key="`vehicle-search-${vehicle.id}`">
+                                                <button
+                                                    type="button"
+                                                    @click="selectVehicle(vehicle)"
+                                                    class="flex w-full items-start justify-between border-b border-gray-100 px-3 py-2 text-left text-sm hover:bg-indigo-50"
+                                                >
+                                                    <span class="font-medium text-gray-800" x-text="vehicle.label || `Vehiculo #${vehicle.id}`"></span>
+                                                    <span class="ml-3 text-xs text-gray-500" x-text="vehicle.client_name ? `(${vehicle.client_name})` : ''"></span>
+                                                </button>
+                                            </template>
+                                        </div>
                                     </div>
+                                    <button type="button"
+                                            @click="toggleQuickVehicle()"
+                                            class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">
+                                        <i class="ri-add-line"></i>
+                                        <span class="ml-1 hidden sm:inline">Nuevo</span>
+                                    </button>
                                 </div>
-                                <button type="button"
-                                        @click="toggleQuickVehicle()"
-                                        class="inline-flex h-11 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">
-                                    <i class="ri-add-line"></i>
-                                    <span class="ml-1 hidden sm:inline">Nuevo</span>
-                                </button>
                             </div>
-                        </div>
-
-                        @php
-                            $defaultIntakeDateTime = old(
-                                'intake_date',
-                                optional($editingOrder)->intake_date
-                                    ? optional($editingOrder)->intake_date->format('Y-m-d\TH:i')
-                                    : now()->format('Y-m-d\TH:i')
-                            );
-                        @endphp
-                        <div
-                            class="shrink-0 w-full sm:w-auto sm:min-w-[248px]"
-                            x-data="{ intakeDateTime: @js($defaultIntakeDateTime) }"
-                        >
-                            <label class="mb-1 flex items-center gap-1.5 text-sm font-medium text-gray-700">
-                                <i class="ri-calendar-event-line text-indigo-600"></i>
-                                Fecha y hora de ingreso
-                            </label>
-                            <div class="flex items-center gap-2">
-                                <div class="relative min-w-0 flex-1">
+                            <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_96px]">
+                                @php
+                                    $defaultIntakeDateTime = old(
+                                        'intake_date',
+                                        optional($editingOrder)->intake_date
+                                            ? optional($editingOrder)->intake_date->format('Y-m-d\TH:i')
+                                            : now()->format('Y-m-d\TH:i')
+                                    );
+                                @endphp
+                                <div class="min-w-0"
+                                    x-data="{ intakeDateTime: @js($defaultIntakeDateTime) }"
+                                >
+                                    <label class="mb-1 flex items-center gap-1.5 text-sm font-medium text-gray-700">
+                                        <i class="ri-calendar-event-line text-indigo-600"></i>
+                                        Fecha y hora de ingreso
+                                    </label>
                                     <input
                                         type="datetime-local"
                                         name="intake_date"
@@ -1825,137 +1832,128 @@
                                         class="h-11 w-full min-w-0 rounded-xl border border-gray-300 bg-gradient-to-b from-white to-gray-50/80 px-3 text-sm text-gray-800 shadow-sm transition focus:border-indigo-500 focus:from-white focus:ring-2 focus:ring-indigo-200/80 outline-none dark:border-gray-600 dark:from-gray-900 dark:to-gray-900/60 dark:text-gray-100"
                                     >
                                 </div>
-                                {{-- <button
-                                    type="button"
-                                    @click="intakeDateTime = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)"
-                                    class="inline-flex h-11 shrink-0 items-center gap-1 rounded-xl border border-indigo-200 bg-indigo-50 px-3 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100"
-                                    title="Usar fecha y hora actual del sistema"
-                                >
-                                    <i class="ri-time-line text-base"></i>
-                                    <span class="hidden sm:inline">Ahora</span>
-                                </button> --}}
+                                <div class="min-w-0">
+                                    <label class="mb-1 block text-sm font-medium text-gray-700">KM ing.</label>
+                                    <input
+                                        name="mileage_in"
+                                        type="number"
+                                        min="0"
+                                        x-model="mileageIn"
+                                        class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                                        placeholder="KM ingreso"
+                                    >
+                                </div>
                             </div>
-                        </div>
-
-                        <div class="shrink-0" style="width: 96px; min-width: 96px; max-width: 96px; flex: 0 0 96px;">
-                            <label class="mb-1 block text-sm font-medium text-gray-700">KM ing.</label>
-                            <input
-                                name="mileage_in"
-                                type="number"
-                                min="0"
-                                x-model="mileageIn"
-                                class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
-                                placeholder="KM ingreso">
-                        </div>
                         </div>
                         <div class="grid gap-3">
                             <div class="w-full"
                                  @pointermove.window="moveFuelDrag($event)"
                                  @pointerup.window="stopFuelDrag()"
                                  @pointercancel.window="stopFuelDrag()">
-                            <input type="hidden" name="fuel_level" x-model="fuelLevel">
-                            <div class="rounded-xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 px-4 py-3 shadow-sm">
-                                <div class="mb-1 flex items-center justify-between">
-                                    <label class="text-sm font-semibold text-gray-700">Combustible</label>
-                                    <div class="text-right">
-                                        <p class="text-sm font-black text-slate-900" x-text="fuelLevelLabel()"></p>
-                                        <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500" x-text="fuelLevelText()"></p>
+                                <input type="hidden" name="fuel_level" x-model="fuelLevel">
+                                <div class="rounded-xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 px-4 py-3 shadow-sm">
+                                    <div class="mb-1 flex items-center justify-between">
+                                        <label class="text-sm font-semibold text-gray-700">Combustible</label>
+                                        <div class="text-right">
+                                            <p class="text-sm font-black text-slate-900" x-text="fuelLevelLabel()"></p>
+                                            <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500" x-text="fuelLevelText()"></p>
+                                        </div>
+                                    </div>
+                                    <svg x-ref="fuelGauge"
+                                         viewBox="0 0 320 180"
+                                         class="block h-36 w-full cursor-pointer select-none touch-none"
+                                         role="slider"
+                                         aria-label="Nivel de combustible"
+                                         :aria-valuenow="Math.round(normalizedFuelLevel())"
+                                         aria-valuemin="0"
+                                         aria-valuemax="100"
+                                         tabindex="0"
+                                         @pointerdown.prevent="startFuelDrag($event)"
+                                         @keydown.arrow-left.prevent="fuelLevel = String(Math.max(0, normalizedFuelLevel() - 5))"
+                                         @keydown.arrow-down.prevent="fuelLevel = String(Math.max(0, normalizedFuelLevel() - 5))"
+                                         @keydown.arrow-right.prevent="fuelLevel = String(Math.min(100, normalizedFuelLevel() + 5))"
+                                         @keydown.arrow-up.prevent="fuelLevel = String(Math.min(100, normalizedFuelLevel() + 5))">
+                                        <defs>
+                                            <linearGradient id="fuel-arc-gradient" x1="35" y1="95" x2="285" y2="95" gradientUnits="userSpaceOnUse">
+                                                <stop offset="0" stop-color="#b91c1c"/>
+                                                <stop offset="0.36" stop-color="#f59e0b"/>
+                                                <stop offset="1" stop-color="#334155"/>
+                                            </linearGradient>
+                                            <filter id="fuel-shadow" x="-20%" y="-20%" width="140%" height="140%">
+                                                <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#0f172a" flood-opacity="0.22"/>
+                                            </filter>
+                                        </defs>
+
+                                        <path d="M 40 116 A 140 140 0 0 1 280 116"
+                                              fill="none"
+                                              stroke="#1f2937"
+                                              stroke-width="16"
+                                              stroke-linecap="round"/>
+                                        <path d="M 40 116 A 140 140 0 0 1 280 116"
+                                              fill="none"
+                                              stroke="url(#fuel-arc-gradient)"
+                                              stroke-width="8"
+                                              stroke-linecap="round"/>
+
+                                        @for($tick = 0; $tick <= 10; $tick++)
+                                            @php
+                                                $angle = 220 + ($tick * 10);
+                                                $rad = deg2rad($angle);
+                                                $outerX = 160 + cos($rad) * 140;
+                                                $outerY = 150 + sin($rad) * 140;
+                                                $innerLength = in_array($tick, [0, 5, 10], true) ? 114 : 124;
+                                                $innerX = 160 + cos($rad) * $innerLength;
+                                                $innerY = 150 + sin($rad) * $innerLength;
+                                            @endphp
+                                            <line x1="{{ $outerX }}" y1="{{ $outerY }}" x2="{{ $innerX }}" y2="{{ $innerY }}"
+                                                  stroke="{{ in_array($tick, [0, 10], true) ? '#111827' : '#475569' }}"
+                                                  stroke-width="{{ in_array($tick, [0, 5, 10], true) ? 7 : 3 }}"
+                                                  stroke-linecap="round"/>
+                                        @endfor
+
+                                        <text x="30" y="158" font-size="34" font-weight="900" fill="#b91c1c">E</text>
+                                        <text x="270" y="158" font-size="34" font-weight="900" fill="#1f2937">F</text>
+
+                                        <g transform="translate(160 62)">
+                                            <rect x="-12" y="-22" width="24" height="42" rx="3" fill="#1f2937"/>
+                                            <rect x="-7" y="-28" width="14" height="6" rx="2" fill="#1f2937"/>
+                                            <path d="M 14 -12 C 29 -8 22 12 33 13" fill="none" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+                                            <circle cx="34" cy="13" r="3" fill="#1f2937"/>
+                                        </g>
+
+                                        <line x1="160" y1="150"
+                                              :x2="fuelNeedleX()"
+                                              :y2="fuelNeedleY()"
+                                              stroke="#dc2626"
+                                              stroke-width="9"
+                                              stroke-linecap="round"
+                                              filter="url(#fuel-shadow)"/>
+                                        <circle cx="160" cy="150" r="28" fill="#27272a" filter="url(#fuel-shadow)"/>
+                                        <circle cx="160" cy="150" r="9" fill="#111827"/>
+                                    </svg>
+                                    <div class="mt-1 grid grid-cols-5 gap-1 text-center text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                                        <span>0</span>
+                                        <span>1/4</span>
+                                        <span>1/2</span>
+                                        <span>3/4</span>
+                                        <span>100</span>
                                     </div>
                                 </div>
-                                <svg x-ref="fuelGauge"
-                                     viewBox="0 0 320 180"
-                                     class="block h-36 w-full cursor-pointer select-none touch-none"
-                                     role="slider"
-                                     aria-label="Nivel de combustible"
-                                     :aria-valuenow="Math.round(normalizedFuelLevel())"
-                                     aria-valuemin="0"
-                                     aria-valuemax="100"
-                                     tabindex="0"
-                                     @pointerdown.prevent="startFuelDrag($event)"
-                                     @keydown.arrow-left.prevent="fuelLevel = String(Math.max(0, normalizedFuelLevel() - 5))"
-                                     @keydown.arrow-down.prevent="fuelLevel = String(Math.max(0, normalizedFuelLevel() - 5))"
-                                     @keydown.arrow-right.prevent="fuelLevel = String(Math.min(100, normalizedFuelLevel() + 5))"
-                                     @keydown.arrow-up.prevent="fuelLevel = String(Math.min(100, normalizedFuelLevel() + 5))">
-                                    <defs>
-                                        <linearGradient id="fuel-arc-gradient" x1="35" y1="95" x2="285" y2="95" gradientUnits="userSpaceOnUse">
-                                            <stop offset="0" stop-color="#b91c1c"/>
-                                            <stop offset="0.36" stop-color="#f59e0b"/>
-                                            <stop offset="1" stop-color="#334155"/>
-                                        </linearGradient>
-                                        <filter id="fuel-shadow" x="-20%" y="-20%" width="140%" height="140%">
-                                            <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#0f172a" flood-opacity="0.22"/>
-                                        </filter>
-                                    </defs>
-
-                                    <path d="M 40 116 A 140 140 0 0 1 280 116"
-                                          fill="none"
-                                          stroke="#1f2937"
-                                          stroke-width="16"
-                                          stroke-linecap="round"/>
-                                    <path d="M 40 116 A 140 140 0 0 1 280 116"
-                                          fill="none"
-                                          stroke="url(#fuel-arc-gradient)"
-                                          stroke-width="8"
-                                          stroke-linecap="round"/>
-
-                                    @for($tick = 0; $tick <= 10; $tick++)
-                                        @php
-                                            $angle = 220 + ($tick * 10);
-                                            $rad = deg2rad($angle);
-                                            $outerX = 160 + cos($rad) * 140;
-                                            $outerY = 150 + sin($rad) * 140;
-                                            $innerLength = in_array($tick, [0, 5, 10], true) ? 114 : 124;
-                                            $innerX = 160 + cos($rad) * $innerLength;
-                                            $innerY = 150 + sin($rad) * $innerLength;
-                                        @endphp
-                                        <line x1="{{ $outerX }}" y1="{{ $outerY }}" x2="{{ $innerX }}" y2="{{ $innerY }}"
-                                              stroke="{{ in_array($tick, [0, 10], true) ? '#111827' : '#475569' }}"
-                                              stroke-width="{{ in_array($tick, [0, 5, 10], true) ? 7 : 3 }}"
-                                              stroke-linecap="round"/>
-                                    @endfor
-
-                                    <text x="30" y="158" font-size="34" font-weight="900" fill="#b91c1c">E</text>
-                                    <text x="270" y="158" font-size="34" font-weight="900" fill="#1f2937">F</text>
-
-                                    <g transform="translate(160 62)">
-                                        <rect x="-12" y="-22" width="24" height="42" rx="3" fill="#1f2937"/>
-                                        <rect x="-7" y="-28" width="14" height="6" rx="2" fill="#1f2937"/>
-                                        <path d="M 14 -12 C 29 -8 22 12 33 13" fill="none" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
-                                        <circle cx="34" cy="13" r="3" fill="#1f2937"/>
-                                    </g>
-
-                                    <line x1="160" y1="150"
-                                          :x2="fuelNeedleX()"
-                                          :y2="fuelNeedleY()"
-                                          stroke="#dc2626"
-                                          stroke-width="9"
-                                          stroke-linecap="round"
-                                          filter="url(#fuel-shadow)"/>
-                                    <circle cx="160" cy="150" r="28" fill="#27272a" filter="url(#fuel-shadow)"/>
-                                    <circle cx="160" cy="150" r="9" fill="#111827"/>
-                                </svg>
-                                <div class="mt-1 grid grid-cols-5 gap-1 text-center text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                                    <span>0</span>
-                                    <span>1/4</span>
-                                    <span>1/2</span>
-                                    <span>3/4</span>
-                                    <span>100</span>
+                            </div>
+                            <div class="grid gap-3 sm:grid-cols-[1fr_auto] items-end">
+                                <div class="min-w-0">
+                                    <label class="mb-1 block text-sm font-medium text-gray-700">Diagnostico</label>
+                                    <input name="diagnosis_text" x-model="diagnosisText" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Diagnostico inicial (opcional)">
+                                </div>
+                                <div class="flex flex-col justify-end">
+                                    <label class="mb-1 block text-sm font-medium text-gray-700 opacity-0">Spacer</label>
+                                    <label class="inline-flex h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border border-gray-200 bg-slate-50 px-3 text-sm text-gray-700">
+                                        <input type="checkbox" name="tow_in" value="1" class="h-4 w-4 rounded border-gray-300" @checked(old('tow_in', optional($editingOrder)->tow_in ?? false))>
+                                        Ingreso en grua
+                                    </label>
                                 </div>
                             </div>
                         </div>
-                        <div class="min-w-0 w-full md:flex-[2.5_1_0%]">
-                            <label class="mb-1 block text-sm font-medium text-gray-700">Diagnostico</label>
-                            <input name="diagnosis_text" x-model="diagnosisText" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Diagnostico inicial (opcional)">
-                        </div>
-
-                        <div class="flex flex-col">
-                            <label class="mb-1 block text-sm font-medium text-gray-700 opacity-0">Spacer</label>
-                            <label class="inline-flex h-11 shrink-0 items-center gap-2 whitespace-nowrap text-sm text-gray-700">
-                                <input type="checkbox" name="tow_in" value="1" class="h-4 w-4 rounded border-gray-300" @checked(old('tow_in', optional($editingOrder)->tow_in ?? false))>
-                                Ingreso en grua
-                            </label>
-                        </div>
-                    </div>
                     </div>
 
                     <div x-show="driverInfoEnabled" x-cloak class="md:col-span-3 grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -2112,15 +2110,15 @@
                             <canvas
                                 x-ref="clientSignatureCanvas"
                                 width="700"
-                                height="180"
+                                height="140"
                                 x-effect="showClientSignature && initSignaturePad()"
                                 @pointerdown.prevent="startSignature($event)"
                                 @pointermove.prevent="drawSignature($event)"
-                                @pointerup.window="stopSignature()"
-                                @pointercancel.window="stopSignature()"
-                                @pointerleave="stopSignature()"
+                                @pointerup.window="stopSignature($event)"
+                                @pointercancel.window="stopSignature($event)"
+                                @pointerleave.prevent="stopSignature($event)"
                                 style="touch-action: none;"
-                                class="w-full rounded-lg border border-dashed border-gray-300 bg-white"
+                                class="w-full h-[140px] rounded-lg border border-dashed border-gray-300 bg-white"
                             ></canvas>
                             <p class="mt-1 text-[11px] text-gray-500">Conformidad de ingreso del vehiculo.</p>
                         </div>
