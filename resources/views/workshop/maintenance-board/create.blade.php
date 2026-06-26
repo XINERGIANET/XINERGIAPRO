@@ -1377,17 +1377,23 @@
         clientSignatureData: '',
         signatureCanvas: null,
         signatureCtx: null,
+        signaturePadInitialized: false,
         isSigning: false,
         initSignaturePad() {
             this.signatureCanvas = this.$refs.clientSignatureCanvas || null;
             if (!this.signatureCanvas) return;
+
+            if (!this.signaturePadInitialized) {
+                window.addEventListener('resize', () => this.resizeSignatureCanvas());
+                this.signaturePadInitialized = true;
+            }
+
             this.resizeSignatureCanvas();
             this.signatureCtx = this.signatureCanvas.getContext('2d');
             if (!this.signatureCtx) return;
             this.signatureCtx.lineWidth = 2;
             this.signatureCtx.lineCap = 'round';
             this.signatureCtx.strokeStyle = '#111827';
-            window.addEventListener('resize', () => this.resizeSignatureCanvas());
         },
         resizeSignatureCanvas() {
             if (!this.signatureCanvas) return;
@@ -1719,9 +1725,10 @@
                             <span class="text-xs text-gray-600">Se agregara y seleccionara automaticamente.</span>
                         </div>
                     </div>
-                    <div class="md:col-span-3 flex flex-col gap-3 md:flex-row md:items-end">
-                        <div class="w-full min-w-0 md:flex-[2.4_1_0%]">
-                            <div class="relative flex w-full items-end gap-2">
+                    <div class="md:col-span-3 grid gap-3 lg:grid-cols-[minmax(520px,2fr)_minmax(360px,1fr)]">
+                        <div class="grid gap-3">
+                            <div class="w-full min-w-0 md:flex-[2.4_1_0%]">
+                                <div class="relative flex w-full items-end gap-2">
                                 <input type="hidden" name="vehicle_id" x-model="selectedVehicleId" required>
                                 <input type="hidden" name="appointment_id" value="{{ $appointmentIdDefault }}">
                                 <input type="hidden" name="service_type" x-model="serviceType">
@@ -1840,10 +1847,12 @@
                                 class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
                                 placeholder="KM ingreso">
                         </div>
-                        <div class="w-full md:w-[300px]"
-                             @pointermove.window="moveFuelDrag($event)"
-                             @pointerup.window="stopFuelDrag()"
-                             @pointercancel.window="stopFuelDrag()">
+                        </div>
+                        <div class="grid gap-3">
+                            <div class="w-full"
+                                 @pointermove.window="moveFuelDrag($event)"
+                                 @pointerup.window="stopFuelDrag()"
+                                 @pointercancel.window="stopFuelDrag()">
                             <input type="hidden" name="fuel_level" x-model="fuelLevel">
                             <div class="rounded-xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 px-4 py-3 shadow-sm">
                                 <div class="mb-1 flex items-center justify-between">
@@ -1946,6 +1955,7 @@
                                 Ingreso en grua
                             </label>
                         </div>
+                    </div>
                     </div>
 
                     <div x-show="driverInfoEnabled" x-cloak class="md:col-span-3 grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -2103,13 +2113,13 @@
                                 x-ref="clientSignatureCanvas"
                                 width="700"
                                 height="180"
-                                @mousedown="startSignature($event)"
-                                @mousemove="drawSignature($event)"
-                                @mouseup="stopSignature()"
-                                @mouseleave="stopSignature()"
-                                @touchstart.prevent="startSignature($event)"
-                                @touchmove.prevent="drawSignature($event)"
-                                @touchend="stopSignature()"
+                                x-effect="showClientSignature && initSignaturePad()"
+                                @pointerdown.prevent="startSignature($event)"
+                                @pointermove.prevent="drawSignature($event)"
+                                @pointerup.window="stopSignature()"
+                                @pointercancel.window="stopSignature()"
+                                @pointerleave="stopSignature()"
+                                style="touch-action: none;"
                                 class="w-full rounded-lg border border-dashed border-gray-300 bg-white"
                             ></canvas>
                             <p class="mt-1 text-[11px] text-gray-500">Conformidad de ingreso del vehiculo.</p>
