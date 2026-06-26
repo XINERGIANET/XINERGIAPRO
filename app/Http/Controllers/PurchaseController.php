@@ -7,6 +7,7 @@ use App\Models\Branch;
 use App\Models\Category;
 use App\Models\CashMovements;
 use App\Models\CashRegister;
+use App\Models\CashShiftRelation;
 use App\Models\DocumentType;
 use App\Models\DigitalWallet;
 use App\Models\Location;
@@ -28,9 +29,13 @@ use App\Models\TaxRate;
 use App\Models\Unit;
 use App\Services\AccountReceivablePayableService;
 use App\Services\KardexSyncService;
+use App\Support\PurchaseExcelImport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class PurchaseController extends Controller
@@ -68,9 +73,19 @@ class PurchaseController extends Controller
             ->where('movements.branch_id', $branchId)
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($inner) use ($search) {
-                    $inner->where('number', 'ILIKE', "%{$search}%")
-                        ->orWhere('person_name', 'ILIKE', "%{$search}%")
-                        ->orWhere('user_name', 'ILIKE', "%{$search}%");
+                    $inner->where('movements.number', 'ILIKE', "%{$search}%")
+                        ->orWhere('movements.person_name', 'ILIKE', "%{$search}%")
+                        ->orWhere('movements.user_name', 'ILIKE', "%{$search}%")
+                        ->orWhereExists(function ($sub) use ($search) {
+                            $sub->selectRaw('1')
+                                ->from('people')
+                                ->whereColumn('people.id', 'movements.person_id')
+                                ->where(function ($p) use ($search) {
+                                    $p->where('people.document_number', 'ILIKE', "%{$search}%")
+                                      ->orWhere('people.first_name', 'ILIKE', "%{$search}%")
+                                      ->orWhere('people.last_name', 'ILIKE', "%{$search}%");
+                                });
+                        });
                 });
             })
             ->when($dateFrom !== '', function ($query) use ($dateFrom) {
@@ -204,6 +219,681 @@ class PurchaseController extends Controller
             'document' => (string) ($person->document_number ?? ''),
             'credit_days' => (int) ($person->credit_days ?? 0),
         ]);
+    }
+
+    public function importExcel(Request $request)
+    {
+        $viewId = $request->input('view_id');
+        $branchId = (int) session('branch_id');
+
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:10240'],
+        ]);
+
+        if ($branchId <= 0) {
+            return redirect()
+                ->route('admin.purchases.index', $viewId ? ['view_id' => $viewId] : [])
+                ->with('error', 'Selecciona una sucursal para importar compras.');
+        }
+
+        $uploaded = $request->file('file');
+        $ext = strtolower((string) $uploaded->getClientOriginalExtension()) ?: 'xlsx';
+        $storedRelative = $uploaded->storeAs(
+            'temp/purchase-imports',
+            Str::uuid()->toString() . '.' . $ext,
+            'local'
+        );
+
+        if ($storedRelative === false) {
+            return redirect()
+                ->route('admin.purchases.index', $viewId ? ['view_id' => $viewId] : [])
+                ->with('error', 'No se pudo guardar el archivo temporalmente.');
+        }
+
+        $fullPath = Storage::disk('local')->path($storedRelative);
+
+        $rows = [];
+        $parseError = null;
+        try {
+            $rows = PurchaseExcelImport::extractRows($fullPath);
+        } catch (\InvalidArgumentException $e) {
+            $parseError = $e->getMessage();
+        } finally {
+            Storage::disk('local')->delete($storedRelative);
+        }
+
+        if ($parseError !== null) {
+            return redirect()
+                ->route('admin.purchases.index', $viewId ? ['view_id' => $viewId] : [])
+                ->with('error', $parseError);
+        }
+
+        $branch = Branch::query()->findOrFail($branchId);
+        $companyId = (int) ($branch->company_id ?? 0);
+        $branchDistrictId = (int) ($branch->location_id ?? 0);
+        $user = $request->user();
+        $movementType = $this->resolvePurchaseMovementType();
+        $documentTypes = DocumentType::query()
+            ->where('movement_type_id', $movementType->id)
+            ->get(['id', 'name']);
+        $defaultDocType = $documentTypes->first();
+        $defaultUnit = Unit::query()->orderBy('id')->first();
+
+        $imported = 0;
+        $skipped = 0;
+        $rowErrors = [];
+        $duplicates = [];
+        $seenKeys = [];
+
+        // Facturas → caja "Motolab", anything else → caja "Tivo"
+        $importCashRegMotolab = CashRegister::query()
+            ->where('branch_id', $branchId)
+            ->where('number', 'ILIKE', '%motolab%')
+            ->first();
+        $importCashRegTivo = CashRegister::query()
+            ->where('branch_id', $branchId)
+            ->where('number', 'ILIKE', '%tivo%')
+            ->first();
+        $importAllPaymentMethods = PaymentMethod::query()->where('status', true)->get(['id', 'description']);
+        $importShift = Shift::query()->where('branch_id', $branchId)->first() ?? Shift::query()->first();
+        try {
+            $importCashMvtTypeId   = $this->resolveCashMovementTypeId();
+            $importCashDocTypeId   = $this->resolveCashExpenseDocumentTypeId($importCashMvtTypeId);
+            $importPaymentConcept  = $this->resolvePurchasePaymentConcept();
+        } catch (\RuntimeException) {
+            $importCashMvtTypeId  = null;
+            $importCashDocTypeId  = null;
+            $importPaymentConcept = null;
+        }
+
+        // Apertura/cierre concepts and efectivo method for per-month shift sessions
+        $importAperturaConcept = null;
+        $importCierreConcept   = null;
+        $importIngresoDocTypeId = null;
+        $importEfectivoMethod  = null;
+        if ($importCashMvtTypeId !== null) {
+            $importAperturaConcept = PaymentConcept::query()
+                ->where('type', 'I')
+                ->whereRaw("LOWER(description) LIKE '%apertura%'")
+                ->orderBy('id')
+                ->first();
+            $importCierreConcept = PaymentConcept::query()
+                ->where('type', 'E')
+                ->whereRaw("LOWER(description) LIKE '%cierre%'")
+                ->orderBy('id')
+                ->first();
+            $importIngresoDocTypeId = DocumentType::query()
+                ->where('movement_type_id', $importCashMvtTypeId)
+                ->whereRaw("LOWER(name) = 'ingreso'")
+                ->value('id');
+            $importEfectivoMethod = PaymentMethod::query()
+                ->where('status', true)
+                ->where(fn ($q) => $q->whereRaw("LOWER(description) LIKE '%efectivo%'")
+                    ->orWhereRaw("LOWER(description) LIKE '%cash%'"))
+                ->orderBy('order_num')
+                ->first();
+        }
+
+        $currentYearMonth = \Carbon\Carbon::now()->format('Y-m');
+
+        // Pre-scan rows to collect unique (year-month, cash_register) combos
+        $importMonthGroups = [];
+        foreach ($rows as $row) {
+            if ($row['date'] === '') {
+                continue;
+            }
+            $monthKey    = substr($row['date'], 0, 7);
+            $isFacturaGs = str_contains(strtolower(trim($row['doc_type_name'])), 'factura');
+            $cashRegGs   = $isFacturaGs ? $importCashRegMotolab : $importCashRegTivo;
+            if ($cashRegGs === null) {
+                continue;
+            }
+            $groupKey = $monthKey . '|' . $cashRegGs->id;
+            if (!isset($importMonthGroups[$groupKey])) {
+                $importMonthGroups[$groupKey] = ['month' => $monthKey, 'cash_register' => $cashRegGs];
+            }
+        }
+
+        try {
+            DB::transaction(function () use (
+                $rows, $branchId, $companyId, $branchDistrictId, $user,
+                $movementType, $documentTypes, $defaultDocType, $defaultUnit,
+                $importCashRegMotolab, $importCashRegTivo,
+                $importAllPaymentMethods, $importShift,
+                $importCashMvtTypeId, $importCashDocTypeId, $importPaymentConcept,
+                $importAperturaConcept, $importCierreConcept,
+                $importIngresoDocTypeId, $importEfectivoMethod, $importMonthGroups,
+                $currentYearMonth,
+                &$imported, &$skipped, &$rowErrors, &$duplicates, &$seenKeys
+            ) {
+                $responsibleName = $user?->person
+                    ? trim((string) (($user->person->first_name ?? '') . ' ' . ($user->person->last_name ?? '')))
+                    : ($user?->name ?? 'Sistema');
+
+                // FASE 1: Apertura histórica por mes y caja — crea CashShiftRelation (status='1')
+                $importShiftRelations = [];
+                if (
+                    $importAperturaConcept !== null
+                    && $importIngresoDocTypeId !== null
+                    && $importCashMvtTypeId !== null
+                    && $importShift !== null
+                    && $user?->id !== null
+                ) {
+                    foreach ($importMonthGroups as $groupKey => $groupData) {
+                        $monthKey = $groupData['month'];
+                        $cashReg  = $groupData['cash_register'];
+                        $firstDay = \Carbon\Carbon::parse($monthKey . '-01')->startOfDay();
+
+                        // Si ya existe una sesión para este mes y esta caja, no crear otra
+                        $alreadyExists = CashShiftRelation::query()
+                            ->where('branch_id', $branchId)
+                            ->whereYear('started_at', substr($monthKey, 0, 4))
+                            ->whereMonth('started_at', (int) substr($monthKey, 5, 2))
+                            ->whereHas('cashMovementStart', fn ($q) => $q->where('cash_register_id', $cashReg->id))
+                            ->exists();
+
+                        if ($alreadyExists) {
+                            continue;
+                        }
+
+                        $aperturaMvt = Movement::query()->create([
+                            'number'           => $this->generateCashMovementNumber($branchId, $cashReg->id, (int) $importAperturaConcept->id),
+                            'moved_at'         => $firstDay,
+                            'user_id'          => $user->id,
+                            'user_name'        => $user->name ?? 'Sistema',
+                            'person_id'        => null,
+                            'person_name'      => $user->name ?? 'Sistema',
+                            'responsible_id'   => $user->id,
+                            'responsible_name' => $responsibleName,
+                            'comment'          => 'Apertura caja importación ' . $monthKey,
+                            'status'           => '1',
+                            'movement_type_id' => $importCashMvtTypeId,
+                            'document_type_id' => $importIngresoDocTypeId,
+                            'branch_id'        => $branchId,
+                        ]);
+
+                        $aperturaCashMvt = CashMovements::query()->create([
+                            'payment_concept_id'  => $importAperturaConcept->id,
+                            'currency'            => 'PEN',
+                            'exchange_rate'       => 1.0,
+                            'total'               => 0.0,
+                            'cash_register_id'    => $cashReg->id,
+                            'cash_register'       => $cashReg->number ?? 'Caja',
+                            'shift_id'            => $importShift->id,
+                            'shift_snapshot'      => [
+                                'name'       => $importShift->name,
+                                'start_time' => $importShift->start_time,
+                                'end_time'   => $importShift->end_time,
+                            ],
+                            'movement_id'         => $aperturaMvt->id,
+                            'branch_id'           => $branchId,
+                            'is_historical_import' => $monthKey < $currentYearMonth,
+                        ]);
+
+                        if ($importEfectivoMethod !== null) {
+                            DB::table('cash_movement_details')->insert([
+                                'cash_movement_id'   => $aperturaCashMvt->id,
+                                'type'               => 'PAGADO',
+                                'paid_at'            => $firstDay,
+                                'payment_method_id'  => $importEfectivoMethod->id,
+                                'payment_method'     => $importEfectivoMethod->description ?? 'Efectivo',
+                                'number'             => $aperturaMvt->number,
+                                'card_id'            => null,
+                                'card'               => null,
+                                'bank_id'            => null,
+                                'bank'               => null,
+                                'digital_wallet_id'  => null,
+                                'digital_wallet'     => null,
+                                'payment_gateway_id' => null,
+                                'payment_gateway'    => null,
+                                'amount'             => 0.0,
+                                'comment'            => 'Apertura importación ' . $monthKey,
+                                'status'             => 'A',
+                                'branch_id'          => $branchId,
+                                'created_at'         => now(),
+                                'updated_at'         => now(),
+                            ]);
+                        }
+
+                        $shiftRelation = CashShiftRelation::create([
+                            'started_at'             => $firstDay,
+                            'status'                 => '1',
+                            'cash_movement_start_id' => $aperturaCashMvt->id,
+                            'branch_id'              => $branchId,
+                        ]);
+
+                        $importShiftRelations[$groupKey] = [
+                            'relation'      => $shiftRelation,
+                            'month'         => $monthKey,
+                            'cash_register' => $cashReg,
+                        ];
+                    }
+                }
+
+                foreach ($rows as $idx => $row) {
+                    $rowNum = $idx + 2;
+
+                    if ($row['date'] === '') {
+                        $rowErrors[] = "Fila {$rowNum}: fecha inválida o vacía.";
+                        $skipped++;
+                        continue;
+                    }
+
+                    // Resolve document type by name match
+                    $docTypeName = strtoupper(trim($row['doc_type_name']));
+                    $documentType = $documentTypes->first(fn ($dt) =>
+                        str_contains(strtoupper((string) $dt->name), $docTypeName)
+                        || ($docTypeName !== '' && str_contains($docTypeName, strtoupper((string) $dt->name)))
+                    ) ?? $defaultDocType;
+
+                    if (!$documentType) {
+                        $rowErrors[] = "Fila {$rowNum}: sin tipo de comprobante disponible en el sistema.";
+                        $skipped++;
+                        continue;
+                    }
+
+                    // Resolve provider
+                    $providerDocNumber = trim($row['provider_doc_number']);
+                    // RUC/DNI de "0" o "00000000..." en el Excel significa sin documento
+                    if (preg_match('/^0+$/', $providerDocNumber)) {
+                        $providerDocNumber = '';
+                    }
+                    $providerName = trim($row['provider_name']);
+                    $person = null;
+
+                    if ($providerDocNumber !== '') {
+                        $person = Person::query()
+                            ->join('branches', 'branches.id', '=', 'people.branch_id')
+                            ->select('people.*')
+                            ->where('branches.company_id', $companyId)
+                            ->where('people.document_number', $providerDocNumber)
+                            ->whereNull('people.deleted_at')
+                            ->first();
+
+                        if (!$person) {
+                            $provDocType = strtoupper(trim($row['provider_doc_type'] ?: 'RUC'));
+                            if (!in_array($provDocType, ['DNI', 'RUC', 'CARNET DE EXTRANGERIA', 'PASAPORTE'], true)) {
+                                $provDocType = 'RUC';
+                            }
+                            $person = Person::query()->create([
+                                'person_type'     => $provDocType,
+                                'document_number' => $providerDocNumber,
+                                'first_name'      => $providerName !== '' ? $providerName : $providerDocNumber,
+                                'last_name'       => $provDocType === 'RUC' ? '' : null,
+                                'branch_id'       => $branchId,
+                                'location_id'     => $branchDistrictId ?: null,
+                                'credit_days'     => 0,
+                                'phone'           => '',
+                                'email'           => '',
+                                'address'         => '-',
+                            ]);
+                        }
+
+                        $person->roles()->syncWithoutDetaching([4 => ['branch_id' => $branchId]]);
+                    } elseif ($providerName !== '') {
+                        $person = Person::query()
+                            ->where('branch_id', $branchId)
+                            ->whereHas('roles', fn ($q) => $q->where('roles.id', 4)->where('role_person.branch_id', $branchId))
+                            ->where(function ($q) use ($providerName) {
+                                $q->where('first_name', 'ILIKE', "%{$providerName}%")
+                                    ->orWhere('last_name', 'ILIKE', "%{$providerName}%");
+                            })
+                            ->first();
+
+                        // Proveedor informal sin RUC/DNI: crear si no existe
+                        if (!$person) {
+                            $person = Person::query()->create([
+                                'person_type'     => 'DNI',
+                                'document_number' => '',
+                                'first_name'      => $providerName,
+                                'last_name'       => null,
+                                'branch_id'       => $branchId,
+                                'location_id'     => $branchDistrictId ?: null,
+                                'credit_days'     => 0,
+                                'phone'           => '',
+                                'email'           => '',
+                                'address'         => '-',
+                            ]);
+                        }
+
+                        $person->roles()->syncWithoutDetaching([4 => ['branch_id' => $branchId]]);
+                    }
+
+                    if (!$person) {
+                        $rowErrors[] = "Fila {$rowNum}: no se encontró proveedor '{$providerName}' y no tiene N° de documento.";
+                        $skipped++;
+                        continue;
+                    }
+
+                    // Dedup key: serie|número|ruc_o_nombre_proveedor|fecha
+                    // When there's no RUC and no invoice number (informal services),
+                    // use provider name + date to avoid flagging different providers as duplicates.
+                    // The view prepends the document-type first letter to the series automatically
+                    // (e.g. "F" + series + "-" + number), so strip any matching prefix that the
+                    // Excel already includes: "F002" → "002", displayed back as "F002" ✓
+                    $series = trim($row['series'] ?: '001');
+                    if ($documentType) {
+                        $docPrefix = strtoupper(substr((string) ($documentType->name ?? ''), 0, 1));
+                        if ($docPrefix !== '' && strlen($series) > 1 && strtoupper($series[0]) === $docPrefix) {
+                            $series = substr($series, 1) ?: '001';
+                        }
+                    }
+                    $number = trim((string) $row['number']);
+                    $providerKey = $providerDocNumber !== ''
+                        ? $providerDocNumber
+                        : strtoupper(trim($providerName));
+                    $dupKey = strtoupper($series) . '|' . $number . '|' . $providerKey . '|' . $row['date'];
+
+                    $dupInfo = [
+                        'fila'       => $rowNum,
+                        'serie'      => $series,
+                        'numero'     => $number,
+                        'proveedor'  => $providerName ?: $providerDocNumber,
+                        'ruc'        => $providerDocNumber,
+                        'fecha'      => $row['date'],
+                        'total'      => number_format((float) $row['total'], 2),
+                        'razon'      => '',
+                    ];
+
+                    // 1. Intra-archivo: misma fila repetida en el Excel
+                    if (isset($seenKeys[$dupKey])) {
+                        $dupInfo['razon'] = 'Duplicado dentro del mismo archivo';
+                        $duplicates[] = $dupInfo;
+                        $skipped++;
+                        continue;
+                    }
+
+                    // 2. Contra la BD: mismo comprobante + proveedor ya registrado en la sucursal
+                    $isDup = Movement::query()
+                        ->where('movement_type_id', $movementType->id)
+                        ->where('branch_id', $branchId)
+                        ->where('person_id', $person->id)
+                        ->where('number', $number)
+                        ->whereHas('purchaseMovement', fn ($q) => $q->where('series', $series))
+                        ->exists();
+
+                    if ($isDup) {
+                        $dupInfo['razon'] = 'Ya existe en el sistema';
+                        $duplicates[] = $dupInfo;
+                        $skipped++;
+                        continue;
+                    }
+
+                    $seenKeys[$dupKey] = true;
+
+                    // Resolve cash register: Factura → Motolab, else → Tivo
+                    $isFactura = str_contains(strtolower($docTypeName), 'factura');
+                    $rowCashReg = $isFactura ? $importCashRegMotolab : $importCashRegTivo;
+
+                    // Match payment method from Excel's "Medio de Pago" by name
+                    $paymentMethodText = trim($row['payment_method']);
+                    $rowPaymentMethod  = null;
+                    if ($paymentMethodText !== '' && $importAllPaymentMethods->isNotEmpty()) {
+                        $needle = mb_strtolower($paymentMethodText, 'UTF-8');
+                        $rowPaymentMethod = $importAllPaymentMethods->first(
+                            fn ($pm) => str_contains(mb_strtolower((string) $pm->description, 'UTF-8'), $needle)
+                                     || str_contains($needle, mb_strtolower((string) $pm->description, 'UTF-8'))
+                        );
+                    }
+
+                    $rowAffectsCash = $rowCashReg !== null
+                        && $rowPaymentMethod !== null
+                        && $importShift !== null
+                        && $importPaymentConcept !== null
+                        && $importCashMvtTypeId !== null
+                        && $importCashDocTypeId !== null;
+
+                    // Totals from Excel (already computed)
+                    $subtotal = round((float) $row['subtotal'], 2);
+                    $tax      = round((float) $row['tax'], 2);
+                    $total    = round((float) $row['total'], 2);
+                    if ($total <= 0) {
+                        $total = round($subtotal + $tax, 2);
+                    }
+                    if ($subtotal <= 0 && $total > 0) {
+                        $subtotal = round($total - $tax, 2);
+                    }
+
+                    // Build item description from category / use / area
+                    $descParts = array_filter([
+                        $row['category'],
+                        $row['use_description'],
+                        $row['purchase_type'] ? 'Tipo: ' . $row['purchase_type'] : null,
+                        $row['vehicle_type'] ? 'Veh: ' . $row['vehicle_type'] : null,
+                        $row['area'] ? 'Área: ' . $row['area'] : null,
+                    ]);
+                    $itemDescription = implode(' | ', $descParts) ?: 'Compra importada';
+
+                    $movement = Movement::query()->create([
+                        'number'           => (string) $row['number'],
+                        'moved_at'         => $row['date'],
+                        'user_id'          => $user?->id,
+                        'user_name'        => $user?->name ?? 'Sistema',
+                        'person_id'        => $person->id,
+                        'person_name'      => trim(($person->first_name ?? '') . ' ' . ($person->last_name ?? '')),
+                        'responsible_id'   => $user?->id,
+                        'responsible_name' => $responsibleName,
+                        'comment'          => $row['observations'] !== '' ? $row['observations'] : null,
+                        'status'           => 'A',
+                        'movement_type_id' => $movementType->id,
+                        'document_type_id' => $documentType->id,
+                        'branch_id'        => $branchId,
+                    ]);
+
+                    $purchase = PurchaseMovement::query()->create([
+                        'series'         => $series,
+                        'year'           => (string) date('Y', strtotime($row['date'])),
+                        'detail_type'    => 'GLOSA',
+                        'includes_tax'   => 'N',
+                        'payment_type'   => 'CONTADO',
+                        'affects_cash'   => $rowAffectsCash ? 'S' : 'N',
+                        'currency'       => $row['currency'],
+                        'exchange_rate'  => $row['exchange_rate'],
+                        'subtotal'       => $subtotal,
+                        'tax'            => $tax,
+                        'total'          => $total,
+                        'affects_kardex' => 'N',
+                        'fiscal_credit'  => $row['fiscal_credit'] !== '' ? strtoupper($row['fiscal_credit']) : null,
+                        'movement_id'    => $movement->id,
+                        'branch_id'      => $branchId,
+                    ]);
+
+                    PurchaseMovementDetail::query()->create([
+                        'detail_type'         => 'GLOSA',
+                        'purchase_movement_id' => $purchase->id,
+                        'code'                => 'GLOSA',
+                        'description'         => mb_substr($itemDescription, 0, 255),
+                        'product_id'          => null,
+                        'product_json'        => null,
+                        'unit_id'             => $defaultUnit?->id,
+                        'tax_rate_id'         => null,
+                        'quantity'            => 1,
+                        'amount'              => $subtotal,
+                        'comment'             => mb_substr($row['observations'], 0, 255) ?: '',
+                        'status'              => 'E',
+                        'branch_id'           => $branchId,
+                    ]);
+
+                    if ($rowAffectsCash) {
+                        $cashOutMovement = Movement::query()->create([
+                            'number'             => $this->generateCashMovementNumber($branchId, $rowCashReg->id, (int) $importPaymentConcept->id),
+                            'moved_at'           => $row['date'],
+                            'user_id'            => $user?->id,
+                            'user_name'          => $user?->name ?? 'Sistema',
+                            'person_id'          => $person->id,
+                            'person_name'        => trim(($person->first_name ?? '') . ' ' . ($person->last_name ?? '')),
+                            'responsible_id'     => $user?->id,
+                            'responsible_name'   => $responsibleName,
+                            'comment'            => 'Pago compra ' . (string) $row['number'],
+                            'status'             => '1',
+                            'movement_type_id'   => $importCashMvtTypeId,
+                            'document_type_id'   => $importCashDocTypeId,
+                            'branch_id'          => $branchId,
+                            'parent_movement_id' => $movement->id,
+                            'shift_id'           => $importShift->id,
+                            'shift_snapshot'     => [
+                                'name'       => $importShift->name,
+                                'start_time' => $importShift->start_time,
+                                'end_time'   => $importShift->end_time,
+                            ],
+                        ]);
+
+                        $rowIsPastMonth = \Carbon\Carbon::parse($row['date'])->format('Y-m') < $currentYearMonth;
+
+                        $cashMovement = CashMovements::query()->create([
+                            'payment_concept_id'  => $importPaymentConcept->id,
+                            'currency'            => $row['currency'] ?: 'PEN',
+                            'exchange_rate'       => $row['exchange_rate'],
+                            'total'               => $total,
+                            'cash_register_id'    => $rowCashReg->id,
+                            'cash_register'       => $rowCashReg->number ?? 'Caja',
+                            'shift_id'            => $importShift->id,
+                            'shift_snapshot'      => [
+                                'name'       => $importShift->name,
+                                'start_time' => $importShift->start_time,
+                                'end_time'   => $importShift->end_time,
+                            ],
+                            'movement_id'         => $cashOutMovement->id,
+                            'branch_id'           => $branchId,
+                            'is_historical_import' => $rowIsPastMonth,
+                        ]);
+
+                        DB::table('cash_movement_details')->insert([
+                            'cash_movement_id'   => $cashMovement->id,
+                            'type'               => 'PAGADO',
+                            'paid_at'            => $row['date'],
+                            'payment_method_id'  => $rowPaymentMethod->id,
+                            'payment_method'     => $rowPaymentMethod->description ?? $paymentMethodText,
+                            'number'             => $cashOutMovement->number,
+                            'card_id'            => null,
+                            'card'               => null,
+                            'bank_id'            => null,
+                            'bank'               => null,
+                            'digital_wallet_id'  => null,
+                            'digital_wallet'     => null,
+                            'payment_gateway_id' => null,
+                            'payment_gateway'    => null,
+                            'amount'             => $total,
+                            'comment'            => $row['observations'] !== '' ? $row['observations'] : ('Compra ' . (string) $row['number']),
+                            'status'             => 'A',
+                            'branch_id'          => $branchId,
+                            'created_at'         => now(),
+                            'updated_at'         => now(),
+                        ]);
+                    }
+
+                    app(KardexSyncService::class)->syncMovement($movement);
+
+                    $imported++;
+                }
+
+                // FASE 3: Cierre histórico — actualiza CashShiftRelation (status='0')
+                if (
+                    $importCierreConcept !== null
+                    && $importCashDocTypeId !== null
+                    && $importCashMvtTypeId !== null
+                    && $importShift !== null
+                    && $user?->id !== null
+                ) {
+                    foreach ($importShiftRelations as $groupInfo) {
+                        $monthKey      = $groupInfo['month'];
+                        $cashReg       = $groupInfo['cash_register'];
+                        $shiftRelation = $groupInfo['relation'];
+                        $lastDay       = \Carbon\Carbon::parse($monthKey . '-01')->endOfMonth()->endOfDay();
+
+                        $cierreMvt = Movement::query()->create([
+                            'number'           => $this->generateCashMovementNumber($branchId, $cashReg->id, (int) $importCierreConcept->id),
+                            'moved_at'         => $lastDay,
+                            'user_id'          => $user->id,
+                            'user_name'        => $user->name ?? 'Sistema',
+                            'person_id'        => null,
+                            'person_name'      => $user->name ?? 'Sistema',
+                            'responsible_id'   => $user->id,
+                            'responsible_name' => $responsibleName,
+                            'comment'          => 'Cierre caja importación ' . $monthKey,
+                            'status'           => '1',
+                            'movement_type_id' => $importCashMvtTypeId,
+                            'document_type_id' => $importCashDocTypeId,
+                            'branch_id'        => $branchId,
+                        ]);
+
+                        $cierreCashMvt = CashMovements::query()->create([
+                            'payment_concept_id'  => $importCierreConcept->id,
+                            'currency'            => 'PEN',
+                            'exchange_rate'       => 1.0,
+                            'total'               => 0.0,
+                            'cash_register_id'    => $cashReg->id,
+                            'cash_register'       => $cashReg->number ?? 'Caja',
+                            'shift_id'            => $importShift->id,
+                            'shift_snapshot'      => [
+                                'name'       => $importShift->name,
+                                'start_time' => $importShift->start_time,
+                                'end_time'   => $importShift->end_time,
+                            ],
+                            'movement_id'         => $cierreMvt->id,
+                            'branch_id'           => $branchId,
+                            'is_historical_import' => $monthKey < $currentYearMonth,
+                        ]);
+
+                        if ($importEfectivoMethod !== null) {
+                            DB::table('cash_movement_details')->insert([
+                                'cash_movement_id'   => $cierreCashMvt->id,
+                                'type'               => 'PAGADO',
+                                'paid_at'            => $lastDay,
+                                'payment_method_id'  => $importEfectivoMethod->id,
+                                'payment_method'     => $importEfectivoMethod->description ?? 'Efectivo',
+                                'number'             => $cierreMvt->number,
+                                'card_id'            => null,
+                                'card'               => null,
+                                'bank_id'            => null,
+                                'bank'               => null,
+                                'digital_wallet_id'  => null,
+                                'digital_wallet'     => null,
+                                'payment_gateway_id' => null,
+                                'payment_gateway'    => null,
+                                'amount'             => 0.0,
+                                'comment'            => 'Cierre importación ' . $monthKey,
+                                'status'             => 'A',
+                                'branch_id'          => $branchId,
+                                'created_at'         => now(),
+                                'updated_at'         => now(),
+                            ]);
+                        }
+
+                        $shiftRelation->update([
+                            'ended_at'             => $lastDay,
+                            'status'               => '0',
+                            'cash_movement_end_id' => $cierreCashMvt->id,
+                        ]);
+                    }
+                }
+            });
+        } catch (\Throwable $e) {
+            Log::error('importExcel compras: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+
+            return redirect()
+                ->route('admin.purchases.index', $viewId ? ['view_id' => $viewId] : [])
+                ->with('error', 'Error al importar: ' . $e->getMessage());
+        }
+
+        $message = "Importación lista: {$imported} compra(s) registrada(s).";
+        if (!empty($rowErrors)) {
+            $shown = array_slice($rowErrors, 0, 3);
+            $message .= ' Errores: ' . implode('; ', $shown);
+            if (count($rowErrors) > 3) {
+                $message .= ' ... y ' . (count($rowErrors) - 3) . ' más.';
+            }
+        }
+
+        $redirect = redirect()
+            ->route('admin.purchases.index', $viewId ? ['view_id' => $viewId] : [])
+            ->with('status', $message);
+
+        if (!empty($duplicates)) {
+            $redirect = $redirect->with('import_duplicates', $duplicates);
+        }
+
+        return $redirect;
     }
 
     public function store(Request $request)

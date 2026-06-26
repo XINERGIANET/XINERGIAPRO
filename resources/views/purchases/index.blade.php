@@ -12,8 +12,71 @@
             @if (session('status'))
                 <div class="mb-4 rounded-lg border border-green-300 bg-green-50 p-3 text-sm text-green-700">{{ session('status') }}</div>
             @endif
+            @if (session('error'))
+                <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ session('error') }}</div>
+            @endif
             @if ($errors->any())
                 <div class="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{{ $errors->first() }}</div>
+            @endif
+
+            @if (session('import_duplicates') && count(session('import_duplicates')) > 0)
+                @php $dups = session('import_duplicates'); @endphp
+                <div
+                    x-data="{ open: true }"
+                    x-show="open"
+                    class="mb-4 rounded-xl border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20"
+                >
+                    {{-- Header del panel --}}
+                    <div class="flex items-center justify-between px-4 py-3 border-b border-amber-200 dark:border-amber-700">
+                        <div class="flex items-center gap-2">
+                            <i class="ri-file-copy-2-line text-amber-600 text-lg"></i>
+                            <span class="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                                {{ count($dups) }} comprobante(s) duplicado(s) — no fueron importados
+                            </span>
+                        </div>
+                        <button @click="open = false" class="text-amber-500 hover:text-amber-700 transition">
+                            <i class="ri-close-line text-lg"></i>
+                        </button>
+                    </div>
+
+                    {{-- Tabla de duplicados --}}
+                    <div class="overflow-x-auto px-4 py-3">
+                        <table class="w-full text-xs">
+                            <thead>
+                                <tr class="border-b border-amber-200 dark:border-amber-700">
+                                    <th class="pb-2 text-left font-semibold text-amber-700 dark:text-amber-400 pr-4">Fila</th>
+                                    <th class="pb-2 text-left font-semibold text-amber-700 dark:text-amber-400 pr-4">Serie</th>
+                                    <th class="pb-2 text-left font-semibold text-amber-700 dark:text-amber-400 pr-4">Número</th>
+                                    <th class="pb-2 text-left font-semibold text-amber-700 dark:text-amber-400 pr-4">Proveedor</th>
+                                    <th class="pb-2 text-left font-semibold text-amber-700 dark:text-amber-400 pr-4">RUC</th>
+                                    <th class="pb-2 text-left font-semibold text-amber-700 dark:text-amber-400 pr-4">Fecha</th>
+                                    <th class="pb-2 text-right font-semibold text-amber-700 dark:text-amber-400 pr-4">Total</th>
+                                    <th class="pb-2 text-left font-semibold text-amber-700 dark:text-amber-400">Motivo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($dups as $dup)
+                                    <tr class="border-b border-amber-100 dark:border-amber-800 last:border-0">
+                                        <td class="py-1.5 pr-4 text-amber-700 dark:text-amber-300">#{{ $dup['fila'] }}</td>
+                                        <td class="py-1.5 pr-4 font-medium text-gray-800 dark:text-gray-200">{{ $dup['serie'] }}</td>
+                                        <td class="py-1.5 pr-4 font-medium text-gray-800 dark:text-gray-200">{{ $dup['numero'] }}</td>
+                                        <td class="py-1.5 pr-4 text-gray-700 dark:text-gray-300 max-w-[180px] truncate" title="{{ $dup['proveedor'] }}">{{ $dup['proveedor'] }}</td>
+                                        <td class="py-1.5 pr-4 text-gray-600 dark:text-gray-400">{{ $dup['ruc'] }}</td>
+                                        <td class="py-1.5 pr-4 text-gray-600 dark:text-gray-400">{{ $dup['fecha'] }}</td>
+                                        <td class="py-1.5 pr-4 text-right font-semibold text-gray-800 dark:text-gray-200">S/ {{ $dup['total'] }}</td>
+                                        <td class="py-1.5">
+                                            <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium
+                                                {{ $dup['razon'] === 'Ya existe en el sistema' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700' }}">
+                                                <i class="{{ $dup['razon'] === 'Ya existe en el sistema' ? 'ri-database-2-line' : 'ri-file-copy-line' }}"></i>
+                                                {{ $dup['razon'] }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             @endif
 
             @php
@@ -99,11 +162,186 @@
                     </div>
                 </form>
 
-                <div class="flex flex-wrap items-start gap-2">
+                <div
+                    x-data="{ open: false, file: null, fileName: '', dragging: false }"
+                    class="flex flex-wrap items-start gap-2"
+                >
+                    {{-- Import Excel button --}}
+                    <button
+                        type="button"
+                        @click="open = true"
+                        class="inline-flex h-11 items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 active:scale-95"
+                    >
+                        <i class="ri-file-excel-2-line text-green-600 text-base"></i>
+                        <span>Importar Excel</span>
+                    </button>
+
+                    {{-- Nueva compra --}}
                     <x-ui.link-button size="md" variant="primary" style="background-color: #12f00e; color: #111827;" href="{{ route('admin.purchases.create', $viewId ? ['view_id' => $viewId] : []) }}">
                         <i class="ri-add-line"></i>
                         <span>Nueva compra</span>
                     </x-ui.link-button>
+
+                    {{-- Modal: backdrop + dialog en un solo div (igual que retail), teleportado a body --}}
+                    <template x-teleport="body">
+                        <div
+                            x-show="open"
+                            x-transition:enter="transition ease-out duration-200"
+                            x-transition:enter-start="opacity-0"
+                            x-transition:enter-end="opacity-100"
+                            x-transition:leave="transition ease-in duration-150"
+                            x-transition:leave-start="opacity-100"
+                            x-transition:leave-end="opacity-0"
+                            class="fixed inset-0 flex items-center justify-center px-4 backdrop-blur-sm bg-black/30"
+                            style="display:none; z-index:999999;"
+                            @click.self="open = false; file = null; fileName = ''"
+                        >
+                            {{-- Dialog --}}
+                            <div
+                                x-show="open"
+                                x-transition:enter="transition ease-out duration-200"
+                                x-transition:enter-start="opacity-0 scale-95"
+                                x-transition:enter-end="opacity-100 scale-100"
+                                x-transition:leave="transition ease-in duration-150"
+                                x-transition:leave-start="opacity-100 scale-100"
+                                x-transition:leave-end="opacity-0 scale-95"
+                                class="w-full max-w-2xl rounded-2xl bg-white shadow-2xl dark:bg-gray-900"
+                            >
+                                {{-- Header --}}
+                                <div class="flex items-center gap-3 border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+                                    <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-green-600">
+                                        <i class="ri-file-excel-2-line text-lg text-white"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <h3 class="text-base font-semibold text-gray-900 dark:text-white">Importar compras desde Excel</h3>
+                                        <p class="text-sm text-gray-500 dark:text-gray-400">Se registrarán en la sucursal actual</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        @click="open = false; file = null; fileName = ''"
+                                        class="rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+                                    >
+                                        <i class="ri-close-line text-xl"></i>
+                                    </button>
+                                </div>
+
+                                {{-- Body --}}
+                                <div class="space-y-4 px-6 py-5">
+
+                                    {{-- Format table --}}
+                                    <div>
+                                        <p class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Formato esperado del archivo:</p>
+                                        <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                                            <table class="w-full text-xs">
+                                                <thead>
+                                                    <tr style="background-color: #f97316;">
+                                                        <th class="whitespace-nowrap px-3 py-2 text-left font-semibold text-white">Fecha de Pago</th>
+                                                        <th class="whitespace-nowrap px-3 py-2 text-left font-semibold text-white">Tipo Comprobante</th>
+                                                        <th class="whitespace-nowrap px-3 py-2 text-left font-semibold text-white">Serie</th>
+                                                        <th class="whitespace-nowrap px-3 py-2 text-left font-semibold text-white">Número</th>
+                                                        <th class="whitespace-nowrap px-3 py-2 text-left font-semibold text-white">N° Doc Proveedor</th>
+                                                        <th class="whitespace-nowrap px-3 py-2 text-left font-semibold text-white">Razón Social Proveedor</th>
+                                                        <th class="whitespace-nowrap px-3 py-2 text-left font-semibold text-white">Base Imponible</th>
+                                                        <th class="whitespace-nowrap px-3 py-2 text-left font-semibold text-white">IGV</th>
+                                                        <th class="whitespace-nowrap px-3 py-2 text-left font-semibold text-white">Total</th>
+                                                        <th class="whitespace-nowrap px-3 py-2 text-left font-semibold text-orange-100">Categoría (opc.)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr class="bg-white dark:bg-gray-900">
+                                                        <td class="whitespace-nowrap px-3 py-2 text-gray-700 dark:text-gray-300">30/03/2026</td>
+                                                        <td class="whitespace-nowrap px-3 py-2 text-blue-600">Factura</td>
+                                                        <td class="whitespace-nowrap px-3 py-2 text-gray-700 dark:text-gray-300">F035</td>
+                                                        <td class="whitespace-nowrap px-3 py-2 text-gray-700 dark:text-gray-300">14526</td>
+                                                        <td class="whitespace-nowrap px-3 py-2 text-gray-700 dark:text-gray-300">20604875235</td>
+                                                        <td class="whitespace-nowrap px-3 py-2 text-gray-700 dark:text-gray-300">CAX PETROL E.I.R.L.</td>
+                                                        <td class="whitespace-nowrap px-3 py-2 text-gray-700 dark:text-gray-300">4.24</td>
+                                                        <td class="whitespace-nowrap px-3 py-2 text-gray-700 dark:text-gray-300">0.76</td>
+                                                        <td class="whitespace-nowrap px-3 py-2 font-semibold text-gray-900 dark:text-white">5.00</td>
+                                                        <td class="whitespace-nowrap px-3 py-2 text-gray-400">COMBUSTIBLE</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    {{-- Info note --}}
+                                    <div class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
+                                        Las columnas se detectan por encabezado — el orden no importa. Los proveedores se buscan por N° de documento; si no existen, se crean automáticamente. Columnas opcionales: Moneda, Tipo Cambio Dia, Tipo de Compra, Uso de la Compra, Área, Medio de Pago, Observaciones.
+                                    </div>
+
+                                    {{-- File upload form --}}
+                                    <form
+                                        method="POST"
+                                        action="{{ route('admin.purchases.import-excel') }}"
+                                        enctype="multipart/form-data"
+                                        data-turbo="false"
+                                        @submit="if (!file) { $event.preventDefault(); alert('Selecciona un archivo primero.'); }"
+                                    >
+                                        @csrf
+                                        @if ($viewId)
+                                            <input type="hidden" name="view_id" value="{{ $viewId }}">
+                                        @endif
+
+                                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            Archivo Excel <span class="text-red-500">*</span>
+                                        </label>
+
+                                        <div
+                                            class="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 transition-colors"
+                                            :class="dragging ? 'border-green-400 bg-green-50' : 'border-gray-300 bg-gray-50 hover:bg-gray-100'"
+                                            @dragover.prevent="dragging = true"
+                                            @dragleave.prevent="dragging = false"
+                                            @drop.prevent="
+                                                dragging = false;
+                                                const f = $event.dataTransfer.files[0];
+                                                if (f) { file = f; fileName = f.name; $refs.fileInput.files = $event.dataTransfer.files; }
+                                            "
+                                            @click="$refs.fileInput.click()"
+                                        >
+                                            <input
+                                                type="file"
+                                                name="file"
+                                                x-ref="fileInput"
+                                                accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+                                                class="hidden"
+                                                @change="const f = $event.target.files[0]; if (f) { file = f; fileName = f.name; }"
+                                            >
+                                            <i
+                                                class="ri-upload-cloud-2-line mb-2 text-3xl"
+                                                :class="file ? 'text-green-500' : 'text-gray-400'"
+                                            ></i>
+                                            <p
+                                                class="text-sm font-medium"
+                                                :class="file ? 'text-green-700' : 'text-gray-700'"
+                                                x-text="file ? fileName : 'Arrastra tu archivo o haz clic para seleccionar'"
+                                            ></p>
+                                            <p class="mt-1 text-xs text-gray-400">.xlsx, .xls, .csv &bull; Máximo 10 MB</p>
+                                        </div>
+
+                                        <div class="mt-5 flex gap-3">
+                                            <button
+                                                type="submit"
+                                                class="flex h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-green-600 text-sm font-semibold text-white transition hover:bg-green-700 active:scale-95"
+                                            >
+                                                <i class="ri-upload-2-line"></i>
+                                                Importar
+                                            </button>
+                                            <button
+                                                type="button"
+                                                @click="open = false; file = null; fileName = ''"
+                                                class="flex h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 transition hover:bg-gray-50 active:scale-95"
+                                            >
+                                                <i class="ri-close-line"></i>
+                                                Cancelar
+                                            </button>
+                                        </div>
+                                    </form>
+
+                                </div>
+                            </div>
+                        </div>
+                    </template>
                 </div>
             </div>
 

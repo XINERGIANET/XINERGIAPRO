@@ -106,7 +106,7 @@
             <div class="flex items-center gap-4">
                 <div
                     class="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-500 dark:bg-brand-500/10">
-                    <i class="ri-restaurant-line text-2xl"></i>
+                    <i class="ri-tools-line text-2xl"></i>
                 </div>
                 <div>
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">Registrar producto</h3>

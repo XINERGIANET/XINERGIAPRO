@@ -90,7 +90,6 @@ class DashboardController extends Controller
             ->when($branchId > 0, fn ($q) => $q->where('wm.branch_id', $branchId))
             ->groupBy('ws.name', 'workshop_movement_details.description')
             ->orderByRaw('COUNT(*) DESC')
-            ->limit(5)
             ->get([
                 DB::raw("COALESCE(ws.name, workshop_movement_details.description, 'Servicio') as name"),
                 DB::raw('COUNT(*) as qty'),
@@ -211,12 +210,12 @@ class DashboardController extends Controller
             ->whereBetween('workshop_movements.intake_date', [$dateFrom, $dateTo])
             ->groupBy('people.id', 'people.first_name', 'people.last_name', 'people.document_number')
             ->orderByRaw('COUNT(*) DESC')
-            ->limit(5)
             ->get([
                 DB::raw("CONCAT(COALESCE(people.first_name,''), ' ', COALESCE(people.last_name,'')) as client"),
                 'people.document_number',
                 DB::raw('COUNT(*) as visits'),
-            ]);
+                DB::raw('SUM(workshop_movements.total) as total_spent'),
+            ])->filter(fn($c) => (float)$c->total_spent > 0)->values();
 
         $weekStart = now()->startOfWeek(Carbon::MONDAY);
         $weekEnd = now()->endOfWeek(Carbon::SUNDAY);
@@ -381,7 +380,7 @@ class DashboardController extends Controller
             ];
         }
 
-        $monthCursor = now()->copy()->subMonths(13)->startOfMonth();
+        $monthCursor = now()->copy()->startOfYear();
         $monthEnd = now()->copy()->endOfMonth();
         $monthKeys = [];
         $monthLabels = [];
@@ -400,7 +399,7 @@ class DashboardController extends Controller
         $salesAgg = SalesMovement::query()
             ->join('movements as m', 'm.id', '=', 'sales_movements.movement_id')
             ->where('sales_movements.branch_id', $branchId)
-            ->whereBetween('m.moved_at', [now()->subMonths(13)->startOfMonth(), now()->endOfMonth()])
+            ->whereBetween('m.moved_at', [now()->startOfYear(), now()->endOfMonth()])
             ->select(['sales_movements.total', 'sales_movements.billing_status', 'm.moved_at'])
             ->get();
 

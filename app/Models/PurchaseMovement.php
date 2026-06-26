@@ -23,6 +23,7 @@ class PurchaseMovement extends Model
         'tax',
         'total',
         'affects_kardex',
+        'fiscal_credit',
         'movement_id',
         'branch_id',
     ];
