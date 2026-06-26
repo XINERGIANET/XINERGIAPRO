@@ -1388,20 +1388,33 @@
                 this.signaturePadInitialized = true;
             }
 
-            this.resizeSignatureCanvas();
-            this.signatureCtx = this.signatureCanvas.getContext('2d');
-            if (!this.signatureCtx) return;
-            this.signatureCtx.lineWidth = 2;
-            this.signatureCtx.lineCap = 'round';
-            this.signatureCtx.strokeStyle = '#111827';
+            this.$nextTick(() => {
+                this.resizeSignatureCanvas();
+                this.signatureCtx = this.signatureCanvas.getContext('2d');
+                if (!this.signatureCtx) return;
+                this.signatureCtx.lineWidth = 2;
+                this.signatureCtx.lineCap = 'round';
+                this.signatureCtx.strokeStyle = '#111827';
+            });
         },
         resizeSignatureCanvas() {
             if (!this.signatureCanvas) return;
             const rect = this.signatureCanvas.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) return;
             const dpr = window.devicePixelRatio || 1;
             const width = Math.max(1, Math.round(rect.width * dpr));
             const height = Math.max(1, Math.round(rect.height * dpr));
             if (this.signatureCanvas.width !== width || this.signatureCanvas.height !== height) {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = this.signatureCanvas.width;
+                tempCanvas.height = this.signatureCanvas.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                let hasContent = false;
+                if (tempCtx) {
+                    tempCtx.drawImage(this.signatureCanvas, 0, 0);
+                    hasContent = true;
+                }
+
                 this.signatureCanvas.width = width;
                 this.signatureCanvas.height = height;
                 const ctx = this.signatureCanvas.getContext('2d');
@@ -1411,6 +1424,9 @@
                     ctx.lineWidth = 2;
                     ctx.lineCap = 'round';
                     ctx.strokeStyle = '#111827';
+                    if (hasContent && tempCanvas.width > 1 && tempCanvas.height > 1) {
+                        ctx.drawImage(tempCanvas, 0, 0, tempCanvas.width / dpr, tempCanvas.height / dpr);
+                    }
                 }
             }
         },
