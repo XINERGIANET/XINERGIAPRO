@@ -1438,6 +1438,16 @@
             }
         },
         signaturePoint(evt) {
+            const isTouch = (evt.touches && evt.touches.length > 0) || (evt.changedTouches && evt.changedTouches.length > 0);
+            if (!isTouch && evt.offsetX !== undefined && evt.offsetY !== undefined) {
+                if (evt.target === this.signatureCanvas) {
+                    return {
+                        x: evt.offsetX,
+                        y: evt.offsetY
+                    };
+                }
+            }
+
             const rect = this.signatureCanvas.getBoundingClientRect();
             let source = evt;
             if (evt.touches && evt.touches.length > 0) {
@@ -1451,7 +1461,11 @@
             };
         },
         startSignature(evt) {
-            if (!this.signatureCtx || !this.signatureCanvas) return;
+            if (!this.signatureCanvas) return;
+            this.resizeSignatureCanvas();
+            this.signatureCtx = this.signatureCanvas.getContext('2d');
+            if (!this.signatureCtx) return;
+
             evt.preventDefault();
             this.isSigning = true;
             if (evt.pointerId && this.signatureCanvas.setPointerCapture) {
