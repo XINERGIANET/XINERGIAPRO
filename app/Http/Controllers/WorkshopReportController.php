@@ -200,7 +200,7 @@ class WorkshopReportController extends Controller
     public function serviceOrderPdf(WorkshopMovement $order)
     {
         $this->assertOrderScope($order);
-        $order->load(['movement', 'vehicle', 'client', 'details.product', 'checklists.items', 'damages.photos', 'intakeInventory']);
+        $order->load(['movement', 'vehicle', 'client', 'details.product', 'checklists.items', 'damages.photos', 'intakeInventory', 'additionalAccessories']);
 
         $html = view('workshop.pdf.order', compact('order'))->render();
         $pdfBinary = $this->renderPdfWithWkhtmltopdf($html, 'A4', [
@@ -630,7 +630,7 @@ class WorkshopReportController extends Controller
     public function saveOrderPdfSnapshot(WorkshopMovement $order)
     {
         $this->assertOrderScope($order);
-        $order->load(['movement', 'vehicle', 'client', 'details.product', 'checklists.items', 'damages', 'intakeInventory']);
+        $order->load(['movement', 'vehicle', 'client', 'details.product', 'checklists.items', 'damages', 'intakeInventory', 'additionalAccessories']);
 
         $html = view('workshop.pdf.order', compact('order'))->render();
         $number = $order->movement?->number ?: ('os-' . $order->id);
@@ -772,4 +772,3 @@ class WorkshopReportController extends Controller
         return null;
     }
 }
-

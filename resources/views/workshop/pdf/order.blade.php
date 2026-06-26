@@ -88,6 +88,27 @@
         .table-econ th { text-align: left; font-size: 12px; text-transform: uppercase; background: #f7fafc; }
         .table-econ td.num { text-align: right; }
         .totals { margin-top: 6px; text-align: right; font-weight: 700; }
+        .fuel-pdf-wrap {
+            margin: 8px 0 12px;
+            page-break-inside: avoid;
+        }
+        .fuel-pdf-title {
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .fuel-pdf-box {
+            display: inline-block;
+            width: 220px;
+            vertical-align: middle;
+        }
+        .fuel-pdf-value {
+            display: inline-block;
+            margin-left: 14px;
+            vertical-align: middle;
+            font-weight: 700;
+            font-size: 16px;
+        }
 
         .signature-wrap { margin-top: 16px; width: 100%; border-collapse: collapse; }
         .signature-wrap td { width: 50%; vertical-align: bottom; padding-right: 18px; }
@@ -113,6 +134,7 @@
     $clientName = trim(($order->client?->first_name ?? '') . ' ' . ($order->client?->last_name ?? ''));
     $services = $order->details->where('line_type', 'SERVICE')->values();
     $inventory = $order->intakeInventory->values();
+    $additionalAccessories = $order->additionalAccessories->values();
     $damages = $order->damages->values();
     $damageSides = collect([
         'FRONT' => 'Frontal',
@@ -173,6 +195,13 @@
             $signatureUrl = asset('storage/' . ltrim($signaturePath, '/'));
         }
     }
+    $fuelLevelRaw = $order->fuel_level;
+    $fuelLevel = $fuelLevelRaw === null ? null : max(0, min(100, (int) $fuelLevelRaw));
+    $fuelNeedleLevel = $fuelLevel ?? 50;
+    $fuelAngle = 220 + $fuelNeedleLevel;
+    $fuelRadians = deg2rad($fuelAngle);
+    $fuelNeedleX = 160 + cos($fuelRadians) * 82;
+    $fuelNeedleY = 150 + sin($fuelRadians) * 82;
 @endphp
 
 <div class="page-title">
@@ -185,6 +214,7 @@
             <div class="line-item"><span class="label">Marca:</span><span class="fill w-lg">{{ $order->vehicle?->brand ?? '' }}</span></div>
             <div class="line-item"><span class="label">Modelo:</span><span class="fill w-sm">{{ $order->vehicle?->model ?? '' }}</span> <span class="label" style="min-width:56px;">Color:</span><span class="fill w-sm">{{ $order->vehicle?->color ?? '' }}</span></div>
             <div class="line-item"><span class="label">Km:</span><span class="fill w-sm">{{ number_format((float) ($order->mileage_in ?? 0), 0, '.', ',') }}</span> <span class="label" style="min-width:56px;">Placa:</span><span class="fill w-sm">{{ $order->vehicle?->plate ?? '' }}</span></div>
+            <div class="line-item"><span class="label">Combustible:</span><span class="fill w-sm">{{ $fuelLevel === null ? '' : ($fuelLevel . '%') }}</span></div>
             <div class="line-item"><span class="label">N Serie:</span><span class="fill w-lg">{{ $order->vehicle?->serial_number ?? '' }}</span></div>
             <div class="line-item"><span class="label">Ingreso en grua?:</span><span class="fill w-xs">{{ $order->tow_in ? 'Si' : 'No' }}</span></div>
         </td>
@@ -197,6 +227,43 @@
         </td>
     </tr>
 </table>
+
+<div class="fuel-pdf-wrap">
+    <div class="fuel-pdf-title">Nivel de combustible</div>
+    <div class="fuel-pdf-box">
+        <svg viewBox="0 0 320 180" width="220" height="124" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 40 116 A 140 140 0 0 1 280 116" fill="none" stroke="#1f2937" stroke-width="16" stroke-linecap="round"/>
+            <path d="M 40 116 A 140 140 0 0 1 280 116" fill="none" stroke="#4b5563" stroke-width="8" stroke-linecap="round"/>
+            @for($tick = 0; $tick <= 10; $tick++)
+                @php
+                    $angle = 220 + ($tick * 10);
+                    $rad = deg2rad($angle);
+                    $outerX = 160 + cos($rad) * 140;
+                    $outerY = 150 + sin($rad) * 140;
+                    $innerLength = in_array($tick, [0, 5, 10], true) ? 114 : 124;
+                    $innerX = 160 + cos($rad) * $innerLength;
+                    $innerY = 150 + sin($rad) * $innerLength;
+                @endphp
+                <line x1="{{ $outerX }}" y1="{{ $outerY }}" x2="{{ $innerX }}" y2="{{ $innerY }}"
+                      stroke="#111827"
+                      stroke-width="{{ in_array($tick, [0, 5, 10], true) ? 7 : 3 }}"
+                      stroke-linecap="round"/>
+            @endfor
+            <text x="30" y="158" font-size="34" font-weight="900" fill="#b91c1c">E</text>
+            <text x="270" y="158" font-size="34" font-weight="900" fill="#1f2937">F</text>
+            <g transform="translate(160 62)">
+                <rect x="-12" y="-22" width="24" height="42" rx="3" fill="#1f2937"/>
+                <rect x="-7" y="-28" width="14" height="6" rx="2" fill="#1f2937"/>
+                <path d="M 14 -12 C 29 -8 22 12 33 13" fill="none" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+                <circle cx="34" cy="13" r="3" fill="#1f2937"/>
+            </g>
+            <line x1="160" y1="150" x2="{{ $fuelNeedleX }}" y2="{{ $fuelNeedleY }}" stroke="#dc2626" stroke-width="9" stroke-linecap="round"/>
+            <circle cx="160" cy="150" r="28" fill="#27272a"/>
+            <circle cx="160" cy="150" r="9" fill="#111827"/>
+        </svg>
+    </div>
+    <div class="fuel-pdf-value">{{ $fuelLevel === null ? 'Sin registrar' : ($fuelLevel . '%') }}</div>
+</div>
 
 <div class="section-title">Trabajo a realizar</div>
 <table class="grid-3">
@@ -248,6 +315,25 @@
         @endfor
     </tr>
 </table>
+
+@if($additionalAccessories->isNotEmpty())
+    <div class="section-title">Accesorios adicionales</div>
+    <table class="grid-3">
+        <tr>
+            @for($col = 0; $col < 3; $col++)
+                <td>
+                    @for($i = $col * 6; $i < ($col * 6) + 6; $i++)
+                        @php $item = $additionalAccessories[$i] ?? null; @endphp
+                        <div class="check-line">
+                            <span class="check-box">{{ $item ? ($item->present ? '[x]' : '[ ]') : '[ ]' }}</span>
+                            {{ $item?->name ?? '' }}
+                        </div>
+                    @endfor
+                </td>
+            @endfor
+        </tr>
+    </table>
+@endif
 
 <div class="section-title">Danos pre-existentes de la unidad</div>
 @if($damageSidesWithData->isEmpty())

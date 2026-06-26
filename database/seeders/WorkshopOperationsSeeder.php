@@ -44,6 +44,12 @@ class WorkshopOperationsSeeder extends Seeder
                 ['name' => 'Editar', 'icon' => 'ri-edit-line', 'action' => 'workshop.vehicle-types.update', 'color' => '#0f766e', 'status' => 1, 'type' => 'R'],
                 ['name' => 'Eliminar', 'icon' => 'ri-delete-bin-line', 'action' => 'workshop.vehicle-types.destroy', 'color' => '#dc2626', 'status' => 1, 'type' => 'R'],
             ],
+            'TAL_ACC' => [
+                ['name' => 'Crear', 'icon' => 'ri-add-line', 'action' => 'workshop.accessories.store', 'color' => '#111827', 'status' => 1, 'type' => 'T'],
+                ['name' => 'Ver', 'icon' => 'ri-eye-line', 'action' => 'workshop.accessories.index', 'color' => '#1d4ed8', 'status' => 1, 'type' => 'R'],
+                ['name' => 'Editar', 'icon' => 'ri-edit-line', 'action' => 'workshop.accessories.update', 'color' => '#0f766e', 'status' => 1, 'type' => 'R'],
+                ['name' => 'Eliminar', 'icon' => 'ri-delete-bin-line', 'action' => 'workshop.accessories.destroy', 'color' => '#dc2626', 'status' => 1, 'type' => 'R'],
+            ],
             'TAL_OS' => [
                 ['name' => 'Crear', 'icon' => 'ri-add-line', 'action' => 'workshop.orders.create', 'color' => '#111827', 'status' => 1, 'type' => 'T'],
                 ['name' => 'Ver', 'icon' => 'ri-eye-line', 'action' => 'workshop.orders.show', 'color' => '#1d4ed8', 'status' => 1, 'type' => 'R'],
@@ -340,7 +346,7 @@ class WorkshopOperationsSeeder extends Seeder
                     $allowed = match ($profileName) {
                         'ADMIN' => true,
                         'RECEPCION' => true,
-                        'TECNICO' => !in_array($menuName, ['Reportes Taller', 'Clientes Taller'], true),
+                        'TECNICO' => !in_array($menuName, ['Reportes Taller', 'Clientes Taller', 'Accesorios Adicionales'], true),
                         'CAJERO' => in_array($menuName, ['Ordenes de Servicio', 'Reportes Taller', 'Ventas Taller'], true),
                         'ALMACENERO' => in_array($menuName, ['Ordenes de Servicio', 'Armados Taller', 'Compras Taller'], true),
                         default => false,

@@ -29,7 +29,7 @@ class StoreWorkshopOrderRequest extends FormRequest
             'tow_in' => ['nullable', 'boolean'],
             'diagnosis_text' => ['nullable', 'string'],
             'observations' => ['nullable', 'string'],
-            'status' => ['nullable', 'in:draft,diagnosis,awaiting_approval,approved,in_progress,finished,delivered,cancelled'],
+            'status' => ['nullable', 'in:draft,diagnosis,awaiting_approval,approved,awaiting_technician_start,in_progress,finished,delivered,cancelled'],
             'comment' => ['nullable', 'string'],
         ];
     }

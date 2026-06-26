@@ -1162,7 +1162,64 @@ class WorkshopOrderController extends Controller
             );
         }
 
+        if ($records->isNotEmpty() && in_array((string) $order->status, ['approved', 'awaiting_technician_start'], true)) {
+            $branchId = (int) session('branch_id');
+            $waitForTechnicianStart = $this->branchBooleanParameter($branchId, 'Esperar inicio del tecnico asignado', false);
+            $targetStatus = $waitForTechnicianStart ? 'awaiting_technician_start' : 'in_progress';
+            $message = $waitForTechnicianStart
+                ? 'Tecnicos asignados. La OS queda esperando inicio del tecnico asignado.'
+                : 'Tecnicos asignados. La OS paso a reparacion.';
+
+            try {
+                $this->flowService->updateOrder($order, [
+                    'status' => $targetStatus,
+                    'comment' => $message,
+                ]);
+            } catch (\Throwable $e) {
+                return back()->withErrors(['error' => $e->getMessage()]);
+            }
+
+            return back()->with('status', $message);
+        }
+
         return back()->with('status', 'Tecnicos asignados correctamente.');
+    }
+
+    private function branchBooleanParameter(int $branchId, string $description, bool $default = false): bool
+    {
+        $parameter = DB::table('parameters')
+            ->whereNull('deleted_at')
+            ->where('status', 1)
+            ->where('description', $description)
+            ->first();
+
+        if (!$parameter) {
+            return $default;
+        }
+
+        $branchValue = DB::table('branch_parameters')
+            ->where('parameter_id', $parameter->id)
+            ->where('branch_id', $branchId)
+            ->whereNull('deleted_at')
+            ->value('value');
+
+        $value = $branchValue ?? $parameter->value;
+        if ($value === null) {
+            return $default;
+        }
+
+        $normalized = strtoupper(trim((string) $value));
+        $normalized = str_replace(['Í', 'í', 'Ã', 'Ã­'], 'I', $normalized);
+
+        if (in_array($normalized, ['1', 'TRUE', 'YES', 'SI', 'S'], true)) {
+            return true;
+        }
+
+        if (in_array($normalized, ['0', 'FALSE', 'NO', 'N'], true)) {
+            return false;
+        }
+
+        return $default;
     }
 
     public function cancel(Request $request, WorkshopMovement $order): RedirectResponse
@@ -1314,6 +1371,7 @@ class WorkshopOrderController extends Controller
             'diagnosis',
             'awaiting_approval',
             'approved',
+            'awaiting_technician_start',
             'in_progress',
             'finished',
             'delivered',

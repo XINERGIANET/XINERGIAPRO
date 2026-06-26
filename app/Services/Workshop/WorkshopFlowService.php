@@ -36,12 +36,14 @@ use App\Models\WorkshopIntakeInventory;
 use App\Models\WorkshopMaintenanceReminder;
 use App\Models\WorkshopMovement;
 use App\Models\WorkshopMovementDetail;
+use App\Models\WorkshopMovementAccessory;
 use App\Models\WorkshopMovementTechnician;
 use App\Models\WorkshopPreexistingDamage;
 use App\Models\WorkshopPreexistingDamagePhoto;
 use App\Models\WorkshopStatusHistory;
 use App\Models\WorkshopMovementStatusLog;
 use App\Models\WorkshopVehicleIntakeInventoryItem;
+use App\Models\WorkshopAdditionalAccessory;
 use App\Models\WorkshopStockReservation;
 use App\Models\WorkshopVehicleLog;
 use App\Models\WorkshopWarranty;
@@ -56,7 +58,8 @@ class WorkshopFlowService
         'draft' => ['diagnosis', 'cancelled'],
         'diagnosis' => ['awaiting_approval', 'cancelled'],
         'awaiting_approval' => ['approved', 'diagnosis', 'cancelled'],
-        'approved' => ['in_progress', 'in_progress_external', 'cancelled'],
+        'approved' => ['awaiting_technician_start', 'in_progress', 'in_progress_external', 'cancelled'],
+        'awaiting_technician_start' => ['in_progress', 'in_progress_external', 'cancelled'],
         'in_progress' => ['paused', 'finished', 'cancelled', 'in_progress_external'],
         'in_progress_external' => ['approved', 'in_progress', 'finished', 'cancelled'],
         'paused' => ['in_progress', 'cancelled'],
@@ -134,6 +137,7 @@ class WorkshopFlowService
                 'intake_date' => $data['intake_date'] ?? now(),
                 'delivery_date' => $data['delivery_date'] ?? null,
                 'mileage_in' => $data['mileage_in'] ?? null,
+                'fuel_level' => $data['fuel_level'] ?? null,
                 'mileage_out' => $data['mileage_out'] ?? null,
                 'tow_in' => (bool) ($data['tow_in'] ?? false),
                 'diagnosis_text' => $data['diagnosis_text'] ?? null,
@@ -228,6 +232,7 @@ class WorkshopFlowService
                 'intake_date' => $data['intake_date'] ?? $order->intake_date,
                 'delivery_date' => $data['delivery_date'] ?? $order->delivery_date,
                 'mileage_in' => $data['mileage_in'] ?? $order->mileage_in,
+                'fuel_level' => array_key_exists('fuel_level', $data) ? $data['fuel_level'] : $order->fuel_level,
                 'mileage_out' => $data['mileage_out'] ?? $order->mileage_out,
                 'tow_in' => array_key_exists('tow_in', $data) ? (bool) $data['tow_in'] : $order->tow_in,
                 'diagnosis_text' => $data['diagnosis_text'] ?? $order->diagnosis_text,
@@ -515,6 +520,66 @@ class WorkshopFlowService
                 $order->update([
                     'intake_client_signature_path' => (string) $meta['intake_client_signature_path'],
                 ]);
+            }
+        });
+    }
+
+    public function syncAdditionalAccessories(WorkshopMovement $order, array $accessories, bool $allowEditWhenChecklistLocked = false): void
+    {
+        DB::transaction(function () use ($order, $accessories, $allowEditWhenChecklistLocked) {
+            $order = WorkshopMovement::query()->lockForUpdate()->findOrFail($order->id);
+            $this->assertWorkshopInCurrentBranch($order);
+
+            if ($this->isChecklistLocked($order) && !$this->isAdminUser() && !$allowEditWhenChecklistLocked) {
+                throw new \RuntimeException('No se puede modificar accesorios adicionales despues de aprobado.');
+            }
+
+            $configuredAccessories = WorkshopAdditionalAccessory::query()
+                ->where('company_id', (int) $order->company_id)
+                ->where('branch_id', (int) $order->branch_id)
+                ->where('active', true)
+                ->orderBy('order_num')
+                ->orderBy('name')
+                ->get(['id', 'name']);
+
+            if ($configuredAccessories->isEmpty()) {
+                WorkshopMovementAccessory::query()
+                    ->where('workshop_movement_id', $order->id)
+                    ->delete();
+                return;
+            }
+
+            $configuredNames = $configuredAccessories
+                ->map(fn ($item) => (string) $item->name)
+                ->values()
+                ->all();
+
+            WorkshopMovementAccessory::query()
+                ->where('workshop_movement_id', $order->id)
+                ->whereNotIn('name', $configuredNames)
+                ->delete();
+
+            foreach ($configuredAccessories as $accessory) {
+                $key = (string) $accessory->id;
+                $present = array_key_exists($key, $accessories) ? (bool) $accessories[$key] : false;
+
+                $movementAccessory = WorkshopMovementAccessory::query()
+                    ->withTrashed()
+                    ->firstOrNew([
+                        'workshop_movement_id' => $order->id,
+                        'name' => (string) $accessory->name,
+                    ]);
+
+                $movementAccessory->fill([
+                    'accessory_id' => (int) $accessory->id,
+                    'present' => $present,
+                ]);
+
+                if ($movementAccessory->trashed()) {
+                    $movementAccessory->restore();
+                }
+
+                $movementAccessory->save();
             }
         });
     }
@@ -2523,7 +2588,7 @@ class WorkshopFlowService
 
     private function isChecklistLocked(WorkshopMovement $order): bool
     {
-        return in_array((string) $order->status, ['approved', 'in_progress', 'finished', 'delivered'], true);
+        return in_array((string) $order->status, ['approved', 'awaiting_technician_start', 'in_progress', 'finished', 'delivered'], true);
     }
 
     private function assertCanChangeStatus(string $fromStatus, string $toStatus): void
@@ -2537,7 +2602,7 @@ class WorkshopFlowService
 
         $allowed = match ($toStatus) {
             'diagnosis', 'awaiting_approval' => ['RECEPCION', 'RECEPCIÓN', 'JEFE TALLER', 'TECNICO', 'TÉCNICO'],
-            'approved' => ['RECEPCION', 'RECEPCIÓN', 'JEFE TALLER'],
+            'approved', 'awaiting_technician_start' => ['RECEPCION', 'RECEPCIÓN', 'JEFE TALLER', 'TECNICO', 'TÉCNICO'],
             'in_progress', 'paused', 'finished' => ['TECNICO', 'TÉCNICO', 'JEFE TALLER'],
             'delivered' => ['RECEPCION', 'RECEPCIÓN', 'CAJERO', 'JEFE TALLER'],
             'cancelled' => ['RECEPCION', 'RECEPCIÓN', 'JEFE TALLER'],

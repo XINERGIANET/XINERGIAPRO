@@ -46,6 +46,12 @@
         } else {
             $inventoryForUi = $initialInventoryChecks ?? [];
         }
+        $accessoriesOld = old('accessories');
+        if ($hasFormOld && is_array($accessoriesOld)) {
+            $accessoriesForUi = collect($accessoriesOld)->map(fn($v) => (bool) $v)->all();
+        } else {
+            $accessoriesForUi = $initialAccessoryChecks ?? [];
+        }
         $vehicleIdDefault = (string) old('vehicle_id', $editing ? (string) $editing->vehicle_id : ($preFilledVehicleId ?? ''));
         $clientIdDefault = (string) old('client_person_id', $editing ? (string) $editing->client_person_id : ($preFilledClientId ?? ''));
         $appointmentIdDefault = (string) old('appointment_id', $editing ? (string) $editing->appointment_id : ($preFilledAppointmentId ?? ''));
@@ -57,6 +63,13 @@
             $mileageDefault = (string) $editing->mileage_in;
         } else {
             $mileageDefault = '';
+        }
+        if (old('fuel_level', null) !== null && old('fuel_level', null) !== '') {
+            $fuelLevelDefault = (string) old('fuel_level');
+        } elseif ($editing && $editing->fuel_level !== null) {
+            $fuelLevelDefault = (string) $editing->fuel_level;
+        } else {
+            $fuelLevelDefault = '';
         }
     @endphp
     <div @workshop-product-created.window="registerCreatedProduct($event.detail)" x-data="Object.assign(typeof formAutocompleteHelpers === 'function' ? formAutocompleteHelpers() : {}, {
@@ -121,6 +134,8 @@
         selectedClientId: @js($clientIdDefault),
         plateLookupUrl: @js(route('workshop.maintenance-board.vehicles.lookup-plate')),
         mileageIn: @js($mileageDefault),
+        fuelLevel: @js($fuelLevelDefault),
+        fuelDragging: false,
         creatingVehicle: false,
         creatingVehicleLoading: false,
         lookingUpPlate: false,
@@ -189,6 +204,8 @@
         serviceLines: @js($serviceLinesForUi),
         inventoryItemsByVehicleType: @js($inventoryItemsByVehicleType ?? []),
         inventoryChecks: @js($inventoryForUi),
+        additionalAccessories: @js($additionalAccessories ?? []),
+        accessoryChecks: @js($accessoriesForUi),
         selectedVehicleTypeId: '',
         showInventory: @js($showInventoryDefault ?? true),
         showDamagesPreexisting: @js($showDamagesPreexistingDefault ?? true),
@@ -405,6 +422,58 @@
                 return Number.isFinite(n) && n >= 0 ? n : 0;
             }
             return parseInt(String(this.mileageIn || '').replace(/\D/g, ''), 10) || 0;
+        },
+        normalizedFuelLevel() {
+            if (String(this.fuelLevel ?? '').trim() === '') return 50;
+            const n = Number(this.fuelLevel);
+            if (!Number.isFinite(n)) return 50;
+            return Math.min(100, Math.max(0, n));
+        },
+        fuelLevelLabel() {
+            if (String(this.fuelLevel ?? '').trim() === '') return 'Sin registrar';
+            return `${Math.round(this.normalizedFuelLevel())}%`;
+        },
+        fuelLevelText() {
+            const level = this.normalizedFuelLevel();
+            if (String(this.fuelLevel ?? '').trim() === '') return 'Mueva la aguja';
+            if (level <= 5) return 'Vacio';
+            if (level <= 30) return 'Reserva';
+            if (level < 70) return 'Medio tanque';
+            if (level < 95) return 'Casi lleno';
+            return 'Lleno';
+        },
+        fuelNeedleAngle() {
+            return 220 + (this.normalizedFuelLevel() * 1);
+        },
+        fuelNeedleX(length = 92) {
+            const radians = this.fuelNeedleAngle() * Math.PI / 180;
+            return 160 + Math.cos(radians) * length;
+        },
+        fuelNeedleY(length = 92) {
+            const radians = this.fuelNeedleAngle() * Math.PI / 180;
+            return 150 + Math.sin(radians) * length;
+        },
+        setFuelFromPointer(event) {
+            const rect = this.$refs.fuelGauge?.getBoundingClientRect();
+            if (!rect) return;
+            const point = event.touches?.[0] || event.changedTouches?.[0] || event;
+            const x = ((point.clientX - rect.left) / rect.width) * 320;
+            const y = ((point.clientY - rect.top) / rect.height) * 180;
+            let angle = Math.atan2(y - 150, x - 160) * 180 / Math.PI;
+            if (angle < 0) angle += 360;
+            angle = Math.min(320, Math.max(220, angle));
+            this.fuelLevel = String(Math.round(angle - 220));
+        },
+        startFuelDrag(event) {
+            this.fuelDragging = true;
+            this.setFuelFromPointer(event);
+        },
+        moveFuelDrag(event) {
+            if (!this.fuelDragging) return;
+            this.setFuelFromPointer(event);
+        },
+        stopFuelDrag() {
+            this.fuelDragging = false;
         },
         normalizeWorkshopServiceType(raw) {
             let t = String(raw ?? '').trim().toLowerCase();
@@ -987,9 +1056,8 @@
             return String(this.quickClient.person_type || '').toUpperCase() === 'RUC';
         },
         resetQuickVehicle() {
-            const fallbackClientId = this.resolveDefaultClientId();
             this.quickVehicle = {
-                client_person_id: this.selectedClientId || fallbackClientId || '',
+                client_person_id: '',
                 vehicle_type_id: @js(optional($vehicleTypes->firstWhere('name', 'moto lineal'))->id ?? optional($vehicleTypes->first())->id ?? ''),
                 brand: '',
                 model: '',
@@ -1001,9 +1069,13 @@
                 chassis_number: '',
                 serial_number: '',
                 current_mileage: this.mileageIn || '',
-                engine_displacement_cc: ''
+                engine_displacement_cc: '',
+                soat_vencimiento: '',
+                revision_tecnica_vencimiento: ''
             };
             this.quickVehicleError = '';
+            this.quickVehicleSoatNotice = '';
+            this.quickVehicleSoatStatus = '';
             this.syncQuickVehicleClientSearch();
         },
         normalizePlateForLookup(value) {
@@ -1038,11 +1110,15 @@
             this.creatingVehicle = !this.creatingVehicle;
             if (this.creatingVehicle) {
                 this.resetQuickVehicle();
-                this.ensureQuickVehicleClient();
             }
         },
         async saveQuickVehicle() {
             this.quickVehicleError = '';
+            if (!String(this.quickVehicle.client_person_id || '').trim()) {
+                this.quickVehicleError = 'Seleccione o registre un cliente para el vehiculo.';
+                return;
+            }
+
             const kmStr = String(this.quickVehicle.current_mileage ?? '').trim();
             if (kmStr === '') {
                 this.quickVehicleError = 'Debes registrar KM actual.';
@@ -1063,7 +1139,6 @@
                 return;
             }
 
-            this.ensureQuickVehicleClient();
             this.creatingVehicleLoading = true;
             try {
                 const response = await fetch(@js(route('workshop.maintenance-board.vehicles.store')), {
@@ -1765,6 +1840,100 @@
                                 class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm"
                                 placeholder="KM ingreso">
                         </div>
+                        <div class="w-full md:w-[300px]"
+                             @pointermove.window="moveFuelDrag($event)"
+                             @pointerup.window="stopFuelDrag()"
+                             @pointercancel.window="stopFuelDrag()">
+                            <input type="hidden" name="fuel_level" x-model="fuelLevel">
+                            <div class="rounded-xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 px-4 py-3 shadow-sm">
+                                <div class="mb-1 flex items-center justify-between">
+                                    <label class="text-sm font-semibold text-gray-700">Combustible</label>
+                                    <div class="text-right">
+                                        <p class="text-sm font-black text-slate-900" x-text="fuelLevelLabel()"></p>
+                                        <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500" x-text="fuelLevelText()"></p>
+                                    </div>
+                                </div>
+                                <svg x-ref="fuelGauge"
+                                     viewBox="0 0 320 180"
+                                     class="block h-36 w-full cursor-pointer select-none touch-none"
+                                     role="slider"
+                                     aria-label="Nivel de combustible"
+                                     :aria-valuenow="Math.round(normalizedFuelLevel())"
+                                     aria-valuemin="0"
+                                     aria-valuemax="100"
+                                     tabindex="0"
+                                     @pointerdown.prevent="startFuelDrag($event)"
+                                     @keydown.arrow-left.prevent="fuelLevel = String(Math.max(0, normalizedFuelLevel() - 5))"
+                                     @keydown.arrow-down.prevent="fuelLevel = String(Math.max(0, normalizedFuelLevel() - 5))"
+                                     @keydown.arrow-right.prevent="fuelLevel = String(Math.min(100, normalizedFuelLevel() + 5))"
+                                     @keydown.arrow-up.prevent="fuelLevel = String(Math.min(100, normalizedFuelLevel() + 5))">
+                                    <defs>
+                                        <linearGradient id="fuel-arc-gradient" x1="35" y1="95" x2="285" y2="95" gradientUnits="userSpaceOnUse">
+                                            <stop offset="0" stop-color="#b91c1c"/>
+                                            <stop offset="0.36" stop-color="#f59e0b"/>
+                                            <stop offset="1" stop-color="#334155"/>
+                                        </linearGradient>
+                                        <filter id="fuel-shadow" x="-20%" y="-20%" width="140%" height="140%">
+                                            <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#0f172a" flood-opacity="0.22"/>
+                                        </filter>
+                                    </defs>
+
+                                    <path d="M 40 116 A 140 140 0 0 1 280 116"
+                                          fill="none"
+                                          stroke="#1f2937"
+                                          stroke-width="16"
+                                          stroke-linecap="round"/>
+                                    <path d="M 40 116 A 140 140 0 0 1 280 116"
+                                          fill="none"
+                                          stroke="url(#fuel-arc-gradient)"
+                                          stroke-width="8"
+                                          stroke-linecap="round"/>
+
+                                    @for($tick = 0; $tick <= 10; $tick++)
+                                        @php
+                                            $angle = 220 + ($tick * 10);
+                                            $rad = deg2rad($angle);
+                                            $outerX = 160 + cos($rad) * 140;
+                                            $outerY = 150 + sin($rad) * 140;
+                                            $innerLength = in_array($tick, [0, 5, 10], true) ? 114 : 124;
+                                            $innerX = 160 + cos($rad) * $innerLength;
+                                            $innerY = 150 + sin($rad) * $innerLength;
+                                        @endphp
+                                        <line x1="{{ $outerX }}" y1="{{ $outerY }}" x2="{{ $innerX }}" y2="{{ $innerY }}"
+                                              stroke="{{ in_array($tick, [0, 10], true) ? '#111827' : '#475569' }}"
+                                              stroke-width="{{ in_array($tick, [0, 5, 10], true) ? 7 : 3 }}"
+                                              stroke-linecap="round"/>
+                                    @endfor
+
+                                    <text x="30" y="158" font-size="34" font-weight="900" fill="#b91c1c">E</text>
+                                    <text x="270" y="158" font-size="34" font-weight="900" fill="#1f2937">F</text>
+
+                                    <g transform="translate(160 62)">
+                                        <rect x="-12" y="-22" width="24" height="42" rx="3" fill="#1f2937"/>
+                                        <rect x="-7" y="-28" width="14" height="6" rx="2" fill="#1f2937"/>
+                                        <path d="M 14 -12 C 29 -8 22 12 33 13" fill="none" stroke="#1f2937" stroke-width="4" stroke-linecap="round"/>
+                                        <circle cx="34" cy="13" r="3" fill="#1f2937"/>
+                                    </g>
+
+                                    <line x1="160" y1="150"
+                                          :x2="fuelNeedleX()"
+                                          :y2="fuelNeedleY()"
+                                          stroke="#dc2626"
+                                          stroke-width="9"
+                                          stroke-linecap="round"
+                                          filter="url(#fuel-shadow)"/>
+                                    <circle cx="160" cy="150" r="28" fill="#27272a" filter="url(#fuel-shadow)"/>
+                                    <circle cx="160" cy="150" r="9" fill="#111827"/>
+                                </svg>
+                                <div class="mt-1 grid grid-cols-5 gap-1 text-center text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                                    <span>0</span>
+                                    <span>1/4</span>
+                                    <span>1/2</span>
+                                    <span>3/4</span>
+                                    <span>100</span>
+                                </div>
+                            </div>
+                        </div>
                         <div class="min-w-0 w-full md:flex-[2.5_1_0%]">
                             <label class="mb-1 block text-sm font-medium text-gray-700">Diagnostico</label>
                             <input name="diagnosis_text" x-model="diagnosisText" class="h-11 w-full rounded-lg border border-gray-300 px-3 text-sm" placeholder="Diagnostico inicial (opcional)">
@@ -1832,6 +2001,26 @@
                                             x-model="inventoryChecks[item.item_key]"
                                             class="h-4 w-4 rounded border-gray-300">
                                         <span x-text="item.label"></span>
+                                    </label>
+                                </template>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3" x-show="additionalAccessories.length > 0" x-cloak>
+                            <div class="mb-3">
+                                <h4 class="text-sm font-semibold text-gray-800">Accesorios adicionales</h4>
+                                <p class="text-xs text-gray-500">Marque los accesorios recibidos con la unidad.</p>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2 md:grid-cols-4">
+                                <template x-for="accessory in additionalAccessories" :key="`accessory-${accessory.id}`">
+                                    <label class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+                                        <input type="checkbox"
+                                            :name="`accessories[${accessory.id}]`"
+                                            value="1"
+                                            x-model="accessoryChecks[accessory.id]"
+                                            class="h-4 w-4 rounded border-gray-300">
+                                        <span x-text="accessory.name"></span>
                                     </label>
                                 </template>
                             </div>

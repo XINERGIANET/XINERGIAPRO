@@ -20,6 +20,7 @@ use App\Models\TaxRate;
 use App\Models\Unit;
 use App\Models\Vehicle;
 use App\Models\VehicleType;
+use App\Models\WorkshopAdditionalAccessory;
 use App\Models\WorkshopMovement;
 use App\Models\WorkshopMovementTechnician;
 use App\Models\WorkshopPartReplacementPair;
@@ -68,6 +69,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'diagnosis',
             'awaiting_approval',
             'approved',
+            'awaiting_technician_start',
             'in_progress',
             'in_progress_external',
             'paused',
@@ -96,6 +98,7 @@ class WorkshopMaintenanceBoardController extends Controller
             ])
             ->withCount([
                 'details as pending_billing_count' => fn($query) => $query->whereNull('sales_movement_id'),
+                'technicians as assigned_technicians_count',
             ])
             ->withSum([
                 'details as pending_billing_total' => fn($query) => $query->whereNull('sales_movement_id'),
@@ -162,14 +165,14 @@ class WorkshopMaintenanceBoardController extends Controller
             })
             ->when($selectedStatus !== 'all', function ($query) use ($selectedStatus) {
                 if ($selectedStatus === 'in_progress') {
-                    return $query->whereIn('status', ['in_progress', 'paused']);
+                    return $query->whereIn('status', ['awaiting_technician_start', 'in_progress', 'paused']);
                 }
                 if ($selectedStatus === 'in_progress_external') {
                     return $query->where('status', 'in_progress_external');
                 }
                 return $query->where('status', $selectedStatus);
             })
-            ->orderByRaw("CASE status WHEN 'in_progress' THEN 1 WHEN 'in_progress_external' THEN 2 WHEN 'paused' THEN 3 WHEN 'approved' THEN 4 WHEN 'awaiting_approval' THEN 5 WHEN 'diagnosis' THEN 6 ELSE 7 END")
+            ->orderByRaw("CASE status WHEN 'awaiting_technician_start' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'in_progress_external' THEN 3 WHEN 'paused' THEN 4 WHEN 'approved' THEN 5 WHEN 'awaiting_approval' THEN 6 WHEN 'diagnosis' THEN 7 ELSE 8 END")
             ->orderByDesc('id')
             ->paginate(18)
             ->withQueryString();
@@ -338,6 +341,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'vehicle',
             'client',
             'intakeInventory',
+            'additionalAccessories',
             'damages.photos',
             'details' => fn($query) => $query->whereNull('sales_movement_id')->whereNull('deleted_at')->orderBy('id'),
             'details.service',
@@ -394,6 +398,13 @@ class WorkshopMaintenanceBoardController extends Controller
             $initialInventoryChecks[$key] = (bool) $order->intakeInventory->firstWhere('item_key', $key)?->present;
         }
 
+        $initialAccessoryChecks = [];
+        foreach ($order->additionalAccessories as $accessoryRow) {
+            if ($accessoryRow->accessory_id) {
+                $initialAccessoryChecks[(string) $accessoryRow->accessory_id] = (bool) $accessoryRow->present;
+            }
+        }
+
         $editingVehicleLabel = trim(((string) ($order->vehicle?->brand ?? '')) . ' ' . ((string) ($order->vehicle?->model ?? '')) . (((string) ($order->vehicle?->plate ?? '') !== '' ? ' - ' . $order->vehicle->plate : '')));
         $editingClientLabel = trim(((string) ($order->client?->first_name ?? '')) . ' ' . ((string) ($order->client?->last_name ?? '')));
 
@@ -438,6 +449,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'initialServiceLines' => $initialServiceLines,
             'initialProductLines' => $initialProductLines,
             'initialInventoryChecks' => $initialInventoryChecks,
+            'initialAccessoryChecks' => $initialAccessoryChecks,
             'editingVehicleLabel' => $editingVehicleLabel,
             'editingClientLabel' => $editingClientLabel,
             'editingDamageRows' => $editingDamageRows,
@@ -550,6 +562,20 @@ class WorkshopMaintenanceBoardController extends Controller
             ])->values()->all())
             ->toArray();
 
+        $additionalAccessories = WorkshopAdditionalAccessory::query()
+            ->where('company_id', $companyId)
+            ->where('branch_id', $branchId)
+            ->where('active', true)
+            ->orderBy('order_num')
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn($item) => [
+                'id' => (int) $item->id,
+                'name' => (string) $item->name,
+            ])
+            ->values()
+            ->all();
+
         $products = ProductBranch::query()
             ->join('products', 'products.id', '=', 'product_branch.product_id')
             ->where('product_branch.branch_id', $branchId)
@@ -649,6 +675,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'selectedDistrictName',
             'technicians',
             'inventoryItemsByVehicleType',
+            'additionalAccessories',
             'showInventoryDefault',
             'showDamagesPreexistingDefault',
             'showClientSignatureDefault',
@@ -908,6 +935,7 @@ class WorkshopMaintenanceBoardController extends Controller
             'vehicle_id' => ['required', 'integer', 'exists:vehicles,id'],
             'client_person_id' => ['nullable', 'integer', 'exists:people,id'],
             'mileage_in' => ['nullable', 'integer', 'min:0'],
+            'fuel_level' => ['nullable', 'integer', 'min:0', 'max:100'],
             'appointment_id' => ['nullable', 'integer', 'exists:appointments,id'],
             'quotation_id' => ['nullable', 'integer', 'exists:workshop_movements,id'],
             'driver_name' => ['nullable', 'string', 'max:255'],
@@ -918,6 +946,8 @@ class WorkshopMaintenanceBoardController extends Controller
             'observations' => ['nullable', 'string'],
             'inventory' => ['nullable', 'array'],
             'inventory.*' => ['nullable', 'boolean'],
+            'accessories' => ['nullable', 'array'],
+            'accessories.*' => ['nullable', 'boolean'],
             'damages' => ['nullable', 'array'],
             'damages.*.side' => ['nullable', 'in:RIGHT,LEFT,FRONT,BACK'],
             'damages.*.description' => ['nullable', 'string'],
@@ -1007,6 +1037,7 @@ class WorkshopMaintenanceBoardController extends Controller
                 'previous_workshop_movement_id' => !empty($validated['quotation_id']) ? (int) $validated['quotation_id'] : null,
                 'intake_date' => $intakeDate,
                 'mileage_in' => $validated['mileage_in'] ?? null,
+                'fuel_level' => $validated['fuel_level'] ?? null,
                 'tow_in' => (bool) ($validated['tow_in'] ?? false),
                 'diagnosis_text' => $validated['diagnosis_text'] ?? null,
                 'observations' => $validated['observations'] ?? null,
@@ -1035,6 +1066,7 @@ class WorkshopMaintenanceBoardController extends Controller
                     'intake_client_signature_path' => $signaturePath,
                 ]
             );
+            $this->flowService->syncAdditionalAccessories($workshop, (array) ($validated['accessories'] ?? []));
 
             $catalogIds = collect($parsedServiceLines)
                 ->where('kind', 'catalog')
@@ -1180,12 +1212,15 @@ class WorkshopMaintenanceBoardController extends Controller
             'vehicle_id' => ['required', 'integer', 'exists:vehicles,id'],
             'client_person_id' => ['nullable', 'integer', 'exists:people,id'],
             'mileage_in' => ['nullable', 'integer', 'min:0'],
+            'fuel_level' => ['nullable', 'integer', 'min:0', 'max:100'],
             'tow_in' => ['nullable', 'boolean'],
             'intake_date' => ['nullable', 'date'],
             'diagnosis_text' => ['nullable', 'string'],
             'observations' => ['nullable', 'string'],
             'inventory' => ['nullable', 'array'],
             'inventory.*' => ['nullable', 'boolean'],
+            'accessories' => ['nullable', 'array'],
+            'accessories.*' => ['nullable', 'boolean'],
             'damages' => ['nullable', 'array'],
             'damages.*.side' => ['nullable', 'in:RIGHT,LEFT,FRONT,BACK'],
             'damages.*.description' => ['nullable', 'string'],
@@ -1263,6 +1298,7 @@ class WorkshopMaintenanceBoardController extends Controller
                     'client_person_id' => $clientPersonId,
                     'intake_date' => $intakeDate,
                     'mileage_in' => $validated['mileage_in'] ?? null,
+                    'fuel_level' => $validated['fuel_level'] ?? null,
                     'tow_in' => (bool) ($validated['tow_in'] ?? false),
                     'diagnosis_text' => $validated['diagnosis_text'] ?? null,
                     'observations' => $validated['observations'] ?? null,
@@ -1285,6 +1321,7 @@ class WorkshopMaintenanceBoardController extends Controller
                     $meta,
                     true
                 );
+                $this->flowService->syncAdditionalAccessories($lockedOrder, (array) ($validated['accessories'] ?? []), true);
 
                 $lockedOrder->refresh();
 
@@ -1852,7 +1889,7 @@ class WorkshopMaintenanceBoardController extends Controller
         $this->assertOrderScope($order);
         $validated = $request->validate([
             'service_type' => ['required', 'string', 'in:internal,external'],
-            'technician_person_id' => ['required_if:service_type,internal', 'nullable', 'integer', 'exists:people,id'],
+            'technician_person_id' => ['nullable', 'integer', 'exists:people,id'],
             'glosa' => ['required_if:service_type,external', 'nullable', 'string', 'max:1000'],
         ]);
 
@@ -1861,17 +1898,25 @@ class WorkshopMaintenanceBoardController extends Controller
         try {
             DB::transaction(function () use ($order, $validated, &$newBoardStatus) {
                 if ($validated['service_type'] === 'internal') {
-                    // Assign technician
-                    WorkshopMovementTechnician::query()->updateOrCreate(
-                        [
-                            'workshop_movement_id' => $order->id,
-                            'technician_person_id' => $validated['technician_person_id'],
-                        ],
-                        [
-                            'commission_percentage' => 0,
-                            'commission_amount' => 0,
-                        ]
-                    );
+                    if (!in_array((string) $order->status, ['approved', 'awaiting_technician_start'], true)) {
+                        throw new \RuntimeException('Solo se puede iniciar un servicio aprobado o esperando inicio del tecnico.');
+                    }
+
+                    $technicianId = (int) ($validated['technician_person_id'] ?? 0);
+                    if ($technicianId > 0) {
+                        WorkshopMovementTechnician::query()->updateOrCreate(
+                            [
+                                'workshop_movement_id' => $order->id,
+                                'technician_person_id' => $technicianId,
+                            ],
+                            [
+                                'commission_percentage' => 0,
+                                'commission_amount' => 0,
+                            ]
+                        );
+                    } elseif (!$order->technicians()->exists()) {
+                        throw new \RuntimeException('Debe asignar un tecnico antes de iniciar el servicio.');
+                    }
 
                     $this->flowService->updateOrder($order, [
                         'status' => 'in_progress',

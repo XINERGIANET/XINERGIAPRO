@@ -20,7 +20,7 @@
         <form method="GET" class="mb-4 grid grid-cols-1 gap-2 rounded-xl border border-gray-200 bg-white p-4 md:grid-cols-4 dark:border-gray-800 dark:bg-white/[0.02]">
             <select name="status" class="h-11 rounded-lg border border-gray-300 px-3 text-sm">
                 <option value="">Todos</option>
-                @foreach(['draft','diagnosis','awaiting_approval','approved','in_progress','finished','delivered','cancelled'] as $s)
+                @foreach(['draft','diagnosis','awaiting_approval','approved','awaiting_technician_start','in_progress','finished','delivered','cancelled'] as $s)
                     <option value="{{ $s }}" @selected($status === $s)>{{ $s }}</option>
                 @endforeach
             </select>

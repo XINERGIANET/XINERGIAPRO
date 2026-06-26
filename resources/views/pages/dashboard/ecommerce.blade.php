@@ -57,6 +57,7 @@
             'DIAGNOSIS' => 'DIAGNÓSTICO',
             'AWAITING_APPROVAL' => 'ESPERANDO APROBACIÓN',
             'APPROVED' => 'APROBADO',
+            'AWAITING_TECHNICIAN_START' => 'ESPERANDO INICIO DEL TÉCNICO',
             'IN PROGRESS' => 'EN PROGRESO',
             'FINISHED' => 'FINALIZADO',
             'DELIVERED' => 'ENTREGADO',

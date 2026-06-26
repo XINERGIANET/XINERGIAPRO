@@ -39,6 +39,7 @@ use App\Http\Controllers\RecipeBookController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\WarehouseMovementController;
 use App\Http\Controllers\WorkshopAppointmentController;
+use App\Http\Controllers\WorkshopAdditionalAccessoryController;
 use App\Http\Controllers\WorkshopAssemblyController;
 use App\Http\Controllers\WorkshopAssemblyLocationController;
 use App\Http\Controllers\WorkshopClientController;
@@ -522,6 +523,10 @@ Route::middleware('auth')->group(function () {
     Route::delete('/tipos-vehiculo/{vehicleType}', [WorkshopVehicleTypeController::class, 'destroy'])->name('vehicle-types.destroy');
     Route::get('/tipos-vehiculo/{vehicleType}/inventario', [WorkshopVehicleTypeController::class, 'inventoryEdit'])->name('vehicle-types.inventory.edit');
     Route::post('/tipos-vehiculo/{vehicleType}/inventario', [WorkshopVehicleTypeController::class, 'inventoryUpdate'])->name('vehicle-types.inventory.update');
+    Route::get('/accesorios-adicionales', [WorkshopAdditionalAccessoryController::class, 'index'])->name('accessories.index');
+    Route::post('/accesorios-adicionales', [WorkshopAdditionalAccessoryController::class, 'store'])->name('accessories.store');
+    Route::put('/accesorios-adicionales/{accessory}', [WorkshopAdditionalAccessoryController::class, 'update'])->name('accessories.update');
+    Route::delete('/accesorios-adicionales/{accessory}', [WorkshopAdditionalAccessoryController::class, 'destroy'])->name('accessories.destroy');
         Route::get('/clientes/{person}/historial', [WorkshopClientController::class, 'show'])->name('clients.history');
         Route::get('/vehiculos/{vehicle}/historial', [WorkshopVehicleController::class, 'show'])->name('vehicles.history');
         Route::get('/armados/ubicaciones', [WorkshopAssemblyLocationController::class, 'index'])->name('assembly-locations.index');

@@ -39,7 +39,7 @@ class DashboardController extends Controller
             ->when($companyId > 0, fn ($q) => $q->where('workshop_movements.company_id', $companyId))
             ->when($branchId > 0, fn ($q) => $q->where('workshop_movements.branch_id', $branchId));
 
-        $activeStatuses = ['draft', 'diagnosis', 'awaiting_approval', 'approved', 'in_progress'];
+        $activeStatuses = ['draft', 'diagnosis', 'awaiting_approval', 'approved', 'awaiting_technician_start', 'in_progress'];
         $closedStatuses = ['finished', 'delivered'];
         $cancelledStatuses = ['cancelled'];
 

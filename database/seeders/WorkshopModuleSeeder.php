@@ -37,6 +37,7 @@ class WorkshopModuleSeeder extends Seeder
             ['name' => 'Agenda/Citas Taller', 'abbreviation' => 'TAL_CITAS'],
             ['name' => 'Vehiculos Taller', 'abbreviation' => 'TAL_VEH'],
             ['name' => 'Tipos de Vehiculo Taller', 'abbreviation' => 'TAL_VTYPE'],
+            ['name' => 'Accesorios Adicionales Taller', 'abbreviation' => 'TAL_ACC'],
             ['name' => 'Ordenes de Servicio Taller', 'abbreviation' => 'TAL_OS'],
             ['name' => 'Servicios Taller', 'abbreviation' => 'TAL_SERV'],
             ['name' => 'Compras Taller', 'abbreviation' => 'TAL_COMP'],

@@ -21,6 +21,7 @@ class WorkshopMenuOptionSeeder extends Seeder
             ['name' => 'Agenda/Citas', 'icon' => 'ri-calendar-event-line', 'action' => 'workshop.appointments.index', 'view' => 'TAL_CITAS'],
             ['name' => 'Vehiculos', 'icon' => 'ri-motorbike-line', 'action' => 'workshop.vehicles.index', 'view' => 'TAL_VEH'],
             ['name' => 'Tipos de Vehiculo', 'icon' => 'ri-steering-2-line', 'action' => 'workshop.vehicle-types.index', 'view' => 'TAL_VTYPE'],
+            ['name' => 'Accesorios Adicionales', 'icon' => 'ri-first-aid-kit-line', 'action' => 'workshop.accessories.index', 'view' => 'TAL_ACC'],
             ['name' => 'Ordenes de Servicio', 'icon' => 'ri-file-list-3-line', 'action' => 'workshop.orders.index', 'view' => 'TAL_OS'],
             ['name' => 'Servicios Taller', 'icon' => 'ri-settings-4-line', 'action' => 'workshop.services.index', 'view' => 'TAL_SERV'],
             ['name' => 'Compras Taller', 'icon' => 'ri-file-list-2-line', 'action' => 'workshop.purchases.index', 'view' => 'TAL_COMP'],

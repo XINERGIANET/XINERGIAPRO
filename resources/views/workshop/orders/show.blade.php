@@ -7,6 +7,7 @@
         'diagnosis' => 'Diagnóstico',
         'awaiting_approval' => 'Esperando aprobación',
         'approved' => 'Aprobado',
+        'awaiting_technician_start' => 'Esperando inicio del técnico',
         'in_progress' => 'En reparación',
         'finished' => 'Terminado',
         'delivered' => 'Entregado',

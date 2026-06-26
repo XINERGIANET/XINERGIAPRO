@@ -21,6 +21,7 @@ class WorkshopMovement extends Model
         'intake_date',
         'delivery_date',
         'mileage_in',
+        'fuel_level',
         'mileage_out',
         'tow_in',
         'diagnosis_text',
@@ -182,6 +183,11 @@ class WorkshopMovement extends Model
         return $this->hasMany(WorkshopIntakeInventory::class);
     }
 
+    public function additionalAccessories()
+    {
+        return $this->hasMany(WorkshopMovementAccessory::class);
+    }
+
     public function statusHistories()
     {
         return $this->hasMany(WorkshopStatusHistory::class);
@@ -212,4 +218,3 @@ class WorkshopMovement extends Model
         return max(0, (float) $this->total - (float) $this->paid_total);
     }
 }
-

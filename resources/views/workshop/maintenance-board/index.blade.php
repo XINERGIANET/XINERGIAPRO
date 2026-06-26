@@ -98,7 +98,8 @@
                     <option value="draft" @selected(($selectedStatus ?? 'in_progress') === 'draft')>Borrador / recepción parcial</option>
                     <option value="awaiting_approval" @selected(($selectedStatus ?? 'in_progress') === 'awaiting_approval')>Esperando aprobación</option>
                     <option value="approved" @selected(($selectedStatus ?? 'in_progress') === 'approved')>Aprobado</option>
-                    <option value="in_progress" @selected(($selectedStatus ?? 'in_progress') === 'in_progress')>En reparación / Pausa</option>
+                    <option value="awaiting_technician_start" @selected(($selectedStatus ?? 'in_progress') === 'awaiting_technician_start')>Esperando inicio del tecnico</option>
+                    <option value="in_progress" @selected(($selectedStatus ?? 'in_progress') === 'in_progress')>Espera tecnico / Reparacion / Pausa</option>
                     <option value="in_progress_external" @selected(($selectedStatus ?? 'in_progress') === 'in_progress_external')>Servicios Externos</option>
                     <option value="paused" @selected(($selectedStatus ?? 'in_progress') === 'paused')>Pausados (Solo)</option>
                     <option value="finished" @selected(($selectedStatus ?? 'in_progress') === 'finished')>Terminado</option>
@@ -122,9 +123,9 @@
                     $pendingBillingCountCard = (int) ($card->pending_billing_count ?? 0);
                     $isAnticipoFeatureActive = ($isSunatActive ?? false) && ($isAnticipoEnabled ?? false);
                     $canAnticipoCard = $isAnticipoFeatureActive
-                        && in_array((string) $card->status, ['approved', 'in_progress', 'paused'], true)
+                        && in_array((string) $card->status, ['approved', 'awaiting_technician_start', 'in_progress', 'paused'], true)
                         && $pendingDebtCard > 0.00001;
-                    $canQuoteCard = in_array((string) $card->status, ['awaiting_approval', 'approved'], true);
+                    $canQuoteCard = in_array((string) $card->status, ['awaiting_approval', 'approved', 'awaiting_technician_start'], true);
                     $canCheckoutCard = in_array((string) $card->status, ['in_progress', 'paused', 'finished'], true)
                         && ($pendingBillingCountCard > 0 || $pendingDebtCard > 0.00001 || (float) $card->total <= 0.00001);
                     $canEditBoardCard = !in_array((string) $card->status, ['cancelled', 'delivered'], true) && !$card->sales_movement_id;
@@ -164,6 +165,7 @@
                         'diagnosis' => ['Diagnóstico', 'bg-indigo-100 text-indigo-700 border-indigo-200'],
                         'awaiting_approval' => ['Esperando aprobación', 'bg-amber-100 text-amber-700 border-amber-200'],
                         'approved' => ['Aprobado', 'bg-emerald-100 text-emerald-700 border-emerald-200'],
+                        'awaiting_technician_start' => ['Esperando inicio del tecnico', 'bg-blue-100 text-blue-700 border-blue-200'],
                         'in_progress' => ['En reparación', 'bg-orange-100 text-orange-700 border-orange-200'],
                         'in_progress_external' => ['Servicio Externo', 'bg-purple-100 text-purple-700 border-purple-200'],
                         'paused' => ['Pausado', 'bg-slate-200 text-slate-800 border-slate-300'],
@@ -272,19 +274,20 @@
 
                     <div class="relative z-10 mt-4 flex flex-wrap gap-2">
                         @if($card->service_type !== 'correctivo' || !$card->corrective_phase || $card->status !== 'draft')
-                            @if($card->status === 'approved')
+                            @if(in_array($card->status, ['approved', 'awaiting_technician_start'], true))
                                 <button type="button"
                                         class="rounded-xl bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700"
                                         @click="$dispatch('open-start-service-modal', {
                                             action: @js(route('workshop.maintenance-board.start', $card)),
                                             order_label: @js('OS ' . ($card->movement?->number ?? ('#' . $card->id)) . ' - ' . trim(($card->vehicle?->brand ?? '') . ' ' . ($card->vehicle?->model ?? ''))),
-                                            type: 'internal'
+                                            type: 'internal',
+                                            has_technician: @js((int) ($card->assigned_technicians_count ?? 0) > 0)
                                         })">
                                     Iniciar servicio
                                 </button>
                             @endif
 
-                            @if($externalServicesEnabled && $hasOutsourced && in_array($card->status, ['approved', 'in_progress', 'paused']))
+                            @if($externalServicesEnabled && $hasOutsourced && in_array($card->status, ['approved', 'awaiting_technician_start', 'in_progress', 'paused']))
                                 <button type="button"
                                         class="rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-purple-700"
                                         @click="$dispatch('open-start-service-modal', {
@@ -433,7 +436,7 @@
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <div>
                         Estado actual:
-                        <span class="font-semibold" x-text="status === 'awaiting_approval' ? 'Esperando aprobación' : (status === 'approved' ? 'Aprobado' : (status === 'in_progress' ? 'En reparación' : status))"></span>
+                        <span class="font-semibold" x-text="status === 'awaiting_approval' ? 'Esperando aprobación' : (status === 'approved' ? 'Aprobado' : (status === 'awaiting_technician_start' ? 'Esperando inicio del tecnico' : (status === 'in_progress' ? 'En reparación' : status)))"></span>
                     </div>
                     <div class="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-white px-3 py-1">
                         <span class="text-[11px] font-semibold uppercase tracking-wide text-indigo-700">Lineas</span>
@@ -521,6 +524,7 @@
             action: '',
             order_label: '',
             technician_id: '',
+            has_technician: false,
             service_type: 'internal',
             glosa: ''
         }"
@@ -529,6 +533,7 @@
             action = $event.detail.action;
             order_label = $event.detail.order_label;
             service_type = $event.detail.type || 'internal';
+            has_technician = Boolean($event.detail.has_technician || false);
             technician_id = '';
             glosa = '';
         "
@@ -552,8 +557,9 @@
 
                 <div x-show="service_type === 'internal'" x-transition>
                     <label class="mb-2 block text-sm font-bold text-slate-700">¿Quién se encargará de este servicio?</label>
+                    <p class="mb-2 text-xs text-slate-500" x-show="has_technician && !technician_id">Esta OS ya tiene tecnico asignado; seleccione otro solo si desea agregarlo.</p>
                     <div class="relative">
-                        <select name="technician_person_id" x-model="technician_id" :required="service_type === 'internal'"
+                        <select name="technician_person_id" x-model="technician_id" :required="service_type === 'internal' && !has_technician"
                                 class="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 py-3.5 pl-4 pr-10 text-sm font-medium text-slate-700 transition-all focus:border-orange-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-orange-500/10">
                             <option value="">Seleccione un técnico...</option>
                             @foreach($technicians ?? [] as $tech)
@@ -575,7 +581,7 @@
                 </div>
 
                 <div class="flex flex-col gap-3 pt-2">
-                    <button type="submit" :disabled="(service_type === 'internal' && !technician_id) || (service_type === 'external' && !glosa.trim())"
+                    <button type="submit" :disabled="(service_type === 'internal' && !technician_id && !has_technician) || (service_type === 'external' && !glosa.trim())"
                             class="flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white shadow-lg transition-all disabled:cursor-not-allowed disabled:bg-slate-300 disabled:shadow-none"
                             :class="service_type === 'internal' ? 'bg-orange-600 shadow-orange-600/20 hover:bg-orange-700 hover:shadow-orange-600/30' : 'bg-purple-600 shadow-purple-600/20 hover:bg-purple-700 hover:shadow-purple-600/30'">
                         <i class="ri-play-circle-line text-lg"></i>
