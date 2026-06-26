@@ -1392,6 +1392,9 @@
                 this.resizeSignatureCanvas();
                 this.signatureCtx = this.signatureCanvas.getContext('2d');
                 if (!this.signatureCtx) return;
+                const dpr = window.devicePixelRatio || 1;
+                this.signatureCtx.setTransform(1, 0, 0, 1, 0, 0);
+                this.signatureCtx.scale(dpr, dpr);
                 this.signatureCtx.lineWidth = 2;
                 this.signatureCtx.lineCap = 'round';
                 this.signatureCtx.strokeStyle = '#111827';
@@ -1427,6 +1430,15 @@
                     if (hasContent && tempCanvas.width > 1 && tempCanvas.height > 1) {
                         ctx.drawImage(tempCanvas, 0, 0, tempCanvas.width / dpr, tempCanvas.height / dpr);
                     }
+                }
+            } else {
+                const ctx = this.signatureCanvas.getContext('2d');
+                if (ctx) {
+                    ctx.setTransform(1, 0, 0, 1, 0, 0);
+                    ctx.scale(dpr, dpr);
+                    ctx.lineWidth = 2;
+                    ctx.lineCap = 'round';
+                    ctx.strokeStyle = '#111827';
                 }
             }
         },
@@ -1476,7 +1488,10 @@
         },
         clearSignature() {
             if (!this.signatureCtx || !this.signatureCanvas) return;
+            this.signatureCtx.save();
+            this.signatureCtx.setTransform(1, 0, 0, 1, 0, 0);
             this.signatureCtx.clearRect(0, 0, this.signatureCanvas.width, this.signatureCanvas.height);
+            this.signatureCtx.restore();
             this.clientSignatureData = '';
         },
         syncSignature() {
