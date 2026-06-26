@@ -1392,9 +1392,7 @@
                 this.resizeSignatureCanvas();
                 this.signatureCtx = this.signatureCanvas.getContext('2d');
                 if (!this.signatureCtx) return;
-                const dpr = window.devicePixelRatio || 1;
                 this.signatureCtx.setTransform(1, 0, 0, 1, 0, 0);
-                this.signatureCtx.scale(dpr, dpr);
                 this.signatureCtx.lineWidth = 2;
                 this.signatureCtx.lineCap = 'round';
                 this.signatureCtx.strokeStyle = '#111827';
@@ -1404,9 +1402,8 @@
             if (!this.signatureCanvas) return;
             const rect = this.signatureCanvas.getBoundingClientRect();
             if (rect.width === 0 || rect.height === 0) return;
-            const dpr = window.devicePixelRatio || 1;
-            const width = Math.max(1, Math.round(rect.width * dpr));
-            const height = Math.max(1, Math.round(rect.height * dpr));
+            const width = Math.max(1, Math.round(rect.width));
+            const height = Math.max(1, Math.round(rect.height));
             if (this.signatureCanvas.width !== width || this.signatureCanvas.height !== height) {
                 const tempCanvas = document.createElement('canvas');
                 tempCanvas.width = this.signatureCanvas.width;
@@ -1423,19 +1420,17 @@
                 const ctx = this.signatureCanvas.getContext('2d');
                 if (ctx) {
                     ctx.setTransform(1, 0, 0, 1, 0, 0);
-                    ctx.scale(dpr, dpr);
                     ctx.lineWidth = 2;
                     ctx.lineCap = 'round';
                     ctx.strokeStyle = '#111827';
                     if (hasContent && tempCanvas.width > 1 && tempCanvas.height > 1) {
-                        ctx.drawImage(tempCanvas, 0, 0, tempCanvas.width / dpr, tempCanvas.height / dpr);
+                        ctx.drawImage(tempCanvas, 0, 0);
                     }
                 }
             } else {
                 const ctx = this.signatureCanvas.getContext('2d');
                 if (ctx) {
                     ctx.setTransform(1, 0, 0, 1, 0, 0);
-                    ctx.scale(dpr, dpr);
                     ctx.lineWidth = 2;
                     ctx.lineCap = 'round';
                     ctx.strokeStyle = '#111827';
