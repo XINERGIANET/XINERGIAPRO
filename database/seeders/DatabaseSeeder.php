@@ -25,5 +25,6 @@ class DatabaseSeeder extends Seeder
         $this->call(WorkshopVehicleTypeSeeder::class);
         $this->call(WorkshopParameterSeeder::class);
         $this->call(WorkshopAssemblySeeder::class);
+        $this->call(WorkshopAdditionalAccessorySeeder::class);
     }
 }
