@@ -77,8 +77,12 @@ class WorkshopServiceHistoryExcelImport
                 $dniRuc = preg_replace('/[^\d]/', '', $dniRuc);
                 $docType = strlen($dniRuc) === 11 ? '6' : '1'; // 6=RUC, 1=DNI
 
-                $person = Person::query()->where('document_number', $dniRuc)->where('branch_id', $branchId)->first();
-                if (!$person) {
+                $person = Person::query()->withTrashed()->where('document_number', $dniRuc)->where('branch_id', $branchId)->first();
+                if ($person) {
+                    if ($person->trashed()) {
+                        $person->restore();
+                    }
+                } else {
                     $person = Person::query()->create([
                         'company_id' => $branch->company_id,
                         'branch_id' => $branchId,
@@ -103,9 +107,13 @@ class WorkshopServiceHistoryExcelImport
                     ]);
                 }
 
-                $placaFormatted = strtoupper(str_replace('-', '', $placa));
-                $vehicle = Vehicle::query()->where('plate', $placaFormatted)->where('company_id', $branch->company_id)->first();
-                if (!$vehicle) {
+                $placaFormatted = strtoupper(str_replace(['-', ' '], '', $placa));
+                $vehicle = Vehicle::query()->withTrashed()->where('plate', $placaFormatted)->where('company_id', $branch->company_id)->first();
+                if ($vehicle) {
+                    if ($vehicle->trashed()) {
+                        $vehicle->restore();
+                    }
+                } else {
                     $vehicleType = VehicleType::query()
                         ->where(function ($query) use ($branch) {
                             $query->whereNull('company_id')
@@ -113,8 +121,17 @@ class WorkshopServiceHistoryExcelImport
                         })
                         ->first();
                         
-                    $vehicleTypeId = $vehicleType ? $vehicleType->id : 1;
-                    $vehicleTypeName = $vehicleType ? $vehicleType->name : 'Auto';
+                    if (!$vehicleType) {
+                        $vehicleType = VehicleType::query()->create([
+                            'company_id' => $branch->company_id,
+                            'branch_id' => $branchId,
+                            'name' => 'Auto',
+                            'active' => true,
+                        ]);
+                    }
+
+                    $vehicleTypeId = $vehicleType->id;
+                    $vehicleTypeName = $vehicleType->name;
 
                     $vehicle = Vehicle::query()->create([
                         'company_id' => $branch->company_id,
