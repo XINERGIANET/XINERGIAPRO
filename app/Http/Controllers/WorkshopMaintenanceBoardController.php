@@ -562,19 +562,22 @@ class WorkshopMaintenanceBoardController extends Controller
             ])->values()->all())
             ->toArray();
 
-        $additionalAccessories = WorkshopAdditionalAccessory::query()
-            ->where('company_id', $companyId)
-            ->where('branch_id', $branchId)
-            ->where('active', true)
-            ->orderBy('order_num')
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn($item) => [
-                'id' => (int) $item->id,
-                'name' => (string) $item->name,
-            ])
-            ->values()
-            ->all();
+        $additionalAccessories = [];
+        if (\Illuminate\Support\Facades\Schema::hasTable('workshop_additional_accessories')) {
+            $additionalAccessories = WorkshopAdditionalAccessory::query()
+                ->where('company_id', $companyId)
+                ->where('branch_id', $branchId)
+                ->where('active', true)
+                ->orderBy('order_num')
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn($item) => [
+                    'id' => (int) $item->id,
+                    'name' => (string) $item->name,
+                ])
+                ->values()
+                ->all();
+        }
 
         $products = ProductBranch::query()
             ->join('products', 'products.id', '=', 'product_branch.product_id')

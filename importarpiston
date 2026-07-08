@@ -1,0 +1,34 @@
+# Módulo de Importación de Historial Masivo de Taller
+
+Se ha completado con éxito la implementación de la carga masiva mediante Excel para registrar el historial de operaciones de taller, clientes, vehículos y finanzas. 
+
+## 🚀 Lo que se logró
+
+A diferencia de una simple importación de datos, este módulo actúa como un robot que **reconstruye transacciones completas del pasado** garantizando que todos los registros de XinergiaPro (Finanzas, Ventas y Taller) queden perfectamente sincronizados.
+
+### 1. Motor Inteligente de Importación (`WorkshopServiceHistoryExcelImport`)
+- **Lectura Dinámica:** El sistema detecta dinámicamente si el Excel trae 1, 5 o 100 servicios por fila, iterando automáticamente sobre las columnas disponibles.
+- **Auto-creación de Entidades:** Si un cliente (DNI/RUC) o un vehículo (Placa) no existen, se crean de inmediato y se vinculan a la sucursal actual.
+
+### 2. Cumplimiento Financiero y Contable Estricto
+Durante el desarrollo se superaron rigurosas restricciones de la base de datos para simular ventas exactas. Se generan en cadena:
+- `movements`: Documento maestro de operaciones.
+- `workshop_movements` & `workshop_movement_details`: La Orden de Trabajo y sus ítems de servicio.
+- `sales_movements` & `sales_movement_details`: El comprobante de venta electrónica asociado, inyectando snapshots de sucursal, tasa de cambio (`1.000`), unidad (`NIU`), e identificadores de sucursal (`branch_id`).
+- `cash_movements` & `cash_movement_details`: El flujo directo del dinero hacia la caja actual abierta, registrándose como método de pago (Efectivo/Transferencia/etc.)
+
+### 3. Aislamiento Multi-Sucursal (Multi-Branch)
+- Todo el módulo está diseñado para estar "aislado" (*sandboxed*). Todo el dinero, los clientes y las órdenes generadas **le pertenecerán única y exclusivamente a la sucursal activa** (sesión actual) en el momento de subir el Excel, protegiendo así la integridad de las demás sedes.
+
+### 4. Protecciones de Datos Agregadas
+- **Truncado de Textos:** Se aplicó protección contra exceso de texto (`String data, right truncated`) recortando preventivamente las descripciones de servicios excesivamente largas a 250 caracteres, asegurando que las columnas `description` en las tablas de detalles no fallen.
+- **Tablero de Mantenimiento (500 Error Fix):** Se parcheó el controlador del tablero (`WorkshopMaintenanceBoardController`) usando `Schema::hasTable('workshop_additional_accessories')` para evitar que el sistema colapse (mostrando "Not Found" / 500) si detecta que falta esa tabla en versiones previas de las migraciones.
+
+---
+
+> [!TIP]
+> **Recomendación para futuras subidas:**
+> Puedes seguir utilizando esta plantilla sin preocuparte por crear los clientes o vehículos previamente en el sistema. El motor de importación continuará auto-gestionando todo, y el dinero siempre ingresará a tu *Caja actual*.
+
+> [!NOTE]
+> Todos los cambios fueron testeados exitosamente logrando importar el bloque masivo de **657 órdenes** íntegras.

@@ -110,6 +110,18 @@
                     <i class="ri-file-excel-2-line text-lg"></i>
                     <span>Importar Excel</span>
                 </x-ui.button>
+                @if(isset($isWorkshopGlosaEnabled) && $isWorkshopGlosaEnabled)
+                <x-ui.button
+                    size="md"
+                    variant="outline"
+                    type="button"
+                    class="h-11 rounded-xl border-2 border-indigo-500/40 bg-gradient-to-r from-indigo-50 to-blue-50 px-5 font-bold text-indigo-800 shadow-sm transition-all hover:border-indigo-500 hover:from-indigo-100 hover:to-blue-100 active:scale-95 dark:from-indigo-950/40 dark:to-blue-950/40 dark:text-indigo-200"
+                    @click="$dispatch('open-import-history-modal')"
+                >
+                    <i class="ri-history-line text-lg"></i>
+                    <span>Importar Historial Masivo</span>
+                </x-ui.button>
+                @endif
                 <button
                     type="button"
                     class="inline-flex h-11 items-center gap-2 rounded-xl border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
@@ -410,6 +422,70 @@
             </div>
         </div>
     </x-ui.modal>
+
+    @if(isset($isWorkshopGlosaEnabled) && $isWorkshopGlosaEnabled)
+    <x-ui.modal x-data="{ open: false, fileName: '', dragging: false }" x-on:open-import-history-modal.window="open = true; fileName = ''; dragging = false; $nextTick(() => { const el = $refs.importHistoryFile; if (el) el.value = '' })" :isOpen="false" :showCloseButton="false" class="max-w-lg">
+        <div class="overflow-hidden rounded-3xl bg-white dark:bg-gray-900">
+            <div class="relative bg-gradient-to-br from-indigo-600 via-blue-600 to-slate-800 px-6 pb-10 pt-8 text-white">
+                <div class="absolute -right-6 -top-6 h-28 w-28 rounded-full bg-white/10 blur-2xl"></div>
+                <div class="absolute -bottom-8 left-4 h-24 w-24 rounded-full bg-indigo-300/20 blur-xl"></div>
+                <div class="relative flex items-start justify-between gap-3">
+                    <div>
+                        <div class="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-indigo-50">
+                            <i class="ri-history-line text-sm"></i>
+                            Importación de Historial
+                        </div>
+                        <h3 class="mt-3 text-xl font-bold leading-tight sm:text-2xl">Historial → Servicios y Caja</h3>
+                        <p class="mt-2 max-w-md text-sm text-indigo-50/90">Sube el archivo Excel con el historial de servicios. Se crearán clientes, vehículos, órdenes, ventas y movimientos de caja automáticamente.</p>
+                    </div>
+                    <button type="button" @click="open = false" class="flex h-11 w-11 flex-none items-center justify-center rounded-2xl bg-white/10 text-white transition hover:bg-white/20">
+                        <i class="ri-close-line text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="-mt-6 px-6 pb-8 pt-0">
+                <form method="POST" action="{{ route('workshop.services.import-history') }}" enctype="multipart/form-data" data-turbo="false" class="rounded-2xl border border-gray-200/80 bg-white p-5 shadow-xl dark:border-gray-700 dark:bg-gray-900">
+                    @csrf
+                    @if(request('view_id'))
+                        <input type="hidden" name="view_id" value="{{ request('view_id') }}">
+                    @endif
+                    <label x-ref="dropZoneHistory"
+                        @dragover.prevent="dragging = true"
+                        @dragleave.prevent="dragging = false"
+                        @drop.prevent="
+                            dragging = false;
+                            if ($event.dataTransfer.files.length) {
+                                const dt = new DataTransfer();
+                                dt.items.add($event.dataTransfer.files[0]);
+                                $refs.importHistoryFile.files = dt.files;
+                                fileName = $event.dataTransfer.files[0].name;
+                            }
+                        "
+                        :class="dragging ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-400/50' : 'border-gray-200 bg-gray-50/50 hover:border-indigo-300'"
+                        class="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-4 py-10 transition-all dark:border-gray-600 dark:bg-gray-800/50">
+                        <div class="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-lg shadow-indigo-500/30">
+                            <i class="ri-file-excel-2-line text-2xl"></i>
+                        </div>
+                        <p class="text-center text-sm font-semibold text-gray-800 dark:text-gray-100">Arrastra tu archivo aquí o haz clic para elegir</p>
+                        <p class="mt-1 text-center text-xs text-gray-500 dark:text-gray-400">.xlsx, .xls o .csv &middot; max. 12 MB</p>
+                        <p class="mt-3 text-center text-xs font-medium text-indigo-700 dark:text-indigo-400" x-show="fileName !== ''" x-text="fileName"></p>
+                        <input type="file" name="import_file" x-ref="importHistoryFile" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" required class="sr-only" @change="fileName = $event.target.files.length ? $event.target.files[0].name : ''">
+                    </label>
+
+                    <div class="mt-5 flex flex-wrap items-center justify-end gap-3">
+                        <button type="button" @click="open = false" class="h-11 rounded-xl border border-gray-200 bg-white px-5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 px-6 text-sm font-bold text-white shadow-lg shadow-indigo-600/25 transition hover:brightness-110 active:scale-[0.98]">
+                            <i class="ri-upload-2-line text-lg"></i>
+                            Procesar Importación
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </x-ui.modal>
+    @endif
 
     <x-ui.modal x-on:open-service-modal.window="open = true" 
                 :isOpen="false" :showCloseButton="false" class="max-w-4xl">

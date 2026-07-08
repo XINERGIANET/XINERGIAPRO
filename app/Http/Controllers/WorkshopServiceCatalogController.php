@@ -51,7 +51,23 @@ class WorkshopServiceCatalogController extends Controller
             ->paginate($perPage)
             ->withQueryString();
 
-        return view('workshop.services.index', compact('services', 'search', 'perPage'));
+        $parameter = DB::table('parameters')
+            ->where('description', 'Guardar glosa como servicio de taller')
+            ->first();
+
+        $branchValue = null;
+        if ($parameter) {
+            $branchValue = DB::table('branch_parameters')
+                ->where('parameter_id', $parameter->id)
+                ->where('branch_id', $branchId)
+                ->whereNull('deleted_at')
+                ->value('value');
+        }
+
+        $paramValue = strtolower(trim((string) ($branchValue ?? $parameter->value ?? 'no')));
+        $isWorkshopGlosaEnabled = in_array($paramValue, ['sí', 'si', 'yes', 'true', '1'], true);
+
+        return view('workshop.services.index', compact('services', 'search', 'perPage', 'isWorkshopGlosaEnabled'));
     }
 
     public function importFromSpreadsheet(Request $request): RedirectResponse
@@ -125,6 +141,34 @@ class WorkshopServiceCatalogController extends Controller
         }
 
         return back()->with('status', implode(' ', $parts));
+    }
+
+    public function importHistory(Request $request): RedirectResponse
+    {
+        if (!class_exists(\PhpOffice\PhpSpreadsheet\IOFactory::class)) {
+            return back()->with('error', 'Se requiere phpoffice/phpspreadsheet para leer Excel.');
+        }
+
+        $validated = $request->validate([
+            'import_file' => ['required', File::types(['xlsx', 'xls', 'csv'])->max(12288)],
+        ]);
+
+        $path = $request->file('import_file')?->getRealPath();
+        if (!$path || !is_readable($path)) {
+            return back()->with('error', 'No se pudo leer el archivo subido.');
+        }
+
+        try {
+            $result = \App\Support\WorkshopServiceHistoryExcelImport::import($path);
+        } catch (\InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Error en importHistory: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            return back()->with('error', 'Ocurrió un error inesperado durante la importación: ' . $e->getMessage());
+        }
+
+        $imported = $result['imported'] ?? 0;
+        return back()->with('status', "Importación de historial lista: {$imported} orden(es) registrada(s).");
     }
 
     public function downloadImportTemplate()
