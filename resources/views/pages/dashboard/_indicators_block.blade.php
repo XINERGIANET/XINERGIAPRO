@@ -44,14 +44,15 @@
                 <div x-show="tab === 'sales'" x-cloak class="space-y-6">
                     <p class="text-sm text-slate-600">Mes a mes: <strong>Facturado SUNAT</strong> frente a ventas <strong>sin factura electronica</strong> (pending u otros estados), y el total.</p>
                     <div class="overflow-x-auto">
-                        <div class="h-[380px] min-w-[1800px]" id="indicator-chart-monthly-sales"></div>
+                        <div class="h-[380px] min-w-[2200px]" id="indicator-chart-monthly-sales"></div>
                     </div>
                     <style>
                         @media (max-width: 639px) {
                             #indicator-chart-monthly-sales .apexcharts-datalabels text {
                                 transform-box: fill-box;
                                 transform-origin: center center;
-                                transform: rotate(-90deg);
+                                transform: translateY(-28px) rotate(-90deg);
+                                letter-spacing: 2px;
                             }
                         }
                     </style>
@@ -292,6 +293,7 @@
             if (!ApexCharts) return;
             const el = document.querySelector('#indicator-chart-monthly-sales');
             if (!el || chartStore.monthly) return;
+            el.style.width = '2200px';
             const categories = payload.month_labels || [];
             chartStore.monthly = new ApexCharts(el, Object.assign({}, baseOpts(), {
                 chart: { type: 'bar', height: 440, stacked: false },
