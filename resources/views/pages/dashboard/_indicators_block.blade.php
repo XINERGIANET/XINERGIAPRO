@@ -43,7 +43,9 @@
                 <!-- Tab: Ventas / facturacion -->
                 <div x-show="tab === 'sales'" x-cloak class="space-y-6">
                     <p class="text-sm text-slate-600">Mes a mes: <strong>Facturado SUNAT</strong> frente a ventas <strong>sin factura electronica</strong> (pending u otros estados), y el total.</p>
-                    <div class="h-[380px] w-full min-w-0" id="indicator-chart-monthly-sales"></div>
+                    <div class="overflow-x-auto">
+                        <div class="h-[380px] min-w-[1800px]" id="indicator-chart-monthly-sales"></div>
+                    </div>
                     <style>
                         @media (max-width: 639px) {
                             #indicator-chart-monthly-sales .apexcharts-datalabels text {
@@ -300,7 +302,7 @@
                 ],
                 xaxis: { categories, labels: { rotate: -35, rotateAlways: categories.length > 8 } },
                 colors: ['#2563eb', '#ea580c', '#22c55e'],
-                plotOptions: { bar: { borderRadius: 4, columnWidth: '100%', dataLabels: { position: 'top' } } },
+                plotOptions: { bar: { borderRadius: 4, columnWidth: '65%', dataLabels: { position: 'top' } } },
                 yaxis: {
                     min: 0,
                     forceNiceScale: true,
