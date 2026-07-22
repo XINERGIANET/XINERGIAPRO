@@ -44,6 +44,15 @@
                 <div x-show="tab === 'sales'" x-cloak class="space-y-6">
                     <p class="text-sm text-slate-600">Mes a mes: <strong>Facturado SUNAT</strong> frente a ventas <strong>sin factura electronica</strong> (pending u otros estados), y el total.</p>
                     <div class="h-[380px] w-full min-w-0" id="indicator-chart-monthly-sales"></div>
+                    <style>
+                        @media (max-width: 639px) {
+                            #indicator-chart-monthly-sales .apexcharts-datalabels text {
+                                transform-box: fill-box;
+                                transform-origin: center center;
+                                transform: rotate(-90deg);
+                            }
+                        }
+                    </style>
                     <div class="overflow-x-auto rounded-2xl border border-slate-200">
                         <table class="min-w-full text-left text-sm">
                             <thead class="bg-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-500">
@@ -283,16 +292,36 @@
             if (!el || chartStore.monthly) return;
             const categories = payload.month_labels || [];
             chartStore.monthly = new ApexCharts(el, Object.assign({}, baseOpts(), {
-                chart: { type: 'bar', height: 380, stacked: false },
+                chart: { type: 'bar', height: 440, stacked: false },
                 series: [
-                    { name: 'Mont. fact. (INVOICED)', data: payload.series_monthly_fact || [] },
-                    { name: 'No fact. (otros estados)', data: payload.series_monthly_nofact || [] },
+                    { name: 'Mont. fact.', data: payload.series_monthly_fact || [] },
+                    { name: 'No fact.', data: payload.series_monthly_nofact || [] },
                     { name: 'Total', data: payload.series_monthly_total || [] },
                 ],
                 xaxis: { categories, labels: { rotate: -35, rotateAlways: categories.length > 8 } },
                 colors: ['#2563eb', '#ea580c', '#22c55e'],
-                plotOptions: { bar: { borderRadius: 4, columnWidth: '62%' } },
-                yaxis: { labels: { formatter: function (val) { return 'S/' + Number(val).toLocaleString('es-PE', { maximumFractionDigits: 0 }); } } },
+                plotOptions: { bar: { borderRadius: 4, columnWidth: '100%', dataLabels: { position: 'top' } } },
+                yaxis: {
+                    min: 0,
+                    forceNiceScale: true,
+                    labels: { formatter: function (val) { return 'S/' + Number(val).toLocaleString('es-PE', { maximumFractionDigits: 0 }); } },
+                },
+                dataLabels: {
+                    enabled: true,
+                    formatter: function (val) {
+                        if (!val || val === 0) return '';
+                        return 'S/ ' + Number(val).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+                    },
+                    style: { fontSize: '10px', fontWeight: 800, colors: ['#2563eb', '#ea580c', '#22c55e'] },
+                    offsetY: -16,
+                    dropShadow: { enabled: false },
+                },
+                responsive: [{
+                    breakpoint: 640,
+                    options: {
+                        dataLabels: { offsetY: -26 },
+                    },
+                }],
             }));
             chartStore.monthly.render();
         }
