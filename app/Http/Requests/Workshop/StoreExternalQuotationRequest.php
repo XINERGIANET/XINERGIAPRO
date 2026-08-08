@@ -53,7 +53,7 @@ class StoreExternalQuotationRequest extends FormRequest
             'quotation_bank_cci' => ['nullable', 'string', 'max:64'],
             'observations' => ['nullable', 'string', 'max:5000'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.line_type' => ['required', 'in:PART,LABOR,SERVICE'],
+            'items.*.line_type' => ['required', 'in:PART,LABOR,SERVICE,GLOSA'],
             'items.*.description' => ['required', 'string', 'max:255'],
             'items.*.qty' => ['required', 'numeric', 'min:0.000001'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],

@@ -358,7 +358,7 @@
                                                     'approve_url' => route('workshop.orders.approve', $quotation->id),
                                                     'approval_status' => $quotation->approval_status ?? 'pending',
                                                     'approval_note' => $quotation->approval_note ?? ($quotation->quotation_lost_reason ?? ''),
-                                                    'details' => $quotation->details->whereIn('line_type', ['PART', 'SERVICE', 'LABOR'])->map(fn($d) => [
+                                                    'details' => $quotation->details->whereIn('line_type', ['PART', 'SERVICE', 'LABOR', 'GLOSA'])->map(fn($d) => [
                                                         'id' => $d->id,
                                                         'line_type' => $d->line_type,
                                                         'description' => $d->description,
@@ -366,7 +366,7 @@
                                                         'unit_price' => (float)$d->unit_price,
                                                         'total' => (float)$d->total,
                                                     ])->values()->toArray(),
-                                                    'deleted_details' => $quotation->deletedDetails->whereIn('line_type', ['PART', 'SERVICE', 'LABOR'])->map(fn($d) => [
+                                                    'deleted_details' => $quotation->deletedDetails->whereIn('line_type', ['PART', 'SERVICE', 'LABOR', 'GLOSA'])->map(fn($d) => [
                                                         'line_type' => $d->line_type,
                                                         'description' => $d->description,
                                                         'qty' => (float)$d->qty,
@@ -484,7 +484,7 @@
                                                 <template x-for="(detail, index) in selectedQuotation?.details" :key="detail.id">
                                                     <tr class="group hover:bg-slate-50/50 transition-colors">
                                                         <td class="px-3 py-3.5 text-center">
-                                                            <span class="inline-flex px-2 py-0.5 rounded-md bg-slate-100 text-[9px] font-black uppercase tracking-wider text-slate-500 border border-slate-200" x-text="(detail.line_type || 'LABOR') === 'PART' ? 'Rep.' : ((detail.line_type || 'LABOR') === 'LABOR' ? 'M.O.' : 'Serv.')"></span>
+                                                            <span class="inline-flex px-2 py-0.5 rounded-md bg-slate-100 text-[9px] font-black uppercase tracking-wider text-slate-500 border border-slate-200" x-text="detail.line_type === 'PART' ? 'Rep.' : (detail.line_type === 'LABOR' ? 'M.O.' : (detail.line_type === 'GLOSA' ? 'Glosa' : 'Serv.'))"></span>
                                                         </td>
                                                         <td class="px-6 py-3.5">
                                                             <p class="text-sm font-bold text-slate-700 leading-tight" x-text="detail.description"></p>
@@ -528,7 +528,7 @@
                                                 <template x-for="deleted in selectedQuotation?.deleted_details" :key="'deleted-' + Math.random()">
                                                     <tr class="bg-red-50/5 opacity-60 backdrop-blur-[2px]">
                                                         <td class="px-3 py-3.5 text-center">
-                                                            <span class="inline-flex px-2 py-0.5 rounded-md bg-red-50 text-[9px] font-black uppercase tracking-wider text-red-300 border border-red-100" x-text="(deleted.line_type || 'LABOR') === 'PART' ? 'Rep.' : ((deleted.line_type || 'LABOR') === 'LABOR' ? 'M.O.' : 'Serv.')"></span>
+                                                            <span class="inline-flex px-2 py-0.5 rounded-md bg-red-50 text-[9px] font-black uppercase tracking-wider text-red-300 border border-red-100" x-text="deleted.line_type === 'PART' ? 'Rep.' : (deleted.line_type === 'LABOR' ? 'M.O.' : (deleted.line_type === 'GLOSA' ? 'Glosa' : 'Serv.'))"></span>
                                                         </td>
                                                         <td class="px-6 py-3.5">
                                                             <p class="text-[12px] font-semibold text-red-900/40 line-through decoration-red-200/50 italic" x-text="deleted.description"></p>

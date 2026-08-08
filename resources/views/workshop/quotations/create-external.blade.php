@@ -16,20 +16,28 @@
             'discount_amount' => 0,
         ];
         $existingRows = [];
+        $existingGlozas = [];
         if ($isEdit) {
-            $existingRows = $quotation->details
-                ->map(fn ($d) => [
-                    'line_type' => (string) $d->line_type,
-                    'description' => (string) $d->description,
-                    'qty' => (float) $d->qty,
-                    'unit_price' => (float) $d->unit_price,
-                    'product_id' => $d->product_id ? (int) $d->product_id : '',
-                    'service_id' => $d->service_id ? (int) $d->service_id : '',
-                    'tax_rate_id' => $d->tax_rate_id ? (int) $d->tax_rate_id : '',
-                    'discount_amount' => (float) ($d->discount_amount ?? 0),
-                ])
-                ->values()
-                ->all();
+            foreach ($quotation->details as $d) {
+                if (strtoupper((string) $d->line_type) === 'GLOSA') {
+                    $existingGlozas[] = [
+                        'description' => (string) $d->description,
+                        'qty'         => (float) $d->qty,
+                        'unit_price'  => (float) $d->unit_price,
+                    ];
+                } else {
+                    $existingRows[] = [
+                        'line_type'       => (string) $d->line_type,
+                        'description'     => (string) $d->description,
+                        'qty'             => (float) $d->qty,
+                        'unit_price'      => (float) $d->unit_price,
+                        'product_id'      => $d->product_id ? (int) $d->product_id : '',
+                        'service_id'      => $d->service_id ? (int) $d->service_id : '',
+                        'tax_rate_id'     => $d->tax_rate_id ? (int) $d->tax_rate_id : '',
+                        'discount_amount' => (float) ($d->discount_amount ?? 0),
+                    ];
+                }
+            }
         }
         $initialRows = old('items', !empty($existingRows) ? $existingRows : [$defaultRow]);
         $selectedClientId = (int) old('client_person_id', $isEdit ? (int) $quotation->client_person_id : $clientId);
@@ -353,6 +361,66 @@
                         </div>
                     </div>
 
+                    {{-- Glosa --}}
+                    <div class="rounded-2xl border border-indigo-200 bg-white">
+                        <div class="flex items-center justify-between border-b border-indigo-100 px-4 py-4">
+                            <h3 class="text-xs font-black uppercase tracking-widest text-indigo-700">Servicio por glosa <span class="font-medium normal-case tracking-normal text-slate-400">(texto libre)</span></h3>
+                            <button type="button" @click="addGloza()" class="h-9 rounded-lg border border-indigo-300 bg-indigo-50 px-4 text-[10px] font-black uppercase tracking-widest text-indigo-700 hover:bg-indigo-100">
+                                + Agregar glosa
+                            </button>
+                        </div>
+                        <template x-if="glozas.length === 0">
+                            <p class="px-4 py-3 text-xs text-slate-400">Sin glosas. Usa este bloque para líneas de texto libre sin catálogo ni IGV.</p>
+                        </template>
+                        <template x-if="glozas.length > 0">
+                            <div class="overflow-x-auto">
+                                <table class="w-full min-w-[560px] border-collapse text-left text-xs">
+                                    <thead>
+                                        <tr class="bg-slate-50 text-[11px] font-black uppercase tracking-wide text-slate-400">
+                                            <th class="px-3 py-3">Descripcion</th>
+                                            <th class="px-3 py-3 w-24 text-right">Cant.</th>
+                                            <th class="px-3 py-3 w-28 text-right">Monto</th>
+                                            <th class="px-3 py-3 w-20"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100">
+                                        <template x-for="(gloza, gi) in glozas" :key="`gloza-${gi}`">
+                                            <tr>
+                                                <td class="px-3 py-2">
+                                                    <input type="hidden" :name="`items[${rows.length + gi}][line_type]`" value="GLOSA">
+                                                    <input type="hidden" :name="`items[${rows.length + gi}][product_id]`" value="">
+                                                    <input type="hidden" :name="`items[${rows.length + gi}][service_id]`" value="">
+                                                    <input type="hidden" :name="`items[${rows.length + gi}][tax_rate_id]`" value="">
+                                                    <input type="hidden" :name="`items[${rows.length + gi}][discount_amount]`" value="0">
+                                                    <input type="text"
+                                                        x-model="gloza.description"
+                                                        :name="`items[${rows.length + gi}][description]`"
+                                                        class="h-10 w-full rounded-lg border border-slate-200 px-2 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-300/30"
+                                                        placeholder="Ej. Trabajo especial / otro concepto">
+                                                </td>
+                                                <td class="px-3 py-2">
+                                                    <input type="number" step="0.01" min="0.01"
+                                                        x-model.number="gloza.qty"
+                                                        :name="`items[${rows.length + gi}][qty]`"
+                                                        class="h-10 w-full rounded-lg border border-slate-200 px-2 text-right text-xs font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-300/30">
+                                                </td>
+                                                <td class="px-3 py-2">
+                                                    <input type="number" step="0.01" min="0"
+                                                        x-model.number="gloza.unit_price"
+                                                        :name="`items[${rows.length + gi}][unit_price]`"
+                                                        class="h-10 w-full rounded-lg border border-slate-200 px-2 text-right text-xs font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-300/30">
+                                                </td>
+                                                <td class="px-3 py-2 text-center">
+                                                    <button type="button" @click="removeGloza(gi)" class="text-xs font-black text-red-500 hover:text-red-700">Quitar</button>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </template>
+                    </div>
+
                     <div class="w-full rounded-2xl border border-slate-200 bg-slate-50 p-4">
                         <h3 class="mb-3 text-xs font-black uppercase tracking-widest text-slate-500">Resumen</h3>
                         <div class="space-y-2 rounded-xl border border-slate-200 bg-white p-3 text-xs">
@@ -662,6 +730,7 @@
     <script>
         function quotationExternalForm() {
             const initialRows = {{ \Illuminate\Support\Js::from($initialRows) }};
+            const initialGlozas = {{ \Illuminate\Support\Js::from($existingGlozas) }};
             const products = {{ \Illuminate\Support\Js::from($productRows) }};
             const services = {{ \Illuminate\Support\Js::from($serviceRows) }};
             const taxMap = {{ \Illuminate\Support\Js::from($taxMap) }};
@@ -673,6 +742,7 @@
             return {
                 ...autocompleteHelpers,
                 rows: initialRows,
+                glozas: initialGlozas,
                 products,
                 services,
                 taxMap,
@@ -1010,16 +1080,20 @@
                 },
                 canSubmitExternalQuotation() {
                     const clientId = parseInt(String(this.externalQuotationSelectedClientId || ''), 10);
-                    if (!clientId || clientId <= 0) {
-                        return false;
-                    }
+                    if (!clientId || clientId <= 0) return false;
 
-                    return (this.rows || []).some((row) => {
+                    const hasValidRow = (this.rows || []).some((row) => {
                         const desc = String(row.description || '').trim();
                         const qty = this.toNumber(row.qty);
                         const price = this.toNumber(row.unit_price);
                         return desc !== '' && qty > 0 && price >= 0;
                     });
+
+                    const hasValidGloza = (this.glozas || []).some((g) =>
+                        String(g.description || '').trim() !== ''
+                    );
+
+                    return hasValidRow || hasValidGloza;
                 },
                 get summary() {
                     let subtotal = 0;
@@ -1038,7 +1112,18 @@
                         tax += lineTax;
                         total += lineNet;
                     });
+                    this.glozas.forEach((g) => {
+                        const lineNet = Math.max(0, this.toNumber(g.qty) * this.toNumber(g.unit_price));
+                        subtotal += lineNet;
+                        total += lineNet;
+                    });
                     return { subtotal, tax, total };
+                },
+                addGloza() {
+                    this.glozas.push({ description: '', qty: 1, unit_price: 0 });
+                },
+                removeGloza(index) {
+                    this.glozas.splice(index, 1);
                 },
                 addRow() {
                     this.rows.push(JSON.parse(JSON.stringify(this.defaultRow)));
