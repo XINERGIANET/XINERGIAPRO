@@ -23,7 +23,6 @@
             this.$nextTick(() => {
                 this.flatpickrInstance = flatpickr(this.$refs.dateInput, {
                     mode: @js($mode),
-                    static: true,
                     monthSelectorType: 'static',
                     dateFormat: @js($dateFormat),
                     altInput: {{ $altInput ? 'true' : 'false' }},
